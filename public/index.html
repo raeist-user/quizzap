@@ -9,118 +9,147 @@
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
-      --bg: #f9f8f6; --white: #ffffff; --ink: #111110; --mid: #6b6b66;
-      --line: #e4e3df; --faint: #f4f3f0;
-      --good: #2d6a4f; --bad: #c1121f; --good-bg: #d8f3dc; --bad-bg: #ffe0e0;
-      --serif: 'DM Serif Display', Georgia, serif;
-      --sans: 'DM Sans', system-ui, sans-serif;
-      --r: 6px;
+      --bg:#f9f8f6; --white:#ffffff; --ink:#111110; --mid:#6b6b66;
+      --line:#e4e3df; --faint:#f4f3f0;
+      --good:#2d6a4f; --bad:#c1121f; --good-bg:#d8f3dc; --bad-bg:#ffe0e0;
+      --serif:'DM Serif Display',Georgia,serif;
+      --sans:'DM Sans',system-ui,sans-serif;
+      --r:6px;
     }
-    html,body { height:100%; }
-    body { font-family:var(--sans); background:var(--bg); color:var(--ink); font-size:15px; line-height:1.5; -webkit-font-smoothing:antialiased; }
-    nav { display:flex; align-items:center; justify-content:space-between; padding:0 28px; height:52px; border-bottom:1px solid var(--line); background:var(--white); position:sticky; top:0; z-index:100; }
-    .brand { font-family:var(--serif); font-size:1.2rem; }
-    .nav-right { display:flex; align-items:center; gap:10px; font-size:.8rem; color:var(--mid); }
-    #ci { width:7px; height:7px; border-radius:50%; background:#ccc; }
-    #ci.on { background:#2d9e6b; } #ci.off { background:#c1121f; }
-    #app { min-height:100vh; display:flex; flex-direction:column; }
-    main { flex:1; }
-    h1 { font-family:var(--serif); font-size:2rem; font-weight:400; line-height:1.15; }
-    h2 { font-family:var(--serif); font-size:1.4rem; font-weight:400; line-height:1.2; }
-    h3 { font-size:.68rem; font-weight:600; letter-spacing:.09em; text-transform:uppercase; color:var(--mid); }
-    .center { display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:calc(100vh - 52px); padding:32px 20px; }
-    .box { background:var(--white); border:1px solid var(--line); border-radius:var(--r); padding:36px; width:100%; max-width:420px; }
-    .page { width:100%; max-width:680px; margin:0 auto; padding:32px 20px; }
-    .wide { width:100%; max-width:980px; margin:0 auto; padding:32px 20px; }
-    .btn { display:inline-flex; align-items:center; justify-content:center; gap:6px; font-family:var(--sans); font-size:.83rem; font-weight:500; padding:8px 18px; border-radius:var(--r); border:1px solid transparent; cursor:pointer; transition:opacity .15s; white-space:nowrap; }
-    .btn:disabled { opacity:.35; cursor:not-allowed; }
-    .btn:not(:disabled):hover { opacity:.8; }
-    .btn-dark  { background:var(--ink); color:#fff; }
-    .btn-white { background:var(--white); color:var(--ink); border-color:var(--line); }
-    .btn-ghost { background:transparent; color:var(--mid); border-color:var(--line); }
-    .btn-good  { background:var(--good); color:#fff; }
-    .btn-bad   { background:var(--bad); color:#fff; }
-    .btn-sm { padding:5px 13px; font-size:.76rem; }
-    .btn-lg { padding:11px 26px; font-size:.9rem; }
-    .btn-full { width:100%; }
-    input[type="text"], input[type="url"] { width:100%; padding:9px 12px; font-family:var(--sans); font-size:.88rem; background:var(--white); color:var(--ink); border:1px solid var(--line); border-radius:var(--r); outline:none; transition:border-color .15s; }
-    input:focus { border-color:#999; }
-    input::placeholder { color:#bbb; }
-    .row { display:flex; align-items:center; } .col { display:flex; flex-direction:column; }
-    .gap2 { gap:8px; } .gap3 { gap:12px; } .between { justify-content:space-between; }
+    html,body{height:100%}
+    body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased}
+    nav{display:flex;align-items:center;justify-content:space-between;padding:0 24px;height:52px;border-bottom:1px solid var(--line);background:var(--white);position:sticky;top:0;z-index:100}
+    .brand{font-family:var(--serif);font-size:1.15rem}
+    .nav-right{display:flex;align-items:center;gap:10px;font-size:.8rem;color:var(--mid)}
+    #ci{width:7px;height:7px;border-radius:50%;background:#ccc}
+    #ci.on{background:#2d9e6b} #ci.off{background:#c1121f}
+    #app{min-height:100vh;display:flex;flex-direction:column}
+    main{flex:1}
+    h1{font-family:var(--serif);font-size:2rem;font-weight:400;line-height:1.15}
+    h2{font-family:var(--serif);font-size:1.4rem;font-weight:400;line-height:1.2}
+    h3{font-size:.67rem;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--mid)}
+    .center{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:calc(100vh - 52px);padding:32px 20px}
+    .box{background:var(--white);border:1px solid var(--line);border-radius:var(--r);padding:36px;width:100%;max-width:420px}
+    .page{width:100%;max-width:680px;margin:0 auto;padding:32px 20px}
+    .wide{width:100%;max-width:980px;margin:0 auto;padding:28px 20px}
+    .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;font-family:var(--sans);font-size:.82rem;font-weight:500;padding:8px 18px;border-radius:var(--r);border:1px solid transparent;cursor:pointer;transition:opacity .15s;white-space:nowrap}
+    .btn:disabled{opacity:.35;cursor:not-allowed}
+    .btn:not(:disabled):hover{opacity:.8}
+    .btn-dark{background:var(--ink);color:#fff}
+    .btn-white{background:var(--white);color:var(--ink);border-color:var(--line)}
+    .btn-ghost{background:transparent;color:var(--mid);border-color:var(--line)}
+    .btn-good{background:var(--good);color:#fff}
+    .btn-bad{background:var(--bad);color:#fff}
+    .btn-sm{padding:5px 12px;font-size:.75rem}
+    .btn-lg{padding:11px 26px;font-size:.9rem}
+    .btn-full{width:100%}
+    input[type="text"],input[type="url"],input[type="password"]{width:100%;padding:9px 12px;font-family:var(--sans);font-size:.88rem;background:var(--white);color:var(--ink);border:1px solid var(--line);border-radius:var(--r);outline:none;transition:border-color .15s}
+    input:focus{border-color:#999}
+    input::placeholder{color:#bbb}
+    .row{display:flex;align-items:center} .col{display:flex;flex-direction:column}
+    .gap2{gap:8px} .gap3{gap:12px} .between{justify-content:space-between}
     .mt1{margin-top:6px} .mt2{margin-top:12px} .mt3{margin-top:20px} .mt4{margin-top:32px}
     .mb1{margin-bottom:6px} .mb2{margin-bottom:12px} .mb3{margin-bottom:20px}
-    .muted { color:var(--mid); font-size:.84rem; } .small { font-size:.77rem; }
-    hr { border:none; border-top:1px solid var(--line); margin:20px 0; }
-    .tag { display:inline-flex; align-items:center; gap:4px; padding:2px 9px; border-radius:20px; font-size:.7rem; font-weight:500; }
-    .tag-green { background:var(--good-bg); color:var(--good); }
-    .tag-ink { background:#e8e8e6; color:var(--ink); }
-    .dot-live { width:6px; height:6px; border-radius:50%; background:#2d9e6b; animation:blink 1.2s ease-in-out infinite; }
-    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.3} }
-    .notice { padding:11px 14px; border-radius:var(--r); font-size:.84rem; }
-    .n-good { background:var(--good-bg); color:var(--good); }
-    .n-bad  { background:var(--bad-bg);  color:var(--bad); }
-    .n-neutral { background:var(--faint); color:var(--ink); }
-    .q-list { border:1px solid var(--line); border-radius:var(--r); overflow:hidden; }
-    .q-item { display:flex; align-items:flex-start; gap:12px; padding:12px 14px; border-bottom:1px solid var(--line); cursor:pointer; background:var(--white); transition:background .1s; }
-    .q-item:last-child { border-bottom:none; }
-    .q-item:hover { background:var(--faint); }
-    .q-item.active { background:#eeeee9; }
-    .q-num { font-size:.7rem; font-weight:600; color:var(--mid); padding-top:2px; min-width:20px; }
-    .q-body { flex:1; }
-    .q-text { font-size:.88rem; line-height:1.4; }
-    .q-pills { display:flex; gap:5px; margin-top:5px; flex-wrap:wrap; }
-    .pill { font-size:.68rem; color:var(--mid); background:var(--faint); border-radius:3px; padding:1px 6px; }
-    .key-row { display:flex; gap:7px; }
-    .key-btn { flex:1; padding:9px 0; text-align:center; font-size:.82rem; font-weight:600; border:1px solid var(--line); border-radius:var(--r); background:var(--white); cursor:pointer; transition:background .1s; }
-    .key-btn:hover { background:var(--faint); }
-    .key-btn.selected { background:var(--ink); color:#fff; border-color:var(--ink); }
-    .bar-row { margin-bottom:10px; }
-    .bar-meta { display:flex; justify-content:space-between; font-size:.77rem; color:var(--mid); margin-bottom:3px; }
-    .bar-track { height:5px; background:var(--line); border-radius:3px; overflow:hidden; }
-    .bar-fill { height:100%; background:var(--ink); border-radius:3px; transition:width .4s ease; }
-    .bar-fill.correct { background:var(--good); }
-    .opt-grid { display:grid; grid-template-columns:1fr 1fr; gap:9px; }
-    .opt-card { display:flex; align-items:center; gap:11px; padding:13px 14px; border:1px solid var(--line); border-radius:var(--r); cursor:pointer; background:var(--white); transition:border-color .15s, background .15s; font-size:.87rem; }
-    .opt-card:not(.locked):hover { border-color:#999; background:#fafaf8; }
-    .opt-card.chosen  { border-color:var(--ink); background:var(--faint); }
-    .opt-card.correct { border-color:var(--good); background:var(--good-bg); }
-    .opt-card.wrong   { opacity:.4; }
-    .opt-card.locked  { cursor:default; }
-    .opt-key { width:24px; height:24px; flex-shrink:0; border-radius:4px; background:var(--line); display:flex; align-items:center; justify-content:center; font-size:.73rem; font-weight:600; }
-    .opt-card.chosen  .opt-key { background:var(--ink); color:#fff; }
-    .opt-card.correct .opt-key { background:var(--good); color:#fff; }
-    .score-list { border:1px solid var(--line); border-radius:var(--r); overflow:hidden; }
-    .score-row { display:flex; align-items:center; gap:10px; padding:11px 14px; border-bottom:1px solid var(--line); background:var(--white); font-size:.87rem; }
-    .score-row:last-child { border-bottom:none; }
-    .score-rank { min-width:22px; text-align:center; font-size:.76rem; color:var(--mid); }
-    .score-name { flex:1; }
-    .score-pts  { font-weight:600; }
-    .score-row.me { background:var(--faint); }
-    .itbl-wrap { overflow-x:auto; border:1px solid var(--line); border-radius:var(--r); }
-    .itbl { border-collapse:collapse; width:100%; font-size:.8rem; }
-    .itbl th { padding:9px 12px; text-align:left; border-bottom:1px solid var(--line); background:var(--faint); font-size:.68rem; font-weight:600; letter-spacing:.07em; text-transform:uppercase; color:var(--mid); white-space:nowrap; }
-    .itbl td { padding:9px 12px; border-bottom:1px solid var(--line); vertical-align:middle; }
-    .itbl tr:last-child td { border-bottom:none; }
-    .itbl tbody tr:hover td { background:#fafaf8; cursor:pointer; }
-    .c-ok  { color:var(--good); font-weight:600; }
-    .c-bad { color:var(--bad); }
-    .c-nil { color:#ccc; }
-    .detail-wrap { border:1px solid var(--line); border-radius:var(--r); overflow:hidden; margin-top:16px; }
-    .detail-head { padding:12px 16px; border-bottom:1px solid var(--line); background:var(--faint); display:flex; align-items:center; justify-content:space-between; }
-    .detail-row { padding:11px 16px; border-bottom:1px solid var(--line); font-size:.84rem; }
-    .detail-row:last-child { border-bottom:none; }
-    .detail-q { color:var(--mid); font-size:.76rem; margin-bottom:3px; }
-    .ans-chips { display:flex; gap:7px; flex-wrap:wrap; }
-    .ans-chip { padding:2px 9px; border-radius:20px; font-size:.75rem; font-weight:500; }
-    .ac-good { background:var(--good-bg); color:var(--good); }
-    .ac-bad  { background:var(--bad-bg);  color:var(--bad); }
-    .ac-none { background:var(--faint); color:var(--mid); }
-    .host-grid { display:grid; grid-template-columns:1fr 340px; gap:24px; align-items:start; }
-    @media(max-width:720px){ .host-grid{grid-template-columns:1fr} .opt-grid{grid-template-columns:1fr} }
-    .spinner { width:38px; height:38px; border:3px solid var(--line); border-top-color:var(--ink); border-radius:50%; animation:spin .7s linear infinite; }
-    @keyframes spin { to{transform:rotate(360deg)} }
-    code { font-size:.78rem; background:var(--faint); padding:1px 5px; border-radius:3px; font-family:monospace; }
+    .muted{color:var(--mid);font-size:.84rem} .small{font-size:.77rem}
+    hr{border:none;border-top:1px solid var(--line);margin:18px 0}
+    .notice{padding:11px 14px;border-radius:var(--r);font-size:.84rem}
+    .n-good{background:var(--good-bg);color:var(--good)}
+    .n-bad{background:var(--bad-bg);color:var(--bad)}
+    .n-neutral{background:var(--faint);color:var(--ink)}
+    .tag{display:inline-flex;align-items:center;gap:4px;padding:2px 9px;border-radius:20px;font-size:.7rem;font-weight:500}
+    .tag-green{background:var(--good-bg);color:var(--good)}
+    .tag-ink{background:#e8e8e6;color:var(--ink)}
+    .tag-red{background:var(--bad-bg);color:var(--bad)}
+    .dot-live{width:6px;height:6px;border-radius:50%;background:#2d9e6b;animation:blink 1.2s ease-in-out infinite}
+    @keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+
+    /* HOST LAYOUT */
+    .host-shell{display:grid;grid-template-columns:260px 1fr;min-height:calc(100vh - 52px)}
+    .host-sidebar{border-right:1px solid var(--line);background:var(--white);padding:20px 16px;overflow-y:auto}
+    .host-main{padding:24px 28px;overflow-y:auto}
+    @media(max-width:700px){.host-shell{grid-template-columns:1fr}.host-sidebar{border-right:none;border-bottom:1px solid var(--line)}}
+
+    /* SIDEBAR Q LIST */
+    .q-list{display:flex;flex-direction:column;gap:4px;margin-top:12px}
+    .q-row{display:flex;align-items:flex-start;gap:10px;padding:9px 10px;border-radius:var(--r);cursor:pointer;transition:background .1s;border:1px solid transparent}
+    .q-row:hover{background:var(--faint)}
+    .q-row.active{background:var(--faint);border-color:var(--line)}
+    .q-row.done{opacity:.45}
+    .q-row.live{border-color:#2d9e6b;background:var(--good-bg)}
+    .q-idx{font-size:.68rem;font-weight:600;color:var(--mid);padding-top:2px;min-width:18px}
+    .q-snippet{font-size:.82rem;line-height:1.35;flex:1}
+
+    /* ANSWER KEY */
+    .key-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px}
+    .key-card{padding:12px 10px;border:1px solid var(--line);border-radius:var(--r);cursor:pointer;transition:background .1s,border-color .1s;text-align:center}
+    .key-card:hover{background:var(--faint)}
+    .key-card.selected{background:var(--ink);color:#fff;border-color:var(--ink)}
+    .key-card .kl{font-size:.7rem;font-weight:700;opacity:.65;margin-bottom:3px}
+    .key-card .kt{font-size:.82rem;line-height:1.3}
+
+    /* LIVE BARS */
+    .bar-row{margin-bottom:11px}
+    .bar-meta{display:flex;justify-content:space-between;font-size:.77rem;color:var(--mid);margin-bottom:3px}
+    .bar-track{height:6px;background:var(--line);border-radius:3px;overflow:hidden}
+    .bar-fill{height:100%;background:var(--ink);border-radius:3px;transition:width .4s ease}
+    .bar-fill.correct{background:var(--good)}
+    .bar-names{font-size:.7rem;color:var(--mid);margin-top:2px;line-height:1.5}
+
+    /* PARTICIPANT OPTIONS */
+    .opt-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+    .opt-card{display:flex;align-items:center;gap:11px;padding:13px 14px;border:1px solid var(--line);border-radius:var(--r);cursor:pointer;background:var(--white);transition:border-color .15s,background .15s;font-size:.87rem}
+    .opt-card:not(.locked):hover{border-color:#999;background:#fafaf8}
+    .opt-card.chosen{border-color:var(--ink);background:var(--faint)}
+    .opt-card.correct{border-color:var(--good);background:var(--good-bg)}
+    .opt-card.wrong{opacity:.4}
+    .opt-card.locked{cursor:default}
+    .opt-key{width:24px;height:24px;flex-shrink:0;border-radius:4px;background:var(--line);display:flex;align-items:center;justify-content:center;font-size:.72rem;font-weight:600}
+    .opt-card.chosen .opt-key{background:var(--ink);color:#fff}
+    .opt-card.correct .opt-key{background:var(--good);color:#fff}
+    @media(max-width:520px){.opt-grid{grid-template-columns:1fr}}
+
+    /* SCORE LIST */
+    .score-list{border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+    .score-row{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--line);background:var(--white);font-size:.86rem}
+    .score-row:last-child{border-bottom:none}
+    .score-rank{min-width:22px;text-align:center;font-size:.74rem;color:var(--mid)}
+    .score-name{flex:1}
+    .score-pts{font-weight:600}
+    .score-row.me{background:var(--faint)}
+
+    /* INSPECT TABLE */
+    .itbl-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:var(--r)}
+    .itbl{border-collapse:collapse;width:100%;font-size:.8rem}
+    .itbl th{padding:8px 12px;text-align:left;border-bottom:1px solid var(--line);background:var(--faint);font-size:.67rem;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--mid);white-space:nowrap}
+    .itbl td{padding:9px 12px;border-bottom:1px solid var(--line);vertical-align:middle}
+    .itbl tr:last-child td{border-bottom:none}
+    .itbl tbody tr:hover td{background:#fafaf8;cursor:pointer}
+    .c-ok{color:var(--good);font-weight:600} .c-bad{color:var(--bad)} .c-nil{color:#ccc}
+    .detail-wrap{border:1px solid var(--line);border-radius:var(--r);overflow:hidden;margin-top:16px}
+    .detail-head{padding:12px 16px;border-bottom:1px solid var(--line);background:var(--faint);display:flex;align-items:center;justify-content:space-between}
+    .detail-row{padding:11px 16px;border-bottom:1px solid var(--line);font-size:.84rem}
+    .detail-row:last-child{border-bottom:none}
+    .detail-q{color:var(--mid);font-size:.75rem;margin-bottom:4px}
+    .ans-chips{display:flex;gap:6px;flex-wrap:wrap}
+    .ans-chip{padding:2px 9px;border-radius:20px;font-size:.74rem;font-weight:500}
+    .ac-good{background:var(--good-bg);color:var(--good)}
+    .ac-bad{background:var(--bad-bg);color:var(--bad)}
+    .ac-none{background:var(--faint);color:var(--mid)}
+
+    /* VOICE INDICATOR */
+    .voice-bar{display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--faint);border-radius:var(--r);font-size:.82rem;margin-bottom:16px}
+    .mic-dot{width:9px;height:9px;border-radius:50%;background:#ccc;flex-shrink:0}
+    .mic-dot.on{background:#2d9e6b;box-shadow:0 0 0 3px rgba(45,158,107,.2);animation:blink 1s infinite}
+    .mic-dot.off{background:var(--bad)}
+    .speaker-icon{font-size:1rem;flex-shrink:0}
+
+    .spinner{width:36px;height:36px;border:3px solid var(--line);border-top-color:var(--ink);border-radius:50%;animation:spin .7s linear infinite}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    code{font-size:.77rem;background:var(--faint);padding:1px 5px;border-radius:3px;font-family:monospace}
+    .stat-strip{display:flex;gap:20px;padding:12px 0;border-bottom:1px solid var(--line);margin-bottom:20px;flex-wrap:wrap}
+    .stat-item{display:flex;flex-direction:column}
+    .stat-val{font-weight:600;font-size:1.1rem}
+    .stat-lbl{font-size:.7rem;color:var(--mid);text-transform:uppercase;letter-spacing:.07em}
   </style>
 </head>
 <body>
@@ -135,15 +164,29 @@
   </nav>
   <main><div id="view"></div></main>
 </div>
-<script>
-/* ── STATE ─────────────────── */
-let S={}; let role=null; let myPid=null; let myName=null;
-let questions=[]; let selIdx=-1; let answerKey=-1; let inspectPid=null;
-let hostAuthed=false;  // true once password accepted
+<audio id="remote-audio" autoplay playsinline style="display:none"></audio>
 
-/* ── WEBSOCKET ─────────────── */
-let ws;
+<script>
+/* ══════════════════════════════════════════
+   STATE
+══════════════════════════════════════════ */
+let S={}, role=null, myPid=null, myName=null;
+let hostAuthed=false;
+let questions=[], selIdx=-1, answerKey=-1, inspectPid=null;
+
+// Voice
+let localStream=null;           // host mic stream
+const peerConns={};             // cid → RTCPeerConnection (host side)
+let remoteConn=null;            // RTCPeerConnection (student side)
+
+const STUN={ iceServers:[{urls:'stun:stun.l.google.com:19302'},{urls:'stun:stun1.l.google.com:19302'}] };
+
+/* ══════════════════════════════════════════
+   WEBSOCKET
+══════════════════════════════════════════ */
+let ws, myCid=null;
 const WS_URL=`${location.protocol==='https:'?'wss':'ws'}://${location.host}`;
+
 function connect(){
   ws=new WebSocket(WS_URL);
   ws.onopen=()=>{
@@ -151,13 +194,20 @@ function connect(){
     if(role==='host'&&hostAuthed) send({type:'set_host',password:'2325'});
     else if(role==='participant'&&myName) send({type:'join',name:myName,pid:myPid});
   };
-  ws.onmessage=e=>{
+  ws.onmessage=async e=>{
     const m=JSON.parse(e.data);
-    if(m.type==='state')  { S=m.payload; render(); }
-    if(m.type==='joined') { myPid=m.pid; sessionStorage.setItem('qz_pid',m.pid); }
-    if(m.type==='auth_ok'){ hostAuthed=true; render(); }
-    if(m.type==='auth_fail'){ hostAuthed=false; document.getElementById('pw-err')&&(document.getElementById('pw-err').textContent='Incorrect password.'); }
-    if(m.type==='left')   { doLeave(); }
+    if(m.type==='hello')      { myCid=m.cid; }
+    if(m.type==='state')      { S=m.payload; render(); }
+    if(m.type==='joined')     { myPid=m.pid; sessionStorage.setItem('qz_pid',m.pid); }
+    if(m.type==='auth_ok')    { hostAuthed=true; render(); }
+    if(m.type==='auth_fail')  { const el=document.getElementById('pw-err'); if(el)el.textContent='Incorrect password.'; }
+    if(m.type==='left')       { doLeave(); }
+    // WebRTC signaling
+    if(m.type==='rtc_new_peer'&&role==='host') await hostCallPeer(m.cid);
+    if(m.type==='rtc_offer'  &&role==='participant') await studentHandleOffer(m.signal);
+    if(m.type==='rtc_answer' &&role==='host') await hostHandleAnswer(m.fromCid,m.signal);
+    if(m.type==='rtc_ice'    &&role==='host') peerConns[m.fromCid]?.addIceCandidate(m.signal).catch(()=>{});
+    if(m.type==='rtc_ice'    &&role==='participant') remoteConn?.addIceCandidate(m.signal).catch(()=>{});
   };
   ws.onclose=()=>{ setConn(false); setTimeout(connect,2000); };
   ws.onerror=()=>ws.close();
@@ -165,34 +215,111 @@ function connect(){
 function send(d){ if(ws?.readyState===1) ws.send(JSON.stringify(d)); }
 function setConn(on){ document.getElementById('ci').className=on?'on':'off'; document.getElementById('cl').textContent=on?'connected':'reconnecting…'; }
 
-/* ── PARSER ────────────────── */
+/* ══════════════════════════════════════════
+   WEBRTC — HOST SIDE (broadcaster)
+══════════════════════════════════════════ */
+async function startMic(){
+  try{
+    localStream=await navigator.mediaDevices.getUserMedia({audio:true,video:false});
+    render();
+    return true;
+  }catch(e){
+    alert('Microphone access denied or unavailable.');
+    return false;
+  }
+}
+function stopMic(){
+  localStream?.getTracks().forEach(t=>t.stop());
+  localStream=null;
+  Object.values(peerConns).forEach(pc=>pc.close());
+  Object.keys(peerConns).forEach(k=>delete peerConns[k]);
+  render();
+}
+
+async function hostCallPeer(cid){
+  if(!localStream) return;                     // voice not started — skip
+  if(peerConns[cid]) return;
+  const pc=new RTCPeerConnection(STUN);
+  peerConns[cid]=pc;
+  localStream.getTracks().forEach(t=>pc.addTrack(t,localStream));
+  pc.onicecandidate=ev=>{ if(ev.candidate) send({type:'rtc_ice_to_peer',toCid:cid,signal:ev.candidate}); };
+  pc.onconnectionstatechange=()=>{ if(['failed','closed','disconnected'].includes(pc.connectionState)){ pc.close(); delete peerConns[cid]; } };
+  const offer=await pc.createOffer();
+  await pc.setLocalDescription(offer);
+  send({type:'rtc_offer',toCid:cid,signal:pc.localDescription});
+}
+
+async function hostHandleAnswer(cid,sdp){
+  const pc=peerConns[cid];
+  if(!pc||pc.signalingState==='stable') return;
+  await pc.setRemoteDescription(sdp).catch(()=>{});
+}
+
+// When host starts mic, call all existing participants
+async function callAllPeers(){
+  // We don't have cids of participants directly, server will re-join them won't,
+  // so we trigger by sending a 'get_peers' — actually we handle via reconnect on voice start
+  // The simplest approach: broadcast a voice-started notification so participants reconnect
+  send({type:'voice_started'});
+}
+
+/* ══════════════════════════════════════════
+   WEBRTC — STUDENT SIDE (listener)
+══════════════════════════════════════════ */
+async function studentHandleOffer(sdp){
+  if(remoteConn){ remoteConn.close(); }
+  const pc=new RTCPeerConnection(STUN);
+  remoteConn=pc;
+  pc.onicecandidate=ev=>{ if(ev.candidate) send({type:'rtc_ice_to_host',signal:ev.candidate}); };
+  pc.ontrack=ev=>{
+    const audio=document.getElementById('remote-audio');
+    if(audio.srcObject!==ev.streams[0]) audio.srcObject=ev.streams[0];
+  };
+  await pc.setRemoteDescription(sdp);
+  const answer=await pc.createAnswer();
+  await pc.setLocalDescription(answer);
+  send({type:'rtc_answer',signal:pc.localDescription});
+  updateVoiceUI();
+}
+function updateVoiceUI(){
+  const d=document.getElementById('voice-status');
+  if(!d) return;
+  const connected=remoteConn&&['connected','completed'].includes(remoteConn.iceConnectionState);
+  d.innerHTML=`<span class="mic-dot ${connected?'on':''}"></span><span>${connected?'Host is speaking':'Listening…'}</span>`;
+}
+
+/* ══════════════════════════════════════════
+   PARSER
+══════════════════════════════════════════ */
 function parseQuestions(text){
-  const out=[];
-  const lines=text.split('\n').map(l=>l.trim()).filter(Boolean);
+  const out=[], lines=text.split('\n').map(l=>l.trim()).filter(Boolean);
   for(let i=0;i<lines.length;i++){
-    const qLine=lines[i];
-    const oLine=lines[i+1]||'';
+    const qLine=lines[i], oLine=lines[i+1]||'';
     const m=oLine.match(/\(A\)([^,(]+)[,，]\s*\(B\)([^,(]+)[,，]\s*\(C\)([^,(]+)[,，]\s*\(D\)([^,(]+)/i);
     if(m){ out.push({text:qLine.replace(/^\d+[.)]\s*/,'').trim(),options:[m[1].trim(),m[2].trim(),m[3].trim(),m[4].trim()]}); i++; }
   }
   return out;
 }
 
-/* ── RENDER ────────────────── */
+/* ══════════════════════════════════════════
+   RENDER ROUTER
+══════════════════════════════════════════ */
 function render(){
   const el=document.getElementById('nav-role');
   if(role==='host'&&hostAuthed){el.style.display='';el.textContent='Host';}
   else if(myName){el.style.display='';el.textContent=myName;}
-  else{el.style.display='none';}
+  else el.style.display='none';
   const v=document.getElementById('view');
-  if(!role) v.innerHTML=landingHTML();
-  else if(role==='host'&&!hostAuthed) v.innerHTML=hostPasswordHTML();
-  else if(role==='host') v.innerHTML=hostHTML();
-  else v.innerHTML=participantHTML();
+  if(!role)                       v.innerHTML=landingHTML();
+  else if(role==='host'&&!hostAuthed) v.innerHTML=hostPassHTML();
+  else if(role==='host')          v.innerHTML=hostHTML();
+  else                            v.innerHTML=participantHTML();
   attach();
 }
 
-/* ── LANDING ───────────────── */
+/* ══════════════════════════════════════════
+   LANDING
+══════════════════════════════════════════ */
 function landingHTML(){
   const n=(S.participants||[]).length;
   return `<div class="center"><div class="box">
@@ -206,218 +333,249 @@ function landingHTML(){
   </div></div>`;
 }
 
-/* ── HOST PASSWORD ─────────── */
-function hostPasswordHTML(){
+/* ══════════════════════════════════════════
+   HOST PASSWORD
+══════════════════════════════════════════ */
+function hostPassHTML(){
   return `<div class="center"><div class="box">
     <h2 class="mb1">Host login</h2>
     <p class="muted mb3">Enter the host password to continue.</p>
-    <input type="text" id="pw-in" placeholder="Password" maxlength="20" autocomplete="off" style="-webkit-text-security:disc" />
+    <input type="password" id="pw-in" placeholder="Password" maxlength="20" autocomplete="off" />
     <p id="pw-err" style="color:var(--bad);font-size:.8rem;min-height:1.2em;margin-top:6px"></p>
     <div class="row gap2 mt2">
       <button class="btn btn-ghost btn-sm" id="btn-pw-back">← Back</button>
-      <button class="btn btn-dark" id="btn-pw-submit" style="flex:1">Enter</button>
+      <button class="btn btn-dark" id="btn-pw-ok" style="flex:1">Enter</button>
     </div>
   </div></div>`;
 }
 
-/* ── HOST ──────────────────── */
+/* ══════════════════════════════════════════
+   HOST SHELL
+══════════════════════════════════════════ */
 function hostHTML(){
   if(S.status==='ended') return hostEndedHTML();
-  return `<div class="wide"><div class="host-grid">${leftPanel()}${rightPanel()}</div></div>`;
+  return `<div class="host-shell">${hostSidebar()}${hostMain()}</div>`;
 }
 
-function leftPanel(){
-  const list=questions.length?`
-    <div class="mt3">
-      <h3 class="mb2">${questions.length} questions loaded</h3>
-      <div class="q-list">
-        ${questions.map((q,i)=>`
-          <div class="q-item${selIdx===i?' active':''}" data-qi="${i}">
-            <div class="q-num">${i+1}</div>
-            <div class="q-body">
-              <div class="q-text">${esc(q.text)}</div>
-              <div class="q-pills">${q.options.map((o,oi)=>`<span class="pill">${'ABCD'[oi]}) ${esc(o)}</span>`).join('')}</div>
-            </div>
-          </div>`).join('')}
-      </div>
-    </div>`:'';
-  return `<div>
-    <div class="row between mb3">
-      <h2>Questions</h2>
-      <div class="row gap2">
-        <button class="btn btn-bad btn-sm" id="btn-end">End session</button>
-        <button class="btn btn-ghost btn-sm" id="btn-reset">Reset</button>
-      </div>
-    </div>
-    <h3 class="mb1">Load from GitHub</h3>
-    <p class="muted small mb2">Paste the raw file URL from GitHub</p>
+/* ── SIDEBAR: compact question list ── */
+function hostSidebar(){
+  const isLive=S.status==='question'||S.status==='revealed';
+  const pushedText=isLive&&S.question?S.question.text:null;
+  const doneTexts=(S.history||[]).map(h=>h.question.text);
+
+  const qRows=questions.length?questions.map((q,i)=>{
+    const isActive=selIdx===i&&!isLive;
+    const isDone=doneTexts.includes(q.text);
+    const isLiveNow=isLive&&pushedText===q.text;
+    let cls='q-row';
+    if(isLiveNow) cls+=' live';
+    else if(isActive) cls+=' active';
+    else if(isDone) cls+=' done';
+    return `<div class="${cls}" data-qi="${i}">
+      <div class="q-idx">${i+1}</div>
+      <div class="q-snippet">${esc(q.text.length>70?q.text.slice(0,68)+'…':q.text)}</div>
+      ${isLiveNow?'<span style="font-size:.68rem;color:var(--good)">●</span>':''}
+    </div>`;
+  }).join(''):'<p class="muted small mt2">No questions loaded yet.</p>';
+
+  return `<div class="host-sidebar">
+    <h3 class="mb2">Questions</h3>
+    <div class="q-list">${qRows}</div>
+    <hr/>
     <div class="row gap2">
-      <input type="url" id="gh-url" placeholder="https://raw.githubusercontent.com/…/questions.txt" />
-      <button class="btn btn-dark btn-sm" id="btn-load" style="flex-shrink:0">Load</button>
+      <button class="btn btn-bad btn-sm" id="btn-end" style="flex:1">End session</button>
+      <button class="btn btn-ghost btn-sm" id="btn-reset">Reset</button>
     </div>
-    <p class="muted small mt1">Format: question on one line, options on the next line as <code>(A)opt,(B)opt,(C)opt,(D)opt</code></p>
-    <div id="load-msg"></div>
-    ${list}
   </div>`;
 }
 
-function rightPanel(){
-  const q=selIdx>=0?questions[selIdx]:null;
-  const pushPanel=q?`
-    <div style="border:1px solid var(--line);border-radius:var(--r);overflow:hidden">
-      <div style="padding:12px 14px;border-bottom:1px solid var(--line);background:var(--faint)">
-        <h3 class="mb1">Q${selIdx+1}</h3>
-        <p style="font-size:.87rem;line-height:1.4">${esc(q.text)}</p>
-      </div>
-      <div style="padding:14px">
-        <h3 class="mb2">Set answer key</h3>
-        <div class="key-row mb3">
-          ${q.options.map((o,i)=>`<div class="key-btn${answerKey===i?' selected':''}" data-key="${i}">${'ABCD'[i]}) ${esc(o)}</div>`).join('')}
-        </div>
-        <button class="btn btn-dark btn-full" id="btn-push" ${answerKey<0||S.status==='question'?'disabled':''}>Push to students</button>
-      </div>
-    </div>`:
-    `<div class="notice n-neutral">Select a question from the list to push to students.</div>`;
+/* ── MAIN PANEL ── */
+function hostMain(){
+  const isLive=S.status==='question'||S.status==='revealed';
 
-  let livePanel='';
-  if((S.status==='question'||S.status==='revealed')&&S.question){
-    const totalAnswered=S.totalAnswered||0;
-    const totalParts=(S.participants||[]).length;
-    const counts=S.answerCounts||[];
-    const total=counts.reduce((a,b)=>a+b,0)||1;
-    // Who answered what (current question)
-    const partMap={};
-    (S.participants||[]).forEach(p=>partMap[p.id]=p.name);
-    const answersByOpt=[0,1,2,3].map(i=>{
-      const names=Object.entries(S.answers||{}).filter(([pid,ans])=>ans===i).map(([pid])=>partMap[pid]||pid);
-      return names;
-    });
-    livePanel=`
-      <div style="margin-top:16px;border:1px solid var(--line);border-radius:var(--r);overflow:hidden">
-        <div style="padding:11px 14px;border-bottom:1px solid var(--line);background:var(--faint);display:flex;align-items:center;justify-content:space-between">
-          <div>${S.status==='question'?'<span class="tag tag-green"><span class="dot-live"></span>Live</span>':'<span class="tag tag-ink">Revealed</span>'}</div>
-          <span class="small muted">${totalAnswered}/${totalParts} answered</span>
-        </div>
-        <div style="padding:14px">
-          ${S.question.options.map((o,i)=>{
-            const cnt=counts[i]||0;
-            const pct=(cnt/total*100).toFixed(0);
-            const names=answersByOpt[i];
-            return `<div class="bar-row">
-              <div class="bar-meta">
-                <span>${'ABCD'[i]}) ${esc(o)}${S.correct===i?' ✓':''}</span>
-                <span>${cnt}</span>
-              </div>
-              <div class="bar-track"><div class="bar-fill${S.correct===i?' correct':''}" style="width:${pct}%"></div></div>
-              ${names.length?`<div style="font-size:.72rem;color:var(--mid);margin-top:2px">${names.map(n=>`<span style="margin-right:6px">${esc(n)}</span>`).join('')}</div>`:''}
-            </div>`;
-          }).join('')}
-          <div class="row gap2 mt3">
-            ${S.status==='question'?'<button class="btn btn-good btn-sm" id="btn-reveal">Reveal answer</button>':''}
-            <button class="btn btn-ghost btn-sm" id="btn-clear">Next question</button>
-          </div>
-        </div>
-      </div>`;
+  // No questions loaded yet — show loader
+  if(!questions.length){
+    return `<div class="host-main">
+      ${voiceHostBar()}
+      <h2 class="mb3">Load questions</h2>
+      <p class="muted small mb2">Paste the raw GitHub file URL</p>
+      <div class="row gap2 mb2">
+        <input type="url" id="gh-url" placeholder="https://raw.githubusercontent.com/…/questions.txt" />
+        <button class="btn btn-dark btn-sm" id="btn-load" style="flex-shrink:0">Load</button>
+      </div>
+      <p class="muted small">Format: question on one line, options on next line as <code>(A)opt,(B)opt,(C)opt,(D)opt</code></p>
+      <div id="load-msg"></div>
+    </div>`;
   }
 
-  const sorted=[...(S.participants||[])].sort((a,b)=>(b.score||0)-(a.score||0));
-  const scorePanel=sorted.length?`
-    <div style="margin-top:16px">
-      <h3 class="mb2">Scoreboard</h3>
-      <div class="score-list">
-        ${sorted.map((p,i)=>`
-          <div class="score-row">
-            <div class="score-rank">${i+1}</div>
-            <div class="score-name">${esc(p.name)}</div>
-            <div class="score-pts">${p.score||0}</div>
+  // Questions loaded, live question active
+  if(isLive) return `<div class="host-main">${voiceHostBar()}${livePanel()}</div>`;
+
+  // Questions loaded, pick one
+  const q=selIdx>=0?questions[selIdx]:null;
+  return `<div class="host-main">
+    ${voiceHostBar()}
+    <div class="row gap2 mb3" style="flex-wrap:wrap">
+      <h2 style="flex:1">${q?`Q${selIdx+1}`:'Select a question'}</h2>
+      <button class="btn btn-ghost btn-sm" id="btn-reload">↻ Change file</button>
+    </div>
+    ${!q?`<p class="muted">Click a question from the sidebar to select it.</p>`:`
+      <p style="font-size:1rem;line-height:1.5;margin-bottom:20px">${esc(q.text)}</p>
+      <h3 class="mb2">Set answer key</h3>
+      <div class="key-grid">
+        ${q.options.map((o,i)=>`
+          <div class="key-card${answerKey===i?' selected':''}" data-key="${i}">
+            <div class="kl">${'ABCD'[i]}</div>
+            <div class="kt">${esc(o)}</div>
           </div>`).join('')}
       </div>
-    </div>`:'';
-
-  return `<div>${pushPanel}${livePanel}${scorePanel}</div>`;
+      <button class="btn btn-dark btn-full" id="btn-push" ${answerKey<0?'disabled':''}>
+        Push to students →
+      </button>
+    `}
+  </div>`;
 }
 
-/* ── HOST ENDED ─────────────── */
-function hostEndedHTML(){
-  const history=S.history||[];
-  const participants=S.participants||[];
-  const sorted=[...participants].sort((a,b)=>(b.score||0)-(a.score||0));
-  const partMap={};
-  participants.forEach(p=>partMap[p.id]=p);
+function voiceHostBar(){
+  const on=!!localStream;
+  return `<div class="voice-bar">
+    <span class="speaker-icon">🎙️</span>
+    <span style="flex:1">${on?'Microphone live — students can hear you':'Voice off — students cannot hear you'}</span>
+    ${on
+      ?`<button class="btn btn-bad btn-sm" id="btn-mic-stop">Stop mic</button>`
+      :`<button class="btn btn-good btn-sm" id="btn-mic-start">Start mic</button>`
+    }
+  </div>`;
+}
 
-  // Overview table: rows = students, cols = questions
-  const overviewTable=participants.length&&history.length?`
+function livePanel(){
+  const q=S.question; if(!q) return '';
+  const totalParts=(S.participants||[]).length;
+  const answered=S.totalAnswered||0;
+  const counts=S.answerCounts||[];
+  const total=counts.reduce((a,b)=>a+b,0)||1;
+  const partMap={};
+  (S.participants||[]).forEach(p=>partMap[p.id]=p.name);
+
+  const bars=q.options.map((o,i)=>{
+    const cnt=counts[i]||0;
+    const pct=(cnt/total*100).toFixed(0);
+    const names=Object.entries(S.answers||{}).filter(([,ans])=>ans===i).map(([pid])=>partMap[pid]||'?');
+    return `<div class="bar-row">
+      <div class="bar-meta">
+        <span>${'ABCD'[i]}) ${esc(o)}${S.correct===i?' ✓':''}</span>
+        <span>${cnt}</span>
+      </div>
+      <div class="bar-track"><div class="bar-fill${S.correct===i?' correct':''}" style="width:${pct}%"></div></div>
+      ${names.length?`<div class="bar-names">${names.map(n=>esc(n)).join(', ')}</div>`:''}
+    </div>`;
+  }).join('');
+
+  const sorted=[...(S.participants||[])].sort((a,b)=>(b.score||0)-(a.score||0));
+  const scoreRows=sorted.map((p,i)=>`
+    <div class="score-row">
+      <div class="score-rank">${i+1}</div>
+      <div class="score-name">${esc(p.name)}</div>
+      <div class="score-pts">${p.score||0}</div>
+    </div>`).join('');
+
+  return `
+    <div class="row between mb2" style="flex-wrap:wrap;gap:8px">
+      <div>
+        <h3 class="mb1">Live — ${S.status==='revealed'?'Answer revealed':'Waiting for answers'}</h3>
+        <p style="font-size:.9rem;line-height:1.4">${esc(q.text)}</p>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center">
+        ${S.status==='revealed'
+          ?`<span style="font-size:.78rem;color:var(--mid)">${answered}/${totalParts} answered</span>
+            <button class="btn btn-dark btn-sm" id="btn-next">Next question →</button>`
+          :`<span style="font-size:.78rem;color:var(--mid)">${answered}/${totalParts} answered</span>
+            <button class="btn btn-good btn-sm" id="btn-reveal">Reveal answer</button>`
+        }
+      </div>
+    </div>
+    <div class="stat-strip">
+      <div class="stat-item"><div class="stat-val">${totalParts}</div><div class="stat-lbl">Students</div></div>
+      <div class="stat-item"><div class="stat-val">${answered}</div><div class="stat-lbl">Answered</div></div>
+      <div class="stat-item"><div class="stat-val">${(S.history||[]).length+1}</div><div class="stat-lbl">Question #</div></div>
+    </div>
+    <h3 class="mb2">Responses</h3>
+    ${bars}
+    ${sorted.length?`<h3 class="mb2 mt3">Scoreboard</h3><div class="score-list">${scoreRows}</div>`:''}
+  `;
+}
+
+/* ══════════════════════════════════════════
+   HOST ENDED
+══════════════════════════════════════════ */
+function hostEndedHTML(){
+  const history=S.history||[], participants=S.participants||[];
+  const sorted=[...participants].sort((a,b)=>(b.score||0)-(a.score||0));
+  const partMap={}; participants.forEach(p=>partMap[p.id]=p);
+
+  const table=participants.length&&history.length?`
     <div class="itbl-wrap">
       <table class="itbl">
-        <thead>
-          <tr>
-            <th>Student</th>
-            ${history.map((_,i)=>`<th>Q${i+1}</th>`).join('')}
-            <th>Score</th>
-          </tr>
-        </thead>
+        <thead><tr>
+          <th>Student</th>
+          ${history.map((_,i)=>`<th>Q${i+1}</th>`).join('')}
+          <th>Score</th>
+        </tr></thead>
         <tbody>
-          ${sorted.map(p=>`
-            <tr data-pid="${p.id}">
-              <td><strong>${esc(p.name)}</strong></td>
-              ${history.map(h=>{
-                const ans=h.answers[p.id]??null;
-                if(ans===null) return '<td class="c-nil">—</td>';
-                const ok=ans===h.correct;
-                return `<td class="${ok?'c-ok':'c-bad'}">${'ABCD'[ans]}${ok?' ✓':' ✗'}</td>`;
-              }).join('')}
-              <td><strong>${p.score||0}</strong></td>
-            </tr>`).join('')}
+          ${sorted.map(p=>`<tr data-pid="${p.id}">
+            <td><strong>${esc(p.name)}</strong></td>
+            ${history.map(h=>{
+              const ans=h.answers[p.id]??null;
+              if(ans===null) return '<td class="c-nil">—</td>';
+              return `<td class="${ans===h.correct?'c-ok':'c-bad'}">${'ABCD'[ans]}${ans===h.correct?' ✓':' ✗'}</td>`;
+            }).join('')}
+            <td><strong>${p.score||0}</strong></td>
+          </tr>`).join('')}
         </tbody>
       </table>
     </div>`:
     `<div class="notice n-neutral">No data recorded.</div>`;
 
-  // Inspect a student
-  let detailPanel='';
+  let detail='';
   if(inspectPid&&partMap[inspectPid]){
     const p=partMap[inspectPid];
-    detailPanel=`
-      <div class="detail-wrap">
-        <div class="detail-head">
-          <span><strong>${esc(p.name)}</strong> — ${p.score||0} pts</span>
-          <button class="btn btn-ghost btn-sm" id="btn-close-inspect">Close</button>
-        </div>
-        ${history.map((h,i)=>{
-          const ans=h.answers[p.id]??null;
-          const ok=ans!==null&&ans===h.correct;
-          return `<div class="detail-row">
-            <div class="detail-q">Q${i+1}: ${esc(h.question.text)}</div>
-            <div class="ans-chips">
-              ${h.question.options.map((o,oi)=>{
-                let cls='ac-none';
-                if(oi===h.correct) cls='ac-good';
-                if(ans===oi&&oi!==h.correct) cls='ac-bad';
-                const mark=oi===ans?(oi===h.correct?' ✓':' ✗'):'';
-                const bold=oi===ans||oi===h.correct?'font-weight:600;':'';
-                return `<span class="ans-chip ${cls}" style="${bold}">${'ABCD'[oi]}) ${esc(o)}${mark}</span>`;
-              }).join('')}
-              ${ans===null?'<span class="ans-chip ac-none">No answer</span>':''}
-            </div>
-          </div>`;
-        }).join('')}
-      </div>`;
+    detail=`<div class="detail-wrap">
+      <div class="detail-head">
+        <span><strong>${esc(p.name)}</strong> — ${p.score||0} pts</span>
+        <button class="btn btn-ghost btn-sm" id="btn-close-inspect">Close</button>
+      </div>
+      ${history.map((h,i)=>{
+        const ans=h.answers[p.id]??null;
+        return `<div class="detail-row">
+          <div class="detail-q">Q${i+1}: ${esc(h.question.text)}</div>
+          <div class="ans-chips">
+            ${h.question.options.map((o,oi)=>{
+              let cls='ac-none';
+              if(oi===h.correct) cls='ac-good';
+              if(ans===oi&&oi!==h.correct) cls='ac-bad';
+              const mark=oi===ans?(oi===h.correct?' ✓':' ✗'):'';
+              return `<span class="ans-chip ${cls}" style="${oi===ans||oi===h.correct?'font-weight:600':''}">${'ABCD'[oi]}) ${esc(o)}${mark}</span>`;
+            }).join('')}
+            ${ans===null?'<span class="ans-chip ac-none">No answer</span>':''}
+          </div>
+        </div>`;
+      }).join('')}
+    </div>`;
   }
 
   return `<div class="wide">
     <div class="row between mb3">
       <h2>Session Results</h2>
-      <div class="row gap2">
-        <button class="btn btn-ghost btn-sm" id="btn-reset">New session</button>
-      </div>
+      <button class="btn btn-ghost btn-sm" id="btn-reset">New session</button>
     </div>
-    <p class="muted small mb3">Click any student row to inspect their individual answers.</p>
-    ${overviewTable}
-    ${detailPanel}
+    <p class="muted small mb3">Click any row to inspect that student's answers.</p>
+    ${table}${detail}
   </div>`;
 }
 
-/* ── PARTICIPANT ─────────────── */
+/* ══════════════════════════════════════════
+   PARTICIPANT
+══════════════════════════════════════════ */
 function participantHTML(){
   if(!myName) return joinHTML();
   if(S.status==='idle') return waitHTML();
@@ -437,6 +595,9 @@ function joinHTML(){
 function waitHTML(){
   const n=(S.participants||[]).length;
   return `<div class="center" style="text-align:center">
+    <div id="voice-status" class="voice-bar" style="margin-bottom:24px;justify-content:center">
+      <span class="mic-dot"></span><span>Waiting for voice…</span>
+    </div>
     <div class="spinner" style="margin:0 auto 20px"></div>
     <h2 class="mb1">Waiting for question</h2>
     <p class="muted mb3">${n} participant${n!==1?'s':''} in the room</p>
@@ -451,9 +612,9 @@ function questionViewHTML(){
   const correct=S.correct;
   const opts=q.options.map((o,i)=>{
     let cls='opt-card';
-    if(revealed){cls+=' locked'; if(i===correct)cls+=' correct'; else if(i===S.myAnswer)cls+=' wrong';}
-    else if(answered){cls+=' locked'; if(i===S.myAnswer)cls+=' chosen';}
-    else if(i===S.myAnswer)cls+=' chosen';
+    if(revealed){cls+=' locked';if(i===correct)cls+=' correct';else if(i===S.myAnswer)cls+=' wrong';}
+    else if(answered){cls+=' locked';if(i===S.myAnswer)cls+=' chosen';}
+    else if(i===S.myAnswer) cls+=' chosen';
     return `<div class="${cls}" data-opt="${i}"><div class="opt-key">${'ABCD'[i]}</div><span>${esc(o)}</span></div>`;
   }).join('');
   let notice='';
@@ -464,30 +625,30 @@ function questionViewHTML(){
     notice=`<div class="notice n-neutral mt3">Answer submitted — waiting for host to reveal.</div>`;
   }
   const hist=S.myHistory||[];
-  const histPanel=hist.length?`
-    <div class="mt4">
-      <h3 class="mb2">My answers so far</h3>
-      <div class="score-list">
-        ${hist.map((h,i)=>{
-          const ok=h.myAnswer!==null&&h.myAnswer===h.correct;
-          const none=h.myAnswer===null;
-          return `<div class="score-row">
-            <div class="score-rank">${i+1}</div>
-            <div style="flex:1;font-size:.82rem">${esc(h.question.text)}</div>
-            <div class="${none?'c-nil':ok?'c-ok':'c-bad'}" style="font-size:.82rem;font-weight:600">${none?'—':('ABCD'[h.myAnswer]+(ok?' ✓':' ✗'))}</div>
-          </div>`;
-        }).join('')}
-      </div>
-    </div>`:'';
+  const histPanel=hist.length?`<div class="mt4">
+    <h3 class="mb2">My answers so far</h3>
+    <div class="score-list">
+      ${hist.map((h,i)=>{const ok=h.myAnswer!==null&&h.myAnswer===h.correct,none=h.myAnswer===null;return`
+        <div class="score-row">
+          <div class="score-rank">${i+1}</div>
+          <div style="flex:1;font-size:.82rem">${esc(h.question.text)}</div>
+          <div class="${none?'c-nil':ok?'c-ok':'c-bad'}" style="font-size:.82rem;font-weight:600">${none?'—':('ABCD'[h.myAnswer]+(ok?' ✓':' ✗'))}</div>
+        </div>`;}).join('')}
+    </div>
+  </div>`:'';
   return `<div class="page">
     <div class="row between mb3">
-      <p class="small muted">Score: <strong>${S.myScore||0}</strong> pts &nbsp;·&nbsp; ${(S.participants||[]).length} in room</p>
+      <div>
+        <div id="voice-status" class="row gap2" style="font-size:.78rem;color:var(--mid);margin-bottom:4px">
+          <span class="mic-dot"></span><span>Voice</span>
+        </div>
+        <span class="small muted">Score: <strong>${S.myScore||0}</strong> pts · ${(S.participants||[]).length} in room</span>
+      </div>
       <button class="btn btn-ghost btn-sm" id="btn-leave">Leave</button>
     </div>
     <h2 class="mb3">${esc(q.text)}</h2>
     <div class="opt-grid">${opts}</div>
-    ${notice}
-    ${histPanel}
+    ${notice}${histPanel}
   </div>`;
 }
 
@@ -499,74 +660,83 @@ function studentEndHTML(){
     <p class="muted mb4">You finished #${myRank} of ${sorted.length}</p>
     <h3 class="mb2">Leaderboard</h3>
     <div class="score-list">
-      ${sorted.map((p,i)=>`
-        <div class="score-row${p.id===myPid?' me':''}">
-          <div class="score-rank">${i+1}</div>
-          <div class="score-name">${esc(p.name)}${p.id===myPid?' <span style="font-size:.72rem;color:var(--mid)">← you</span>':''}</div>
-          <div class="score-pts">${p.score||0}</div>
-        </div>`).join('')}
+      ${sorted.map((p,i)=>`<div class="score-row${p.id===myPid?' me':''}">
+        <div class="score-rank">${i+1}</div>
+        <div class="score-name">${esc(p.name)}${p.id===myPid?' <span style="font-size:.7rem;color:var(--mid)">← you</span>':''}</div>
+        <div class="score-pts">${p.score||0}</div>
+      </div>`).join('')}
     </div>
-    ${(S.myHistory||[]).length?`
-    <div class="mt4">
+    ${(S.myHistory||[]).length?`<div class="mt4">
       <h3 class="mb2">My answers</h3>
       <div class="score-list">
-        ${(S.myHistory||[]).map((h,i)=>{
-          const ok=h.myAnswer!==null&&h.myAnswer===h.correct;
-          const none=h.myAnswer===null;
-          return `<div class="score-row">
+        ${(S.myHistory||[]).map((h,i)=>{const ok=h.myAnswer!==null&&h.myAnswer===h.correct,none=h.myAnswer===null;return`
+          <div class="score-row">
             <div class="score-rank">${i+1}</div>
             <div style="flex:1;font-size:.82rem">${esc(h.question.text)}</div>
             <div class="${none?'c-nil':ok?'c-ok':'c-bad'}" style="font-size:.82rem;font-weight:600">${none?'—':('ABCD'[h.myAnswer]+(ok?' ✓':' ✗'))}</div>
-          </div>`;
-        }).join('')}
+          </div>`;}).join('')}
       </div>
     </div>`:''}
   </div>`;
 }
 
-/* ── EVENTS ─────────────────── */
+/* ══════════════════════════════════════════
+   EVENTS
+══════════════════════════════════════════ */
 function attach(){
-  // Landing
   on('go-host',()=>{ role='host'; hostAuthed=false; render(); });
   on('go-join', ()=>{ role='participant'; render(); });
-
-  // Host password screen
   on('btn-pw-back',()=>{ role=null; render(); });
-  on('btn-pw-submit', doHostLogin);
+  on('btn-pw-ok', doHostLogin);
   const pi=document.getElementById('pw-in');
   if(pi){ pi.addEventListener('keydown',e=>e.key==='Enter'&&doHostLogin()); pi.focus(); }
-
-  // Student join
   on('btn-enter', doJoin);
   const ni=document.getElementById('name-in');
   if(ni){ ni.addEventListener('keydown',e=>e.key==='Enter'&&doJoin()); ni.focus(); }
-
-  // Student leave
   on('btn-leave',()=>{ if(confirm('Leave the session?')) send({type:'leave'}); });
-
-  // Host controls
+  // Host file load
   on('btn-load', loadGH);
+  on('btn-reload',()=>{ questions=[]; selIdx=-1; answerKey=-1; render(); });
   const gi=document.getElementById('gh-url');
   if(gi) gi.addEventListener('keydown',e=>e.key==='Enter'&&loadGH());
-  document.querySelectorAll('.q-item[data-qi]').forEach(el=>
-    el.addEventListener('click',()=>{ selIdx=+el.dataset.qi; answerKey=-1; render(); })
+  // Host question selection
+  document.querySelectorAll('.q-row[data-qi]').forEach(el=>
+    el.addEventListener('click',()=>{
+      if(S.status==='question'||S.status==='revealed') return; // can't change while live
+      selIdx=+el.dataset.qi; answerKey=-1; render();
+    })
   );
-  document.querySelectorAll('.key-btn[data-key]').forEach(el=>
+  // Answer key
+  document.querySelectorAll('.key-card[data-key]').forEach(el=>
     el.addEventListener('click',()=>{ answerKey=+el.dataset.key; render(); })
   );
-  on('btn-push',()=>{ if(selIdx<0||answerKey<0)return; send({type:'push_question',question:questions[selIdx],correct:answerKey}); });
+  // Push
+  on('btn-push',()=>{
+    if(selIdx<0||answerKey<0) return;
+    send({type:'push_question',question:questions[selIdx],correct:answerKey});
+  });
   on('btn-reveal',()=>send({type:'reveal'}));
-  on('btn-clear', ()=>send({type:'clear'}));
-  on('btn-end',   ()=>{ if(confirm('End the session for all students?')) send({type:'end_session'}); });
-  on('btn-reset', ()=>{ if(confirm('Reset everything and start over?')){ send({type:'reset'}); questions=[]; selIdx=-1; answerKey=-1; inspectPid=null; render(); } });
+  // Next question: clear server state, auto-advance selIdx
+  on('btn-next',()=>{
+    send({type:'clear'});
+    const next=selIdx+1;
+    if(next<questions.length){ selIdx=next; answerKey=-1; }
+    else { selIdx=-1; answerKey=-1; }
+  });
+  on('btn-end',  ()=>{ if(confirm('End the session for all students?')) send({type:'end_session'}); });
+  on('btn-reset',()=>{ if(confirm('Reset everything?')){ send({type:'reset'}); questions=[]; selIdx=-1; answerKey=-1; inspectPid=null; stopMic(); render(); } });
   on('btn-close-inspect',()=>{ inspectPid=null; render(); });
   document.querySelectorAll('.itbl tbody tr[data-pid]').forEach(row=>
     row.addEventListener('click',()=>{ inspectPid=row.dataset.pid; render(); })
   );
+  // Voice
+  on('btn-mic-start',async()=>{ await startMic(); });
+  on('btn-mic-stop', ()=>stopMic());
+  // Participant answers
   document.querySelectorAll('.opt-card[data-opt]').forEach(el=>
     el.addEventListener('click',()=>{
-      if(S.myAnswer!==null&&S.myAnswer!==undefined)return;
-      if(S.status==='revealed')return;
+      if(S.myAnswer!==null&&S.myAnswer!==undefined) return;
+      if(S.status==='revealed') return;
       send({type:'answer',idx:+el.dataset.opt});
     })
   );
@@ -576,42 +746,27 @@ function on(id,fn){ document.getElementById(id)?.addEventListener('click',fn); }
 
 function doHostLogin(){
   const v=document.getElementById('pw-in')?.value?.trim();
-  if(!v)return;
+  if(!v) return;
   send({type:'set_host',password:v});
 }
-
-function doLeave(){
-  role=null; myName=null; myPid=null;
-  sessionStorage.removeItem('qz_pid');
-  render();
-}
-
+function doLeave(){ role=null; myName=null; myPid=null; sessionStorage.removeItem('qz_pid'); render(); }
 function doJoin(){
-  const v=document.getElementById('name-in')?.value?.trim();
-  if(!v)return;
+  const v=document.getElementById('name-in')?.value?.trim(); if(!v) return;
   myName=v; myPid=sessionStorage.getItem('qz_pid');
-  send({type:'join',name:myName,pid:myPid});
-  render();
+  send({type:'join',name:myName,pid:myPid}); render();
 }
 
 async function loadGH(){
   const url=document.getElementById('gh-url')?.value?.trim();
-  const msg=document.getElementById('load-msg');
-  if(!url||!msg)return;
+  const msg=document.getElementById('load-msg'); if(!url||!msg) return;
   let raw=url.replace('https://github.com/','https://raw.githubusercontent.com/').replace('/blob/','/')
   msg.innerHTML='<p class="muted small mt1">Loading…</p>';
   try{
-    const res=await fetch(raw);
-    if(!res.ok)throw new Error(`HTTP ${res.status}`);
-    const text=await res.text();
-    questions=parseQuestions(text);
-    if(!questions.length)throw new Error('No valid questions found. Check your file format.');
-    selIdx=-1; answerKey=-1;
-    msg.innerHTML='';
-    render();
-  }catch(e){
-    msg.innerHTML=`<div class="notice n-bad mt2">${esc(e.message)}</div>`;
-  }
+    const res=await fetch(raw); if(!res.ok) throw new Error(`HTTP ${res.status}`);
+    questions=parseQuestions(await res.text());
+    if(!questions.length) throw new Error('No valid questions found. Check the file format.');
+    selIdx=0; answerKey=-1; msg.innerHTML=''; render();
+  }catch(e){ msg.innerHTML=`<div class="notice n-bad mt2">${esc(e.message)}</div>`; }
 }
 
 function esc(s){ return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
