@@ -5,34 +5,46 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>QuizZap</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Sans:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet" />
   <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    :root {
-      --bg:#f9f8f6; --white:#ffffff; --ink:#111110; --mid:#6b6b66;
-      --line:#e4e3df; --faint:#f4f3f0;
-      --good:#2d6a4f; --bad:#c1121f; --good-bg:#d8f3dc; --bad-bg:#ffe0e0;
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    :root{
+      --bg:#f9f8f6;--white:#fff;--ink:#111110;--mid:#6b6b66;
+      --line:#e4e3df;--faint:#f4f3f0;
+      --good:#2d6a4f;--bad:#c1121f;--good-bg:#d8f3dc;--bad-bg:#ffe0e0;
       --serif:'DM Serif Display',Georgia,serif;
       --sans:'DM Sans',system-ui,sans-serif;
       --r:6px;
     }
     html,body{height:100%}
     body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased}
-    nav{display:flex;align-items:center;justify-content:space-between;padding:0 24px;height:52px;border-bottom:1px solid var(--line);background:var(--white);position:sticky;top:0;z-index:100}
-    .brand{font-family:var(--serif);font-size:1.15rem}
-    .nav-right{display:flex;align-items:center;gap:10px;font-size:.8rem;color:var(--mid)}
+
+    /* NAV */
+    nav{display:flex;align-items:center;justify-content:space-between;padding:0 20px;height:52px;border-bottom:1px solid var(--line);background:var(--white);position:sticky;top:0;z-index:100;gap:12px}
+    .brand{font-family:var(--serif);font-size:1.15rem;flex-shrink:0}
+    .nav-right{display:flex;align-items:center;gap:10px;font-size:.8rem;color:var(--mid);flex-shrink:0}
     #ci{width:7px;height:7px;border-radius:50%;background:#ccc}
     #ci.on{background:#2d9e6b} #ci.off{background:#c1121f}
+    /* live scoreboard strip in nav */
+    #nav-score-strip{display:flex;align-items:center;gap:6px;overflow:hidden;flex:1;justify-content:center}
+    .ns-chip{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:20px;font-size:.72rem;font-weight:500;background:var(--faint);border:1px solid var(--line);white-space:nowrap}
+    .ns-chip.me{background:#e8f5ee;border-color:#b7dfc7}
+    .ns-chip .ns-rank{font-weight:700;color:var(--mid)}
+    .ns-chip .ns-pts{font-weight:600;color:var(--good)}
+
+    /* LAYOUT */
     #app{min-height:100vh;display:flex;flex-direction:column}
     main{flex:1}
     h1{font-family:var(--serif);font-size:2rem;font-weight:400;line-height:1.15}
-    h2{font-family:var(--serif);font-size:1.4rem;font-weight:400;line-height:1.2}
+    h2{font-family:var(--serif);font-size:1.35rem;font-weight:400;line-height:1.2}
     h3{font-size:.67rem;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--mid)}
     .center{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:calc(100vh - 52px);padding:32px 20px}
-    .box{background:var(--white);border:1px solid var(--line);border-radius:var(--r);padding:36px;width:100%;max-width:420px}
-    .page{width:100%;max-width:680px;margin:0 auto;padding:32px 20px}
-    .wide{width:100%;max-width:980px;margin:0 auto;padding:28px 20px}
-    .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;font-family:var(--sans);font-size:.82rem;font-weight:500;padding:8px 18px;border-radius:var(--r);border:1px solid transparent;cursor:pointer;transition:opacity .15s;white-space:nowrap}
+    .box{background:var(--white);border:1px solid var(--line);border-radius:var(--r);padding:32px;width:100%;max-width:400px}
+    .page{width:100%;max-width:640px;margin:0 auto;padding:28px 20px}
+    .wide{width:100%;max-width:960px;margin:0 auto;padding:28px 20px}
+
+    /* BUTTONS */
+    .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;font-family:var(--sans);font-size:.82rem;font-weight:500;padding:8px 16px;border-radius:var(--r);border:1px solid transparent;cursor:pointer;transition:opacity .15s;white-space:nowrap}
     .btn:disabled{opacity:.35;cursor:not-allowed}
     .btn:not(:disabled):hover{opacity:.8}
     .btn-dark{background:var(--ink);color:#fff}
@@ -40,17 +52,21 @@
     .btn-ghost{background:transparent;color:var(--mid);border-color:var(--line)}
     .btn-good{background:var(--good);color:#fff}
     .btn-bad{background:var(--bad);color:#fff}
-    .btn-sm{padding:5px 12px;font-size:.75rem}
-    .btn-lg{padding:11px 26px;font-size:.9rem}
+    .btn-sm{padding:5px 12px;font-size:.74rem}
+    .btn-lg{padding:11px 24px;font-size:.9rem}
     .btn-full{width:100%}
+
+    /* INPUTS */
     input[type="text"],input[type="url"],input[type="password"]{width:100%;padding:9px 12px;font-family:var(--sans);font-size:.88rem;background:var(--white);color:var(--ink);border:1px solid var(--line);border-radius:var(--r);outline:none;transition:border-color .15s}
     input:focus{border-color:#999}
     input::placeholder{color:#bbb}
-    .row{display:flex;align-items:center} .col{display:flex;flex-direction:column}
-    .gap2{gap:8px} .gap3{gap:12px} .between{justify-content:space-between}
-    .mt1{margin-top:6px} .mt2{margin-top:12px} .mt3{margin-top:20px} .mt4{margin-top:32px}
-    .mb1{margin-bottom:6px} .mb2{margin-bottom:12px} .mb3{margin-bottom:20px}
-    .muted{color:var(--mid);font-size:.84rem} .small{font-size:.77rem}
+
+    /* UTILS */
+    .row{display:flex;align-items:center}.col{display:flex;flex-direction:column}
+    .gap2{gap:8px}.gap3{gap:12px}.between{justify-content:space-between}
+    .mt1{margin-top:6px}.mt2{margin-top:12px}.mt3{margin-top:20px}.mt4{margin-top:32px}
+    .mb1{margin-bottom:6px}.mb2{margin-bottom:12px}.mb3{margin-bottom:20px}
+    .muted{color:var(--mid);font-size:.84rem}.small{font-size:.77rem}
     hr{border:none;border-top:1px solid var(--line);margin:18px 0}
     .notice{padding:11px 14px;border-radius:var(--r);font-size:.84rem}
     .n-good{background:var(--good-bg);color:var(--good)}
@@ -59,32 +75,31 @@
     .tag{display:inline-flex;align-items:center;gap:4px;padding:2px 9px;border-radius:20px;font-size:.7rem;font-weight:500}
     .tag-green{background:var(--good-bg);color:var(--good)}
     .tag-ink{background:#e8e8e6;color:var(--ink)}
-    .tag-red{background:var(--bad-bg);color:var(--bad)}
-    .dot-live{width:6px;height:6px;border-radius:50%;background:#2d9e6b;animation:blink 1.2s ease-in-out infinite}
+    .dot-live{width:6px;height:6px;border-radius:50%;background:#2d9e6b;animation:blink 1.2s ease-in-out infinite;display:inline-block}
     @keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
 
-    /* HOST LAYOUT */
-    .host-shell{display:grid;grid-template-columns:260px 1fr;min-height:calc(100vh - 52px)}
-    .host-sidebar{border-right:1px solid var(--line);background:var(--white);padding:20px 16px;overflow-y:auto}
+    /* HOST SHELL */
+    .host-shell{display:grid;grid-template-columns:240px 1fr;min-height:calc(100vh - 52px)}
+    .host-sidebar{border-right:1px solid var(--line);background:var(--white);padding:16px 14px;overflow-y:auto}
     .host-main{padding:24px 28px;overflow-y:auto}
-    @media(max-width:700px){.host-shell{grid-template-columns:1fr}.host-sidebar{border-right:none;border-bottom:1px solid var(--line)}}
+    @media(max-width:680px){.host-shell{grid-template-columns:1fr}.host-sidebar{border-right:none;border-bottom:1px solid var(--line)}}
 
     /* SIDEBAR Q LIST */
-    .q-list{display:flex;flex-direction:column;gap:4px;margin-top:12px}
-    .q-row{display:flex;align-items:flex-start;gap:10px;padding:9px 10px;border-radius:var(--r);cursor:pointer;transition:background .1s;border:1px solid transparent}
+    .q-list{display:flex;flex-direction:column;gap:3px;margin-top:10px}
+    .q-row{display:flex;align-items:flex-start;gap:8px;padding:8px 9px;border-radius:var(--r);cursor:pointer;transition:background .1s;border:1px solid transparent}
     .q-row:hover{background:var(--faint)}
     .q-row.active{background:var(--faint);border-color:var(--line)}
-    .q-row.done{opacity:.45}
-    .q-row.live{border-color:#2d9e6b;background:var(--good-bg)}
-    .q-idx{font-size:.68rem;font-weight:600;color:var(--mid);padding-top:2px;min-width:18px}
-    .q-snippet{font-size:.82rem;line-height:1.35;flex:1}
+    .q-row.done{opacity:.4}
+    .q-row.live{border-color:var(--good);background:var(--good-bg)}
+    .q-idx{font-size:.67rem;font-weight:600;color:var(--mid);padding-top:2px;min-width:17px}
+    .q-snippet{font-size:.8rem;line-height:1.35;flex:1}
 
     /* ANSWER KEY */
     .key-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px}
-    .key-card{padding:12px 10px;border:1px solid var(--line);border-radius:var(--r);cursor:pointer;transition:background .1s,border-color .1s;text-align:center}
+    .key-card{padding:11px 10px;border:1px solid var(--line);border-radius:var(--r);cursor:pointer;transition:background .1s,border-color .1s;text-align:center}
     .key-card:hover{background:var(--faint)}
     .key-card.selected{background:var(--ink);color:#fff;border-color:var(--ink)}
-    .key-card .kl{font-size:.7rem;font-weight:700;opacity:.65;margin-bottom:3px}
+    .key-card .kl{font-size:.68rem;font-weight:700;opacity:.6;margin-bottom:3px}
     .key-card .kt{font-size:.82rem;line-height:1.3}
 
     /* LIVE BARS */
@@ -97,34 +112,46 @@
 
     /* PARTICIPANT OPTIONS */
     .opt-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px}
-    .opt-card{display:flex;align-items:center;gap:11px;padding:13px 14px;border:1px solid var(--line);border-radius:var(--r);cursor:pointer;background:var(--white);transition:border-color .15s,background .15s;font-size:.87rem}
-    .opt-card:not(.locked):hover{border-color:#999;background:#fafaf8}
+    .opt-card{display:flex;align-items:center;gap:11px;padding:14px;border:1px solid var(--line);border-radius:var(--r);cursor:pointer;background:var(--white);transition:border-color .15s,background .15s,transform .1s;font-size:.87rem}
+    .opt-card:not(.locked):hover{border-color:#999;background:#fafaf8;transform:translateY(-1px)}
+    .opt-card:not(.locked):active{transform:translateY(0)}
     .opt-card.chosen{border-color:var(--ink);background:var(--faint)}
     .opt-card.correct{border-color:var(--good);background:var(--good-bg)}
     .opt-card.wrong{opacity:.4}
     .opt-card.locked{cursor:default}
-    .opt-key{width:24px;height:24px;flex-shrink:0;border-radius:4px;background:var(--line);display:flex;align-items:center;justify-content:center;font-size:.72rem;font-weight:600}
+    .opt-key{width:26px;height:26px;flex-shrink:0;border-radius:4px;background:var(--line);display:flex;align-items:center;justify-content:center;font-size:.73rem;font-weight:600}
     .opt-card.chosen .opt-key{background:var(--ink);color:#fff}
     .opt-card.correct .opt-key{background:var(--good);color:#fff}
-    @media(max-width:520px){.opt-grid{grid-template-columns:1fr}}
+    @media(max-width:480px){.opt-grid{grid-template-columns:1fr}}
 
-    /* SCORE LIST */
+    /* WAITING ROOM */
+    .wait-shell{display:flex;flex-direction:column;align-items:center;min-height:calc(100vh - 52px);padding:40px 20px;gap:0}
+    .wait-header{text-align:center;margin-bottom:32px}
+    .spinner{width:36px;height:36px;border:3px solid var(--line);border-top-color:var(--ink);border-radius:50%;animation:spin .7s linear infinite;margin:0 auto 16px}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    .student-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px;width:100%;max-width:560px}
+    .student-chip{display:flex;align-items:center;gap:8px;padding:9px 12px;background:var(--white);border:1px solid var(--line);border-radius:var(--r);font-size:.83rem;animation:fadeSlideIn .35s ease}
+    @keyframes fadeSlideIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+    .student-avatar{width:26px;height:26px;border-radius:50%;background:var(--faint);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:.72rem;font-weight:600;flex-shrink:0}
+
+    /* SCORES */
     .score-list{border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
-    .score-row{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--line);background:var(--white);font-size:.86rem}
+    .score-row{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--line);background:var(--white);font-size:.86rem;transition:background .15s}
     .score-row:last-child{border-bottom:none}
     .score-rank{min-width:22px;text-align:center;font-size:.74rem;color:var(--mid)}
     .score-name{flex:1}
-    .score-pts{font-weight:600}
-    .score-row.me{background:var(--faint)}
+    .score-pts{font-weight:600;font-variant-numeric:tabular-nums}
+    .score-row.me{background:#e8f5ee}
+    .score-row.top{background:var(--faint)}
 
     /* INSPECT TABLE */
     .itbl-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:var(--r)}
-    .itbl{border-collapse:collapse;width:100%;font-size:.8rem}
-    .itbl th{padding:8px 12px;text-align:left;border-bottom:1px solid var(--line);background:var(--faint);font-size:.67rem;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--mid);white-space:nowrap}
+    .itbl{border-collapse:collapse;width:100%;font-size:.79rem}
+    .itbl th{padding:8px 12px;text-align:left;border-bottom:1px solid var(--line);background:var(--faint);font-size:.66rem;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--mid);white-space:nowrap}
     .itbl td{padding:9px 12px;border-bottom:1px solid var(--line);vertical-align:middle}
     .itbl tr:last-child td{border-bottom:none}
     .itbl tbody tr:hover td{background:#fafaf8;cursor:pointer}
-    .c-ok{color:var(--good);font-weight:600} .c-bad{color:var(--bad)} .c-nil{color:#ccc}
+    .c-ok{color:var(--good);font-weight:600}.c-bad{color:var(--bad)}.c-nil{color:#ccc}
     .detail-wrap{border:1px solid var(--line);border-radius:var(--r);overflow:hidden;margin-top:16px}
     .detail-head{padding:12px 16px;border-bottom:1px solid var(--line);background:var(--faint);display:flex;align-items:center;justify-content:space-between}
     .detail-row{padding:11px 16px;border-bottom:1px solid var(--line);font-size:.84rem}
@@ -136,26 +163,25 @@
     .ac-bad{background:var(--bad-bg);color:var(--bad)}
     .ac-none{background:var(--faint);color:var(--mid)}
 
-    /* VOICE INDICATOR */
-    .voice-bar{display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--faint);border-radius:var(--r);font-size:.82rem;margin-bottom:16px}
-    .mic-dot{width:9px;height:9px;border-radius:50%;background:#ccc;flex-shrink:0}
-    .mic-dot.on{background:#2d9e6b;box-shadow:0 0 0 3px rgba(45,158,107,.2);animation:blink 1s infinite}
-    .mic-dot.off{background:var(--bad)}
-    .speaker-icon{font-size:1rem;flex-shrink:0}
+    /* VOICE */
+    .voice-bar{display:flex;align-items:center;gap:10px;padding:9px 12px;background:var(--faint);border-radius:var(--r);font-size:.81rem;margin-bottom:14px;border:1px solid var(--line)}
+    .mic-dot{width:8px;height:8px;border-radius:50%;background:#ccc;flex-shrink:0;transition:background .3s}
+    .mic-dot.live{background:#2d9e6b;box-shadow:0 0 0 3px rgba(45,158,107,.18);animation:blink 1s infinite}
+    .mic-dot.err{background:var(--bad)}
 
-    .spinner{width:36px;height:36px;border:3px solid var(--line);border-top-color:var(--ink);border-radius:50%;animation:spin .7s linear infinite}
-    @keyframes spin{to{transform:rotate(360deg)}}
-    code{font-size:.77rem;background:var(--faint);padding:1px 5px;border-radius:3px;font-family:monospace}
-    .stat-strip{display:flex;gap:20px;padding:12px 0;border-bottom:1px solid var(--line);margin-bottom:20px;flex-wrap:wrap}
-    .stat-item{display:flex;flex-direction:column}
-    .stat-val{font-weight:600;font-size:1.1rem}
-    .stat-lbl{font-size:.7rem;color:var(--mid);text-transform:uppercase;letter-spacing:.07em}
+    /* STAT STRIP */
+    .stat-strip{display:flex;gap:20px;padding:10px 0;border-bottom:1px solid var(--line);margin-bottom:18px;flex-wrap:wrap}
+    .stat-item .stat-val{font-weight:600;font-size:1.05rem}
+    .stat-item .stat-lbl{font-size:.68rem;color:var(--mid);text-transform:uppercase;letter-spacing:.07em}
+
+    code{font-size:.76rem;background:var(--faint);padding:1px 5px;border-radius:3px;font-family:monospace}
   </style>
 </head>
 <body>
 <div id="app">
   <nav>
     <span class="brand">QuizZap</span>
+    <div id="nav-score-strip"></div>
     <div class="nav-right">
       <div id="ci"></div>
       <span id="cl">connecting</span>
@@ -167,23 +193,28 @@
 <audio id="remote-audio" autoplay playsinline style="display:none"></audio>
 
 <script>
-/* ══════════════════════════════════════════
+/* ═══════════════════════════════════
    STATE
-══════════════════════════════════════════ */
-let S={}, role=null, myPid=null, myName=null;
-let hostAuthed=false;
+═══════════════════════════════════ */
+let S={}, role=null, myPid=null, myName=null, hostAuthed=false;
 let questions=[], selIdx=-1, answerKey=-1, inspectPid=null;
 
-// Voice
-let localStream=null;           // host mic stream
-const peerConns={};             // cid → RTCPeerConnection (host side)
-let remoteConn=null;            // RTCPeerConnection (student side)
+// Voice (host)
+let localStream=null;
+const peerConns={};  // cid → RTCPeerConnection
 
-const STUN={ iceServers:[{urls:'stun:stun.l.google.com:19302'},{urls:'stun:stun1.l.google.com:19302'}] };
+// Voice (student)
+let remoteConn=null;
 
-/* ══════════════════════════════════════════
+const STUN={ iceServers:[
+  {urls:'stun:stun.l.google.com:19302'},
+  {urls:'stun:stun1.l.google.com:19302'},
+  {urls:'stun:stun2.l.google.com:19302'},
+]};
+
+/* ═══════════════════════════════════
    WEBSOCKET
-══════════════════════════════════════════ */
+═══════════════════════════════════ */
 let ws, myCid=null;
 const WS_URL=`${location.protocol==='https:'?'wss':'ws'}://${location.host}`;
 
@@ -191,106 +222,158 @@ function connect(){
   ws=new WebSocket(WS_URL);
   ws.onopen=()=>{
     setConn(true);
-    if(role==='host'&&hostAuthed) send({type:'set_host',password:'2325'});
-    else if(role==='participant'&&myName) send({type:'join',name:myName,pid:myPid});
+    if(role==='host'&&hostAuthed)          send({type:'set_host',password:'2325'});
+    else if(role==='participant'&&myName)  send({type:'join',name:myName,pid:myPid});
   };
   ws.onmessage=async e=>{
     const m=JSON.parse(e.data);
-    if(m.type==='hello')      { myCid=m.cid; }
-    if(m.type==='state')      { S=m.payload; render(); }
-    if(m.type==='joined')     { myPid=m.pid; sessionStorage.setItem('qz_pid',m.pid); }
-    if(m.type==='auth_ok')    { hostAuthed=true; render(); }
-    if(m.type==='auth_fail')  { const el=document.getElementById('pw-err'); if(el)el.textContent='Incorrect password.'; }
-    if(m.type==='left')       { doLeave(); }
-    // WebRTC signaling
-    if(m.type==='rtc_new_peer'&&role==='host') await hostCallPeer(m.cid);
-    if(m.type==='rtc_offer'  &&role==='participant') await studentHandleOffer(m.signal);
-    if(m.type==='rtc_answer' &&role==='host') await hostHandleAnswer(m.fromCid,m.signal);
-    if(m.type==='rtc_ice'    &&role==='host') peerConns[m.fromCid]?.addIceCandidate(m.signal).catch(()=>{});
-    if(m.type==='rtc_ice'    &&role==='participant') remoteConn?.addIceCandidate(m.signal).catch(()=>{});
+    switch(m.type){
+      case 'hello':      myCid=m.cid; break;
+      case 'state':      S=m.payload; render(); updateNavScore(); break;
+      case 'joined':     myPid=m.pid; sessionStorage.setItem('qz_pid',m.pid); break;
+      case 'auth_ok':    hostAuthed=true; render(); break;
+      case 'auth_fail':  { const el=document.getElementById('pw-err'); if(el) el.textContent='Incorrect password.'; break; }
+      case 'left':       doLeave(); break;
+      case 'peer_list':  for(const cid of m.cids) await hostCallPeer(cid); break;
+      case 'rtc_new_peer': if(role==='host') await hostCallPeer(m.cid); break;
+      case 'rtc_offer':    if(role==='participant') await studentHandleOffer(m.signal); break;
+      case 'rtc_answer':   if(role==='host') await hostHandleAnswer(m.fromCid,m.signal); break;
+      case 'rtc_ice':
+        if(role==='host'&&peerConns[m.fromCid])
+          peerConns[m.fromCid].addIceCandidate(new RTCIceCandidate(m.signal)).catch(()=>{});
+        if(role==='participant'&&remoteConn)
+          remoteConn.addIceCandidate(new RTCIceCandidate(m.signal)).catch(()=>{});
+        break;
+    }
   };
   ws.onclose=()=>{ setConn(false); setTimeout(connect,2000); };
   ws.onerror=()=>ws.close();
 }
 function send(d){ if(ws?.readyState===1) ws.send(JSON.stringify(d)); }
-function setConn(on){ document.getElementById('ci').className=on?'on':'off'; document.getElementById('cl').textContent=on?'connected':'reconnecting…'; }
+function setConn(on){
+  document.getElementById('ci').className=on?'on':'off';
+  document.getElementById('cl').textContent=on?'connected':'reconnecting…';
+}
 
-/* ══════════════════════════════════════════
-   WEBRTC — HOST SIDE (broadcaster)
-══════════════════════════════════════════ */
+/* ═══════════════════════════════════
+   NAV SCORE STRIP (students only)
+═══════════════════════════════════ */
+function updateNavScore(){
+  const strip=document.getElementById('nav-score-strip');
+  if(!strip) return;
+  if(role!=='participant'||!myPid||S.status==='idle'||S.status==='ended'){
+    strip.innerHTML=''; return;
+  }
+  const sorted=[...(S.participants||[])].sort((a,b)=>(b.score||0)-(a.score||0));
+  const top=sorted.slice(0,3);
+  const myRank=sorted.findIndex(p=>p.id===myPid)+1;
+  const myP=sorted.find(p=>p.id===myPid);
+  const medals=['🥇','🥈','🥉'];
+  let html=top.map((p,i)=>`
+    <div class="ns-chip${p.id===myPid?' me':''}">
+      <span>${medals[i]||i+1}</span>
+      <span>${esc(p.name.length>10?p.name.slice(0,9)+'…':p.name)}</span>
+      <span class="ns-pts">${p.score||0}</span>
+    </div>`).join('');
+  // If I'm not in top 3, add my chip
+  if(myRank>3&&myP){
+    html+=`<span style="color:var(--mid);font-size:.7rem;padding:0 4px">…</span>
+    <div class="ns-chip me">
+      <span>#${myRank}</span>
+      <span>${esc(myP.name.length>10?myP.name.slice(0,9)+'…':myP.name)}</span>
+      <span class="ns-pts">${myP.score||0}</span>
+    </div>`;
+  }
+  strip.innerHTML=html;
+}
+
+/* ═══════════════════════════════════
+   WEBRTC — HOST
+═══════════════════════════════════ */
 async function startMic(){
   try{
-    localStream=await navigator.mediaDevices.getUserMedia({audio:true,video:false});
+    // Stop any existing stream first
+    if(localStream){ localStream.getTracks().forEach(t=>t.stop()); localStream=null; }
+    localStream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true},video:false});
     render();
-    return true;
-  }catch(e){
-    alert('Microphone access denied or unavailable.');
-    return false;
+    // Ask server for all current participant cids and call them
+    send({type:'get_peers'});
+  }catch(err){
+    console.error('Mic error',err);
+    alert('Microphone access denied. Please allow microphone access in your browser and try again.');
   }
 }
+
 function stopMic(){
-  localStream?.getTracks().forEach(t=>t.stop());
-  localStream=null;
+  if(localStream){ localStream.getTracks().forEach(t=>t.stop()); localStream=null; }
   Object.values(peerConns).forEach(pc=>pc.close());
   Object.keys(peerConns).forEach(k=>delete peerConns[k]);
   render();
 }
 
 async function hostCallPeer(cid){
-  if(!localStream) return;                     // voice not started — skip
-  if(peerConns[cid]) return;
+  if(!localStream) return;
+  // Close stale connection if exists
+  if(peerConns[cid]){ peerConns[cid].close(); delete peerConns[cid]; }
   const pc=new RTCPeerConnection(STUN);
   peerConns[cid]=pc;
   localStream.getTracks().forEach(t=>pc.addTrack(t,localStream));
-  pc.onicecandidate=ev=>{ if(ev.candidate) send({type:'rtc_ice_to_peer',toCid:cid,signal:ev.candidate}); };
-  pc.onconnectionstatechange=()=>{ if(['failed','closed','disconnected'].includes(pc.connectionState)){ pc.close(); delete peerConns[cid]; } };
-  const offer=await pc.createOffer();
-  await pc.setLocalDescription(offer);
-  send({type:'rtc_offer',toCid:cid,signal:pc.localDescription});
+  pc.onicecandidate=ev=>{
+    if(ev.candidate) send({type:'rtc_ice_to_peer',toCid:cid,signal:ev.candidate.toJSON()});
+  };
+  pc.onconnectionstatechange=()=>{
+    if(['failed','closed','disconnected'].includes(pc.connectionState)){
+      pc.close(); delete peerConns[cid];
+    }
+  };
+  try{
+    const offer=await pc.createOffer();
+    await pc.setLocalDescription(offer);
+    send({type:'rtc_offer',toCid:cid,signal:{type:pc.localDescription.type,sdp:pc.localDescription.sdp}});
+  }catch(e){ console.error('offer error',e); }
 }
 
 async function hostHandleAnswer(cid,sdp){
   const pc=peerConns[cid];
-  if(!pc||pc.signalingState==='stable') return;
-  await pc.setRemoteDescription(sdp).catch(()=>{});
+  if(!pc) return;
+  if(pc.signalingState==='stable') return;
+  try{ await pc.setRemoteDescription(new RTCSessionDescription(sdp)); }catch(e){ console.error('answer error',e); }
 }
 
-// When host starts mic, call all existing participants
-async function callAllPeers(){
-  // We don't have cids of participants directly, server will re-join them won't,
-  // so we trigger by sending a 'get_peers' — actually we handle via reconnect on voice start
-  // The simplest approach: broadcast a voice-started notification so participants reconnect
-  send({type:'voice_started'});
-}
-
-/* ══════════════════════════════════════════
-   WEBRTC — STUDENT SIDE (listener)
-══════════════════════════════════════════ */
+/* ═══════════════════════════════════
+   WEBRTC — STUDENT
+═══════════════════════════════════ */
 async function studentHandleOffer(sdp){
-  if(remoteConn){ remoteConn.close(); }
+  if(remoteConn){ try{ remoteConn.close(); }catch(e){} remoteConn=null; }
   const pc=new RTCPeerConnection(STUN);
   remoteConn=pc;
-  pc.onicecandidate=ev=>{ if(ev.candidate) send({type:'rtc_ice_to_host',signal:ev.candidate}); };
+  pc.onicecandidate=ev=>{
+    if(ev.candidate) send({type:'rtc_ice_to_host',signal:ev.candidate.toJSON()});
+  };
   pc.ontrack=ev=>{
     const audio=document.getElementById('remote-audio');
-    if(audio.srcObject!==ev.streams[0]) audio.srcObject=ev.streams[0];
+    if(audio&&audio.srcObject!==ev.streams[0]){ audio.srcObject=ev.streams[0]; audio.play().catch(()=>{}); }
+    updateMicDot();
   };
-  await pc.setRemoteDescription(sdp);
-  const answer=await pc.createAnswer();
-  await pc.setLocalDescription(answer);
-  send({type:'rtc_answer',signal:pc.localDescription});
-  updateVoiceUI();
-}
-function updateVoiceUI(){
-  const d=document.getElementById('voice-status');
-  if(!d) return;
-  const connected=remoteConn&&['connected','completed'].includes(remoteConn.iceConnectionState);
-  d.innerHTML=`<span class="mic-dot ${connected?'on':''}"></span><span>${connected?'Host is speaking':'Listening…'}</span>`;
+  pc.oniceconnectionstatechange=()=>updateMicDot();
+  try{
+    await pc.setRemoteDescription(new RTCSessionDescription(sdp));
+    const answer=await pc.createAnswer();
+    await pc.setLocalDescription(answer);
+    send({type:'rtc_answer',signal:{type:pc.localDescription.type,sdp:pc.localDescription.sdp}});
+  }catch(e){ console.error('student offer handling error',e); }
 }
 
-/* ══════════════════════════════════════════
+function updateMicDot(){
+  const d=document.getElementById('mic-dot');
+  if(!d) return;
+  const state=remoteConn?.iceConnectionState;
+  d.className='mic-dot'+(state==='connected'||state==='completed'?' live':state==='failed'?' err':'');
+}
+
+/* ═══════════════════════════════════
    PARSER
-══════════════════════════════════════════ */
+═══════════════════════════════════ */
 function parseQuestions(text){
   const out=[], lines=text.split('\n').map(l=>l.trim()).filter(Boolean);
   for(let i=0;i<lines.length;i++){
@@ -301,25 +384,26 @@ function parseQuestions(text){
   return out;
 }
 
-/* ══════════════════════════════════════════
-   RENDER ROUTER
-══════════════════════════════════════════ */
+/* ═══════════════════════════════════
+   RENDER
+═══════════════════════════════════ */
 function render(){
   const el=document.getElementById('nav-role');
   if(role==='host'&&hostAuthed){el.style.display='';el.textContent='Host';}
   else if(myName){el.style.display='';el.textContent=myName;}
   else el.style.display='none';
   const v=document.getElementById('view');
-  if(!role)                       v.innerHTML=landingHTML();
+  if(!role)                          v.innerHTML=landingHTML();
   else if(role==='host'&&!hostAuthed) v.innerHTML=hostPassHTML();
-  else if(role==='host')          v.innerHTML=hostHTML();
-  else                            v.innerHTML=participantHTML();
+  else if(role==='host')             v.innerHTML=hostHTML();
+  else                               v.innerHTML=participantHTML();
   attach();
+  updateNavScore();
 }
 
-/* ══════════════════════════════════════════
+/* ═══════════════════════════════════
    LANDING
-══════════════════════════════════════════ */
+═══════════════════════════════════ */
 function landingHTML(){
   const n=(S.participants||[]).length;
   return `<div class="center"><div class="box">
@@ -329,19 +413,19 @@ function landingHTML(){
       <button class="btn btn-dark btn-lg" id="go-host">Host a session</button>
       <button class="btn btn-white btn-lg" id="go-join">Join as student</button>
     </div>
-    ${n?`<p class="muted small mt3" style="text-align:center">${n} student${n!==1?'s':''} connected</p>`:''}
+    ${n?`<p class="muted small mt3" style="text-align:center">${n} student${n!==1?'s':''} waiting</p>`:''}
   </div></div>`;
 }
 
-/* ══════════════════════════════════════════
+/* ═══════════════════════════════════
    HOST PASSWORD
-══════════════════════════════════════════ */
+═══════════════════════════════════ */
 function hostPassHTML(){
   return `<div class="center"><div class="box">
     <h2 class="mb1">Host login</h2>
     <p class="muted mb3">Enter the host password to continue.</p>
     <input type="password" id="pw-in" placeholder="Password" maxlength="20" autocomplete="off" />
-    <p id="pw-err" style="color:var(--bad);font-size:.8rem;min-height:1.2em;margin-top:6px"></p>
+    <p id="pw-err" style="color:var(--bad);font-size:.8rem;min-height:1.2em;margin-top:5px"></p>
     <div class="row gap2 mt2">
       <button class="btn btn-ghost btn-sm" id="btn-pw-back">← Back</button>
       <button class="btn btn-dark" id="btn-pw-ok" style="flex:1">Enter</button>
@@ -349,101 +433,91 @@ function hostPassHTML(){
   </div></div>`;
 }
 
-/* ══════════════════════════════════════════
+/* ═══════════════════════════════════
    HOST SHELL
-══════════════════════════════════════════ */
+═══════════════════════════════════ */
 function hostHTML(){
   if(S.status==='ended') return hostEndedHTML();
   return `<div class="host-shell">${hostSidebar()}${hostMain()}</div>`;
 }
 
-/* ── SIDEBAR: compact question list ── */
 function hostSidebar(){
   const isLive=S.status==='question'||S.status==='revealed';
-  const pushedText=isLive&&S.question?S.question.text:null;
   const doneTexts=(S.history||[]).map(h=>h.question.text);
-
   const qRows=questions.length?questions.map((q,i)=>{
-    const isActive=selIdx===i&&!isLive;
+    const isLiveNow=isLive&&S.question&&S.question.text===q.text;
     const isDone=doneTexts.includes(q.text);
-    const isLiveNow=isLive&&pushedText===q.text;
+    const isActive=selIdx===i&&!isLive;
     let cls='q-row';
     if(isLiveNow) cls+=' live';
     else if(isActive) cls+=' active';
     else if(isDone) cls+=' done';
     return `<div class="${cls}" data-qi="${i}">
       <div class="q-idx">${i+1}</div>
-      <div class="q-snippet">${esc(q.text.length>70?q.text.slice(0,68)+'…':q.text)}</div>
-      ${isLiveNow?'<span style="font-size:.68rem;color:var(--good)">●</span>':''}
+      <div class="q-snippet">${esc(q.text.length>65?q.text.slice(0,63)+'…':q.text)}</div>
+      ${isLiveNow?'<span style="font-size:.65rem;color:var(--good)">●</span>':''}
     </div>`;
-  }).join(''):'<p class="muted small mt2">No questions loaded yet.</p>';
-
+  }).join(''):'<p class="muted small mt2">No questions loaded.</p>';
   return `<div class="host-sidebar">
     <h3 class="mb2">Questions</h3>
     <div class="q-list">${qRows}</div>
     <hr/>
-    <div class="row gap2">
-      <button class="btn btn-bad btn-sm" id="btn-end" style="flex:1">End session</button>
-      <button class="btn btn-ghost btn-sm" id="btn-reset">Reset</button>
+    <div class="col gap2">
+      <button class="btn btn-bad btn-sm" id="btn-end">End session</button>
+      <button class="btn btn-ghost btn-sm" id="btn-reset">Reset everything</button>
     </div>
   </div>`;
 }
 
-/* ── MAIN PANEL ── */
 function hostMain(){
   const isLive=S.status==='question'||S.status==='revealed';
+  if(!questions.length) return `<div class="host-main">
+    ${voiceBar()}
+    <h2 class="mb3">Load questions</h2>
+    <p class="muted small mb2">Paste the raw GitHub file URL</p>
+    <div class="row gap2 mb2">
+      <input type="url" id="gh-url" placeholder="https://raw.githubusercontent.com/…/questions.txt" />
+      <button class="btn btn-dark btn-sm" id="btn-load" style="flex-shrink:0">Load</button>
+    </div>
+    <p class="muted small">Format: question on one line, options on next: <code>(A)opt,(B)opt,(C)opt,(D)opt</code></p>
+    <div id="load-msg"></div>
+  </div>`;
 
-  // No questions loaded yet — show loader
-  if(!questions.length){
-    return `<div class="host-main">
-      ${voiceHostBar()}
-      <h2 class="mb3">Load questions</h2>
-      <p class="muted small mb2">Paste the raw GitHub file URL</p>
-      <div class="row gap2 mb2">
-        <input type="url" id="gh-url" placeholder="https://raw.githubusercontent.com/…/questions.txt" />
-        <button class="btn btn-dark btn-sm" id="btn-load" style="flex-shrink:0">Load</button>
-      </div>
-      <p class="muted small">Format: question on one line, options on next line as <code>(A)opt,(B)opt,(C)opt,(D)opt</code></p>
-      <div id="load-msg"></div>
-    </div>`;
-  }
+  if(isLive) return `<div class="host-main">${voiceBar()}${livePanel()}</div>`;
 
-  // Questions loaded, live question active
-  if(isLive) return `<div class="host-main">${voiceHostBar()}${livePanel()}</div>`;
-
-  // Questions loaded, pick one
   const q=selIdx>=0?questions[selIdx]:null;
   return `<div class="host-main">
-    ${voiceHostBar()}
-    <div class="row gap2 mb3" style="flex-wrap:wrap">
-      <h2 style="flex:1">${q?`Q${selIdx+1}`:'Select a question'}</h2>
-      <button class="btn btn-ghost btn-sm" id="btn-reload">↻ Change file</button>
+    ${voiceBar()}
+    <div class="row between mb3" style="flex-wrap:wrap;gap:8px">
+      <h2>${q?`Q${selIdx+1} of ${questions.length}`:'Select a question'}</h2>
+      <button class="btn btn-ghost btn-sm" id="btn-reload">↻ Reload file</button>
     </div>
-    ${!q?`<p class="muted">Click a question from the sidebar to select it.</p>`:`
-      <p style="font-size:1rem;line-height:1.5;margin-bottom:20px">${esc(q.text)}</p>
-      <h3 class="mb2">Set answer key</h3>
-      <div class="key-grid">
-        ${q.options.map((o,i)=>`
-          <div class="key-card${answerKey===i?' selected':''}" data-key="${i}">
-            <div class="kl">${'ABCD'[i]}</div>
-            <div class="kt">${esc(o)}</div>
-          </div>`).join('')}
-      </div>
-      <button class="btn btn-dark btn-full" id="btn-push" ${answerKey<0?'disabled':''}>
-        Push to students →
-      </button>
-    `}
+    ${!q
+      ?`<p class="muted">Click a question from the sidebar to select it, then set the answer key.</p>`
+      :`<p style="font-size:.97rem;line-height:1.55;margin-bottom:22px">${esc(q.text)}</p>
+        <h3 class="mb2">Correct answer</h3>
+        <div class="key-grid">
+          ${q.options.map((o,i)=>`
+            <div class="key-card${answerKey===i?' selected':''}" data-key="${i}">
+              <div class="kl">${'ABCD'[i]}</div>
+              <div class="kt">${esc(o)}</div>
+            </div>`).join('')}
+        </div>
+        <button class="btn btn-dark btn-full" id="btn-push" ${answerKey<0?'disabled':''}>
+          Push question to students →
+        </button>`
+    }
   </div>`;
 }
 
-function voiceHostBar(){
+function voiceBar(){
   const on=!!localStream;
   return `<div class="voice-bar">
-    <span class="speaker-icon">🎙️</span>
-    <span style="flex:1">${on?'Microphone live — students can hear you':'Voice off — students cannot hear you'}</span>
+    <div class="mic-dot${on?' live':''}"></div>
+    <span style="flex:1;color:var(--mid)">${on?'Microphone active — students can hear you':'Voice off'}</span>
     ${on
       ?`<button class="btn btn-bad btn-sm" id="btn-mic-stop">Stop mic</button>`
-      :`<button class="btn btn-good btn-sm" id="btn-mic-start">Start mic</button>`
+      :`<button class="btn btn-dark btn-sm" id="btn-mic-start">🎙 Start mic</button>`
     }
   </div>`;
 }
@@ -453,44 +527,38 @@ function livePanel(){
   const totalParts=(S.participants||[]).length;
   const answered=S.totalAnswered||0;
   const counts=S.answerCounts||[];
-  const total=counts.reduce((a,b)=>a+b,0)||1;
-  const partMap={};
-  (S.participants||[]).forEach(p=>partMap[p.id]=p.name);
-
+  const total=Math.max(1,counts.reduce((a,b)=>a+b,0));
+  const partMap={}; (S.participants||[]).forEach(p=>partMap[p.id]=p.name);
   const bars=q.options.map((o,i)=>{
-    const cnt=counts[i]||0;
-    const pct=(cnt/total*100).toFixed(0);
+    const cnt=counts[i]||0,pct=(cnt/total*100).toFixed(0);
     const names=Object.entries(S.answers||{}).filter(([,ans])=>ans===i).map(([pid])=>partMap[pid]||'?');
     return `<div class="bar-row">
-      <div class="bar-meta">
-        <span>${'ABCD'[i]}) ${esc(o)}${S.correct===i?' ✓':''}</span>
-        <span>${cnt}</span>
-      </div>
+      <div class="bar-meta"><span>${'ABCD'[i]}) ${esc(o)}${S.correct===i?' ✓':''}</span><span>${cnt}</span></div>
       <div class="bar-track"><div class="bar-fill${S.correct===i?' correct':''}" style="width:${pct}%"></div></div>
       ${names.length?`<div class="bar-names">${names.map(n=>esc(n)).join(', ')}</div>`:''}
     </div>`;
   }).join('');
-
   const sorted=[...(S.participants||[])].sort((a,b)=>(b.score||0)-(a.score||0));
-  const scoreRows=sorted.map((p,i)=>`
-    <div class="score-row">
-      <div class="score-rank">${i+1}</div>
-      <div class="score-name">${esc(p.name)}</div>
-      <div class="score-pts">${p.score||0}</div>
-    </div>`).join('');
-
+  const scoreRows=sorted.map((p,i)=>`<div class="score-row">
+    <div class="score-rank">${i+1}</div>
+    <div class="score-name">${esc(p.name)}</div>
+    <div class="score-pts">${p.score||0}</div>
+  </div>`).join('');
   return `
-    <div class="row between mb2" style="flex-wrap:wrap;gap:8px">
+    <div class="row between mb2" style="flex-wrap:wrap;gap:10px">
       <div>
-        <h3 class="mb1">Live — ${S.status==='revealed'?'Answer revealed':'Waiting for answers'}</h3>
+        <div class="row gap2 mb1">
+          ${S.status==='revealed'
+            ?'<span class="tag tag-ink">Revealed</span>'
+            :`<span class="tag tag-green"><span class="dot-live"></span> Live</span>`}
+          <span class="small muted">${answered}/${totalParts} answered</span>
+        </div>
         <p style="font-size:.9rem;line-height:1.4">${esc(q.text)}</p>
       </div>
-      <div style="display:flex;gap:8px;align-items:center">
+      <div class="row gap2">
         ${S.status==='revealed'
-          ?`<span style="font-size:.78rem;color:var(--mid)">${answered}/${totalParts} answered</span>
-            <button class="btn btn-dark btn-sm" id="btn-next">Next question →</button>`
-          :`<span style="font-size:.78rem;color:var(--mid)">${answered}/${totalParts} answered</span>
-            <button class="btn btn-good btn-sm" id="btn-reveal">Reveal answer</button>`
+          ?`<button class="btn btn-dark btn-sm" id="btn-next">Next question →</button>`
+          :`<button class="btn btn-good btn-sm" id="btn-reveal">Reveal answer</button>`
         }
       </div>
     </div>
@@ -499,87 +567,62 @@ function livePanel(){
       <div class="stat-item"><div class="stat-val">${answered}</div><div class="stat-lbl">Answered</div></div>
       <div class="stat-item"><div class="stat-val">${(S.history||[]).length+1}</div><div class="stat-lbl">Question #</div></div>
     </div>
-    <h3 class="mb2">Responses</h3>
-    ${bars}
-    ${sorted.length?`<h3 class="mb2 mt3">Scoreboard</h3><div class="score-list">${scoreRows}</div>`:''}
-  `;
+    <h3 class="mb2">Responses</h3>${bars}
+    ${sorted.length?`<h3 class="mb2 mt3">Live scores</h3><div class="score-list">${scoreRows}</div>`:''}`;
 }
 
-/* ══════════════════════════════════════════
+/* ═══════════════════════════════════
    HOST ENDED
-══════════════════════════════════════════ */
+═══════════════════════════════════ */
 function hostEndedHTML(){
   const history=S.history||[], participants=S.participants||[];
   const sorted=[...participants].sort((a,b)=>(b.score||0)-(a.score||0));
   const partMap={}; participants.forEach(p=>partMap[p.id]=p);
-
   const table=participants.length&&history.length?`
-    <div class="itbl-wrap">
-      <table class="itbl">
-        <thead><tr>
-          <th>Student</th>
-          ${history.map((_,i)=>`<th>Q${i+1}</th>`).join('')}
-          <th>Score</th>
-        </tr></thead>
-        <tbody>
-          ${sorted.map(p=>`<tr data-pid="${p.id}">
-            <td><strong>${esc(p.name)}</strong></td>
-            ${history.map(h=>{
-              const ans=h.answers[p.id]??null;
-              if(ans===null) return '<td class="c-nil">—</td>';
-              return `<td class="${ans===h.correct?'c-ok':'c-bad'}">${'ABCD'[ans]}${ans===h.correct?' ✓':' ✗'}</td>`;
-            }).join('')}
-            <td><strong>${p.score||0}</strong></td>
-          </tr>`).join('')}
-        </tbody>
-      </table>
-    </div>`:
+    <div class="itbl-wrap"><table class="itbl">
+      <thead><tr>
+        <th>Student</th>${history.map((_,i)=>`<th>Q${i+1}</th>`).join('')}<th>Score</th>
+      </tr></thead>
+      <tbody>${sorted.map(p=>`<tr data-pid="${p.id}">
+        <td><strong>${esc(p.name)}</strong></td>
+        ${history.map(h=>{ const ans=h.answers[p.id]??null; if(ans===null)return'<td class="c-nil">—</td>';
+          return`<td class="${ans===h.correct?'c-ok':'c-bad'}">${'ABCD'[ans]}${ans===h.correct?' ✓':' ✗'}</td>`; }).join('')}
+        <td><strong>${p.score||0}</strong></td>
+      </tr>`).join('')}</tbody>
+    </table></div>`:
     `<div class="notice n-neutral">No data recorded.</div>`;
-
   let detail='';
   if(inspectPid&&partMap[inspectPid]){
     const p=partMap[inspectPid];
     detail=`<div class="detail-wrap">
-      <div class="detail-head">
-        <span><strong>${esc(p.name)}</strong> — ${p.score||0} pts</span>
-        <button class="btn btn-ghost btn-sm" id="btn-close-inspect">Close</button>
-      </div>
-      ${history.map((h,i)=>{
-        const ans=h.answers[p.id]??null;
-        return `<div class="detail-row">
-          <div class="detail-q">Q${i+1}: ${esc(h.question.text)}</div>
-          <div class="ans-chips">
-            ${h.question.options.map((o,oi)=>{
-              let cls='ac-none';
-              if(oi===h.correct) cls='ac-good';
-              if(ans===oi&&oi!==h.correct) cls='ac-bad';
-              const mark=oi===ans?(oi===h.correct?' ✓':' ✗'):'';
-              return `<span class="ans-chip ${cls}" style="${oi===ans||oi===h.correct?'font-weight:600':''}">${'ABCD'[oi]}) ${esc(o)}${mark}</span>`;
-            }).join('')}
-            ${ans===null?'<span class="ans-chip ac-none">No answer</span>':''}
-          </div>
-        </div>`;
-      }).join('')}
+      <div class="detail-head"><span><strong>${esc(p.name)}</strong> — ${p.score||0} pts</span>
+        <button class="btn btn-ghost btn-sm" id="btn-close-inspect">Close</button></div>
+      ${history.map((h,i)=>{const ans=h.answers[p.id]??null;return`<div class="detail-row">
+        <div class="detail-q">Q${i+1}: ${esc(h.question.text)}</div>
+        <div class="ans-chips">
+          ${h.question.options.map((o,oi)=>{let cls='ac-none';if(oi===h.correct)cls='ac-good';if(ans===oi&&oi!==h.correct)cls='ac-bad';
+            const mark=oi===ans?(oi===h.correct?' ✓':' ✗'):'';
+            return`<span class="ans-chip ${cls}" style="${oi===ans||oi===h.correct?'font-weight:600':''}">${'ABCD'[oi]}) ${esc(o)}${mark}</span>`;}).join('')}
+          ${ans===null?'<span class="ans-chip ac-none">No answer</span>':''}
+        </div>
+      </div>`;}).join('')}
     </div>`;
   }
-
   return `<div class="wide">
-    <div class="row between mb3">
-      <h2>Session Results</h2>
-      <button class="btn btn-ghost btn-sm" id="btn-reset">New session</button>
-    </div>
-    <p class="muted small mb3">Click any row to inspect that student's answers.</p>
+    <div class="row between mb3"><h2>Session Results</h2>
+      <button class="btn btn-ghost btn-sm" id="btn-reset">New session</button></div>
+    <p class="muted small mb3">Click any row to inspect individual answers.</p>
     ${table}${detail}
   </div>`;
 }
 
-/* ══════════════════════════════════════════
+/* ═══════════════════════════════════
    PARTICIPANT
-══════════════════════════════════════════ */
+═══════════════════════════════════ */
 function participantHTML(){
-  if(!myName) return joinHTML();
-  if(S.status==='idle') return waitHTML();
-  if(S.status==='ended') return studentEndHTML();
+  if(!myName)              return joinHTML();
+  if(S.status==='idle')    return waitHTML();
+  if(S.status==='ended')   return studentEndHTML();
   return questionViewHTML();
 }
 
@@ -593,34 +636,47 @@ function joinHTML(){
 }
 
 function waitHTML(){
-  const n=(S.participants||[]).length;
-  return `<div class="center" style="text-align:center">
-    <div id="voice-status" class="voice-bar" style="margin-bottom:24px;justify-content:center">
-      <span class="mic-dot"></span><span>Waiting for voice…</span>
+  const parts=S.participants||[];
+  const myP=parts.find(p=>p.id===myPid);
+  const others=parts.filter(p=>p.id!==myPid);
+  function initials(name){ return name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase(); }
+  const chips=[...(myP?[myP]:[]),...others].map(p=>`
+    <div class="student-chip">
+      <div class="student-avatar" style="${p.id===myPid?'background:#d8f3dc;border-color:#b7dfc7':''}">
+        ${initials(p.name)}
+      </div>
+      <span>${esc(p.name)}${p.id===myPid?' <span style="font-size:.7rem;color:var(--mid)">(you)</span>':''}</span>
+    </div>`).join('');
+  return `<div class="wait-shell">
+    <div class="wait-header">
+      <div class="spinner"></div>
+      <h2>Waiting for the host…</h2>
+      <p class="muted mt1">${parts.length} student${parts.length!==1?'s':''} in the room</p>
     </div>
-    <div class="spinner" style="margin:0 auto 20px"></div>
-    <h2 class="mb1">Waiting for question</h2>
-    <p class="muted mb3">${n} participant${n!==1?'s':''} in the room</p>
-    <button class="btn btn-ghost btn-sm" id="btn-leave">Leave session</button>
+    <div id="voice-bar-student" class="voice-bar" style="max-width:480px;width:100%;margin-bottom:20px">
+      <div id="mic-dot" class="mic-dot"></div>
+      <span style="flex:1;color:var(--mid);font-size:.8rem">Host voice not started</span>
+    </div>
+    <div class="student-grid" style="max-width:560px">${chips}</div>
+    <button class="btn btn-ghost btn-sm mt4" id="btn-leave">Leave session</button>
   </div>`;
 }
 
 function questionViewHTML(){
   const q=S.question; if(!q) return waitHTML();
   const answered=S.myAnswer!==null&&S.myAnswer!==undefined;
-  const revealed=S.status==='revealed';
-  const correct=S.correct;
+  const revealed=S.status==='revealed', correct=S.correct;
   const opts=q.options.map((o,i)=>{
     let cls='opt-card';
-    if(revealed){cls+=' locked';if(i===correct)cls+=' correct';else if(i===S.myAnswer)cls+=' wrong';}
-    else if(answered){cls+=' locked';if(i===S.myAnswer)cls+=' chosen';}
+    if(revealed){ cls+=' locked'; if(i===correct)cls+=' correct'; else if(i===S.myAnswer)cls+=' wrong'; }
+    else if(answered){ cls+=' locked'; if(i===S.myAnswer)cls+=' chosen'; }
     else if(i===S.myAnswer) cls+=' chosen';
     return `<div class="${cls}" data-opt="${i}"><div class="opt-key">${'ABCD'[i]}</div><span>${esc(o)}</span></div>`;
   }).join('');
   let notice='';
   if(revealed&&answered){
     const ok=S.myAnswer===correct;
-    notice=`<div class="notice ${ok?'n-good':'n-bad'} mt3">${ok?'✓ Correct — +100 pts':`✗ Wrong. Correct: ${esc(q.options[correct])}`}</div>`;
+    notice=`<div class="notice ${ok?'n-good':'n-bad'} mt3">${ok?'✓ Correct — +1 point':`✗ Wrong. Correct answer: ${esc(q.options[correct])}`}</div>`;
   } else if(answered&&!revealed){
     notice=`<div class="notice n-neutral mt3">Answer submitted — waiting for host to reveal.</div>`;
   }
@@ -631,18 +687,16 @@ function questionViewHTML(){
       ${hist.map((h,i)=>{const ok=h.myAnswer!==null&&h.myAnswer===h.correct,none=h.myAnswer===null;return`
         <div class="score-row">
           <div class="score-rank">${i+1}</div>
-          <div style="flex:1;font-size:.82rem">${esc(h.question.text)}</div>
-          <div class="${none?'c-nil':ok?'c-ok':'c-bad'}" style="font-size:.82rem;font-weight:600">${none?'—':('ABCD'[h.myAnswer]+(ok?' ✓':' ✗'))}</div>
+          <div style="flex:1;font-size:.81rem">${esc(h.question.text)}</div>
+          <div class="${none?'c-nil':ok?'c-ok':'c-bad'}" style="font-size:.81rem;font-weight:600">${none?'—':('ABCD'[h.myAnswer]+(ok?' ✓':' ✗'))}</div>
         </div>`;}).join('')}
     </div>
   </div>`:'';
   return `<div class="page">
     <div class="row between mb3">
-      <div>
-        <div id="voice-status" class="row gap2" style="font-size:.78rem;color:var(--mid);margin-bottom:4px">
-          <span class="mic-dot"></span><span>Voice</span>
-        </div>
-        <span class="small muted">Score: <strong>${S.myScore||0}</strong> pts · ${(S.participants||[]).length} in room</span>
+      <div class="row gap2">
+        <div id="mic-dot" class="mic-dot"></div>
+        <span class="small muted">Score: <strong>${S.myScore||0}</strong> pts</span>
       </div>
       <button class="btn btn-ghost btn-sm" id="btn-leave">Leave</button>
     </div>
@@ -655,13 +709,14 @@ function questionViewHTML(){
 function studentEndHTML(){
   const sorted=[...(S.participants||[])].sort((a,b)=>(b.score||0)-(a.score||0));
   const myRank=sorted.findIndex(p=>p.id===myPid)+1;
+  const medals=['🥇','🥈','🥉'];
   return `<div class="page">
     <h1 class="mb1">Session ended</h1>
-    <p class="muted mb4">You finished #${myRank} of ${sorted.length}</p>
+    <p class="muted mb4">You finished <strong>#${myRank}</strong> of ${sorted.length}</p>
     <h3 class="mb2">Leaderboard</h3>
     <div class="score-list">
-      ${sorted.map((p,i)=>`<div class="score-row${p.id===myPid?' me':''}">
-        <div class="score-rank">${i+1}</div>
+      ${sorted.map((p,i)=>`<div class="score-row${p.id===myPid?' me':i<3?' top':''}">
+        <div class="score-rank">${medals[i]||i+1}</div>
         <div class="score-name">${esc(p.name)}${p.id===myPid?' <span style="font-size:.7rem;color:var(--mid)">← you</span>':''}</div>
         <div class="score-pts">${p.score||0}</div>
       </div>`).join('')}
@@ -672,67 +727,57 @@ function studentEndHTML(){
         ${(S.myHistory||[]).map((h,i)=>{const ok=h.myAnswer!==null&&h.myAnswer===h.correct,none=h.myAnswer===null;return`
           <div class="score-row">
             <div class="score-rank">${i+1}</div>
-            <div style="flex:1;font-size:.82rem">${esc(h.question.text)}</div>
-            <div class="${none?'c-nil':ok?'c-ok':'c-bad'}" style="font-size:.82rem;font-weight:600">${none?'—':('ABCD'[h.myAnswer]+(ok?' ✓':' ✗'))}</div>
+            <div style="flex:1;font-size:.81rem">${esc(h.question.text)}</div>
+            <div class="${none?'c-nil':ok?'c-ok':'c-bad'}" style="font-size:.81rem;font-weight:600">${none?'—':('ABCD'[h.myAnswer]+(ok?' ✓':' ✗'))}</div>
           </div>`;}).join('')}
       </div>
     </div>`:''}
   </div>`;
 }
 
-/* ══════════════════════════════════════════
+/* ═══════════════════════════════════
    EVENTS
-══════════════════════════════════════════ */
+═══════════════════════════════════ */
 function attach(){
-  on('go-host',()=>{ role='host'; hostAuthed=false; render(); });
-  on('go-join', ()=>{ role='participant'; render(); });
+  on('go-host', ()=>{ role='host'; hostAuthed=false; render(); });
+  on('go-join',  ()=>{ role='participant'; render(); });
   on('btn-pw-back',()=>{ role=null; render(); });
-  on('btn-pw-ok', doHostLogin);
+  on('btn-pw-ok',  doHostLogin);
   const pi=document.getElementById('pw-in');
   if(pi){ pi.addEventListener('keydown',e=>e.key==='Enter'&&doHostLogin()); pi.focus(); }
   on('btn-enter', doJoin);
   const ni=document.getElementById('name-in');
   if(ni){ ni.addEventListener('keydown',e=>e.key==='Enter'&&doJoin()); ni.focus(); }
   on('btn-leave',()=>{ if(confirm('Leave the session?')) send({type:'leave'}); });
-  // Host file load
-  on('btn-load', loadGH);
+  on('btn-load',  loadGH);
   on('btn-reload',()=>{ questions=[]; selIdx=-1; answerKey=-1; render(); });
   const gi=document.getElementById('gh-url');
   if(gi) gi.addEventListener('keydown',e=>e.key==='Enter'&&loadGH());
-  // Host question selection
   document.querySelectorAll('.q-row[data-qi]').forEach(el=>
     el.addEventListener('click',()=>{
-      if(S.status==='question'||S.status==='revealed') return; // can't change while live
+      if(S.status==='question'||S.status==='revealed') return;
       selIdx=+el.dataset.qi; answerKey=-1; render();
     })
   );
-  // Answer key
   document.querySelectorAll('.key-card[data-key]').forEach(el=>
     el.addEventListener('click',()=>{ answerKey=+el.dataset.key; render(); })
   );
-  // Push
-  on('btn-push',()=>{
-    if(selIdx<0||answerKey<0) return;
-    send({type:'push_question',question:questions[selIdx],correct:answerKey});
-  });
+  on('btn-push',()=>{ if(selIdx<0||answerKey<0)return; send({type:'push_question',question:questions[selIdx],correct:answerKey}); });
   on('btn-reveal',()=>send({type:'reveal'}));
-  // Next question: clear server state, auto-advance selIdx
   on('btn-next',()=>{
     send({type:'clear'});
     const next=selIdx+1;
-    if(next<questions.length){ selIdx=next; answerKey=-1; }
-    else { selIdx=-1; answerKey=-1; }
+    selIdx=next<questions.length?next:-1;
+    answerKey=-1;
   });
-  on('btn-end',  ()=>{ if(confirm('End the session for all students?')) send({type:'end_session'}); });
-  on('btn-reset',()=>{ if(confirm('Reset everything?')){ send({type:'reset'}); questions=[]; selIdx=-1; answerKey=-1; inspectPid=null; stopMic(); render(); } });
+  on('btn-end',  ()=>{ if(confirm('End session for all students?')) send({type:'end_session'}); });
+  on('btn-reset',()=>{ if(confirm('Reset everything and start over?')){ send({type:'reset'}); questions=[]; selIdx=-1; answerKey=-1; inspectPid=null; stopMic(); render(); } });
   on('btn-close-inspect',()=>{ inspectPid=null; render(); });
   document.querySelectorAll('.itbl tbody tr[data-pid]').forEach(row=>
     row.addEventListener('click',()=>{ inspectPid=row.dataset.pid; render(); })
   );
-  // Voice
-  on('btn-mic-start',async()=>{ await startMic(); });
+  on('btn-mic-start',()=>startMic());
   on('btn-mic-stop', ()=>stopMic());
-  // Participant answers
   document.querySelectorAll('.opt-card[data-opt]').forEach(el=>
     el.addEventListener('click',()=>{
       if(S.myAnswer!==null&&S.myAnswer!==undefined) return;
@@ -740,26 +785,25 @@ function attach(){
       send({type:'answer',idx:+el.dataset.opt});
     })
   );
+  // Refresh mic dot state after render
+  updateMicDot();
 }
 
 function on(id,fn){ document.getElementById(id)?.addEventListener('click',fn); }
-
 function doHostLogin(){
-  const v=document.getElementById('pw-in')?.value?.trim();
-  if(!v) return;
+  const v=document.getElementById('pw-in')?.value?.trim(); if(!v)return;
   send({type:'set_host',password:v});
 }
 function doLeave(){ role=null; myName=null; myPid=null; sessionStorage.removeItem('qz_pid'); render(); }
 function doJoin(){
-  const v=document.getElementById('name-in')?.value?.trim(); if(!v) return;
+  const v=document.getElementById('name-in')?.value?.trim(); if(!v)return;
   myName=v; myPid=sessionStorage.getItem('qz_pid');
   send({type:'join',name:myName,pid:myPid}); render();
 }
-
 async function loadGH(){
   const url=document.getElementById('gh-url')?.value?.trim();
-  const msg=document.getElementById('load-msg'); if(!url||!msg) return;
-  let raw=url.replace('https://github.com/','https://raw.githubusercontent.com/').replace('/blob/','/')
+  const msg=document.getElementById('load-msg'); if(!url||!msg)return;
+  const raw=url.replace('https://github.com/','https://raw.githubusercontent.com/').replace('/blob/','/');
   msg.innerHTML='<p class="muted small mt1">Loading…</p>';
   try{
     const res=await fetch(raw); if(!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -768,7 +812,6 @@ async function loadGH(){
     selIdx=0; answerKey=-1; msg.innerHTML=''; render();
   }catch(e){ msg.innerHTML=`<div class="notice n-bad mt2">${esc(e.message)}</div>`; }
 }
-
 function esc(s){ return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
 connect();
