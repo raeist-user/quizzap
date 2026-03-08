@@ -11,26 +11,33 @@ const wss = new WebSocketServer({ server });
 
 app.use(express.static(path.join(__dirname, 'public')));
 
-// ── STATE ─────────────────────────────────────────────────────────────────────
+// ── QUIZ STATE ────────────────────────────────────────────────────────────────
 let state = fresh();
-
 function fresh() {
   return {
-    status: 'idle',       // idle | question | revealed | ended
-    question: null,       // { text, options:[a,b,c,d] }
-    correct: null,        // 0-3
-    answers: {},          // pid → optIdx  (current question)
-    participants: {},     // pid → { id, name, score }
-    history: [],          // [{ question, correct, answers:{pid→optIdx} }, ...]
+    status: 'idle',      // idle | question | revealed | ended
+    question: null,
+    correct: null,
+    answers: {},         // pid → optIdx
+    participants: {},    // pid → { id, name, score }
+    history: [],
   };
 }
 
-// ── CLIENTS ───────────────────────────────────────────────────────────────────
+// ── CLIENT REGISTRY ───────────────────────────────────────────────────────────
 let seq = 0;
-const clients = new Map();
+let hostCid = null;                // cid of the authenticated host
+const clients = new Map();         // cid → { ws, role, pid }
 
 function tx(ws, data) {
   if (ws.readyState === 1) ws.send(JSON.stringify(data));
+}
+function txCid(cid, data) {
+  const c = clients.get(cid);
+  if (c) tx(c.ws, data);
+}
+function txHost(data) {
+  if (hostCid !== null) txCid(hostCid, data);
 }
 
 function broadcast() {
@@ -50,33 +57,19 @@ function project(role, pid) {
           Object.values(state.answers).filter(a => a === i).length)
       : [],
   };
-
-  if (role === 'host') {
-    return {
-      ...base,
-      correct:      state.correct,
-      answers:      state.answers,           // pid → optIdx for current Q
-      history:      state.history,           // full history for inspection
-    };
-  }
-
+  if (role === 'host') return { ...base, correct: state.correct, answers: state.answers, history: state.history };
   if (role === 'participant') {
-    // Build student's own history
     const myHistory = state.history.map(h => ({
-      question: h.question,
-      correct:  h.correct,
-      myAnswer: h.answers[pid] ?? null,
+      question: h.question, correct: h.correct, myAnswer: h.answers[pid] ?? null,
     }));
     return {
       ...base,
-      correct:   state.status === 'revealed' || state.status === 'ended'
-                   ? state.correct : null,
-      myAnswer:  state.answers[pid] ?? null,
-      myScore:   state.participants[pid]?.score ?? 0,
+      correct:  (state.status === 'revealed' || state.status === 'ended') ? state.correct : null,
+      myAnswer: state.answers[pid] ?? null,
+      myScore:  state.participants[pid]?.score ?? 0,
       myHistory,
     };
   }
-
   return { status: base.status, participants: base.participants };
 }
 
@@ -84,27 +77,26 @@ function project(role, pid) {
 wss.on('connection', ws => {
   const cid = ++seq;
   clients.set(cid, { ws, role: null, pid: null });
-  tx(ws, { type: 'hello' });
+  tx(ws, { type: 'hello', cid });
   tx(ws, { type: 'state', payload: project(null, null) });
 
   ws.on('message', raw => {
-    let msg;
-    try { msg = JSON.parse(raw); } catch { return; }
+    let msg; try { msg = JSON.parse(raw); } catch { return; }
     const client = clients.get(cid);
     if (!client) return;
 
     switch (msg.type) {
 
+      // ── AUTH ──
       case 'set_host':
-        if (msg.password !== '2325') {
-          tx(ws, { type: 'auth_fail' });
-          break;
-        }
+        if (msg.password !== '2325') { tx(ws, { type: 'auth_fail' }); break; }
         client.role = 'host';
+        hostCid = cid;
         tx(ws, { type: 'auth_ok' });
         tx(ws, { type: 'state', payload: project('host', null) });
         break;
 
+      // ── JOIN ──
       case 'join': {
         if (!msg.name?.trim()) break;
         let pid = msg.pid;
@@ -116,79 +108,57 @@ wss.on('connection', ws => {
         client.pid  = pid;
         tx(ws, { type: 'joined', pid });
         broadcast();
+        // Tell host to initiate WebRTC call to this new peer
+        txHost({ type: 'rtc_new_peer', cid });
         break;
       }
 
+      // ── QUIZ CONTROL (host only) ──
       case 'push_question':
         if (client.role !== 'host') break;
         if (!msg.question?.text || !Array.isArray(msg.question.options)) break;
         if (msg.correct < 0 || msg.correct > 3) break;
-        state.status   = 'question';
-        state.question = msg.question;
-        state.correct  = msg.correct;
-        state.answers  = {};
-        broadcast();
-        break;
+        state.status = 'question'; state.question = msg.question;
+        state.correct = msg.correct; state.answers = {};
+        broadcast(); break;
 
       case 'reveal':
         if (client.role !== 'host' || state.status !== 'question') break;
-        // Score
         Object.entries(state.answers).forEach(([pid, ans]) => {
           if (ans === state.correct && state.participants[pid])
             state.participants[pid].score += 100;
         });
-        // Save to history
-        state.history.push({
-          question: state.question,
-          correct:  state.correct,
-          answers:  { ...state.answers },
-        });
+        state.history.push({ question: state.question, correct: state.correct, answers: { ...state.answers } });
         state.status = 'revealed';
-        broadcast();
-        break;
+        broadcast(); break;
 
       case 'clear':
         if (client.role !== 'host') break;
-        state.status   = 'idle';
-        state.question = null;
-        state.correct  = null;
-        state.answers  = {};
-        broadcast();
-        break;
+        state.status = 'idle'; state.question = null; state.correct = null; state.answers = {};
+        broadcast(); break;
 
       case 'end_session':
         if (client.role !== 'host') break;
-        // If there's an active question, save it first
         if (state.status === 'question') {
           Object.entries(state.answers).forEach(([pid, ans]) => {
             if (ans === state.correct && state.participants[pid])
               state.participants[pid].score += 100;
           });
-          state.history.push({
-            question: state.question,
-            correct:  state.correct,
-            answers:  { ...state.answers },
-          });
+          state.history.push({ question: state.question, correct: state.correct, answers: { ...state.answers } });
         }
-        state.status = 'ended';
-        broadcast();
-        break;
+        state.status = 'ended'; broadcast(); break;
 
       case 'reset':
         if (client.role !== 'host') break;
-        state = fresh();
-        broadcast();
-        break;
+        state = fresh(); broadcast(); break;
 
+      // ── STUDENT ──
       case 'leave':
         if (client.role !== 'participant' || !client.pid) break;
         delete state.participants[client.pid];
         delete state.answers[client.pid];
-        client.role = null;
-        client.pid  = null;
-        tx(ws, { type: 'left' });
-        broadcast();
-        break;
+        client.role = null; client.pid = null;
+        tx(ws, { type: 'left' }); broadcast(); break;
 
       case 'answer':
         if (client.role !== 'participant' || !client.pid) break;
@@ -196,12 +166,29 @@ wss.on('connection', ws => {
         if (state.answers[client.pid] !== undefined) break;
         if (typeof msg.idx !== 'number' || msg.idx < 0 || msg.idx > 3) break;
         state.answers[client.pid] = msg.idx;
-        broadcast();
+        broadcast(); break;
+
+      // ── WEBRTC SIGNALING ──
+      // Host → participant
+      case 'rtc_offer':
+      case 'rtc_ice_to_peer':
+        if (client.role !== 'host') break;
+        txCid(msg.toCid, { type: msg.type === 'rtc_offer' ? 'rtc_offer' : 'rtc_ice', signal: msg.signal });
+        break;
+
+      // Participant → host
+      case 'rtc_answer':
+      case 'rtc_ice_to_host':
+        if (client.role !== 'participant') break;
+        txHost({ type: msg.type === 'rtc_answer' ? 'rtc_answer' : 'rtc_ice', fromCid: cid, signal: msg.signal });
         break;
     }
   });
 
-  ws.on('close', () => clients.delete(cid));
+  ws.on('close', () => {
+    if (cid === hostCid) hostCid = null;
+    clients.delete(cid);
+  });
 });
 
 const PORT = process.env.PORT || 3000;
