@@ -174,6 +174,29 @@
     .stat-item .stat-val{font-weight:600;font-size:1.05rem}
     .stat-item .stat-lbl{font-size:.68rem;color:var(--mid);text-transform:uppercase;letter-spacing:.07em}
 
+    /* STUDENT SCORE BANNER — sticky strip below nav */
+    .score-banner{position:sticky;top:52px;z-index:90;background:var(--white);border-bottom:1px solid var(--line);padding:0 20px;display:flex;align-items:center;gap:6px;height:40px;overflow-x:auto;overflow-y:hidden;scrollbar-width:none}
+    .score-banner::-webkit-scrollbar{display:none}
+    .sb-chip{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:20px;font-size:.72rem;font-weight:500;background:var(--faint);border:1px solid var(--line);white-space:nowrap;flex-shrink:0}
+    .sb-chip.me{background:#e8f5ee;border-color:#b7dfc7;font-weight:600}
+    .sb-chip .sb-pts{color:var(--good);font-weight:700}
+    .sb-sep{color:var(--line);font-size:.8rem;flex-shrink:0}
+
+    /* HOST SIDEBAR SECTIONS */
+    .sb-section{border-bottom:1px solid var(--line);padding-bottom:0}
+    .sb-section-head{display:flex;align-items:center;justify-content:space-between;padding:10px 0;cursor:pointer;user-select:none}
+    .sb-section-head:hover h3{color:var(--ink)}
+    .sb-section-head h3{transition:color .1s;margin:0}
+    .sb-toggle{font-size:.75rem;color:var(--mid);transition:transform .2s;display:inline-block}
+    .sb-toggle.open{transform:rotate(90deg)}
+    .sb-section-body{overflow:hidden;transition:max-height .25s ease}
+    .sb-section-body.closed{max-height:0!important}
+
+    /* JOIN FEED */
+    .join-feed{display:flex;flex-direction:column;gap:4px;padding-bottom:8px}
+    .join-chip{display:flex;align-items:center;gap:7px;padding:6px 8px;border-radius:var(--r);background:var(--faint);font-size:.79rem;animation:fadeSlideIn .3s ease}
+    .j-av{width:22px;height:22px;border-radius:50%;background:var(--line);display:flex;align-items:center;justify-content:center;font-size:.64rem;font-weight:600;flex-shrink:0}
+
     code{font-size:.76rem;background:var(--faint);padding:1px 5px;border-radius:3px;font-family:monospace}
   </style>
 </head>
@@ -181,7 +204,6 @@
 <div id="app">
   <nav>
     <span class="brand">QuizZap</span>
-    <div id="nav-score-strip"></div>
     <div class="nav-right">
       <div id="ci"></div>
       <span id="cl">connecting</span>
@@ -198,6 +220,7 @@
 ═══════════════════════════════════ */
 let S={}, role=null, myPid=null, myName=null, hostAuthed=false;
 let questions=[], selIdx=-1, answerKey=-1, inspectPid=null;
+let sidebarQOpen=true, sidebarStudentsOpen=true, sidebarScoresOpen=true;
 
 // Voice (host)
 let localStream=null;
@@ -229,7 +252,7 @@ function connect(){
     const m=JSON.parse(e.data);
     switch(m.type){
       case 'hello':      myCid=m.cid; break;
-      case 'state':      S=m.payload; render(); updateNavScore(); break;
+      case 'state':      S=m.payload; render(); break;
       case 'joined':     myPid=m.pid; sessionStorage.setItem('qz_pid',m.pid); break;
       case 'auth_ok':    hostAuthed=true; render(); break;
       case 'auth_fail':  { const el=document.getElementById('pw-err'); if(el) el.textContent='Incorrect password.'; break; }
@@ -256,35 +279,30 @@ function setConn(on){
 }
 
 /* ═══════════════════════════════════
-   NAV SCORE STRIP (students only)
+   STUDENT SCORE BANNER (below header)
 ═══════════════════════════════════ */
-function updateNavScore(){
-  const strip=document.getElementById('nav-score-strip');
-  if(!strip) return;
-  if(role!=='participant'||!myPid||S.status==='idle'||S.status==='ended'){
-    strip.innerHTML=''; return;
-  }
+function scoreBannerHTML(){
+  if(!myPid||(S.status!=='question'&&S.status!=='revealed')) return '';
   const sorted=[...(S.participants||[])].sort((a,b)=>(b.score||0)-(a.score||0));
-  const top=sorted.slice(0,3);
+  if(!sorted.length) return '';
+  const medals=['🥇','🥈','🥉'];
   const myRank=sorted.findIndex(p=>p.id===myPid)+1;
   const myP=sorted.find(p=>p.id===myPid);
-  const medals=['🥇','🥈','🥉'];
-  let html=top.map((p,i)=>`
-    <div class="ns-chip${p.id===myPid?' me':''}">
-      <span>${medals[i]||i+1}</span>
-      <span>${esc(p.name.length>10?p.name.slice(0,9)+'…':p.name)}</span>
-      <span class="ns-pts">${p.score||0}</span>
+  let chips=sorted.slice(0,5).map((p,i)=>`
+    <div class="sb-chip${p.id===myPid?' me':''}">
+      <span>${medals[i]||('#'+(i+1))}</span>
+      <span>${esc(p.name.length>12?p.name.slice(0,11)+'…':p.name)}</span>
+      <span class="sb-pts">${p.score||0}</span>
     </div>`).join('');
-  // If I'm not in top 3, add my chip
-  if(myRank>3&&myP){
-    html+=`<span style="color:var(--mid);font-size:.7rem;padding:0 4px">…</span>
-    <div class="ns-chip me">
+  if(myRank>5&&myP){
+    chips+=`<span class="sb-sep">···</span>
+    <div class="sb-chip me">
       <span>#${myRank}</span>
-      <span>${esc(myP.name.length>10?myP.name.slice(0,9)+'…':myP.name)}</span>
-      <span class="ns-pts">${myP.score||0}</span>
+      <span>${esc(myP.name.length>12?myP.name.slice(0,11)+'…':myP.name)}</span>
+      <span class="sb-pts">${myP.score||0}</span>
     </div>`;
   }
-  strip.innerHTML=html;
+  return `<div class="score-banner">${chips}</div>`;
 }
 
 /* ═══════════════════════════════════
@@ -398,7 +416,6 @@ function render(){
   else if(role==='host')             v.innerHTML=hostHTML();
   else                               v.innerHTML=participantHTML();
   attach();
-  updateNavScore();
 }
 
 /* ═══════════════════════════════════
@@ -444,6 +461,8 @@ function hostHTML(){
 function hostSidebar(){
   const isLive=S.status==='question'||S.status==='revealed';
   const doneTexts=(S.history||[]).map(h=>h.question.text);
+
+  // ── Questions section ──
   const qRows=questions.length?questions.map((q,i)=>{
     const isLiveNow=isLive&&S.question&&S.question.text===q.text;
     const isDone=doneTexts.includes(q.text);
@@ -457,10 +476,64 @@ function hostSidebar(){
       <div class="q-snippet">${esc(q.text.length>65?q.text.slice(0,63)+'…':q.text)}</div>
       ${isLiveNow?'<span style="font-size:.65rem;color:var(--good)">●</span>':''}
     </div>`;
-  }).join(''):'<p class="muted small mt2">No questions loaded.</p>';
+  }).join(''):'<p class="muted small" style="padding:4px 0">No questions loaded.</p>';
+
+  // ── Students joining section ──
+  const parts=S.participants||[];
+  function initials(n){ return n.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase(); }
+  const joinChips=parts.length
+    ? parts.map(p=>`<div class="join-chip">
+        <div class="j-av">${initials(p.name)}</div>
+        <span>${esc(p.name)}</span>
+      </div>`).join('')
+    : '<p class="muted small" style="padding:4px 0">No students yet.</p>';
+
+  // ── Live scores section ──
+  const sorted=[...parts].sort((a,b)=>(b.score||0)-(a.score||0));
+  const medals=['🥇','🥈','🥉'];
+  const scoreChips=sorted.length
+    ? sorted.map((p,i)=>`<div class="score-row" style="padding:7px 8px;font-size:.79rem">
+        <div class="score-rank">${medals[i]||i+1}</div>
+        <div class="score-name">${esc(p.name)}</div>
+        <div class="score-pts">${p.score||0}</div>
+      </div>`).join('')
+    : '<p class="muted small" style="padding:4px 0">No scores yet.</p>';
+
   return `<div class="host-sidebar">
-    <h3 class="mb2">Questions</h3>
-    <div class="q-list">${qRows}</div>
+
+    <!-- Questions -->
+    <div class="sb-section">
+      <div class="sb-section-head" id="sb-toggle-q">
+        <h3>Questions ${questions.length?`(${questions.length})`:''}</h3>
+        <span class="sb-toggle${sidebarQOpen?' open':''}">▶</span>
+      </div>
+      <div class="sb-section-body${sidebarQOpen?'':' closed'}" style="max-height:${sidebarQOpen?'1000px':'0'}">
+        <div class="q-list" style="margin-top:0;padding-bottom:10px">${qRows}</div>
+      </div>
+    </div>
+
+    <!-- Students joining -->
+    <div class="sb-section" style="margin-top:4px">
+      <div class="sb-section-head" id="sb-toggle-students">
+        <h3>Students <span style="font-weight:400;text-transform:none;letter-spacing:0;font-size:.8rem;color:var(--mid)">${parts.length}</span></h3>
+        <span class="sb-toggle${sidebarStudentsOpen?' open':''}">▶</span>
+      </div>
+      <div class="sb-section-body${sidebarStudentsOpen?'':' closed'}" style="max-height:${sidebarStudentsOpen?'600px':'0'}">
+        <div class="join-feed">${joinChips}</div>
+      </div>
+    </div>
+
+    <!-- Live scores -->
+    <div class="sb-section" style="margin-top:4px">
+      <div class="sb-section-head" id="sb-toggle-scores">
+        <h3>Live scores</h3>
+        <span class="sb-toggle${sidebarScoresOpen?' open':''}">▶</span>
+      </div>
+      <div class="sb-section-body${sidebarScoresOpen?'':' closed'}" style="max-height:${sidebarScoresOpen?'800px':'0'}">
+        <div class="score-list" style="margin-bottom:10px;border-radius:var(--r);overflow:hidden">${scoreChips}</div>
+      </div>
+    </div>
+
     <hr/>
     <div class="col gap2">
       <button class="btn btn-bad btn-sm" id="btn-end">End session</button>
@@ -647,7 +720,7 @@ function waitHTML(){
       </div>
       <span>${esc(p.name)}${p.id===myPid?' <span style="font-size:.7rem;color:var(--mid)">(you)</span>':''}</span>
     </div>`).join('');
-  return `<div class="wait-shell">
+  return `${scoreBannerHTML()}<div class="wait-shell">
     <div class="wait-header">
       <div class="spinner"></div>
       <h2>Waiting for the host…</h2>
@@ -692,7 +765,7 @@ function questionViewHTML(){
         </div>`;}).join('')}
     </div>
   </div>`:'';
-  return `<div class="page">
+  return `${scoreBannerHTML()}<div class="page">
     <div class="row between mb3">
       <div class="row gap2">
         <div id="mic-dot" class="mic-dot"></div>
@@ -778,6 +851,10 @@ function attach(){
   );
   on('btn-mic-start',()=>startMic());
   on('btn-mic-stop', ()=>stopMic());
+  // Sidebar collapse toggles
+  document.getElementById('sb-toggle-q')?.addEventListener('click',()=>{ sidebarQOpen=!sidebarQOpen; render(); });
+  document.getElementById('sb-toggle-students')?.addEventListener('click',()=>{ sidebarStudentsOpen=!sidebarStudentsOpen; render(); });
+  document.getElementById('sb-toggle-scores')?.addEventListener('click',()=>{ sidebarScoresOpen=!sidebarScoresOpen; render(); });
   document.querySelectorAll('.opt-card[data-opt]').forEach(el=>
     el.addEventListener('click',()=>{
       if(S.myAnswer!==null&&S.myAnswer!==undefined) return;
