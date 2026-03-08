@@ -11,35 +11,33 @@ const wss = new WebSocketServer({ server });
 
 app.use(express.static(path.join(__dirname, 'public')));
 
-// ── QUIZ STATE ────────────────────────────────────────────────────────────────
+// ── STATE ─────────────────────────────────────────────────────────────────────
 let state = fresh();
 function fresh() {
   return {
-    status: 'idle',      // idle | question | revealed | ended
+    status: 'idle',
     question: null,
     correct: null,
-    answers: {},         // pid → optIdx
-    participants: {},    // pid → { id, name, score }
+    answers: {},
+    participants: {},   // pid → { id, name, score }
     history: [],
   };
 }
 
 // ── CLIENT REGISTRY ───────────────────────────────────────────────────────────
 let seq = 0;
-let hostCid = null;                // cid of the authenticated host
-const clients = new Map();         // cid → { ws, role, pid }
+let hostCid = null;
+const clients = new Map(); // cid → { ws, role, pid }
 
 function tx(ws, data) {
   if (ws.readyState === 1) ws.send(JSON.stringify(data));
 }
 function txCid(cid, data) {
-  const c = clients.get(cid);
-  if (c) tx(c.ws, data);
+  const c = clients.get(cid); if (c) tx(c.ws, data);
 }
 function txHost(data) {
   if (hostCid !== null) txCid(hostCid, data);
 }
-
 function broadcast() {
   clients.forEach(({ ws, role, pid }) =>
     tx(ws, { type: 'state', payload: project(role, pid) })
@@ -87,16 +85,13 @@ wss.on('connection', ws => {
 
     switch (msg.type) {
 
-      // ── AUTH ──
       case 'set_host':
         if (msg.password !== '2325') { tx(ws, { type: 'auth_fail' }); break; }
-        client.role = 'host';
-        hostCid = cid;
+        client.role = 'host'; hostCid = cid;
         tx(ws, { type: 'auth_ok' });
         tx(ws, { type: 'state', payload: project('host', null) });
         break;
 
-      // ── JOIN ──
       case 'join': {
         if (!msg.name?.trim()) break;
         let pid = msg.pid;
@@ -104,16 +99,23 @@ wss.on('connection', ws => {
           pid = `p${cid}_${Date.now()}`;
           state.participants[pid] = { id: pid, name: msg.name.trim().slice(0, 28), score: 0 };
         }
-        client.role = 'participant';
-        client.pid  = pid;
+        client.role = 'participant'; client.pid = pid;
         tx(ws, { type: 'joined', pid });
         broadcast();
-        // Tell host to initiate WebRTC call to this new peer
+        // Notify host to call this new peer (if voice is live)
         txHost({ type: 'rtc_new_peer', cid });
         break;
       }
 
-      // ── QUIZ CONTROL (host only) ──
+      // Host asks for all current participant cids (called when mic starts)
+      case 'get_peers': {
+        if (client.role !== 'host') break;
+        const peerCids = [];
+        clients.forEach((c, id) => { if (c.role === 'participant') peerCids.push(id); });
+        tx(ws, { type: 'peer_list', cids: peerCids });
+        break;
+      }
+
       case 'push_question':
         if (client.role !== 'host') break;
         if (!msg.question?.text || !Array.isArray(msg.question.options)) break;
@@ -126,7 +128,7 @@ wss.on('connection', ws => {
         if (client.role !== 'host' || state.status !== 'question') break;
         Object.entries(state.answers).forEach(([pid, ans]) => {
           if (ans === state.correct && state.participants[pid])
-            state.participants[pid].score += 100;
+            state.participants[pid].score += 1;   // 1 pt per correct answer
         });
         state.history.push({ question: state.question, correct: state.correct, answers: { ...state.answers } });
         state.status = 'revealed';
@@ -142,7 +144,7 @@ wss.on('connection', ws => {
         if (state.status === 'question') {
           Object.entries(state.answers).forEach(([pid, ans]) => {
             if (ans === state.correct && state.participants[pid])
-              state.participants[pid].score += 100;
+              state.participants[pid].score += 1;
           });
           state.history.push({ question: state.question, correct: state.correct, answers: { ...state.answers } });
         }
@@ -152,11 +154,9 @@ wss.on('connection', ws => {
         if (client.role !== 'host') break;
         state = fresh(); broadcast(); break;
 
-      // ── STUDENT ──
       case 'leave':
         if (client.role !== 'participant' || !client.pid) break;
-        delete state.participants[client.pid];
-        delete state.answers[client.pid];
+        delete state.participants[client.pid]; delete state.answers[client.pid];
         client.role = null; client.pid = null;
         tx(ws, { type: 'left' }); broadcast(); break;
 
@@ -168,19 +168,24 @@ wss.on('connection', ws => {
         state.answers[client.pid] = msg.idx;
         broadcast(); break;
 
-      // ── WEBRTC SIGNALING ──
-      // Host → participant
+      // ── WebRTC signaling (pure relay, no validation of signal content) ──
       case 'rtc_offer':
       case 'rtc_ice_to_peer':
         if (client.role !== 'host') break;
-        txCid(msg.toCid, { type: msg.type === 'rtc_offer' ? 'rtc_offer' : 'rtc_ice', signal: msg.signal });
+        txCid(msg.toCid, {
+          type:   msg.type === 'rtc_offer' ? 'rtc_offer' : 'rtc_ice',
+          signal: msg.signal,
+        });
         break;
 
-      // Participant → host
       case 'rtc_answer':
       case 'rtc_ice_to_host':
         if (client.role !== 'participant') break;
-        txHost({ type: msg.type === 'rtc_answer' ? 'rtc_answer' : 'rtc_ice', fromCid: cid, signal: msg.signal });
+        txHost({
+          type:    msg.type === 'rtc_answer' ? 'rtc_answer' : 'rtc_ice',
+          fromCid: cid,
+          signal:  msg.signal,
+        });
         break;
     }
   });
