@@ -200,11 +200,9 @@ wss.on('connection', ws => {
       case 'reset':
         if (client.role !== 'host') break;
         state = fresh();
-        // Re-register all still-connected participants so they appear immediately
         clients.forEach((c) => {
-          if (c.role === 'participant' && c.pid && c.name) {
+          if (c.role === 'participant' && c.pid && c.name)
             state.participants[c.pid] = { id: c.pid, name: c.name, score: 0 };
-          }
         });
         broadcast(); break;
 
