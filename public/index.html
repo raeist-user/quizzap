@@ -813,12 +813,24 @@ let editingSha=null;      // SHA of existing file (for update)
 let uploadMsg='';
 let uploadSubjects=[];    // folders list for manage tab
 
-function isValidToken(){ return GITHUB_TOKEN && !GITHUB_TOKEN.startsWith('%%'); }
-function ghHeaders(){
-  const h={'Accept':'application/vnd.github+json','Content-Type':'application/json'};
-  if(isValidToken()) h['Authorization']='Bearer '+GITHUB_TOKEN;
+function isValidToken() { 
+  // Returns true if MY_TOKEN exists and isn't the placeholder '%%...'
+  return MY_TOKEN && !MY_TOKEN.startsWith('%%'); 
+}
+
+function ghHeaders() {
+  const h = {
+    'Accept': 'application/vnd.github+json',
+    'Content-Type': 'application/json',
+    'User-Agent': 'quizzap-app' // IMPORTANT: GitHub requires this to not "freeze"
+  };
+  
+  if (isValidToken()) {
+    h['Authorization'] = 'Bearer ' + MY_TOKEN;
+  }
   return h;
 }
+
 
 async function browseRepo(){
   repoPath=GITHUB_REPO;
