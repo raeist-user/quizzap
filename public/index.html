@@ -369,8 +369,8 @@ let prevMyScore=0, scoreGain=0;
 
 // Host
 let questions=[], selIdx=-1, answerKey=-1, inspectPid=null;
-let sidebarQOpen=true, sidebarStudOpen=true, sidebarScoreOpen=false, sidebarSchedOpen=true;
-let hostTimerSeconds=30;
+let sidebarQOpen=false, sidebarStudOpen=false, sidebarScoreOpen=false, sidebarSchedOpen=false;
+let hostTimerSeconds=0;
 
 // Resource browser
 let repoPath=null;
@@ -404,6 +404,11 @@ let serverSchedules=null;
 let hostSchedules=[]; // schedules shown in host panel
 
 const STUN={iceServers:[{urls:'stun:stun.l.google.com:19302'},{urls:'stun:stun1.l.google.com:19302'}]};
+
+// ── GITHUB CONFIG ─────────────────────────────────────────────────────────
+const GITHUB_TOKEN = ''; // Set your GitHub personal access token here
+const GITHUB_REPO  = 'raeist-user/quizzap';
+const GITHUB_BRANCH = 'main';
 
 /* ══════════════════════════════════════
    SOUNDS (Web Audio API)
@@ -602,7 +607,7 @@ function connect(){
         S=m.payload; render(); break;
       }
       case 'joined':    myPid=m.pid; sessionStorage.setItem('qz_pid',m.pid); break;
-      case 'auth_ok':   hostAuthed=true; fetchHostSchedules(); render(); break;
+      case 'auth_ok':   hostAuthed=true; fetchHostSchedules(); browseRepo(); render(); break;
       case 'auth_fail': { const el=document.getElementById('pw-err'); if(el)el.textContent='Incorrect password.'; break; }
       case 'left':      doLeave(); break;
       case 'peer_list': for(const cid of m.cids) await hostCallPeer(cid); break;
@@ -707,28 +712,144 @@ function parseQuestions(text){
 }
 
 /* ══════════════════════════════════════
-   RESOURCE BROWSER
+   RESOURCE BROWSER / GITHUB MANAGER
 ══════════════════════════════════════ */
+
+// Upload panel state
+let uploadTab='generate'; // 'generate' | 'manage'
+let manageFolder=null;    // currently selected folder for editing
+let editingContent='';    // textarea content while editing
+let editingSha=null;      // SHA of existing file (for update)
+let uploadMsg='';
+let uploadSubjects=[];    // folders list for manage tab
+
+function ghHeaders(){
+  const h={'Accept':'application/vnd.github+json','Content-Type':'application/json'};
+  if(GITHUB_TOKEN) h['Authorization']='Bearer '+GITHUB_TOKEN;
+  return h;
+}
+
 async function browseRepo(){
-  const inp=document.getElementById('repo-url');
+  repoPath=GITHUB_REPO;
   const msg=document.getElementById('repo-msg');
-  if(!inp||!msg) return;
-  const url=inp.value.trim();
-  if(!url){msg.innerHTML='<div class="notice n-bad mt2">Enter a GitHub repo URL.</div>';return;}
-  const match=url.match(/github\.com\/([^/\s]+\/[^/\s]+)/);
-  if(!match){msg.innerHTML='<div class="notice n-bad mt2">Invalid GitHub URL.</div>';return;}
-  repoPath=match[1].replace(/\.git$/,'');
-  msg.innerHTML='<div class="notice n-neutral mt2">Browsing repository…</div>';
+  if(msg) msg.innerHTML='<div class="notice n-neutral mt2">Loading subjects…</div>';
   repoLoading=true; render();
   try{
-    const res=await fetch(`https://api.github.com/repos/${repoPath}/contents/resources`);
-    if(!res.ok) throw new Error(`GitHub API returned ${res.status}.`);
+    const res=await fetch(`https://api.github.com/repos/${GITHUB_REPO}/contents/resources?ref=${GITHUB_BRANCH}`,{headers:ghHeaders()});
+    if(!res.ok) throw new Error(`GitHub API ${res.status}: Check token and repo.`);
     const items=await res.json();
     const dirs=items.filter(i=>i.type==='dir');
     if(!dirs.length) throw new Error('No subject folders found inside "resources" folder.');
-    subjects=dirs.map(d=>({name:d.name,path:d.path,questions:[],count:5}));
-    repoLoading=false; msg.innerHTML=''; render();
-  }catch(e){ repoLoading=false; msg.innerHTML=`<div class="notice n-bad mt2">${esc(e.message)}</div>`; render(); }
+    subjects=dirs.map(d=>({name:d.name,path:d.path,questions:[],count:0}));
+    repoLoading=false;
+    if(msg) msg.innerHTML='';
+    render();
+  }catch(e){ repoLoading=false; if(msg) msg.innerHTML=`<div class="notice n-bad mt2">${esc(e.message)}</div>`; render(); }
+}
+
+async function loadUploadFolders(){
+  try{
+    const res=await fetch(`https://api.github.com/repos/${GITHUB_REPO}/contents/resources?ref=${GITHUB_BRANCH}`,{headers:ghHeaders()});
+    if(!res.ok) throw new Error(`GitHub API ${res.status}`);
+    const items=await res.json();
+    uploadSubjects=items.filter(i=>i.type==='dir').map(d=>({name:d.name,path:d.path}));
+    render();
+  }catch(e){ uploadSubjects=[]; render(); }
+}
+
+async function createFolder(){
+  const inp=document.getElementById('new-folder-name');
+  if(!inp) return;
+  const name=inp.value.trim().replace(/[^a-zA-Z0-9_\- ]/g,'');
+  if(!name){setUploadMsg('Folder name required','bad');return;}
+  if(!GITHUB_TOKEN){setUploadMsg('GitHub token not set','bad');return;}
+  setUploadMsg('Creating folder…','neutral');
+  try{
+    const path=`resources/${name}/.gitkeep`;
+    const res=await fetch(`https://api.github.com/repos/${GITHUB_REPO}/contents/${path}`,{
+      method:'PUT',headers:ghHeaders(),
+      body:JSON.stringify({message:`Create ${name} folder`,content:btoa(''),branch:GITHUB_BRANCH})
+    });
+    if(!res.ok) throw new Error(`GitHub API ${res.status}`);
+    setUploadMsg(`Folder "${name}" created!`,'good');
+    inp.value='';
+    await loadUploadFolders();
+  }catch(e){setUploadMsg(e.message,'bad');}
+}
+
+async function openFolderEdit(folderName){
+  manageFolder=folderName; editingContent=''; editingSha=null;
+  setUploadMsg('Loading questions.txt…','neutral');
+  render();
+  try{
+    const res=await fetch(`https://api.github.com/repos/${GITHUB_REPO}/contents/resources/${folderName}/questions.txt?ref=${GITHUB_BRANCH}`,{headers:ghHeaders()});
+    if(res.status===404){ editingContent=''; editingSha=null; setUploadMsg('No questions.txt yet. Write or upload one below.','neutral'); render(); return; }
+    if(!res.ok) throw new Error(`GitHub API ${res.status}`);
+    const data=await res.json();
+    editingSha=data.sha;
+    editingContent=atob(data.content.replace(/\n/g,''));
+    setUploadMsg('','');
+    render();
+    setTimeout(()=>{ const ta=document.getElementById('q-editor'); if(ta){ ta.value=editingContent; ta.focus(); } },50);
+  }catch(e){setUploadMsg(e.message,'bad');}
+}
+
+async function saveEditorContent(){
+  if(!manageFolder){setUploadMsg('No folder selected','bad');return;}
+  if(!GITHUB_TOKEN){setUploadMsg('GitHub token not set','bad');return;}
+  const ta=document.getElementById('q-editor');
+  const content=ta?ta.value:'';
+  if(!content.trim()){setUploadMsg('Content is empty','bad');return;}
+  setUploadMsg('Saving…','neutral');
+  try{
+    const path=`resources/${manageFolder}/questions.txt`;
+    const body={message:`Update ${manageFolder}/questions.txt`,content:btoa(unescape(encodeURIComponent(content))),branch:GITHUB_BRANCH};
+    if(editingSha) body.sha=editingSha;
+    const res=await fetch(`https://api.github.com/repos/${GITHUB_REPO}/contents/${path}`,{
+      method:'PUT',headers:ghHeaders(),body:JSON.stringify(body)
+    });
+    if(!res.ok) throw new Error(`GitHub API ${res.status}`);
+    const data=await res.json();
+    editingSha=data.content?.sha||editingSha;
+    setUploadMsg('Saved successfully!','good');
+  }catch(e){setUploadMsg(e.message,'bad');}
+}
+
+async function uploadQuestionsFile(){
+  if(!manageFolder){setUploadMsg('Select a folder first','bad');return;}
+  if(!GITHUB_TOKEN){setUploadMsg('GitHub token not set','bad');return;}
+  const inp=document.getElementById('file-upload-inp');
+  if(!inp||!inp.files.length){setUploadMsg('Choose a .txt file first','bad');return;}
+  const file=inp.files[0];
+  if(!file.name.endsWith('.txt')){setUploadMsg('Only .txt files allowed','bad');return;}
+  setUploadMsg('Reading file…','neutral');
+  const reader=new FileReader();
+  reader.onload=async(e)=>{
+    const content=e.target.result;
+    try{
+      setUploadMsg('Uploading…','neutral');
+      const path=`resources/${manageFolder}/questions.txt`;
+      const body={message:`Upload ${manageFolder}/questions.txt`,content:btoa(unescape(encodeURIComponent(content))),branch:GITHUB_BRANCH};
+      if(editingSha) body.sha=editingSha;
+      const res=await fetch(`https://api.github.com/repos/${GITHUB_REPO}/contents/${path}`,{
+        method:'PUT',headers:ghHeaders(),body:JSON.stringify(body)
+      });
+      if(!res.ok) throw new Error(`GitHub API ${res.status}`);
+      const data=await res.json();
+      editingSha=data.content?.sha||editingSha;
+      editingContent=content;
+      setUploadMsg('Uploaded successfully!','good');
+      render();
+      setTimeout(()=>{ const ta=document.getElementById('q-editor'); if(ta) ta.value=content; },50);
+    }catch(err){setUploadMsg(err.message,'bad');}
+  };
+  reader.readAsText(file);
+}
+
+function setUploadMsg(msg,type){
+  uploadMsg=msg?`<div class="notice n-${type} mt2">${esc(msg)}</div>`:'';
+  const el=document.getElementById('upload-msg');
+  if(el) el.innerHTML=uploadMsg;
 }
 
 async function generateQuiz(){
@@ -739,8 +860,9 @@ async function generateQuiz(){
   let all=[];
   try{
     for(const s of chosen){
-      const rawUrl=`https://raw.githubusercontent.com/${repoPath}/main/${s.path}/questions.txt`;
-      const res=await fetch(rawUrl);
+      const rawUrl=`https://raw.githubusercontent.com/${GITHUB_REPO}/${GITHUB_BRANCH}/${s.path}/questions.txt`;
+      const headers={}; if(GITHUB_TOKEN) headers['Authorization']='Bearer '+GITHUB_TOKEN;
+      const res=await fetch(rawUrl,{headers});
       if(!res.ok) throw new Error(`Could not fetch ${s.name}/questions.txt`);
       const parsed=parseQuestions(await res.text());
       if(!parsed.length) throw new Error(`No valid questions in ${s.name}/questions.txt`);
@@ -1026,13 +1148,15 @@ function hostSidebar(){
     </div>`;
   }).join(''):'<p class="muted small" style="padding:4px 0 8px">No questions loaded.</p>';
 
-  const joinChips=parts.length
-    ?parts.map(p=>`<div class="join-chip"><div class="j-av">${initials(p.name)}</div><span>${esc(p.name)}</span></div>`).join('')
+  // Combined students + live scores
+  const studentRows=sorted.length
+    ?sorted.map((p,i)=>`<div class="score-row" style="padding:7px 8px;font-size:.78rem">
+        <div class="score-rank">${medals[i]||i+1}</div>
+        <div class="j-av" style="width:22px;height:22px;border-radius:50%;background:var(--line);display:inline-flex;align-items:center;justify-content:center;font-size:.63rem;font-weight:600;flex-shrink:0;margin-right:4px">${initials(p.name)}</div>
+        <div class="score-name">${esc(p.name)}</div>
+        <div class="score-pts">${p.score||0} pts</div>
+      </div>`).join('')
     :'<p class="muted small" style="padding:4px 0 8px">No students yet.</p>';
-
-  const scoreChips=sorted.length
-    ?sorted.map((p,i)=>`<div class="score-row" style="padding:7px 8px;font-size:.78rem"><div class="score-rank">${medals[i]||i+1}</div><div class="score-name">${esc(p.name)}</div><div class="score-pts">${p.score||0}</div></div>`).join('')
-    :'<p class="muted small" style="padding:4px 0 8px">No scores yet.</p>';
 
   // Schedule rows for host
   const upcoming=hostSchedules.filter(s=>s.ts>Date.now()-3600000);
@@ -1052,19 +1176,8 @@ function hostSidebar(){
     :'<p class="muted small" style="padding:4px 0">No upcoming sessions.</p>';
 
   return `<div class="host-sidebar">
+    <!-- 1. Schedule -->
     <div class="sb-sec">
-      <div class="sb-sec-head" id="sb-toggle-q"><h3>Questions${questions.length?' ('+questions.length+')':''}</h3><span class="sb-chevron${sidebarQOpen?' open':''}">▶</span></div>
-      <div class="sb-body${sidebarQOpen?'':' closed'}" style="max-height:${sidebarQOpen?'1200px':'0'}"><div class="q-list">${qRows}</div></div>
-    </div>
-    <div class="sb-sec" style="margin-top:2px">
-      <div class="sb-sec-head" id="sb-toggle-stud"><h3>Students <span style="font-weight:400;text-transform:none;letter-spacing:0;font-size:.8rem;color:var(--mid)">${parts.length}</span></h3><span class="sb-chevron${sidebarStudOpen?' open':''}">▶</span></div>
-      <div class="sb-body${sidebarStudOpen?'':' closed'}" style="max-height:${sidebarStudOpen?'600px':'0'}"><div class="join-feed">${joinChips}</div></div>
-    </div>
-    <div class="sb-sec" style="margin-top:2px">
-      <div class="sb-sec-head" id="sb-toggle-score"><h3>Live scores</h3><span class="sb-chevron${sidebarScoreOpen?' open':''}">▶</span></div>
-      <div class="sb-body${sidebarScoreOpen?'':' closed'}" style="max-height:${sidebarScoreOpen?'800px':'0'}"><div class="score-list" style="margin-bottom:8px">${scoreChips}</div></div>
-    </div>
-    <div class="sb-sec" style="margin-top:2px">
       <div class="sb-sec-head" id="sb-toggle-sched"><h3>📅 Schedule</h3><span class="sb-chevron${sidebarSchedOpen?' open':''}">▶</span></div>
       <div class="sb-body${sidebarSchedOpen?'':' closed'}" style="max-height:${sidebarSchedOpen?'900px':'0'}">
         <div style="padding-bottom:8px">
@@ -1079,6 +1192,16 @@ function hostSidebar(){
         </div>
       </div>
     </div>
+    <!-- 2. Questions -->
+    <div class="sb-sec" style="margin-top:2px">
+      <div class="sb-sec-head" id="sb-toggle-q"><h3>Questions${questions.length?' ('+questions.length+')':''}</h3><span class="sb-chevron${sidebarQOpen?' open':''}">▶</span></div>
+      <div class="sb-body${sidebarQOpen?'':' closed'}" style="max-height:${sidebarQOpen?'1200px':'0'}"><div class="q-list">${qRows}</div></div>
+    </div>
+    <!-- 3. Students + Live Score combined -->
+    <div class="sb-sec" style="margin-top:2px">
+      <div class="sb-sec-head" id="sb-toggle-stud"><h3>Students <span style="font-weight:400;text-transform:none;letter-spacing:0;font-size:.8rem;color:var(--mid)">${parts.length}</span> <span style="font-weight:400;font-size:.7rem;color:var(--mid);text-transform:none;letter-spacing:0">· live score</span></h3><span class="sb-chevron${sidebarStudOpen?' open':''}">▶</span></div>
+      <div class="sb-body${sidebarStudOpen?'':' closed'}" style="max-height:${sidebarStudOpen?'800px':'0'}"><div class="score-list" style="margin-bottom:8px">${studentRows}</div></div>
+    </div>
     <hr/>
     <div class="col gap2">
       <button class="btn btn-bad btn-sm" id="btn-end">End session</button>
@@ -1090,7 +1213,18 @@ function hostSidebar(){
 function hostMain(){
   const isLive=S.status==='question'||S.status==='revealed';
 
-  // No questions: show session open button + resource browser
+  const sessionBanner=S.sessionOpen
+    ?`<div class="session-open-banner">
+        <span style="font-size:1rem">🟢</span>
+        <div style="flex:1"><strong>Session is open</strong> · <span class="muted small">${(S.participants||[]).length} student${(S.participants||[]).length!==1?'s':''} joined</span></div>
+      </div>`
+    :`<div class="session-closed-banner">
+        <span style="font-size:1rem">⚪</span>
+        <div style="flex:1"><strong>Session not started</strong> · <span class="muted small">Students see "no session active"</span></div>
+        <button class="btn btn-good btn-sm" id="btn-open-session">▶ Start Session</button>
+      </div>`;
+
+  // No questions loaded: show Upload Questions panel
   if(!questions.length){
     const subjectRows=subjects.map(s=>`
       <div class="subject-row">
@@ -1098,43 +1232,71 @@ function hostMain(){
         <span class="subject-count">questions:</span>
         <input class="q-count-input" type="number" min="0" max="50" value="${s.count}" data-subj="${esc(s.name)}" id="cnt-${esc(s.name)}"/>
       </div>`).join('');
+
+    // Manage tab: folder list + editor
+    const folderOptions=uploadSubjects.map(f=>`<option value="${esc(f.name)}"${manageFolder===f.name?' selected':''}>${esc(f.name)}</option>`).join('');
+    const managePanel=`
+      <div style="margin-bottom:10px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <select class="form-input" id="manage-folder-sel" style="flex:1;font-size:.83rem;padding:7px 10px">
+          <option value="">— select folder —</option>
+          ${folderOptions}
+        </select>
+        <button class="btn btn-dark btn-sm" id="btn-folder-open">Open</button>
+      </div>
+      <div style="display:flex;gap:6px;margin-bottom:10px">
+        <input class="form-input" id="new-folder-name" placeholder="New folder name" maxlength="40" style="flex:1;font-size:.83rem;padding:7px 10px"/>
+        <button class="btn btn-accent btn-sm" id="btn-create-folder">+ Create</button>
+      </div>
+      ${manageFolder?`
+        <div style="background:var(--faint);border:1px solid var(--line);border-radius:var(--r);padding:10px;margin-bottom:10px">
+          <div style="font-size:.78rem;font-weight:600;margin-bottom:8px;color:var(--mid)">📁 ${esc(manageFolder)} / questions.txt</div>
+          <textarea id="q-editor" rows="12" class="form-input" style="width:100%;font-family:monospace;font-size:.78rem;resize:vertical;padding:8px">${esc(editingContent)}</textarea>
+          <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
+            <button class="btn btn-good btn-sm" id="btn-save-editor">💾 Save to GitHub</button>
+            <label class="btn btn-white btn-sm" style="cursor:pointer">
+              📂 Upload .txt
+              <input type="file" id="file-upload-inp" accept=".txt" style="display:none"/>
+            </label>
+            <button class="btn btn-ghost btn-sm" id="btn-close-editor">✕ Close</button>
+          </div>
+        </div>`
+      :'<p class="muted small" style="margin-top:4px">Select a folder and click Open to view/edit its questions.txt.</p>'}
+      <div id="upload-msg">${uploadMsg}</div>`;
+
     return `<div class="host-main">
       ${voiceBar()}
-      ${S.sessionOpen
-        ?`<div class="session-open-banner">
-            <span style="font-size:1rem">🟢</span>
-            <div style="flex:1"><strong>Session is open</strong> · <span class="muted small">${(S.participants||[]).length} student${(S.participants||[]).length!==1?'s':''} joined</span></div>
-          </div>`
-        :`<div class="session-closed-banner">
-            <span style="font-size:1rem">⚪</span>
-            <div style="flex:1"><strong>Session not started</strong> · <span class="muted small">Students see "no session active"</span></div>
-            <button class="btn btn-good btn-sm" id="btn-open-session">▶ Start Session</button>
-          </div>`}
-      <h2 class="mb3">Load questions from GitHub</h2>
-      <p class="muted small mb2">Enter your GitHub repo URL (must have a <code>resources/</code> folder with subject subfolders)</p>
-      <div class="row gap2 mb2">
-        <input type="url" id="repo-url" class="form-input" placeholder="https://github.com/your-org/your-repo" style="flex:1"/>
-        <button class="btn btn-dark btn-sm" id="btn-browse" style="flex-shrink:0">${repoLoading?'Loading…':'Browse'}</button>
+      ${sessionBanner}
+      <div style="display:flex;gap:0;border:1px solid var(--line);border-radius:var(--r);overflow:hidden;margin-bottom:16px;margin-top:4px">
+        <button class="btn${uploadTab==='generate'?' btn-dark':' btn-ghost'}" style="flex:1;border-radius:0;border:none" id="tab-generate">📋 Generate Quiz</button>
+        <button class="btn${uploadTab==='manage'?' btn-dark':' btn-ghost'}" style="flex:1;border-radius:0;border:none;border-left:1px solid var(--line)" id="tab-manage">📂 Upload Questions</button>
       </div>
-      <div id="repo-msg"></div>
-      ${subjects.length?`
-        <h3 class="mb2 mt3">Select questions per subject</h3>
-        <div class="timer-input-row">
-          <span class="muted small" style="flex:1">⏱ Timer per question <span style="color:var(--mid)">(0 = no timer)</span></span>
-          <input type="number" min="0" max="300" value="${hostTimerSeconds}" id="timer-sec-input" class="q-count-input" style="width:70px"/>
-          <span class="muted small">sec</span>
-        </div>
-        <div class="subject-list">${subjectRows}</div>
-        <div id="gen-msg"></div>
-        <button class="btn btn-accent btn-full mt2" id="btn-gen">Generate quiz →</button>
-      `:''}
+      ${uploadTab==='generate'?`
+        <p class="muted small mb2">Pick subjects from your GitHub repository and generate a quiz.</p>
+        ${subjects.length?`
+          <div style="margin-bottom:10px;display:flex;gap:8px;align-items:center">
+            <button class="btn btn-white btn-sm" id="btn-browse">${repoLoading?'⏳ Loading…':'↻ Refresh subjects'}</button>
+            <span class="muted small">${subjects.length} subject${subjects.length!==1?'s':''} found</span>
+          </div>
+          <div class="timer-input-row">
+            <span class="muted small" style="flex:1">⏱ Timer per question <span style="color:var(--mid)">(0 = no timer)</span></span>
+            <input type="number" min="0" max="300" value="${hostTimerSeconds}" id="timer-sec-input" class="q-count-input" style="width:70px"/>
+            <span class="muted small">sec</span>
+          </div>
+          <div class="subject-list">${subjectRows}</div>
+          <div id="gen-msg"></div>
+          <button class="btn btn-accent btn-full mt2" id="btn-gen">Generate quiz →</button>
+        `:`
+          <div id="repo-msg"></div>
+          <button class="btn btn-dark btn-sm" id="btn-browse" style="margin-top:8px">${repoLoading?'⏳ Loading…':'Load subjects from GitHub →'}</button>
+        `}
+      `:managePanel}
     </div>`;
   }
 
   if(isLive) return `<div class="host-main">${voiceBar()}${livePanel()}</div>`;
 
   const q=selIdx>=0?questions[selIdx]:null;
-  return `<div class="host-main">
+  return `<div class="host-main" style="display:flex;flex-direction:column;min-height:calc(100vh - 54px)">
     ${voiceBar()}
     ${S.sessionOpen
       ?`<div class="session-open-banner" style="margin-bottom:16px">
@@ -1146,7 +1308,7 @@ function hostMain(){
           <div style="flex:1"><strong>Session not started</strong></div>
           <button class="btn btn-good btn-sm" id="btn-open-session">▶ Start Session</button>
         </div>`}
-    <div class="row between mb3" style="flex-wrap:wrap;gap:8px">
+    <div class="row between mb2" style="flex-wrap:wrap;gap:8px">
       <h2>${q?`Q${selIdx+1} of ${questions.length}${q.subject?' — '+q.subject:''}`:' Select a question'}</h2>
       <button class="btn btn-ghost btn-sm" id="btn-reload">↻ Change questions</button>
     </div>
@@ -1155,18 +1317,25 @@ function hostMain(){
       <input type="number" min="0" max="300" value="${hostTimerSeconds}" id="timer-sec-live" class="q-count-input" style="width:70px"/>
       <span class="muted small">sec</span>
     </div>
+    <div style="flex:1">
     ${!q
       ?`<p class="muted">Click a question from the sidebar to select it.</p>`
       :`<p style="font-size:.97rem;line-height:1.55;margin-bottom:20px">${esc(q.text)}</p>
-        <h3 class="mb2">Correct answer</h3>
-        <div class="key-grid">
+        <h3 class="mb2">Select correct answer</h3>
+        <div class="key-grid mb3">
           ${q.options.map((o,i)=>`
             <div class="key-card${answerKey===i?' selected':''}" data-key="${i}">
               <div class="kl">${'ABCD'[i]}</div><div class="kt">${esc(o)}</div>
             </div>`).join('')}
-        </div>
-        <button class="btn btn-dark btn-full" id="btn-push" ${(answerKey<0||pushing)?'disabled':''}>${pushing?'⏳ Pushing…':'Push question to students →'}</button>`
+        </div>`
     }
+    </div>
+    <!-- ── Fixed bottom action bar ── -->
+    <div style="border-top:1px solid var(--line);padding:14px 0 4px;margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn btn-dark btn-lg" style="flex:1" id="btn-push" ${(!q||answerKey<0||pushing)?'disabled':''}>${pushing?'⏳ Pushing…':'🚀 Push question'}</button>
+      <button class="btn btn-good btn-lg" style="flex:1" id="btn-reveal" disabled>Reveal answer</button>
+      <button class="btn btn-accent btn-lg" style="flex:1" id="btn-next" disabled>Next →</button>
+    </div>
   </div>`;
 }
 
@@ -1197,29 +1366,31 @@ function livePanel(){
   }).join('');
   const sorted=[...(S.participants||[])].sort((a,b)=>(b.score||0)-(a.score||0));
   const medals=['🥇','🥈','🥉'];
+  const isRevealed=S.status==='revealed';
   return `
-    <div class="row between mb2" style="flex-wrap:wrap;gap:8px">
-      <div>
+    <div style="display:flex;flex-direction:column;min-height:calc(100vh - 120px)">
+      <div style="flex:1">
         <div class="row gap2 mb1">
-          ${S.status==='revealed'?'<span class="tag tag-ink">Revealed</span>':`<span class="tag tag-green"><span class="dot-live"></span> Live</span>`}
+          ${isRevealed?'<span class="tag tag-ink">Revealed</span>':`<span class="tag tag-green"><span class="dot-live"></span> Live</span>`}
           <span class="small muted">${answered}/${totalParts} answered</span>
           ${S.timerSeconds&&S.status==='question'?`<span class="small muted">⏱ ~${Math.ceil(timerLeft)}s</span>`:''}
         </div>
-        <p style="font-size:.9rem;line-height:1.4">${esc(q.text)}</p>
+        <p style="font-size:.9rem;line-height:1.4;margin-bottom:14px">${esc(q.text)}</p>
+        <div class="stat-strip">
+          <div class="stat-item"><div class="stat-val">${totalParts}</div><div class="stat-lbl">Students</div></div>
+          <div class="stat-item"><div class="stat-val">${answered}</div><div class="stat-lbl">Answered</div></div>
+          <div class="stat-item"><div class="stat-val">${(S.history||[]).length+1}</div><div class="stat-lbl">Q #</div></div>
+        </div>
+        <h3 class="mb2">Responses</h3>${bars}
+        ${sorted.length?`<h3 class="mb2 mt3">Scores</h3><div class="score-list">${sorted.map((p,i)=>`<div class="score-row"><div class="score-rank">${medals[i]||i+1}</div><div class="score-name">${esc(p.name)}</div><div class="score-pts">${p.score||0}</div></div>`).join('')}</div>`:''}
       </div>
-      <div class="row gap2">
-        ${S.status==='revealed'
-          ?`<button class="btn btn-dark btn-sm" id="btn-next">Next question →</button>`
-          :`<button class="btn btn-good btn-sm" id="btn-reveal">Reveal answer</button>`}
+      <!-- ── Fixed bottom action bar ── -->
+      <div style="border-top:1px solid var(--line);padding:14px 0 4px;margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-dark btn-lg" style="flex:1" id="btn-push" disabled>🚀 Push question</button>
+        <button class="btn btn-good btn-lg" style="flex:1" id="btn-reveal" ${isRevealed?'disabled':''}>Reveal answer</button>
+        <button class="btn btn-accent btn-lg" style="flex:1" id="btn-next" ${isRevealed?'':'disabled'}>Next →</button>
       </div>
-    </div>
-    <div class="stat-strip">
-      <div class="stat-item"><div class="stat-val">${totalParts}</div><div class="stat-lbl">Students</div></div>
-      <div class="stat-item"><div class="stat-val">${answered}</div><div class="stat-lbl">Answered</div></div>
-      <div class="stat-item"><div class="stat-val">${(S.history||[]).length+1}</div><div class="stat-lbl">Q #</div></div>
-    </div>
-    <h3 class="mb2">Responses</h3>${bars}
-    ${sorted.length?`<h3 class="mb2 mt3">Scores</h3><div class="score-list">${sorted.map((p,i)=>`<div class="score-row"><div class="score-rank">${medals[i]||i+1}</div><div class="score-name">${esc(p.name)}</div><div class="score-pts">${p.score||0}</div></div>`).join('')}</div>`:''}`;
+    </div>`;
 }
 
 /* ══════════════════════════════════════
@@ -1515,15 +1686,25 @@ function attach(){
   // Leave
   on('btn-leave',()=>{ if(confirm('Leave the session?')) send({type:'leave'}); });
 
-  // Resource browser
+  // Resource browser / upload panel
   on('btn-browse', browseRepo);
-  document.getElementById('repo-url')?.addEventListener('keydown',e=>{ if(e.key==='Enter') browseRepo(); });
+  on('tab-generate', ()=>{ uploadTab='generate'; render(); });
+  on('tab-manage', ()=>{ uploadTab='manage'; uploadMsg=''; loadUploadFolders(); render(); });
+  on('btn-create-folder', createFolder);
+  on('btn-folder-open', ()=>{
+    const sel=document.getElementById('manage-folder-sel');
+    if(sel&&sel.value) openFolderEdit(sel.value);
+  });
+  on('btn-save-editor', saveEditorContent);
+  on('btn-close-editor', ()=>{ manageFolder=null; editingContent=''; editingSha=null; uploadMsg=''; render(); });
+  on('file-upload-inp', null); // handled via change
+  document.getElementById('file-upload-inp')?.addEventListener('change', uploadQuestionsFile);
   on('btn-gen', ()=>{
     hostTimerSeconds=Math.max(0,parseInt(document.getElementById('timer-sec-input')?.value)||0);
     subjects.forEach(s=>{ const inp=document.getElementById('cnt-'+s.name); if(inp) s.count=Math.max(0,parseInt(inp.value)||0); });
     generateQuiz();
   });
-  on('btn-reload',()=>{ questions=[]; selIdx=-1; answerKey=-1; subjects=[]; repoPath=null; render(); });
+  on('btn-reload',()=>{ questions=[]; selIdx=-1; answerKey=-1; subjects=[]; repoPath=null; uploadTab='generate'; manageFolder=null; editingContent=''; editingSha=null; uploadMsg=''; render(); });
 
   // Timer input (live)
   document.getElementById('timer-sec-live')?.addEventListener('change',e=>{ hostTimerSeconds=Math.max(0,parseInt(e.target.value)||0); });
@@ -1534,7 +1715,6 @@ function attach(){
   // Sidebar toggles
   on('sb-toggle-q',     ()=>{ sidebarQOpen=!sidebarQOpen; render(); });
   on('sb-toggle-stud',  ()=>{ sidebarStudOpen=!sidebarStudOpen; render(); });
-  on('sb-toggle-score', ()=>{ sidebarScoreOpen=!sidebarScoreOpen; render(); });
   on('sb-toggle-sched', ()=>{ sidebarSchedOpen=!sidebarSchedOpen; render(); });
 
   // Q selection
