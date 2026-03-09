@@ -161,7 +161,7 @@
     .score-row.top{background:var(--faint)}
 
     /* ANSWER KEY */
-    .key-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px;height:120px}
+    .key-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:6px;min-height:120px}
     .key-card{padding:11px 10px;border:1px solid var(--line);border-radius:var(--r);cursor:pointer;text-align:center;transition:background .1s,border-color .1s;overflow:hidden;display:flex;flex-direction:column;justify-content:center}
     .key-card:hover{background:var(--faint)}
     .key-card.selected{background:var(--ink);color:#fff;border-color:var(--ink)}
@@ -214,6 +214,7 @@
 
     /* VOICE */
     .voice-bar{display:flex;align-items:center;gap:10px;padding:8px 12px;background:var(--faint);border-radius:var(--r);font-size:.8rem;margin-bottom:12px;border:1px solid var(--line)}
+    .btn svg, .host-ctrl-bar svg, .host-live-nav svg { pointer-events: none; }
     .mic-dot{width:8px;height:8px;border-radius:50%;background:#ccc;flex-shrink:0;transition:background .3s}
     .mic-dot.live{background:#2d9e6b;box-shadow:0 0 0 3px rgba(45,158,107,.18);animation:blink 1s infinite}
     .mic-dot.err{background:var(--bad)}
@@ -1516,11 +1517,12 @@ function hostHTML(){
       ${qNav}
       ${timerRow}
       ${qInfo}
-      ${isLive
-        ?`<div style="overflow-y:auto;flex:1">${liveBars}</div>`
-        :`${keyGrid}`}
+      <div style="min-height:132px;flex-shrink:0;overflow-y:auto">
+        ${isLive
+          ?`<div>${liveBars}</div>`
+          :keyGrid}
+      </div>
       ${actionBtns}
-      <div style="flex:1;min-height:0"></div>
     </div>
     ${schedOverlayHTML()}
   </div>`;
