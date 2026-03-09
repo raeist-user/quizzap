@@ -21,12 +21,13 @@
     body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased}
 
     /* NAV */
-    @keyframes fadeIn{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:translateY(0)}}
+    @keyframes fadeIn{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}
+    @keyframes slideUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
     nav{display:flex;align-items:center;justify-content:space-between;padding:0 16px;height:54px;border-bottom:1px solid var(--line);background:var(--white);position:sticky;top:0;z-index:200;gap:8px}
     .brand{font-family:var(--serif);font-size:1.1rem;flex-shrink:0;line-height:1.2;min-width:0}
     .brand small{display:block;font-family:var(--sans);font-size:.62rem;font-weight:500;color:var(--mid);letter-spacing:.04em;text-transform:uppercase}
     .nav-right{display:flex;align-items:center;gap:8px;flex-shrink:0}
-    #ci{width:7px;height:7px;border-radius:50%;background:#ccc}
+    #ci{width:7px;height:7px;border-radius:50%;background:#ccc;flex-shrink:0}
     #ci.on{background:#2d9e6b}#ci.off{background:#c1121f}
     #conn-lbl{font-size:.77rem;color:var(--mid)}
     @media(max-width:480px){
@@ -34,7 +35,7 @@
       .brand{font-size:.92rem}
       .brand small{display:none}
       #conn-lbl{display:none}
-      .profile-btn span:last-child{display:none}
+      .profile-btn>span:last-child{display:none}
     }
 
     /* PROFILE */
@@ -50,6 +51,45 @@
     .pd-item{display:flex;align-items:center;gap:8px;padding:9px 16px;font-size:.83rem;cursor:pointer;transition:background .1s}
     .pd-item:hover{background:var(--faint)}
     .pd-item.danger{color:var(--bad)}
+
+    /* PROFILE PAGE */
+    .profile-page{max-width:640px;margin:0 auto;padding:28px 20px;animation:slideUp .25s ease}
+    .profile-hero{display:flex;align-items:center;gap:18px;margin-bottom:28px;padding:20px;background:var(--white);border:1px solid var(--line);border-radius:12px}
+    .profile-avatar-lg{width:62px;height:62px;border-radius:50%;background:var(--ink);color:#fff;display:flex;align-items:center;justify-content:center;font-size:1.5rem;font-weight:600;flex-shrink:0}
+    .profile-hero-info{min-width:0}
+    .profile-hero-name{font-size:1.1rem;font-weight:600;line-height:1.3}
+    .profile-hero-disp{font-size:.82rem;color:var(--mid);margin-top:2px}
+    .profile-hero-email{font-size:.77rem;color:var(--mid)}
+    .profile-tabs{display:flex;gap:0;border-bottom:2px solid var(--line);margin-bottom:22px}
+    .profile-tab{padding:8px 18px;font-size:.83rem;font-weight:500;color:var(--mid);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;transition:color .15s,border-color .15s;white-space:nowrap}
+    .profile-tab.active{color:var(--ink);border-bottom-color:var(--ink)}
+    .profile-tab:hover:not(.active){color:var(--ink)}
+    .stat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:20px}
+    .stat-card{background:var(--white);border:1px solid var(--line);border-radius:10px;padding:16px 14px;text-align:center}
+    .stat-num{font-size:1.6rem;font-weight:700;line-height:1;margin-bottom:4px}
+    .stat-lbl{font-size:.72rem;color:var(--mid);text-transform:uppercase;letter-spacing:.04em}
+    .stat-sub{font-size:.72rem;color:var(--mid);margin-top:2px}
+    .best-card{background:var(--white);border:1px solid var(--line);border-radius:10px;padding:16px;margin-bottom:12px}
+    .best-card-head{font-size:.72rem;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--mid);margin-bottom:10px}
+    .best-row{display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--faint);font-size:.84rem}
+    .best-row:last-child{border:none}
+    .best-val{font-weight:600}
+    .streak-badge{display:inline-flex;align-items:center;gap:6px;background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;padding:10px 16px;font-size:.84rem;font-weight:500;color:#c2410c}
+    .hist-row{display:flex;align-items:center;gap:10px;padding:11px 14px;background:var(--white);border:1px solid var(--line);border-radius:8px;margin-bottom:8px;font-size:.82rem}
+    .hist-date{color:var(--mid);font-size:.75rem;min-width:70px}
+    .hist-score{font-weight:700;font-size:.95rem}
+    .hist-rank{color:var(--mid)}
+    .hist-acc{margin-left:auto;font-size:.75rem;padding:2px 8px;border-radius:12px;font-weight:500}
+    .hist-acc.good{background:var(--good-bg);color:var(--good)}
+    .hist-acc.ok{background:#fef9c3;color:#854d0e}
+    .hist-acc.bad{background:var(--bad-bg);color:var(--bad)}
+    .settings-section{background:var(--white);border:1px solid var(--line);border-radius:10px;padding:18px;margin-bottom:14px}
+    .settings-section h3{font-size:.85rem;font-weight:600;margin-bottom:14px;color:var(--ink)}
+    .form-row{display:flex;flex-direction:column;gap:6px;margin-bottom:12px}
+    .form-row label{font-size:.78rem;font-weight:500;color:var(--mid)}
+    .form-msg{font-size:.78rem;margin-top:6px;min-height:18px}
+    .form-msg.ok{color:var(--good)}.form-msg.err{color:var(--bad)}
+    @media(max-width:480px){.stat-grid{grid-template-columns:repeat(2,1fr)}.profile-tabs{overflow-x:auto}}
 
     /* AUTH */
     .auth-page{display:flex;align-items:center;justify-content:center;min-height:100vh;padding:24px 20px;background:var(--faint)}
@@ -273,6 +313,7 @@
             <div class="pd-name" id="pd-full-name"></div>
             <div class="pd-email" id="pd-email"></div>
           </div>
+          <div class="pd-item" id="btn-profile">📊 My Profile</div>
           <div class="pd-item danger" id="btn-logout">🚪 Sign out</div>
         </div>
       </div>
@@ -288,6 +329,7 @@
 ══════════════════════════════════════ */
 let S={}, role=null, myPid=null, myName=null, hostAuthed=false;
 let currentUser=null;   // { id, name, email, role }
+let showingProfile=false, profileTab='overview'; // profile page state
 let authToken=null;
 
 // Host
@@ -310,13 +352,7 @@ let remoteConn=null;
 // Timer
 let timerInterval=null;
 
-const STUN={iceServers:[
-  {urls:'stun:stun.l.google.com:19302'},
-  {urls:'stun:stun1.l.google.com:19302'},
-  {urls:'stun:stun2.l.google.com:19302'},
-  {urls:'stun:stun.cloudflare.com:3478'},
-  {urls:'stun:stun.relay.metered.ca:80'},
-]};
+const STUN={iceServers:[{urls:'stun:stun.l.google.com:19302'},{urls:'stun:stun1.l.google.com:19302'}]};
 
 /* ══════════════════════════════════════
    SOUNDS (Web Audio API)
@@ -373,8 +409,48 @@ function loadStoredAuth(){
 function saveAuth(token,user){ authToken=token; currentUser=user; localStorage.setItem('scc_token',token); localStorage.setItem('scc_user',JSON.stringify(user)); }
 function clearAuth(){ authToken=null; currentUser=null; localStorage.removeItem('scc_token'); localStorage.removeItem('scc_user'); }
 
-async function apiPost(path,body){
-  const r=await fetch(path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+// ── SESSION HISTORY ──────────────────────────────────────────────────────────
+function histKey(){ return `scc_history_${currentUser?.id||'anon'}`; }
+function loadHistory(){ try{ return JSON.parse(localStorage.getItem(histKey())||'[]'); }catch{ return []; } }
+function saveSession(entry){ // {date,score,total,rank,participants,correct,subjects}
+  const h=loadHistory(); h.unshift(entry); localStorage.setItem(histKey(), JSON.stringify(h.slice(0,100))); }
+function computeStats(){
+  const h=loadHistory();
+  if(!h.length) return null;
+  const totalSessions=h.length;
+  const totalCorrect=h.reduce((s,e)=>s+(e.correct||0),0);
+  const totalQs=h.reduce((s,e)=>s+(e.total||0),0);
+  const accuracy=totalQs?Math.round(totalCorrect/totalQs*100):0;
+  const bestScore=Math.max(...h.map(e=>e.score||0));
+  const bestRank=Math.min(...h.map(e=>e.rank||999));
+  // Streak: consecutive days with sessions
+  let streak=0;
+  const today=new Date(); today.setHours(0,0,0,0);
+  const dayMs=86400000;
+  const sessionDays=[...new Set(h.map(e=>{ const d=new Date(e.date); d.setHours(0,0,0,0); return d.getTime(); }))].sort((a,b)=>b-a);
+  if(sessionDays.length&&(today.getTime()-sessionDays[0])<=dayMs){ // today or yesterday counts
+    for(let i=0;i<sessionDays.length;i++){
+      const expected=today.getTime()-i*dayMs;
+      if(Math.abs(sessionDays[i]-expected)<=dayMs) streak++; else break;
+    }
+  }
+  // Best streak ever
+  let bestStreak=0,curStr=1;
+  for(let i=1;i<sessionDays.length;i++){
+    if(sessionDays[i-1]-sessionDays[i]<=dayMs) curStr++; else curStr=1;
+    if(curStr>bestStreak) bestStreak=curStr;
+  }
+  if(sessionDays.length) bestStreak=Math.max(bestStreak,1);
+  // Subject accuracy
+  const subjectMap={};
+  h.forEach(e=>{ if(e.subjects){ e.subjects.forEach(s=>{ if(!subjectMap[s.name]) subjectMap[s.name]={c:0,t:0}; subjectMap[s.name].c+=s.correct||0; subjectMap[s.name].t+=s.total||0; }); } });
+  return {totalSessions,totalCorrect,totalQs,accuracy,bestScore,bestRank,streak,bestStreak,subjectMap};
+}
+
+async function apiPost(path,body,auth){
+  const headers={'Content-Type':'application/json'};
+  if(auth) headers['Authorization']='Bearer '+authToken;
+  const r=await fetch(path,{method:'POST',headers,body:JSON.stringify(body)});
   const d=await r.json();
   if(!r.ok) throw new Error(d.error||'Request failed');
   return d;
@@ -392,22 +468,22 @@ function connect(){
     setConn(true);
     if(role==='host'&&hostAuthed)         send({type:'set_host',password:'2325'});
     else if(role==='participant'&&myName) send({type:'join',name:myName,pid:myPid});
-    // If mic was active, re-establish WebRTC with all current peers after brief delay
-    if(role==='host'&&localStream) setTimeout(()=>send({type:'get_peers'}),800);
   };
   ws.onmessage=async e=>{
     const m=JSON.parse(e.data);
     switch(m.type){
       case 'hello':     myCid=m.cid; break;
       case 'state': {
-        const ns=m.payload.status, incomingScore=m.payload.myScore||0;
-        // Score went up when host revealed → flag to show +1 in leaderboard
-        if(ns==='revealed' && prevStatus==='question' && incomingScore > prevMyScore) showPlusOne=true;
-        // Clear +1 only when next question is actively pushed (not on idle/wait)
-        if(ns==='question') { showPlusOne=false; prevMyScore=incomingScore; }
-        // Track score during idle so we know baseline for next question
-        if(ns==='idle') prevMyScore=incomingScore;
-        prevStatus=ns;
+        const ns=m.payload.status;
+        // Save session when ended
+        if(ns==='ended' && prevStatus!=='ended' && role==='participant' && myPid){
+          const parts=m.payload.participants||[];
+          const sorted=[...parts].sort((a,b)=>(b.score||0)-(a.score||0));
+          const myRank=sorted.findIndex(p=>p.id===myPid)+1;
+          const hist=m.payload.myHistory||[];
+          const correct=hist.filter(h=>h.myAnswer!==null&&h.myAnswer===h.correct).length;
+          saveSession({date:new Date().toISOString(),score:m.payload.myScore||0,total:hist.length,rank:myRank||0,participants:parts.length,correct});
+        }
         S=m.payload; render(); break;
       }
       case 'joined':    myPid=m.pid; sessionStorage.setItem('qz_pid',m.pid); break;
@@ -469,7 +545,6 @@ async function studentHandleOffer(sdp){
   pc.onicecandidate=ev=>{ if(ev.candidate) send({type:'rtc_ice_to_host',signal:ev.candidate.toJSON()}); };
   pc.ontrack=ev=>{ const a=document.getElementById('remote-audio'); if(a&&a.srcObject!==ev.streams[0]){a.srcObject=ev.streams[0];a.play().catch(()=>{});} updateMicDot(); };
   pc.oniceconnectionstatechange=()=>updateMicDot();
-  pc.onconnectionstatechange=()=>{ if(['failed','closed','disconnected'].includes(pc.connectionState)){if(remoteConn===pc){remoteConn=null;} updateMicDot();} };
   try{ await pc.setRemoteDescription(new RTCSessionDescription(sdp)); const ans=await pc.createAnswer(); await pc.setLocalDescription(ans); send({type:'rtc_answer',signal:{type:pc.localDescription.type,sdp:pc.localDescription.sdp}}); }catch(e){}
 }
 function updateMicDot(){ const d=document.getElementById('mic-dot'); if(!d)return; const st=remoteConn?.iceConnectionState; d.className='mic-dot'+(st==='connected'||st==='completed'?' live':st==='failed'?' err':''); }
@@ -590,6 +665,7 @@ function render(){
   document.getElementById('pd-full-name').textContent=u.name;
   document.getElementById('pd-email').textContent=u.email;
   const v=document.getElementById('view');
+  if(showingProfile){ v.innerHTML=profilePageHTML(); attach(); return; }
   if(!role)                           v.innerHTML=landingHTML();
   else if(role==='host'&&!hostAuthed) v.innerHTML=hostPassHTML();
   else if(role==='host')              v.innerHTML=hostHTML();
@@ -668,7 +744,112 @@ function hostPassHTML(){
 /* ══════════════════════════════════════
    HOST SHELL
 ══════════════════════════════════════ */
-function hostHTML(){
+/* ══════════════════════════════════════
+   PROFILE PAGE
+══════════════════════════════════════ */
+function profilePageHTML(){
+  const u=currentUser;
+  const dispName=u.displayName||u.name;
+  const initials=u.name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+  const stats=computeStats();
+  const history=loadHistory();
+  const tabs=['overview','history','settings'];
+  const tabLabels={'overview':'📈 Overview','history':'📋 History','settings':'⚙️ Settings'};
+
+  const tabsHTML=tabs.map(t=>`<div class="profile-tab${profileTab===t?' active':''}" data-ptab="${t}">${tabLabels[t]}</div>`).join('');
+
+  let body='';
+
+  if(profileTab==='overview'){
+    if(!stats){
+      body=`<p class="muted" style="text-align:center;padding:32px 0">No sessions yet — join a quiz to see your stats here!</p>`;
+    } else {
+      const accClass=stats.accuracy>=70?'good':stats.accuracy>=40?'ok':'bad';
+      body=`
+      <div class="stat-grid">
+        <div class="stat-card"><div class="stat-num">${stats.totalSessions}</div><div class="stat-lbl">Sessions</div></div>
+        <div class="stat-card"><div class="stat-num" style="color:${stats.accuracy>=70?'var(--good)':stats.accuracy>=40?'#b45309':'var(--bad)'}">${stats.accuracy}%</div><div class="stat-lbl">Accuracy</div><div class="stat-sub">${stats.totalCorrect}/${stats.totalQs} correct</div></div>
+        <div class="stat-card"><div class="stat-num" style="font-size:1.3rem">${stats.streak>0?'🔥'.repeat(Math.min(stats.streak,5)):'—'}</div><div class="stat-lbl">Streak</div><div class="stat-sub">${stats.streak} day${stats.streak!==1?'s':''}</div></div>
+      </div>
+      <div class="best-card">
+        <div class="best-card-head">🏆 Personal Bests</div>
+        <div class="best-row"><span>Highest score</span><span class="best-val">${stats.bestScore} pts</span></div>
+        <div class="best-row"><span>Best rank</span><span class="best-val">${stats.bestRank===999?'—':'#'+stats.bestRank}</span></div>
+        <div class="best-row"><span>Longest streak</span><span class="best-val">${stats.bestStreak} day${stats.bestStreak!==1?'s':''}</span></div>
+      </div>
+      ${Object.keys(stats.subjectMap).length?`
+      <div class="best-card">
+        <div class="best-card-head">📚 By Subject</div>
+        ${Object.entries(stats.subjectMap).map(([name,{c,t}])=>`
+          <div class="best-row">
+            <span>${esc(name)}</span>
+            <span class="best-val" style="color:${t?c/t>=.7?'var(--good)':c/t>=.4?'#b45309':'var(--bad)':'var(--mid)'}">${t?Math.round(c/t*100):0}% <span style="font-weight:400;font-size:.77rem;color:var(--mid)">(${c}/${t})</span></span>
+          </div>`).join('')}
+      </div>`:''} `;
+    }
+  }
+
+  if(profileTab==='history'){
+    if(!history.length){
+      body=`<p class="muted" style="text-align:center;padding:32px 0">No sessions recorded yet.</p>`;
+    } else {
+      body=history.map((e,i)=>{
+        const d=new Date(e.date);
+        const dateStr=d.toLocaleDateString('en-GB',{day:'numeric',month:'short'});
+        const acc=e.total?Math.round(e.correct/e.total*100):0;
+        const accClass=acc>=70?'good':acc>=40?'ok':'bad';
+        const medal=['🥇','🥈','🥉'][e.rank-1]||(e.rank?'#'+e.rank:'');
+        return `<div class="hist-row">
+          <div class="hist-date">${dateStr}</div>
+          <div class="hist-score">${e.score} pts</div>
+          <div class="hist-rank">${medal} of ${e.participants||'?'}</div>
+          <div class="hist-acc ${accClass}">${acc}%</div>
+        </div>`;
+      }).join('');
+    }
+  }
+
+  if(profileTab==='settings'){
+    body=`
+    <div class="settings-section">
+      <h3>🎭 Session Display Name</h3>
+      <p class="muted small mb2" style="font-size:.78rem">This name shows to other students during quizzes.</p>
+      <div class="form-row">
+        <label>Display name</label>
+        <input class="form-input" id="disp-name-in" maxlength="32" value="${esc(u.displayName||u.name)}" placeholder="Your quiz nickname"/>
+      </div>
+      <button class="btn btn-dark btn-sm" id="btn-save-disp">Save display name</button>
+      <div class="form-msg" id="disp-msg"></div>
+    </div>
+    <div class="settings-section">
+      <h3>🔑 Change Password</h3>
+      <div class="form-row"><label>Current password</label><input class="form-input" type="password" id="pw-cur" placeholder="Current password"/></div>
+      <div class="form-row"><label>New password</label><input class="form-input" type="password" id="pw-new" placeholder="New password (min 6 chars)"/></div>
+      <div class="form-row"><label>Confirm new password</label><input class="form-input" type="password" id="pw-new2" placeholder="Repeat new password"/></div>
+      <button class="btn btn-dark btn-sm" id="btn-save-pw">Update password</button>
+      <div class="form-msg" id="pw-msg"></div>
+    </div>`;
+  }
+
+  return `<div class="profile-page">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:20px">
+      <button class="btn btn-ghost btn-sm" id="btn-profile-back">← Back</button>
+      <h2 style="font-size:1rem;font-weight:600">My Profile</h2>
+    </div>
+    <div class="profile-hero">
+      <div class="profile-avatar-lg">${initials}</div>
+      <div class="profile-hero-info">
+        <div class="profile-hero-name">${esc(dispName)}${u.displayName&&u.displayName!==u.name?`<span style="font-size:.74rem;font-weight:400;color:var(--mid);margin-left:6px">(${esc(u.name)})</span>`:''}</div>
+        <div class="profile-hero-email">${esc(u.email)}</div>
+        ${stats?`<div class="profile-hero-disp" style="margin-top:6px">${stats.totalSessions} session${stats.totalSessions!==1?'s':''} · ${stats.accuracy}% accuracy · ${stats.streak>0?'🔥 '+stats.streak+' day streak':'No active streak'}</div>`:''}
+      </div>
+    </div>
+    <div class="profile-tabs">${tabsHTML}</div>
+    ${body}
+  </div>`;
+}
+
+
   if(S.status==='ended') return hostEndedHTML();
   return `<div class="host-shell">${hostSidebar()}${hostMain()}</div>`;
 }
@@ -898,7 +1079,7 @@ function waitHTML(){
       <div class="lb-row${p.id===myPid?' me':''}">
         <div class="score-rank">${['🥇','🥈','🥉'][i]||i+1}</div>
         <div style="flex:1">${esc(p.name)}${p.id===myPid?' <span style="font-size:.7rem;color:var(--mid)">← you</span>':''}</div>
-        <div class="score-pts">${p.score||0}${p.id===myPid&&showPlusOne?'<span style="color:#22c55e;font-size:.75rem;font-weight:700;margin-left:5px;animation:fadeIn .3s ease">+1</span>':''}</div>
+        <div class="score-pts">${p.score||0}</div>
       </div>`).join('')}
   </div>`:'';
   return `<div class="wait-shell">
@@ -1001,6 +1182,39 @@ function attach(){
   on('profile-btn',()=>{ const d=document.getElementById('p-dropdown'); d.classList.toggle('hidden'); });
   document.addEventListener('click', e=>{ if(!document.getElementById('profile-wrap')?.contains(e.target)) document.getElementById('p-dropdown')?.classList.add('hidden'); }, {capture:true,once:true});
   on('btn-logout', doLogout);
+  on('btn-profile',()=>{ showingProfile=true; profileTab='overview'; document.getElementById('p-dropdown')?.classList.add('hidden'); render(); });
+  on('btn-profile-back',()=>{ showingProfile=false; render(); });
+  // Profile tabs
+  document.querySelectorAll('.profile-tab[data-ptab]').forEach(el=>
+    el.addEventListener('click',()=>{ profileTab=el.dataset.ptab; render(); })
+  );
+  // Save display name
+  on('btn-save-disp', async ()=>{
+    const v=document.getElementById('disp-name-in')?.value?.trim();
+    const msg=document.getElementById('disp-msg'); if(!v||!msg)return;
+    try{
+      const d=await apiPost('/api/update-name',{displayName:v},true);
+      saveAuth(d.token,d.user);
+      msg.className='form-msg ok'; msg.textContent='✓ Display name saved!';
+      setTimeout(()=>render(),800);
+    }catch(e){ msg.className='form-msg err'; msg.textContent=e.message; }
+  });
+  // Save password
+  on('btn-save-pw', async ()=>{
+    const cur=document.getElementById('pw-cur')?.value;
+    const nw=document.getElementById('pw-new')?.value;
+    const nw2=document.getElementById('pw-new2')?.value;
+    const msg=document.getElementById('pw-msg'); if(!msg)return;
+    if(!cur||!nw||!nw2){msg.className='form-msg err';msg.textContent='Fill in all fields';return;}
+    if(nw!==nw2){msg.className='form-msg err';msg.textContent='New passwords do not match';return;}
+    try{
+      await apiPost('/api/change-password',{currentPassword:cur,newPassword:nw},true);
+      msg.className='form-msg ok'; msg.textContent='✓ Password updated!';
+      document.getElementById('pw-cur').value='';
+      document.getElementById('pw-new').value='';
+      document.getElementById('pw-new2').value='';
+    }catch(e){ msg.className='form-msg err'; msg.textContent=e.message; }
+  });
 
   // Landing
   on('go-host', ()=>{ role='host'; hostAuthed=false; render(); });
@@ -1086,7 +1300,7 @@ function attach(){
 }
 
 // Track previous answer state for sound effects
-let prevStatus=null, prevMyAnswer=null, showPlusOne=false, prevMyScore=0;
+let prevStatus=null, prevMyAnswer=null;
 const origRender=render;
 // Intercept state updates for sounds
 const _origOnMsg=ws?.onmessage;
@@ -1099,9 +1313,9 @@ function checkSounds(){
 }
 
 function on(id,fn){ document.getElementById(id)?.addEventListener('click',fn); }
-function doLogout(){ clearAuth(); role=null; myPid=null; myName=null; hostAuthed=false; render(); }
+function doLogout(){ clearAuth(); role=null; myPid=null; myName=null; hostAuthed=false; showingProfile=false; render(); }
 function doHostLogin(){ const v=document.getElementById('pw-in')?.value?.trim(); if(!v)return; send({type:'set_host',password:v}); }
-function doLeave(){ role=null; myName=null; myPid=null; sessionStorage.removeItem('qz_pid'); render(); }
+function doLeave(){ role=null; myName=null; myPid=null; showingProfile=false; sessionStorage.removeItem('qz_pid'); render(); }
 function doJoin(){
   const v=document.getElementById('name-in')?.value?.trim(); if(!v)return;
   myName=v; myPid=sessionStorage.getItem('qz_pid');
