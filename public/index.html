@@ -383,7 +383,18 @@ function connect(){
     const m=JSON.parse(e.data);
     switch(m.type){
       case 'hello':     myCid=m.cid; break;
-      case 'state':     S=m.payload; render(); break;
+      case 'state': {
+        const incomingScore = m.payload.myScore || 0;
+        const incomingStatus = m.payload.status;
+        if(incomingStatus==='revealed' && prevStatus==='question' && incomingScore > prevMyScore){
+          showPlusOne=true;
+          setTimeout(()=>{ showPlusOne=false; render(); }, 3000);
+        }
+        if(incomingStatus==='question'){ showPlusOne=false; prevMyScore=incomingScore; }
+        if(incomingStatus==='idle'){ showPlusOne=false; prevMyScore=0; }
+        S=m.payload;
+        render(); break;
+      }
       case 'joined':    myPid=m.pid; sessionStorage.setItem('qz_pid',m.pid); break;
       case 'auth_ok':   hostAuthed=true; render(); break;
       case 'auth_fail': { const el=document.getElementById('pw-err'); if(el)el.textContent='Incorrect password.'; break; }
@@ -544,7 +555,7 @@ function scoreBannerHTML(){
   const medals=['🥇','🥈','🥉'];
   const myRank=sorted.findIndex(p=>p.id===myPid)+1;
   const myP=sorted.find(p=>p.id===myPid);
-  let chips=sorted.slice(0,5).map((p,i)=>`<div class="sb-chip${p.id===myPid?' me':''}"><span>${medals[i]||'#'+(i+1)}</span><span>${esc(p.name.length>12?p.name.slice(0,11)+'…':p.name)}</span><span class="sb-pts">${p.score||0}</span></div>`).join('');
+  let chips=sorted.slice(0,5).map((p,i)=>`<div class="sb-chip${p.id===myPid?' me':''}"><span>${medals[i]||'#'+(i+1)}</span><span>${esc(p.name.length>12?p.name.slice(0,11)+'…':p.name)}</span><span class="sb-pts">${p.score||0}${p.id===myPid&&showPlusOne?'<span style="color:#22c55e;font-size:.75rem;font-weight:700;margin-left:3px">+1</span>':''}</span></div>`).join('');
   if(myRank>5&&myP) chips+=`<span style="color:var(--line);font-size:.8rem">···</span><div class="sb-chip me"><span>#${myRank}</span><span>${esc(myP.name.slice(0,11))}</span><span class="sb-pts">${myP.score||0}</span></div>`;
   return `<div class="score-banner">${chips}</div>`;
 }
@@ -871,7 +882,7 @@ function waitHTML(){
       <div class="lb-row${p.id===myPid?' me':''}">
         <div class="score-rank">${['🥇','🥈','🥉'][i]||i+1}</div>
         <div style="flex:1">${esc(p.name)}${p.id===myPid?' <span style="font-size:.7rem;color:var(--mid)">← you</span>':''}</div>
-        <div class="score-pts">${p.score||0}</div>
+        <div class="score-pts">${p.score||0}${p.id===myPid&&showPlusOne?'<span style="color:#22c55e;font-size:.78rem;font-weight:700;margin-left:4px">+1</span>':''}</div>
       </div>`).join('')}
   </div>`:'';
   return `<div class="wait-shell">
@@ -913,7 +924,7 @@ function questionViewHTML(){
   const hasTimer=S.timerSeconds&&S.status==='question';
   return `${scoreBannerHTML()}<div class="page">
     <div class="row between mb2">
-      <div class="row gap2"><div id="mic-dot" class="mic-dot"></div><span class="small muted">Score: <strong>${S.myScore||0}</strong> pts</span></div>
+      <div class="row gap2"><div id="mic-dot" class="mic-dot"></div><span class="small muted">Score: <strong>${S.myScore||0}</strong>${showPlusOne?'<span style="color:#22c55e;font-size:.78rem;font-weight:700;margin-left:4px">+1</span>':''} pts</span></div>
       <button class="btn btn-ghost btn-sm" id="btn-leave">Leave</button>
     </div>
     ${hasTimer?`<div class="timer-wrap"><div class="timer-bar-track"><div id="timer-bar" class="timer-bar-fill" style="width:100%"></div></div><div id="timer-digits" class="timer-digits">${S.timerSeconds}s</div></div>`:''}
@@ -1059,7 +1070,7 @@ function attach(){
 }
 
 // Track previous answer state for sound effects
-let prevStatus=null, prevMyAnswer=null;
+let prevStatus=null, prevMyAnswer=null, showPlusOne=false, prevMyScore=0;
 const origRender=render;
 // Intercept state updates for sounds
 const _origOnMsg=ws?.onmessage;
