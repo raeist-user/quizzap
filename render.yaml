@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: quizzap
+    name: shadabcoachingcenter
     env: node
     plan: free
     buildCommand: npm install
