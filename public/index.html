@@ -480,7 +480,7 @@ function parseQuestions(text){
   const out=[],lines=text.split('\n').map(l=>l.trim()).filter(Boolean);
   for(let i=0;i<lines.length;i++){
     const qLine=lines[i],oLine=lines[i+1]||'';
-    const m=oLine.match(/\(A\)([^,(]+)[,，]\s*\(B\)([^,(]+)[,，]\s*\(C\)([^,(]+)[,，]\s*\(D\)([^,(]+)/i);
+    const m=oLine.match(/\(A\)(.*?)[,，]\s*\(B\)(.*?)[,，]\s*\(C\)(.*?)[,，]\s*\(D\)(.+)/i);
     if(m){out.push({text:qLine.replace(/^\d+[.)]\s*/,'').trim(),options:[m[1].trim(),m[2].trim(),m[3].trim(),m[4].trim()]});i++;}
   }
   return out;
