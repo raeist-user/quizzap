@@ -648,7 +648,7 @@ function connect(){
         S=m.payload; render(); break;
       }
       case 'joined':    myPid=m.pid; sessionStorage.setItem('qz_pid',m.pid); break;
-      case 'auth_ok':   hostAuthed=true; fetchHostSchedules(); browseRepo(); render(); break;
+      case 'auth_ok':   hostAuthed=true; fetchHostSchedules(); browseRepo(); navPush(); render(); break;
       case 'auth_fail': { const el=document.getElementById('pw-err'); if(el)el.textContent='Incorrect password.'; break; }
       case 'left':      doLeave(); break;
       case 'peer_list': for(const cid of m.cids) await hostCallPeer(cid); break;
@@ -940,12 +940,17 @@ function render(){
   const nav=document.getElementById('main-nav');
   if(!currentUser){nav.style.display='none'; document.getElementById('view').innerHTML=authHTML(); attach(); return;}
   const isParticipant=(role==='participant'&&myName);
+  const isHome=(!role&&!showingProfile&&!showingHalted&&homeSection==='home');
   nav.style.display=(role==='host'&&hostAuthed)?'none':'flex';
-  // Student in session: hide profile, back, conn — center brand only
-  document.getElementById('nav-back-wrap').style.display=(isParticipant?false:!!(role||showingProfile||showingHalted))?'block':'none';
-  document.getElementById('profile-wrap').style.display=isParticipant?'none':'flex';
-  document.getElementById('ci').style.display=isParticipant?'none':'';
-  document.getElementById('conn-lbl').style.display=isParticipant?'none':'';
+  // Back button: show when not at plain home
+  document.getElementById('nav-back-wrap').style.display=
+    (!isParticipant&&(role||showingProfile||showingHalted))?'block':'none';
+  // Profile: only visible on the home landing section
+  document.getElementById('profile-wrap').style.display=isHome?'flex':'none';
+  // Conn indicator: hide for participants and on profile page (clean look)
+  document.getElementById('ci').style.display=(isParticipant||showingProfile)?'none':'';
+  document.getElementById('conn-lbl').style.display=(isParticipant||showingProfile)?'none':'';
+  // Center brand for participants
   document.getElementById('nav-brand').style.cssText=isParticipant?'flex:1;text-align:center;font-size:1rem':'';
   const u=currentUser;
   document.getElementById('p-avatar').textContent=u.name[0].toUpperCase();
@@ -1140,7 +1145,6 @@ function profilePageHTML(){
   const summ=stats?`${stats.sessions} session${stats.sessions!==1?'s':''} · ${stats.accuracy}% accuracy${stats.streak>0?' · 🔥 '+stats.streak+' day streak':''}`:null;
   return `<div class="profile-page">
     <div class="row gap2 mb3">
-      <button class="btn btn-ghost btn-sm" id="btn-profile-back">← Back</button>
       <span style="font-size:.95rem;font-weight:600">My Profile</span>
     </div>
     <div class="profile-hero">
@@ -1608,33 +1612,19 @@ function attach(){
     _profileBtn.addEventListener('click',_toggleDropdown);
   }
   on('btn-logout', doLogout);
-  on('btn-profile',()=>{ showingProfile=true; profileTab='overview'; document.getElementById('p-dropdown')?.classList.add('hidden'); render(); });
+  on('btn-profile',()=>{ showingProfile=true; profileTab='overview'; document.getElementById('p-dropdown')?.classList.add('hidden'); navPush(); render(); });
   on('btn-profile-back',()=>{ showingProfile=false; render(); });
   document.querySelectorAll('.ptab[data-ptab]').forEach(el=>el.addEventListener('click',()=>{ profileTab=el.dataset.ptab; render(); }));
 
   // Host home button (inside full-window host nav)
-  on('btn-host-home',()=>{
-    if(!confirm('Leave host panel and go home?')) return;
-    role=null; hostAuthed=false; HOST_PASSWORD_INPUT=''; stopMic(); render();
-  });
+  on('btn-host-home', doBack);
+  on('btn-pw-back', doBack);
   // Question prev/next inside host controller
   on('btn-q-prev',()=>{ if(selIdx>0){selIdx--;answerKey=-1;render();} });
   on('btn-q-next',()=>{ if(selIdx<questions.length-1){selIdx++;answerKey=-1;render();} });
 
-  // Nav back button
-  on('btn-nav-back',()=>{
-    if(showingProfile){ showingProfile=false; render(); return; }
-    if(role==='host'&&hostAuthed){
-      if(!confirm('Leave host panel and go home?')) return;
-      role=null; hostAuthed=false; HOST_PASSWORD_INPUT=''; stopMic(); render(); return;
-    }
-    if(role==='participant'&&myName){
-      if(!confirm('Leave the session and go home?')) return;
-      send({type:'leave'}); return;
-    }
-    // host not yet authed or other states — just go home
-    role=null; hostAuthed=false; myName=null; myPid=null; showingProfile=false; render();
-  });
+  // Nav back button — delegates to shared doBack()
+  on('btn-nav-back', doBack);
 
   // Profile settings
   on('btn-save-disp', async ()=>{
@@ -1690,16 +1680,16 @@ function attach(){
   });
 
   // Landing nav
-  on('go-host', ()=>{ role='host'; hostAuthed=false; render(); });
+  on('go-host', ()=>{ role='host'; hostAuthed=false; navPush(); render(); });
   on('go-join',  ()=>{
     role='participant';
     if(!serverSchedules) fetchSchedules();
-    render();
+    navPush(); render();
   });
   on('btn-back-home',()=>{ role=null; myName=null; myPid=null; render(); });
 
   // Host pass
-  on('btn-pw-back',()=>{ role=null; render(); });
+  // btn-pw-back handled above via doBack
   on('btn-pw-ok',  doHostLogin);
   document.getElementById('pw-in')?.addEventListener('keydown',e=>{ if(e.key==='Enter') doHostLogin(); });
   document.getElementById('pw-in')?.focus();
@@ -1799,6 +1789,28 @@ function attach(){
 
 function on(id,fn){ document.getElementById(id)?.addEventListener('click',fn); }
 function doLogout(){ clearAuth(); role=null; myPid=null; myName=null; hostAuthed=false; showingProfile=false; prevMyScore=0; scoreGain=0; allTimeLB=null; serverSchedules=null; hostSchedules=[]; render(); }
+
+/* Shared back navigation — used by nav button, host-home button, and mobile popstate */
+function doBack(){
+  if(showingProfile){
+    showingProfile=false;
+    navPush(); // push a new state so further back press goes home
+    render(); return;
+  }
+  if(role==='host'&&hostAuthed){
+    if(!confirm('Leave host panel and go home?')) return;
+    role=null; hostAuthed=false; HOST_PASSWORD_INPUT=''; stopMic();
+    navPush(); render(); return;
+  }
+  if(role==='host'&&!hostAuthed){
+    role=null; render(); return;
+  }
+  if(role==='participant'&&myName){
+    if(!confirm('Leave the session and go home?')) return;
+    send({type:'leave'}); return;
+  }
+  role=null; hostAuthed=false; myName=null; myPid=null; showingProfile=false; render();
+}
 function doHostLogin(){
   const v=document.getElementById('pw-in')?.value?.trim();
   if(!v)return;
@@ -1840,7 +1852,26 @@ function esc(s){ return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;')
 /* ══════════════════════════════════════
    BOOT
 ══════════════════════════════════════ */
+
+/* Push a history entry whenever we navigate deeper, so the phone's
+   hardware/gesture back button can pop back to the previous screen. */
+function navPush(){
+  history.pushState({qz:true}, '', location.href);
+}
+
+// Intercept browser/phone back button
+window.addEventListener('popstate', ()=>{
+  // If we're somewhere deep, go back one level
+  if(showingProfile||role||showingHalted){
+    doBack();
+    // Re-push so the next back press also works
+    history.pushState({qz:true}, '', location.href);
+  }
+});
+
 loadStoredAuth();
+// Seed the history stack so popstate always has a base entry
+history.replaceState({qz:true}, '', location.href);
 render();
 if(currentUser){
   connect();
