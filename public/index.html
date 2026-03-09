@@ -343,6 +343,22 @@
     .lb-full{width:100%;max-width:520px;margin:0 auto;padding:28px 20px}
 
     @media(max-width:480px){.stat-grid{grid-template-columns:repeat(2,1fr)}}
+
+    /* HOST FULL-SCREEN LAYOUT */
+    .host-full{display:flex;flex-direction:column;height:100vh;overflow:hidden}
+    .host-live-nav{background:var(--white);border-bottom:1px solid var(--line);padding:0 12px;height:48px;display:flex;align-items:center;gap:8px;overflow:hidden;flex-shrink:0}
+    .host-ctrl-bar{display:flex;gap:6px;padding:8px 12px;border-bottom:1px solid var(--line);background:var(--faint);flex-shrink:0}
+    .host-ctrl-bar .btn{flex:1;justify-content:center}
+    .host-students-panel{margin:8px 12px;border:1px solid var(--line);border-radius:var(--r);overflow:hidden;flex-shrink:0;height:230px;display:flex;flex-direction:column}
+    .host-students-head{padding:6px 10px;border-bottom:1px solid var(--line);background:var(--faint);display:flex;justify-content:space-between;align-items:center;flex-shrink:0}
+    .host-students-inner{overflow-y:auto;flex:1}
+    .host-bottom{flex:1;padding:8px 12px 14px;display:flex;flex-direction:column;gap:6px;overflow:hidden;min-height:0}
+    .host-bottom-scroll{overflow-y:auto;flex:1;display:flex;flex-direction:column;gap:6px}
+
+    /* HOME / LB FULLSCREEN */
+    .home-full{height:calc(100vh - 54px);display:flex;align-items:center;justify-content:center;padding:20px;overflow:hidden}
+    .lb-full-screen{height:calc(100vh - 54px);display:flex;flex-direction:column;overflow:hidden;padding:16px 20px}
+    .lb-full-inner{max-width:520px;width:100%;margin:0 auto;display:flex;flex-direction:column;flex:1;overflow:hidden}
   </style>
 </head>
 <body>
@@ -923,7 +939,7 @@ function scoreBannerHTML(){
 function render(){
   const nav=document.getElementById('main-nav');
   if(!currentUser){nav.style.display='none'; document.getElementById('view').innerHTML=authHTML(); attach(); return;}
-  nav.style.display='flex';
+  nav.style.display=(role==='host'&&hostAuthed)?'none':'flex';
   const u=currentUser;
   document.getElementById('p-avatar').textContent=u.name[0].toUpperCase();
   document.getElementById('p-name-lbl').textContent=u.name.split(' ')[0];
@@ -1000,22 +1016,23 @@ function landingHTML(){
             <div class="score-pts">${e.totalScore||0} pts</div>
           </div>`).join('')
         :`<div style="padding:24px;text-align:center;color:var(--mid)">No scores yet — be the first!</div>`;
-    return `<div class="lb-full">
-      ${tabs}
-      <div style="margin-bottom:16px"><h2>All-time Leaderboard</h2><p class="muted small mt1">Cumulative scores across all sessions</p></div>
-      <div class="score-list" style="max-width:520px">${rows}</div>
+    return `<div class="lb-full-screen">
+      <div class="lb-full-inner">
+        ${tabs}
+        <div style="margin-bottom:12px"><h2>All-time Leaderboard</h2><p class="muted small mt1">Cumulative scores across all sessions</p></div>
+        <div class="score-list" style="overflow-y:auto;flex:1">${rows}</div>
+      </div>
     </div>`;
   }
 
-  // Home section
   const n=(S.participants||[]).length;
   const nextS=serverSchedules&&serverSchedules.length?serverSchedules[0]:null;
   const schedHint=nextS
     ?`<div class="notice n-accent mt3" style="text-align:left;font-size:.8rem">
-        📅 Next session: <strong>${esc(nextS.title)}</strong> · ${new Date(nextS.ts).toLocaleDateString('en-GB',{day:'numeric',month:'short'})} at ${new Date(nextS.ts).toLocaleTimeString('en',{hour:'2-digit',minute:'2-digit'})} (${cdStr(nextS.ts)})
+        📅 Next: <strong>${esc(nextS.title)}</strong> · ${new Date(nextS.ts).toLocaleDateString('en-GB',{day:'numeric',month:'short'})} at ${new Date(nextS.ts).toLocaleTimeString('en',{hour:'2-digit',minute:'2-digit'})} (${cdStr(nextS.ts)})
       </div>`
     :'';
-  return `<div class="center"><div class="box">
+  return `<div class="home-full"><div class="box">
     ${tabs}
     <h1 class="mb1">Live Quiz</h1>
     <p class="muted mb3">Welcome, ${esc(currentUser.name.split(' ')[0])} 👋</p>
@@ -1150,107 +1167,74 @@ function hostPassHTML(){
 }
 
 /* ══════════════════════════════════════
-   HOST SHELL
+   HOST SHELL — FULL WINDOW
 ══════════════════════════════════════ */
 function hostHTML(){
   if(S.status==='ended') return hostEndedHTML();
-  return `<div class="host-shell">${hostSidebar()}${hostMain()}</div>`;
-}
 
-function hostSidebar(){
-  const isLive=S.status==='question'||S.status==='revealed';
-  const doneTexts=(S.history||[]).map(h=>h.question.text);
   const parts=S.participants||[];
   const sorted=[...parts].sort((a,b)=>(b.score||0)-(a.score||0));
-  const medals=['🥇','🥈','🥉'];
-  function initials(n){return n.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();}
-
-  const qRows=questions.length?questions.map((q,i)=>{
-    const isLiveNow=isLive&&S.question&&S.question.text===q.text;
-    const isDone=doneTexts.includes(q.text);
-    const isActive=selIdx===i&&!isLive;
-    let cls='q-row';
-    if(isLiveNow)cls+=' live'; else if(isActive)cls+=' active'; else if(isDone)cls+=' done';
-    return `<div class="${cls}" data-qi="${i}">
-      <div class="q-idx">${i+1}</div>
-      <div class="q-body"><div class="q-snippet">${esc(q.text.length>60?q.text.slice(0,58)+'…':q.text)}</div>${q.subject?`<div class="q-subj">${esc(q.subject)}</div>`:''}</div>
-      ${isLiveNow?'<span style="font-size:.65rem;color:var(--good)">●</span>':''}
-    </div>`;
-  }).join(''):'<p class="muted small" style="padding:4px 0 8px">No questions loaded.</p>';
-
-  // Combined students + live scores
-  const studentRows=sorted.length
-    ?sorted.map((p,i)=>`<div class="score-row" style="padding:7px 8px;font-size:.78rem">
-        <div class="score-rank">${medals[i]||i+1}</div>
-        <div class="j-av" style="width:22px;height:22px;border-radius:50%;background:var(--line);display:inline-flex;align-items:center;justify-content:center;font-size:.63rem;font-weight:600;flex-shrink:0;margin-right:4px">${initials(p.name)}</div>
-        <div class="score-name">${esc(p.name)}</div>
-        <div class="score-pts">${p.score||0} pts</div>
-      </div>`).join('')
-    :'<p class="muted small" style="padding:4px 0 8px">No students yet.</p>';
-
-  // Schedule rows for host
-  const upcoming=hostSchedules.filter(s=>s.ts>Date.now()-3600000);
-  const schedRows=upcoming.length
-    ?upcoming.map(s=>{
-      const d=new Date(s.ts);
-      return `<div class="sched-card" style="margin-bottom:6px;padding:8px 10px">
-        <div class="sched-date-blk" style="min-width:36px;padding:4px 7px"><div class="sched-day" style="font-size:.95rem">${d.getDate()}</div><div class="sched-mon">${d.toLocaleString('en',{month:'short'})}</div></div>
-        <div class="sched-info">
-          <div class="sched-title" style="font-size:.8rem">${esc(s.title)}</div>
-          <div class="sched-meta">${d.toLocaleTimeString('en',{hour:'2-digit',minute:'2-digit'})}${s.notes?' · '+esc(s.notes):''}</div>
-          <div class="sched-cd">${cdStr(s.ts)}</div>
-        </div>
-        <span class="sched-del" data-sdel="${s._id}">✕</span>
-      </div>`;
-    }).join('')
-    :'<p class="muted small" style="padding:4px 0">No upcoming sessions.</p>';
-
-  return `<div class="host-sidebar">
-    <!-- 1. Schedule -->
-    <div class="sb-sec">
-      <div class="sb-sec-head" id="sb-toggle-sched"><h3>📅 Schedule</h3><span class="sb-chevron${sidebarSchedOpen?' open':''}">▶</span></div>
-      <div class="sb-body${sidebarSchedOpen?'':' closed'}" style="max-height:${sidebarSchedOpen?'900px':'0'}">
-        <div style="padding-bottom:8px">
-          ${schedRows}
-          <div style="margin-top:10px;display:flex;flex-direction:column;gap:6px">
-            <input class="form-input" id="sched-title" placeholder="Session title" maxlength="60" style="font-size:.8rem;padding:7px 10px"/>
-            <input class="form-input" type="datetime-local" id="sched-dt" style="font-size:.8rem;padding:7px 10px"/>
-            <input class="form-input" id="sched-notes" placeholder="Notes (optional)" maxlength="100" style="font-size:.8rem;padding:7px 10px"/>
-            <button class="btn btn-dark btn-sm btn-full" id="btn-sched-add">+ Add to schedule</button>
-            <div class="form-msg" id="sched-msg"></div>
-          </div>
-        </div>
-      </div>
-    </div>
-    <!-- 2. Questions -->
-    <div class="sb-sec" style="margin-top:2px">
-      <div class="sb-sec-head" id="sb-toggle-q"><h3>Questions${questions.length?' ('+questions.length+')':''}</h3><span class="sb-chevron${sidebarQOpen?' open':''}">▶</span></div>
-      <div class="sb-body${sidebarQOpen?'':' closed'}" style="max-height:${sidebarQOpen?'1200px':'0'}"><div class="q-list">${qRows}</div></div>
-    </div>
-    <!-- 3. Students + Live Score combined -->
-    <div class="sb-sec" style="margin-top:2px">
-      <div class="sb-sec-head" id="sb-toggle-stud"><h3>Students <span style="font-weight:400;text-transform:none;letter-spacing:0;font-size:.8rem;color:var(--mid)">${parts.length}</span> <span style="font-weight:400;font-size:.7rem;color:var(--mid);text-transform:none;letter-spacing:0">· live score</span></h3><span class="sb-chevron${sidebarStudOpen?' open':''}">▶</span></div>
-      <div class="sb-body${sidebarStudOpen?'':' closed'}" style="max-height:${sidebarStudOpen?'800px':'0'}"><div class="score-list" style="margin-bottom:8px">${studentRows}</div></div>
-    </div>
-    <hr/>
-  </div>`;
-}
-
-function hostMain(){
   const isLive=S.status==='question'||S.status==='revealed';
+  const isRevealed=S.status==='revealed';
+  const answered=S.totalAnswered||0;
+  const medals=['🥇','🥈','🥉'];
 
-  const sessionBanner=S.sessionOpen
-    ?`<div class="session-open-banner">
-        <span style="font-size:1rem">🟢</span>
-        <div style="flex:1"><strong>Session is open</strong> · <span class="muted small">${(S.participants||[]).length} student${(S.participants||[]).length!==1?'s':''} joined</span></div>
-      </div>`
-    :`<div class="session-closed-banner">
-        <span style="font-size:1rem">⚪</span>
-        <div style="flex:1"><strong>Session not started</strong> · <span class="muted small">Students see "no session active"</span></div>
-        <button class="btn btn-good btn-sm" id="btn-open-session">▶ Start Session</button>
-      </div>`;
+  // ── 1. LIVE SCORE NAV ──────────────────────────────────────────────────
+  const scoreChips=sorted.slice(0,7).map((p,i)=>
+    `<div class="sb-chip">${medals[i]||'#'+(i+1)} ${esc(p.name.split(' ')[0])} <span class="sb-pts">${p.score||0}</span></div>`
+  ).join('');
+  const liveNav=`
+    <div class="host-live-nav">
+      <button class="btn btn-ghost btn-sm" id="btn-host-home" style="flex-shrink:0;padding:4px 10px;font-size:.75rem">← Home</button>
+      <div style="flex:1;min-width:0;overflow:hidden;display:flex;align-items:center;gap:5px;overflow-x:auto;scrollbar-width:none">
+        ${parts.length?scoreChips:`<span class="muted small" style="white-space:nowrap">No students yet</span>`}
+      </div>
+      <div style="flex-shrink:0;font-size:.75rem;font-weight:600;color:var(--mid);white-space:nowrap">${isLive?`${answered}/${parts.length} answered`:`${parts.length} joined`}</div>
+    </div>`;
 
-  // No questions loaded: show Upload Questions panel
+  // ── 2. CONTROL BUTTONS ────────────────────────────────────────────────
+  const ctrlBar=`
+    <div class="host-ctrl-bar">
+      <button class="btn btn-dark btn-sm" id="btn-reload">🔄 New</button>
+      ${!S.sessionOpen
+        ?`<button class="btn btn-good btn-sm" id="btn-open-session">▶ Start</button>`
+        :`<button class="btn btn-good btn-sm" style="opacity:.4;cursor:default" disabled>▶ Start</button>`}
+      <button class="btn btn-bad btn-sm" id="btn-halt">⏹ Halt</button>
+      <button class="btn btn-ghost btn-sm" id="btn-reset">↺ Reset</button>
+    </div>`;
+
+  // ── 3. STUDENTS PANEL ────────────────────────────────────────────────
+  function initials(n){return n.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();}
+  const studentRows=sorted.length
+    ?sorted.map((p,i)=>{
+        const ans=S.answers?.[p.id];
+        const ansStr=ans!==undefined&&ans!==null?'ABCD'[ans]:'—';
+        return `<div style="display:flex;align-items:center;gap:8px;padding:7px 10px;border-bottom:1px solid var(--line);font-size:.83rem">
+          <div style="min-width:22px;text-align:center;font-size:.72rem;color:var(--mid)">${medals[i]||('#'+(i+1))}</div>
+          <div class="j-av" style="flex-shrink:0">${initials(p.name)}</div>
+          <div style="flex:1;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">${esc(p.name)}</div>
+          <div style="font-size:.75rem;color:var(--mid);min-width:18px;text-align:center">${ansStr}</div>
+          <div style="font-weight:600;min-width:44px;text-align:right">${p.score||0} <span style="font-size:.68rem;color:var(--mid)">pts</span></div>
+        </div>`;
+      }).join('')
+    :`<div style="padding:20px;text-align:center;color:var(--mid);font-size:.83rem">Waiting for students to join…</div>`;
+
+  const studentsPanel=`
+    <div class="host-students-panel">
+      <div class="host-students-head">
+        <h3 style="margin:0">Students${parts.length?' ('+parts.length+')':''}</h3>
+        ${isLive
+          ?`<span class="small muted">${answered}/${parts.length} answered</span>`
+          :S.sessionOpen
+            ?`<span class="tag tag-green"><span class="dot-live"></span> Open</span>`
+            :`<span class="small muted">Session not started</span>`}
+      </div>
+      <div class="host-students-inner">${studentRows}</div>
+    </div>`;
+
+  // ── 4. BOTTOM CONTROLS ───────────────────────────────────────────────
+
+  // No questions loaded → show upload/generate panel
   if(!questions.length){
     const subjectRows=subjects.map(s=>`
       <div class="subject-row">
@@ -1258,14 +1242,11 @@ function hostMain(){
         <span class="subject-count">questions:</span>
         <input class="q-count-input" type="number" min="0" max="50" value="${s.count}" data-subj="${esc(s.name)}" id="cnt-${esc(s.name)}"/>
       </div>`).join('');
-
-    // Manage tab: folder list + editor
     const folderOptions=uploadSubjects.map(f=>`<option value="${esc(f.name)}"${manageFolder===f.name?' selected':''}>${esc(f.name)}</option>`).join('');
     const managePanel=`
-      <div style="margin-bottom:10px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px">
         <select class="form-input" id="manage-folder-sel" style="flex:1;font-size:.83rem;padding:7px 10px">
-          <option value="">— select folder —</option>
-          ${folderOptions}
+          <option value="">— select folder —</option>${folderOptions}
         </select>
         <button class="btn btn-dark btn-sm" id="btn-folder-open">Open</button>
       </div>
@@ -1276,172 +1257,126 @@ function hostMain(){
       ${manageFolder?`
         <div style="background:var(--faint);border:1px solid var(--line);border-radius:var(--r);padding:10px;margin-bottom:10px">
           <div style="font-size:.78rem;font-weight:600;margin-bottom:8px;color:var(--mid)">📁 ${esc(manageFolder)} / questions.txt</div>
-          <textarea id="q-editor" rows="12" class="form-input" style="width:100%;font-family:monospace;font-size:.78rem;resize:vertical;padding:8px">${esc(editingContent)}</textarea>
+          <textarea id="q-editor" rows="8" class="form-input" style="width:100%;font-family:monospace;font-size:.78rem;resize:vertical;padding:8px">${esc(editingContent)}</textarea>
           <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
             <button class="btn btn-good btn-sm" id="btn-save-editor">💾 Save to GitHub</button>
-            <label class="btn btn-white btn-sm" style="cursor:pointer">
-              📂 Upload .txt
-              <input type="file" id="file-upload-inp" accept=".txt" style="display:none"/>
-            </label>
+            <label class="btn btn-white btn-sm" style="cursor:pointer">📂 Upload .txt<input type="file" id="file-upload-inp" accept=".txt" style="display:none"/></label>
             <button class="btn btn-ghost btn-sm" id="btn-close-editor">✕ Close</button>
           </div>
         </div>`
       :'<p class="muted small" style="margin-top:4px">Select a folder and click Open to view/edit its questions.txt.</p>'}
       <div id="upload-msg">${uploadMsg}</div>`;
 
-    return `<div class="host-main">
-      ${voiceBar()}
-      <div class="session-ctrl ${S.sessionOpen?'session-ctrl-open':'session-ctrl-closed'}">
-        <div class="session-ctrl-status"><span style="font-size:.9rem">${S.sessionOpen?'🟢':'⚪'}</span><strong>${S.sessionOpen?'Session open':'Not started'}</strong>${S.sessionOpen?`<span class="muted small">· ${(S.participants||[]).length} joined</span>`:''}</div>
-        <div class="session-ctrl-btns">
-          ${!S.sessionOpen?'<button class="btn btn-good btn-sm" id="btn-open-session">▶ Start</button>':''}
-          <button class="btn btn-bad btn-sm" id="btn-end">⏹ End</button>
-          <button class="btn btn-ghost btn-sm" id="btn-reset">↺ Restart</button>
+    const generatePanel=`
+      <p class="muted small mb2">Pick subjects from your GitHub repository and generate a quiz.</p>
+      ${subjects.length?`
+        <div style="margin-bottom:10px;display:flex;gap:8px;align-items:center">
+          <button class="btn btn-white btn-sm" id="btn-browse">${repoLoading?'⏳ Loading…':'↻ Refresh'}</button>
+          <span class="muted small">${subjects.length} subject${subjects.length!==1?'s':''}</span>
         </div>
+        <div class="timer-input-row">
+          <span class="muted small" style="flex:1">⏱ Timer per question</span>
+          <input type="number" min="0" max="300" value="${hostTimerSeconds}" id="timer-sec-input" class="q-count-input" style="width:70px"/>
+          <span class="muted small">sec</span>
+        </div>
+        <div class="subject-list">${subjectRows}</div>
+        <div id="gen-msg"></div>
+        <button class="btn btn-accent btn-full mt2" id="btn-gen">Generate quiz →</button>
+      `:`
+        <div id="repo-msg"></div>
+        <button class="btn btn-dark btn-sm" id="btn-browse" style="margin-top:8px">${repoLoading?'⏳ Loading…':'Load subjects from GitHub →'}</button>
+      `}`;
+
+    return `<div class="host-full">
+      ${liveNav}
+      ${ctrlBar}
+      ${studentsPanel}
+      <div class="host-bottom">
+        <div style="display:flex;gap:0;border:1px solid var(--line);border-radius:var(--r);overflow:hidden;flex-shrink:0">
+          <button class="btn${uploadTab==='generate'?' btn-dark':' btn-ghost'}" style="flex:1;border-radius:0;border:none" id="tab-generate">📋 Generate</button>
+          <button class="btn${uploadTab==='manage'?' btn-dark':' btn-ghost'}" style="flex:1;border-radius:0;border:none;border-left:1px solid var(--line)" id="tab-manage">📂 Upload</button>
+        </div>
+        <div class="host-bottom-scroll">${uploadTab==='generate'?generatePanel:managePanel}</div>
       </div>
-      <div style="display:flex;gap:0;border:1px solid var(--line);border-radius:var(--r);overflow:hidden;margin-bottom:16px;margin-top:4px">
-        <button class="btn${uploadTab==='generate'?' btn-dark':' btn-ghost'}" style="flex:1;border-radius:0;border:none" id="tab-generate">📋 Generate Quiz</button>
-        <button class="btn${uploadTab==='manage'?' btn-dark':' btn-ghost'}" style="flex:1;border-radius:0;border:none;border-left:1px solid var(--line)" id="tab-manage">📂 Upload Questions</button>
-      </div>
-      ${uploadTab==='generate'?`
-        <p class="muted small mb2">Pick subjects from your GitHub repository and generate a quiz.</p>
-        ${subjects.length?`
-          <div style="margin-bottom:10px;display:flex;gap:8px;align-items:center">
-            <button class="btn btn-white btn-sm" id="btn-browse">${repoLoading?'⏳ Loading…':'↻ Refresh subjects'}</button>
-            <span class="muted small">${subjects.length} subject${subjects.length!==1?'s':''} found</span>
-          </div>
-          <div class="timer-input-row">
-            <span class="muted small" style="flex:1">⏱ Timer per question <span style="color:var(--mid)">(0 = no timer)</span></span>
-            <input type="number" min="0" max="300" value="${hostTimerSeconds}" id="timer-sec-input" class="q-count-input" style="width:70px"/>
-            <span class="muted small">sec</span>
-          </div>
-          <div class="subject-list">${subjectRows}</div>
-          <div id="gen-msg"></div>
-          <button class="btn btn-accent btn-full mt2" id="btn-gen">Generate quiz →</button>
-        `:`
-          <div id="repo-msg"></div>
-          <button class="btn btn-dark btn-sm" id="btn-browse" style="margin-top:8px">${repoLoading?'⏳ Loading…':'Load subjects from GitHub →'}</button>
-        `}
-      `:managePanel}
     </div>`;
   }
 
-  if(isLive) return `<div class="host-main">${voiceBar()}${livePanel()}</div>`;
+  // Questions loaded — build controller
+  const q=selIdx>=0?questions[selIdx]:(isLive?S.question:null);
 
-  const q=selIdx>=0?questions[selIdx]:null;
-  const sessionCtrl=S.sessionOpen
-    ?`<div class="session-ctrl session-ctrl-open">
-        <div class="session-ctrl-status"><span style="font-size:.9rem">🟢</span><strong>Session open</strong><span class="muted small">· ${(S.participants||[]).length} joined</span></div>
-        <div class="session-ctrl-btns">
-          <button class="btn btn-bad btn-sm" id="btn-end">⏹ End</button>
-          <button class="btn btn-ghost btn-sm" id="btn-reset">↺ Restart</button>
-        </div>
-      </div>`
-    :`<div class="session-ctrl session-ctrl-closed">
-        <div class="session-ctrl-status"><span style="font-size:.9rem">⚪</span><strong>Not started</strong></div>
-        <div class="session-ctrl-btns">
-          <button class="btn btn-good btn-sm" id="btn-open-session">▶ Start</button>
-          <button class="btn btn-bad btn-sm" id="btn-end">⏹ End</button>
-          <button class="btn btn-ghost btn-sm" id="btn-reset">↺ Restart</button>
-        </div>
-      </div>`;
-  return `<div class="host-main" style="display:flex;flex-direction:column">
-    ${voiceBar()}
-    ${sessionCtrl}
-    <div class="row between mb2" style="flex-wrap:wrap;gap:8px">
-      <h2 style="font-size:1.1rem">${q?`Q${selIdx+1}/${questions.length}${q.subject?' · '+q.subject:''}`:' Select a question'}</h2>
-      <button class="btn btn-ghost btn-sm" id="btn-reload">↻ Change</button>
-    </div>
-    <div class="timer-input-row mb2">
-      <span style="flex:1;font-size:.82rem;color:var(--mid)">⏱ Timer</span>
-      <input type="number" min="0" max="300" value="${hostTimerSeconds}" id="timer-sec-live" class="q-count-input" style="width:70px"/>
+  // Question navigation bar
+  const qNav=`<div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
+    ${selIdx>0?`<button class="btn btn-ghost btn-sm" style="padding:3px 10px" id="btn-q-prev">‹</button>`:'<span style="width:32px"></span>'}
+    <span class="muted small" style="flex:1;text-align:center">Q${selIdx>=0?selIdx+1:'?'}/${questions.length}${q&&q.subject?' · '+esc(q.subject):''}</span>
+    ${selIdx<questions.length-1?`<button class="btn btn-ghost btn-sm" style="padding:3px 10px" id="btn-q-next">›</button>`:'<span style="width:32px"></span>'}
+  </div>`;
+
+  // Timer row (only before push)
+  const timerRow=!isLive?`
+    <div class="timer-input-row" style="flex-shrink:0">
+      <span style="flex:1;font-size:.8rem;color:var(--mid)">⏱ Timer per question</span>
+      <input type="number" min="0" max="300" value="${hostTimerSeconds}" id="timer-sec-live" class="q-count-input" style="width:60px"/>
       <span class="muted small">sec</span>
-    </div>
-    <div style="flex:1">
-    ${!q
-      ?`<p class="muted small">Select a question from the sidebar.</p>`
-      :`<p style="font-size:.9rem;line-height:1.55;margin-bottom:16px">${esc(q.text)}</p>
-        <h3 class="mb2">Select correct answer</h3>
-        <div class="key-grid mb2">
-          ${q.options.map((o,i)=>`
-            <div class="key-card${answerKey===i?' selected':''}" data-key="${i}">
-              <div class="kl">${'ABCD'[i]}</div><div class="kt">${esc(o)}</div>
-            </div>`).join('')}
-        </div>`
-    }
-    </div>
-    <!-- ── Fixed bottom action bar ── -->
-    <div style="border-top:1px solid var(--line);padding:12px 0 4px;margin-top:8px;display:flex;gap:7px">
-      <button class="btn btn-dark btn-lg" style="flex:1;font-size:.8rem" id="btn-push" ${(!q||answerKey<0||pushing)?'disabled':''}>${pushing?'⏳…':'🚀 Push'}</button>
-      <button class="btn btn-good btn-lg" style="flex:1;font-size:.8rem" id="btn-reveal" disabled>Reveal</button>
-      <button class="btn btn-accent btn-lg" style="flex:1;font-size:.8rem" id="btn-next" disabled>Next →</button>
+    </div>`:'';
+
+  // Question text
+  const qInfo=q?`<p style="font-size:.83rem;line-height:1.4;flex-shrink:0;color:var(--ink)">${esc(q.text.length>130?q.text.slice(0,128)+'…':q.text)}</p>`
+    :`<p class="muted small" style="flex-shrink:0">Select a question above or use ‹ › to navigate.</p>`;
+
+  // Live response bars (shown when live instead of key)
+  let liveBars='';
+  if(isLive&&q){
+    const counts=S.answerCounts||[], total=Math.max(1,counts.reduce((a,b)=>a+b,0));
+    liveBars=q.options.map((o,i)=>{
+      const cnt=counts[i]||0,pct=(cnt/total*100).toFixed(0);
+      return `<div class="bar-row">
+        <div class="bar-meta"><span>${'ABCD'[i]}) ${esc(o)}${S.correct===i?' ✓':''}</span><span>${cnt}</span></div>
+        <div class="bar-track"><div class="bar-fill${S.correct===i?' correct':''}" style="width:${pct}%"></div></div>
+      </div>`;
+    }).join('');
+  }
+
+  // Answer key (shown when not live)
+  const keyGrid=(!isLive&&q)?`
+    <div class="key-grid" style="flex-shrink:0">
+      ${q.options.map((o,i)=>`
+        <div class="key-card${answerKey===i?' selected':''}" data-key="${i}">
+          <div class="kl">${'ABCD'[i]}</div><div class="kt">${esc(o)}</div>
+        </div>`).join('')}
+    </div>`:'';
+
+  // Mic/music state
+  const micOn=!!localStream;
+
+  // Action buttons — fixed at bottom, never move
+  const actionBtns=`
+    <div style="display:flex;gap:6px;flex-shrink:0;border-top:1px solid var(--line);padding-top:8px;margin-top:auto">
+      <button class="btn btn-dark btn-lg" style="flex:1;font-size:.8rem;padding:10px 6px" id="btn-push"
+        ${(!q||answerKey<0||pushing||isLive)?'disabled':''}>${pushing?'⏳ Sending…':'🚀 Push'}</button>
+      <button class="btn btn-good btn-lg" style="flex:1;font-size:.8rem;padding:10px 6px" id="btn-reveal"
+        ${(!isLive||isRevealed)?'disabled':''}>👁 Reveal</button>
+      <button class="btn btn-accent btn-lg" style="flex:1;font-size:.8rem;padding:10px 6px" id="btn-next"
+        ${!isRevealed?'disabled':''}>Next →</button>
+      <button class="btn ${micOn?'btn-bad':'btn-ghost'} btn-lg" style="padding:10px 12px;font-size:1rem;flex-shrink:0"
+        id="${micOn?'btn-mic-stop':'btn-mic-start'}" title="${micOn?'Stop mic':'Start mic'}">${micOn?'🔇':'🎵'}</button>
+    </div>`;
+
+  return `<div class="host-full">
+    ${liveNav}
+    ${ctrlBar}
+    ${studentsPanel}
+    <div class="host-bottom">
+      ${qNav}
+      ${timerRow}
+      ${qInfo}
+      ${isLive
+        ?`<div style="overflow-y:auto;flex:1">${liveBars}</div>`
+        :`${keyGrid}<div style="flex:1"></div>`}
+      ${actionBtns}
     </div>
   </div>`;
 }
 
-function voiceBar(){
-  const on=!!localStream;
-  return `<div class="voice-bar">
-    <div class="mic-dot${on?' live':''}"></div>
-    <span style="flex:1;color:var(--mid)">${on?'Microphone active — students can hear you':'Voice off'}</span>
-    ${on?`<button class="btn btn-bad btn-sm" id="btn-mic-stop">Stop mic</button>`
-        :`<button class="btn btn-dark btn-sm" id="btn-mic-start">🎙 Start mic</button>`}
-  </div>`;
-}
-
-function livePanel(){
-  const q=S.question; if(!q) return '';
-  const totalParts=(S.participants||[]).length, answered=S.totalAnswered||0;
-  const counts=S.answerCounts||[], total=Math.max(1,counts.reduce((a,b)=>a+b,0));
-  const partMap={}; (S.participants||[]).forEach(p=>partMap[p.id]=p.name);
-  const timerLeft=S.timerSeconds&&S.questionPushedAt?Math.max(0,S.timerSeconds-(Date.now()-S.questionPushedAt)/1000):0;
-  const bars=q.options.map((o,i)=>{
-    const cnt=counts[i]||0,pct=(cnt/total*100).toFixed(0);
-    const names=Object.entries(S.answers||{}).filter(([,ans])=>ans===i).map(([pid])=>partMap[pid]||'?');
-    return `<div class="bar-row">
-      <div class="bar-meta"><span>${'ABCD'[i]}) ${esc(o)}${S.correct===i?' ✓':''}</span><span>${cnt}</span></div>
-      <div class="bar-track"><div class="bar-fill${S.correct===i?' correct':''}" style="width:${pct}%"></div></div>
-      ${names.length?`<div class="bar-names">${names.map(n=>esc(n)).join(', ')}</div>`:''}
-    </div>`;
-  }).join('');
-  const sorted=[...(S.participants||[])].sort((a,b)=>(b.score||0)-(a.score||0));
-  const medals=['🥇','🥈','🥉'];
-  const isRevealed=S.status==='revealed';
-  const liveSessionCtrl=S.sessionOpen
-    ?`<div class="session-ctrl session-ctrl-open" style="margin-bottom:10px">
-        <div class="session-ctrl-status"><span>🟢</span><strong>Open</strong><span class="muted small">· ${totalParts} students</span></div>
-        <div class="session-ctrl-btns">
-          <button class="btn btn-bad btn-sm" id="btn-end">⏹ End</button>
-          <button class="btn btn-ghost btn-sm" id="btn-reset">↺ Restart</button>
-        </div>
-      </div>`
-    :'';
-  return `
-    <div style="display:flex;flex-direction:column">
-      ${liveSessionCtrl}
-      <div style="flex:1">
-        <div class="row gap2 mb1">
-          ${isRevealed?'<span class="tag tag-ink">Revealed</span>':`<span class="tag tag-green"><span class="dot-live"></span> Live</span>`}
-          <span class="small muted">${answered}/${totalParts} answered</span>
-          ${S.timerSeconds&&S.status==='question'?`<span class="small muted">⏱ ~${Math.ceil(timerLeft)}s</span>`:''}
-        </div>
-        <p style="font-size:.9rem;line-height:1.4;margin-bottom:14px">${esc(q.text)}</p>
-        <div class="stat-strip">
-          <div class="stat-item"><div class="stat-val">${totalParts}</div><div class="stat-lbl">Students</div></div>
-          <div class="stat-item"><div class="stat-val">${answered}</div><div class="stat-lbl">Answered</div></div>
-          <div class="stat-item"><div class="stat-val">${(S.history||[]).length+1}</div><div class="stat-lbl">Q #</div></div>
-        </div>
-        <h3 class="mb2">Responses</h3>${bars}
-        ${sorted.length?`<h3 class="mb2 mt3">Scores</h3><div class="score-list">${sorted.map((p,i)=>`<div class="score-row"><div class="score-rank">${medals[i]||i+1}</div><div class="score-name">${esc(p.name)}</div><div class="score-pts">${p.score||0}</div></div>`).join('')}</div>`:''}
-      </div>
-      <!-- ── Fixed bottom action bar ── -->
-      <div style="border-top:1px solid var(--line);padding:12px 0 4px;margin-top:8px;display:flex;gap:7px">
-        <button class="btn btn-dark btn-lg" style="flex:1;font-size:.8rem" id="btn-push" disabled>🚀 Push</button>
-        <button class="btn btn-good btn-lg" style="flex:1;font-size:.8rem" id="btn-reveal" ${isRevealed?'disabled':''}>Reveal</button>
-        <button class="btn btn-accent btn-lg" style="flex:1;font-size:.8rem" id="btn-next" ${isRevealed?'':'disabled'}>Next →</button>
-      </div>
-    </div>`;
-}
 
 /* ══════════════════════════════════════
    HOST ENDED
@@ -1577,12 +1512,6 @@ function questionViewHTML(){
   let notice='';
   if(revealed&&answered){ const ok=S.myAnswer===correct; notice=`<div class="notice ${ok?'n-good':'n-bad'} mt3">${ok?'✓ Correct — +1 point':`✗ Wrong. Correct: ${esc(q.options[correct])}`}</div>`; }
   else if(answered&&!revealed){ notice=`<div class="notice n-neutral mt3">Answer submitted — waiting for reveal.</div>`; }
-  const hist=S.myHistory||[];
-  const histPanel=hist.length?`<div class="mt4"><h3 class="mb2">My answers so far</h3><div class="score-list">
-    ${hist.map((h,i)=>{const ok=h.myAnswer!==null&&h.myAnswer===h.correct,none=h.myAnswer===null;return`
-      <div class="score-row"><div class="score-rank">${i+1}</div><div style="flex:1;font-size:.81rem">${esc(h.question.text)}</div>
-      <div class="${none?'c-nil':ok?'c-ok':'c-bad'}" style="font-size:.81rem;font-weight:600">${none?'—':('ABCD'[h.myAnswer]+(ok?' ✓':' ✗'))}</div></div>`;}).join('')}
-  </div></div>`:'';
   const hasTimer=S.timerSeconds&&S.status==='question';
   return `${scoreBannerHTML()}<div class="page">
     <div class="row between mb2">
@@ -1592,7 +1521,7 @@ function questionViewHTML(){
     ${hasTimer?`<div class="timer-wrap"><div class="timer-bar-track"><div id="timer-bar" class="timer-bar-fill" style="width:100%"></div></div><div id="timer-digits" class="timer-digits">${S.timerSeconds}s</div></div>`:''}
     <h2 class="mb3">${esc(q.text)}</h2>
     <div class="opt-grid">${opts}</div>
-    ${notice}${histPanel}
+    ${notice}
   </div>`;
 }
 
@@ -1612,11 +1541,6 @@ function studentEndHTML(){
         <div class="score-pts">${p.score||0}</div>
       </div>`).join('')}
     </div>
-    ${(S.myHistory||[]).length?`<div class="mt4"><h3 class="mb2">My answers</h3><div class="score-list">
-      ${(S.myHistory||[]).map((h,i)=>{const ok=h.myAnswer!==null&&h.myAnswer===h.correct,none=h.myAnswer===null;return`
-        <div class="score-row"><div class="score-rank">${i+1}</div><div style="flex:1;font-size:.81rem">${esc(h.question.text)}</div>
-        <div class="${none?'c-nil':ok?'c-ok':'c-bad'}" style="font-size:.81rem;font-weight:600">${none?'—':('ABCD'[h.myAnswer]+(ok?' ✓':' ✗'))}</div></div>`;}).join('')}
-    </div></div>`:''}
   </div>`;
 }
 
@@ -1668,6 +1592,15 @@ function attach(){
   on('btn-profile',()=>{ showingProfile=true; profileTab='overview'; document.getElementById('p-dropdown')?.classList.add('hidden'); render(); });
   on('btn-profile-back',()=>{ showingProfile=false; render(); });
   document.querySelectorAll('.ptab[data-ptab]').forEach(el=>el.addEventListener('click',()=>{ profileTab=el.dataset.ptab; render(); }));
+
+  // Host home button (inside full-window host nav)
+  on('btn-host-home',()=>{
+    if(!confirm('Leave host panel and go home?')) return;
+    role=null; hostAuthed=false; HOST_PASSWORD_INPUT=''; stopMic(); render();
+  });
+  // Question prev/next inside host controller
+  on('btn-q-prev',()=>{ if(selIdx>0){selIdx--;answerKey=-1;render();} });
+  on('btn-q-next',()=>{ if(selIdx<questions.length-1){selIdx++;answerKey=-1;render();} });
 
   // Nav back button
   on('btn-nav-back',()=>{
