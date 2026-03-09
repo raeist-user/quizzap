@@ -8,8 +8,10 @@ const mongoose = require('mongoose');
 const bcrypt   = require('bcryptjs');
 const jwt      = require('jsonwebtoken');
 
-const JWT_SECRET   = process.env.JWT_SECRET   || 'scc-quiz-secret-change-in-prod';
-const MONGODB_URI  = process.env.MONGODB_URI  || 'mongodb://localhost:27017/shadabcoaching';
+try { require('dotenv').config(); } catch(_){}
+
+const JWT_SECRET    = process.env.JWT_SECRET    || 'change-this-in-production';
+const MONGODB_URI   = process.env.MONGODB_URI   || 'mongodb://localhost:27017/shadabcoaching';
 const HOST_PASSWORD = process.env.HOST_PASSWORD || '2325';
 
 // ── MONGODB ───────────────────────────────────────────────────────────────────
@@ -27,13 +29,40 @@ const userSchema = new mongoose.Schema({
 });
 const User = mongoose.model('User', userSchema);
 
+// ── SCHEDULES ─────────────────────────────────────────────────────────────────
+const schedSchema = new mongoose.Schema({
+  title:     { type: String, required: true, trim: true, maxlength: 100 },
+  ts:        { type: Number, required: true },
+  notes:     { type: String, trim: true, maxlength: 200, default: '' },
+  createdBy: { type: String, default: '' },
+});
+const Schedule = mongoose.model('Schedule', schedSchema);
+
+// ── ALL-TIME LEADERBOARD ──────────────────────────────────────────────────────
+const allTimeSchema = new mongoose.Schema({
+  userId:         { type: String, unique: true },
+  userName:       { type: String },
+  totalScore:     { type: Number, default: 0 },
+  sessionsPlayed: { type: Number, default: 0 },
+  updatedAt:      { type: Date, default: Date.now },
+});
+const AllTime = mongoose.model('AllTime', allTimeSchema);
+
 // ── EXPRESS ───────────────────────────────────────────────────────────────────
 const app = express();
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 const server = http.createServer(app);
 
-// Register
+// ── AUTH MIDDLEWARE ───────────────────────────────────────────────────────────
+function requireAuth(req, res, next) {
+  const auth = req.headers.authorization;
+  if (!auth?.startsWith('Bearer ')) return res.status(401).json({ error: 'Unauthorised' });
+  try { req.user = jwt.verify(auth.slice(7), JWT_SECRET); next(); }
+  catch { res.status(401).json({ error: 'Invalid token' }); }
+}
+
+// ── USER ROUTES ───────────────────────────────────────────────────────────────
 app.post('/api/register', async (req, res) => {
   try {
     const { name, email, password } = req.body;
@@ -47,7 +76,6 @@ app.post('/api/register', async (req, res) => {
   } catch (e) { res.status(500).json({ error: 'Registration failed' }); }
 });
 
-// Login
 app.post('/api/login', async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -60,55 +88,92 @@ app.post('/api/login', async (req, res) => {
   } catch (e) { res.status(500).json({ error: 'Login failed' }); }
 });
 
-// ── AUTH MIDDLEWARE ───────────────────────────────────────────────────────────
-function authMiddleware(req, res, next) {
-  const auth = req.headers.authorization;
-  if (!auth?.startsWith('Bearer ')) return res.status(401).json({ error: 'Unauthorised' });
-  try {
-    req.user = jwt.verify(auth.slice(7), JWT_SECRET);
-    next();
-  } catch { res.status(401).json({ error: 'Invalid token' }); }
-}
-
-// Change password
-app.post('/api/change-password', authMiddleware, async (req, res) => {
+app.post('/api/change-password', requireAuth, async (req, res) => {
   try {
     const { currentPassword, newPassword } = req.body;
     if (!currentPassword || !newPassword) return res.status(400).json({ error: 'Both passwords required' });
-    if (newPassword.length < 6) return res.status(400).json({ error: 'New password must be at least 6 characters' });
+    if (newPassword.length < 6) return res.status(400).json({ error: 'Min 6 characters' });
     const user = await User.findById(req.user.id);
     if (!user || !(await bcrypt.compare(currentPassword, user.password)))
       return res.status(400).json({ error: 'Current password is incorrect' });
     user.password = await bcrypt.hash(newPassword, 10);
     await user.save();
     res.json({ ok: true });
-  } catch (e) { res.status(500).json({ error: 'Failed to change password' }); }
+  } catch (e) { res.status(500).json({ error: 'Failed' }); }
 });
 
-// Update display name
-app.post('/api/update-name', authMiddleware, async (req, res) => {
+app.post('/api/update-name', requireAuth, async (req, res) => {
   try {
     const { displayName } = req.body;
     if (!displayName?.trim()) return res.status(400).json({ error: 'Display name required' });
     if (displayName.trim().length > 32) return res.status(400).json({ error: 'Max 32 characters' });
-    const user = await User.findByIdAndUpdate(
-      req.user.id,
-      { displayName: displayName.trim() },
-      { new: true }
-    );
+    const user = await User.findByIdAndUpdate(req.user.id, { displayName: displayName.trim() }, { new: true });
     const token = jwt.sign({ id: user._id, name: user.name, displayName: user.displayName, email: user.email, role: user.role }, JWT_SECRET, { expiresIn: '7d' });
     res.json({ ok: true, token, user: { id: user._id, name: user.name, displayName: user.displayName, email: user.email, role: user.role } });
-  } catch (e) { res.status(500).json({ error: 'Failed to update name' }); }
+  } catch (e) { res.status(500).json({ error: 'Failed' }); }
 });
 
+// ── SCHEDULE ROUTES ───────────────────────────────────────────────────────────
+// Public: upcoming schedules (students can view)
+app.get('/api/schedules', async (req, res) => {
+  try {
+    const scheds = await Schedule.find({ ts: { $gte: Date.now() - 3600000 } }).sort('ts').limit(20);
+    res.json({ schedules: scheds });
+  } catch(e) { res.status(500).json({ error: 'Failed' }); }
+});
 
+// Host only: add schedule
+app.post('/api/schedules', requireAuth, async (req, res) => {
+  try {
+    if (req.user.role !== 'host') return res.status(403).json({ error: 'Hosts only' });
+    const { title, ts, notes } = req.body;
+    if (!title?.trim() || !ts) return res.status(400).json({ error: 'Title and time required' });
+    if (Number(ts) <= Date.now()) return res.status(400).json({ error: 'Must be a future time' });
+    const sched = await Schedule.create({ title: title.trim(), ts: Number(ts), notes: (notes||'').trim(), createdBy: req.user.name });
+    res.json({ ok: true, sched });
+  } catch(e) { res.status(500).json({ error: 'Failed' }); }
+});
+
+// Host only: delete schedule
+app.delete('/api/schedules/:id', requireAuth, async (req, res) => {
+  try {
+    if (req.user.role !== 'host') return res.status(403).json({ error: 'Hosts only' });
+    await Schedule.findByIdAndDelete(req.params.id);
+    res.json({ ok: true });
+  } catch(e) { res.status(500).json({ error: 'Failed' }); }
+});
+
+// ── LEADERBOARD ───────────────────────────────────────────────────────────────
+app.get('/api/leaderboard', async (req, res) => {
+  try {
+    const lb = await AllTime.find().sort({ totalScore: -1 }).limit(50);
+    res.json({ leaderboard: lb });
+  } catch(e) { res.status(500).json({ error: 'Failed' }); }
+});
+
+// Persist session scores to all-time leaderboard
+async function persistScores(participants) {
+  for (const p of participants) {
+    if (!p.userId) continue;
+    try {
+      await AllTime.findOneAndUpdate(
+        { userId: p.userId },
+        { $inc: { totalScore: p.score || 0, sessionsPlayed: 1 }, $set: { userName: p.name, updatedAt: new Date() } },
+        { upsert: true }
+      );
+    } catch(e) { console.warn('AllTime update failed:', e.message); }
+  }
+}
+
+// ── QUIZ STATE ────────────────────────────────────────────────────────────────
 let state = fresh();
 function fresh() {
   return {
     status: 'idle',
+    sessionOpen: false,
     question: null, correct: null,
-    answers: {},              // pid → optIdx
-    participants: {},         // pid → { id, name, score }
+    answers: {},
+    participants: {},
     history: [],
     timerSeconds: 0,
     questionPushedAt: null,
@@ -122,7 +187,7 @@ const clients = new Map();
 function tx(ws, d)      { if (ws.readyState === 1) ws.send(JSON.stringify(d)); }
 function txCid(cid, d)  { const c = clients.get(cid); if (c) tx(c.ws, d); }
 function txHost(d)      { if (hostCid !== null) txCid(hostCid, d); }
-function broadcast()    {
+function broadcast() {
   clients.forEach(({ ws, role, pid }) =>
     tx(ws, { type: 'state', payload: project(role, pid) })
   );
@@ -130,15 +195,16 @@ function broadcast()    {
 
 function project(role, pid) {
   const base = {
-    status:          state.status,
-    question:        state.question,
-    participants:    Object.values(state.participants),
-    totalAnswered:   Object.keys(state.answers).length,
-    answerCounts:    state.question
+    status:           state.status,
+    sessionOpen:      state.sessionOpen,
+    question:         state.question,
+    participants:     Object.values(state.participants),
+    totalAnswered:    Object.keys(state.answers).length,
+    answerCounts:     state.question
       ? state.question.options.map((_, i) =>
           Object.values(state.answers).filter(a => a === i).length)
       : [],
-    timerSeconds:    state.timerSeconds,
+    timerSeconds:     state.timerSeconds,
     questionPushedAt: state.questionPushedAt,
   };
   if (role === 'host') return { ...base, correct: state.correct, answers: state.answers, history: state.history };
@@ -154,7 +220,7 @@ function project(role, pid) {
       myHistory,
     };
   }
-  return { status: base.status, participants: base.participants };
+  return { status: base.status, sessionOpen: base.sessionOpen, participants: base.participants };
 }
 
 // ── WEBSOCKET ─────────────────────────────────────────────────────────────────
@@ -183,7 +249,12 @@ wss.on('connection', ws => {
         let pid = msg.pid;
         if (!pid || !state.participants[pid]) {
           pid = `p${cid}_${Date.now()}`;
-          state.participants[pid] = { id: pid, name: msg.name.trim().slice(0, 32), score: 0 };
+          state.participants[pid] = {
+            id: pid,
+            name: msg.name.trim().slice(0, 32),
+            score: 0,
+            userId: msg.userId || null,
+          };
         }
         client.role = 'participant'; client.pid = pid; client.name = state.participants[pid].name;
         tx(ws, { type: 'joined', pid });
@@ -200,12 +271,18 @@ wss.on('connection', ws => {
         break;
       }
 
+      // Host opens session so students can join
+      case 'open_session':
+        if (client.role !== 'host') break;
+        state.sessionOpen = true;
+        broadcast(); break;
+
       case 'push_question':
         if (client.role !== 'host') break;
         if (!msg.question?.text || !Array.isArray(msg.question.options)) break;
         if (msg.correct < 0 || msg.correct > 3) break;
         state.status = 'question';
-        state.question = msg.question;
+        state.question = { ...msg.question };
         state.correct = msg.correct;
         state.answers = {};
         state.timerSeconds = Math.max(0, parseInt(msg.timerSeconds) || 0);
@@ -237,28 +314,53 @@ wss.on('connection', ws => {
           });
           state.history.push({ question: state.question, correct: state.correct, answers: { ...state.answers } });
         }
-        state.status = 'ended'; broadcast(); break;
+        state.status = 'ended';
+        persistScores(Object.values(state.participants));
+        broadcast(); break;
+
+      // Continue session: go back to idle (students return to waiting room)
+      case 'continue_session':
+        if (client.role !== 'host' || state.status !== 'ended') break;
+        state.status = 'idle';
+        state.question = null; state.correct = null;
+        state.answers = {}; state.timerSeconds = 0; state.questionPushedAt = null;
+        broadcast(); break;
+
+      // Halt: dismiss all students with a message, then reset
+      case 'halt':
+        if (client.role !== 'host') break;
+        if (state.status === 'question') {
+          Object.entries(state.answers).forEach(([pid, ans]) => {
+            if (ans === state.correct && state.participants[pid])
+              state.participants[pid].score += 1;
+          });
+          state.history.push({ question: state.question, correct: state.correct, answers: { ...state.answers } });
+        }
+        persistScores(Object.values(state.participants));
+        clients.forEach((c) => {
+          if (c.role === 'participant') {
+            tx(c.ws, { type: 'halted' });
+            c.role = null; c.pid = null;
+          }
+        });
+        state = fresh();
+        broadcast(); break;
 
       case 'reset':
         if (client.role !== 'host') break;
         state = fresh();
         clients.forEach((c) => {
           if (c.role === 'participant' && c.pid && c.name)
-            state.participants[c.pid] = { id: c.pid, name: c.name, score: 0 };
+            state.participants[c.pid] = { id: c.pid, name: c.name, score: 0, userId: null };
         });
         broadcast(); break;
 
       case 'shutdown':
         if (client.role !== 'host') break;
-        // Boot every participant out then wipe state
         clients.forEach((c) => {
-          if (c.role === 'participant') {
-            tx(c.ws, { type: 'kicked' });
-            c.role = null; c.pid = null;
-          }
+          if (c.role === 'participant') { tx(c.ws, { type: 'kicked' }); c.role = null; c.pid = null; }
         });
-        state = fresh();
-        broadcast(); break;
+        state = fresh(); broadcast(); break;
 
       case 'leave':
         if (client.role !== 'participant' || !client.pid) break;
@@ -288,7 +390,7 @@ wss.on('connection', ws => {
     }
   });
 
-  ws.on('close', () => { if (cid === hostCid) hostCid = null; clients.delete(cid); });
+  ws.on('close', () => { if (cid === hostCid) { hostCid = null; state.sessionOpen = false; } clients.delete(cid); });
 });
 
 const PORT = process.env.PORT || 3000;
