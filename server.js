@@ -143,7 +143,7 @@ wss.on('connection', ws => {
           pid = `p${cid}_${Date.now()}`;
           state.participants[pid] = { id: pid, name: msg.name.trim().slice(0, 32), score: 0 };
         }
-        client.role = 'participant'; client.pid = pid;
+        client.role = 'participant'; client.pid = pid; client.name = state.participants[pid].name;
         tx(ws, { type: 'joined', pid });
         broadcast();
         txHost({ type: 'rtc_new_peer', cid });
@@ -199,7 +199,14 @@ wss.on('connection', ws => {
 
       case 'reset':
         if (client.role !== 'host') break;
-        state = fresh(); broadcast(); break;
+        state = fresh();
+        // Re-register all still-connected participants so they appear immediately
+        clients.forEach((c) => {
+          if (c.role === 'participant' && c.pid && c.name) {
+            state.participants[c.pid] = { id: c.pid, name: c.name, score: 0 };
+          }
+        });
+        broadcast(); break;
 
       case 'leave':
         if (client.role !== 'participant' || !client.pid) break;
