@@ -122,10 +122,9 @@ app.get('/api/schedules', async (req, res) => {
   } catch(e) { res.status(500).json({ error: 'Failed' }); }
 });
 
-// Host only: add schedule
+// Any logged-in user: add schedule
 app.post('/api/schedules', requireAuth, async (req, res) => {
   try {
-    if (req.user.role !== 'host') return res.status(403).json({ error: 'Hosts only' });
     const { title, ts, notes } = req.body;
     if (!title?.trim() || !ts) return res.status(400).json({ error: 'Title and time required' });
     if (Number(ts) <= Date.now()) return res.status(400).json({ error: 'Must be a future time' });
@@ -134,10 +133,9 @@ app.post('/api/schedules', requireAuth, async (req, res) => {
   } catch(e) { res.status(500).json({ error: 'Failed' }); }
 });
 
-// Host only: delete schedule
+// Any logged-in user: delete schedule
 app.delete('/api/schedules/:id', requireAuth, async (req, res) => {
   try {
-    if (req.user.role !== 'host') return res.status(403).json({ error: 'Hosts only' });
     await Schedule.findByIdAndDelete(req.params.id);
     res.json({ ok: true });
   } catch(e) { res.status(500).json({ error: 'Failed' }); }
