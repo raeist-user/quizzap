@@ -939,15 +939,19 @@ function scoreBannerHTML(){
 function render(){
   const nav=document.getElementById('main-nav');
   if(!currentUser){nav.style.display='none'; document.getElementById('view').innerHTML=authHTML(); attach(); return;}
+  const isParticipant=(role==='participant'&&myName);
   nav.style.display=(role==='host'&&hostAuthed)?'none':'flex';
+  // Student in session: hide profile, back, conn — center brand only
+  document.getElementById('nav-back-wrap').style.display=(isParticipant?false:!!(role||showingProfile||showingHalted))?'block':'none';
+  document.getElementById('profile-wrap').style.display=isParticipant?'none':'flex';
+  document.getElementById('ci').style.display=isParticipant?'none':'';
+  document.getElementById('conn-lbl').style.display=isParticipant?'none':'';
+  document.getElementById('nav-brand').style.cssText=isParticipant?'flex:1;text-align:center;font-size:1rem':'';
   const u=currentUser;
   document.getElementById('p-avatar').textContent=u.name[0].toUpperCase();
   document.getElementById('p-name-lbl').textContent=u.name.split(' ')[0];
   document.getElementById('pd-full-name').textContent=u.name;
   document.getElementById('pd-email').textContent=u.email;
-  // Show back button when not on home
-  const showBack=!!(role||showingProfile||showingHalted);
-  document.getElementById('nav-back-wrap').style.display=showBack?'block':'none';
   const v=document.getElementById('view');
 
   if(showingHalted){ v.innerHTML=haltedHTML(); attach(); return; }
@@ -1032,17 +1036,19 @@ function landingHTML(){
         📅 Next: <strong>${esc(nextS.title)}</strong> · ${new Date(nextS.ts).toLocaleDateString('en-GB',{day:'numeric',month:'short'})} at ${new Date(nextS.ts).toLocaleTimeString('en',{hour:'2-digit',minute:'2-digit'})} (${cdStr(nextS.ts)})
       </div>`
     :'';
-  return `<div class="home-full"><div class="box">
-    ${tabs}
-    <h1 class="mb1">Live Quiz</h1>
-    <p class="muted mb3">Welcome, ${esc(currentUser.name.split(' ')[0])} 👋</p>
-    <div class="col gap3">
-      <button class="btn btn-dark btn-lg" id="go-host">🖥 Join as a host</button>
-      <button class="btn btn-white btn-lg" id="go-join">🎓 Join as student</button>
+  return `<div class="lb-full-screen">
+    <div class="lb-full-inner" style="justify-content:center">
+      ${tabs}
+      <h1 class="mb1">Live Quiz</h1>
+      <p class="muted mb3">Welcome, ${esc(currentUser.name.split(' ')[0])} 👋</p>
+      <div class="col gap3">
+        <button class="btn btn-dark btn-lg" id="go-host">🖥 Join as a host</button>
+        <button class="btn btn-white btn-lg" id="go-join">🎓 Join as student</button>
+      </div>
+      ${n?`<p class="muted small mt3" style="text-align:center">${n} student${n!==1?'s':''} in session</p>`:''}
+      ${schedHint}
     </div>
-    ${n?`<p class="muted small mt3" style="text-align:center">${n} student${n!==1?'s':''} in session</p>`:''}
-    ${schedHint}
-  </div></div>`;
+  </div>`;
 }
 
 /* ══════════════════════════════════════
@@ -1192,15 +1198,19 @@ function hostHTML(){
       <div style="flex-shrink:0;font-size:.75rem;font-weight:600;color:var(--mid);white-space:nowrap">${isLive?`${answered}/${parts.length} answered`:`${parts.length} joined`}</div>
     </div>`;
 
-  // ── 2. CONTROL BUTTONS ────────────────────────────────────────────────
+  // SVG icons (inline, 16×16 stroke)
+  const iconNew=`<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>`;
+  const iconPlay=`<svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg>`;
+  const iconStop=`<svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>`;
+  const iconReset=`<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>`;
   const ctrlBar=`
     <div class="host-ctrl-bar">
-      <button class="btn btn-dark btn-sm" id="btn-reload">🔄 New</button>
+      <button class="btn btn-sm" style="flex:1;justify-content:center;background:#eff6ff;color:#1d4ed8;border-color:#bfdbfe;gap:5px" id="btn-reload">${iconNew} New</button>
       ${!S.sessionOpen
-        ?`<button class="btn btn-good btn-sm" id="btn-open-session">▶ Start</button>`
-        :`<button class="btn btn-good btn-sm" style="opacity:.4;cursor:default" disabled>▶ Start</button>`}
-      <button class="btn btn-bad btn-sm" id="btn-halt">⏹ Halt</button>
-      <button class="btn btn-ghost btn-sm" id="btn-reset">↺ Reset</button>
+        ?`<button class="btn btn-sm" style="flex:1;justify-content:center;background:#f0fdf4;color:#15803d;border-color:#bbf7d0;gap:5px" id="btn-open-session">${iconPlay} Start</button>`
+        :`<button class="btn btn-sm" style="flex:1;justify-content:center;background:#f0fdf4;color:#15803d;border-color:#bbf7d0;gap:5px;opacity:.35;cursor:default" disabled>${iconPlay} Start</button>`}
+      <button class="btn btn-sm" style="flex:1;justify-content:center;background:#fff1f2;color:#be123c;border-color:#fecdd3;gap:5px" id="btn-halt">${iconStop} Halt</button>
+      <button class="btn btn-sm" style="flex:1;justify-content:center;background:var(--faint);color:var(--mid);border-color:var(--line);gap:5px" id="btn-reset">${iconReset} Reset</button>
     </div>`;
 
   // ── 3. STUDENTS PANEL ────────────────────────────────────────────────
@@ -1348,17 +1358,24 @@ function hostHTML(){
   // Mic/music state
   const micOn=!!localStream;
 
-  // Action buttons — fixed at bottom, never move
+  // SVG action icons
+  const iconSend=`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22,2 15,22 11,13 2,9"/></svg>`;
+  const iconEye=`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>`;
+  const iconNext=`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9,18 15,12 9,6"/></svg>`;
+  const iconMusic=`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>`;
+  const iconMute=`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="1" y1="1" x2="23" y2="23"/><path d="M9 9v9l-5-4H2V10h2l2-2m8-5v3M9 18V5l5 4"/></svg>`;
+
+  // Action buttons — no margin-top:auto (space goes below, not above)
   const actionBtns=`
-    <div style="display:flex;gap:6px;flex-shrink:0;border-top:1px solid var(--line);padding-top:8px;margin-top:auto">
-      <button class="btn btn-dark btn-lg" style="flex:1;font-size:.8rem;padding:10px 6px" id="btn-push"
-        ${(!q||answerKey<0||pushing||isLive)?'disabled':''}>${pushing?'⏳ Sending…':'🚀 Push'}</button>
-      <button class="btn btn-good btn-lg" style="flex:1;font-size:.8rem;padding:10px 6px" id="btn-reveal"
-        ${(!isLive||isRevealed)?'disabled':''}>👁 Reveal</button>
-      <button class="btn btn-accent btn-lg" style="flex:1;font-size:.8rem;padding:10px 6px" id="btn-next"
-        ${!isRevealed?'disabled':''}>Next →</button>
-      <button class="btn ${micOn?'btn-bad':'btn-ghost'} btn-lg" style="padding:10px 12px;font-size:1rem;flex-shrink:0"
-        id="${micOn?'btn-mic-stop':'btn-mic-start'}" title="${micOn?'Stop mic':'Start mic'}">${micOn?'🔇':'🎵'}</button>
+    <div style="display:flex;gap:6px;flex-shrink:0;padding-top:8px;border-top:1px solid var(--line);margin-top:4px">
+      <button class="btn btn-lg" style="flex:1;font-size:.78rem;padding:10px 4px;gap:5px;background:#1e293b;color:#fff;border-color:#1e293b;justify-content:center" id="btn-push"
+        ${(!q||answerKey<0||pushing||isLive)?'disabled':''}>${iconSend}${pushing?'Sending…':'Push'}</button>
+      <button class="btn btn-lg" style="flex:1;font-size:.78rem;padding:10px 4px;gap:5px;background:#f59e0b;color:#fff;border-color:#f59e0b;justify-content:center" id="btn-reveal"
+        ${(!isLive||isRevealed)?'disabled':''}>${iconEye} Reveal</button>
+      <button class="btn btn-lg" style="flex:1;font-size:.78rem;padding:10px 4px;gap:5px;background:#0ea5e9;color:#fff;border-color:#0ea5e9;justify-content:center" id="btn-next"
+        ${!isRevealed?'disabled':''}>${iconNext} Next</button>
+      <button class="btn btn-lg" style="padding:10px 12px;flex-shrink:0;justify-content:center;${micOn?'background:#fee2e2;color:#be123c;border-color:#fecaca':'background:var(--faint);color:var(--mid);border-color:var(--line)'}"
+        id="${micOn?'btn-mic-stop':'btn-mic-start'}" title="${micOn?'Stop mic':'Start mic'}">${micOn?iconMute:iconMusic}</button>
     </div>`;
 
   return `<div class="host-full">
@@ -1371,8 +1388,9 @@ function hostHTML(){
       ${qInfo}
       ${isLive
         ?`<div style="overflow-y:auto;flex:1">${liveBars}</div>`
-        :`${keyGrid}<div style="flex:1"></div>`}
+        :`${keyGrid}`}
       ${actionBtns}
+      <div style="flex:1;min-height:0"></div>
     </div>
   </div>`;
 }
@@ -1473,6 +1491,7 @@ function waitHTML(){
     <div class="student-chip"><div class="s-av" style="${p.id===myPid?'background:#d8f3dc;border-color:#b7dfc7':''}">${initials(p.name)}</div>
     <span>${esc(p.name)}${p.id===myPid?' <span style="font-size:.7rem;color:var(--mid)">(you)</span>':''}</span></div>`).join('');
   const history=S.myHistory||[];
+  const waitMsg=history.length?'Wait for next question…':'Waiting for host to start…';
   const lbHTML=history.length?`<div class="lb-panel">
     <div class="lb-head"><span style="font-size:.82rem;font-weight:600">🏆 Leaderboard</span><span class="small muted">${parts.length} students</span></div>
     ${[...parts].sort((a,b)=>(b.score||0)-(a.score||0)).map((p,i)=>`
@@ -1485,7 +1504,7 @@ function waitHTML(){
   return `<div class="wait-shell">
     <div class="wait-header">
       <div class="spinner"></div>
-      <h2>Waiting for the host…</h2>
+      <h2>${waitMsg}</h2>
       <p class="muted mt1">${parts.length} student${parts.length!==1?'s':''} in the room</p>
     </div>
     <div class="voice-bar" style="max-width:480px;width:100%;margin-bottom:16px">
