@@ -18,11 +18,12 @@ mongoose.connect(MONGODB_URI)
   .catch(e  => console.warn('MongoDB not connected:', e.message));
 
 const userSchema = new mongoose.Schema({
-  name:      { type: String, required: true, trim: true, maxlength: 50 },
-  email:     { type: String, required: true, unique: true, lowercase: true, trim: true },
-  password:  { type: String, required: true },
-  role:      { type: String, enum: ['student','host'], default: 'student' },
-  createdAt: { type: Date, default: Date.now },
+  name:        { type: String, required: true, trim: true, maxlength: 50 },
+  displayName: { type: String, trim: true, maxlength: 32, default: '' },
+  email:       { type: String, required: true, unique: true, lowercase: true, trim: true },
+  password:    { type: String, required: true },
+  role:        { type: String, enum: ['student','host'], default: 'student' },
+  createdAt:   { type: Date, default: Date.now },
 });
 const User = mongoose.model('User', userSchema);
 
@@ -59,7 +60,48 @@ app.post('/api/login', async (req, res) => {
   } catch (e) { res.status(500).json({ error: 'Login failed' }); }
 });
 
-// ── QUIZ STATE ────────────────────────────────────────────────────────────────
+// ── AUTH MIDDLEWARE ───────────────────────────────────────────────────────────
+function authMiddleware(req, res, next) {
+  const auth = req.headers.authorization;
+  if (!auth?.startsWith('Bearer ')) return res.status(401).json({ error: 'Unauthorised' });
+  try {
+    req.user = jwt.verify(auth.slice(7), JWT_SECRET);
+    next();
+  } catch { res.status(401).json({ error: 'Invalid token' }); }
+}
+
+// Change password
+app.post('/api/change-password', authMiddleware, async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    if (!currentPassword || !newPassword) return res.status(400).json({ error: 'Both passwords required' });
+    if (newPassword.length < 6) return res.status(400).json({ error: 'New password must be at least 6 characters' });
+    const user = await User.findById(req.user.id);
+    if (!user || !(await bcrypt.compare(currentPassword, user.password)))
+      return res.status(400).json({ error: 'Current password is incorrect' });
+    user.password = await bcrypt.hash(newPassword, 10);
+    await user.save();
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: 'Failed to change password' }); }
+});
+
+// Update display name
+app.post('/api/update-name', authMiddleware, async (req, res) => {
+  try {
+    const { displayName } = req.body;
+    if (!displayName?.trim()) return res.status(400).json({ error: 'Display name required' });
+    if (displayName.trim().length > 32) return res.status(400).json({ error: 'Max 32 characters' });
+    const user = await User.findByIdAndUpdate(
+      req.user.id,
+      { displayName: displayName.trim() },
+      { new: true }
+    );
+    const token = jwt.sign({ id: user._id, name: user.name, displayName: user.displayName, email: user.email, role: user.role }, JWT_SECRET, { expiresIn: '7d' });
+    res.json({ ok: true, token, user: { id: user._id, name: user.name, displayName: user.displayName, email: user.email, role: user.role } });
+  } catch (e) { res.status(500).json({ error: 'Failed to update name' }); }
+});
+
+
 let state = fresh();
 function fresh() {
   return {
