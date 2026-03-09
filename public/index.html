@@ -29,18 +29,23 @@
     #ci.on{background:#2d9e6b}#ci.off{background:#c1121f}
     #conn-lbl{font-size:.77rem;color:var(--mid)}
 
+    /* NAV BACK BUTTON */
+    .nav-back{display:flex;align-items:center;gap:5px;font-size:.8rem;font-weight:500;color:var(--mid);cursor:pointer;padding:5px 8px;border-radius:var(--r);border:1px solid var(--line);background:var(--white);white-space:nowrap;flex-shrink:0}
+    .nav-back:hover{background:var(--faint)}
+
     /* PROFILE */
     .profile-wrap{position:relative}
-    .profile-btn{display:flex;align-items:center;gap:8px;cursor:pointer;padding:5px 10px;border-radius:var(--r);border:1px solid var(--line);background:var(--white);font-size:.82rem;font-weight:500;transition:background .15s;user-select:none}
+    .profile-btn{display:flex;align-items:center;gap:8px;cursor:pointer;padding:5px 10px;border-radius:var(--r);border:1px solid var(--line);background:var(--white);font-size:.82rem;font-weight:500;transition:background .15s;user-select:none;-webkit-user-select:none}
     .profile-btn:hover{background:var(--faint)}
     .p-avatar{width:28px;height:28px;border-radius:50%;background:var(--ink);color:#fff;display:flex;align-items:center;justify-content:center;font-size:.75rem;font-weight:600;flex-shrink:0}
-    .p-dropdown{position:absolute;right:0;top:calc(100% + 6px);background:var(--white);border:1px solid var(--line);border-radius:var(--r);padding:8px 0;min-width:200px;box-shadow:0 8px 24px rgba(0,0,0,.08);z-index:300}
+    .p-dropdown{position:fixed;right:8px;top:60px;background:var(--white);border:1px solid var(--line);border-radius:var(--r);padding:8px 0;min-width:200px;max-width:calc(100vw - 16px);box-shadow:0 8px 24px rgba(0,0,0,.12);z-index:9999}
     .p-dropdown.hidden{display:none}
     .pd-info{padding:10px 16px;border-bottom:1px solid var(--line)}
     .pd-name{font-weight:600;font-size:.9rem}
     .pd-email{font-size:.77rem;color:var(--mid)}
-    .pd-item{display:flex;align-items:center;gap:8px;padding:9px 16px;font-size:.83rem;cursor:pointer;transition:background .1s}
+    .pd-item{display:flex;align-items:center;gap:8px;padding:12px 16px;font-size:.83rem;cursor:pointer;transition:background .1s}
     .pd-item:hover{background:var(--faint)}
+    .pd-item:active{background:var(--line)}
     .pd-item.danger{color:var(--bad)}
 
     /* AUTH */
@@ -310,9 +315,24 @@
     .form-msg{font-size:.77rem;margin-top:5px;min-height:16px}
     .form-msg.ok{color:var(--good)}.form-msg.err{color:var(--bad)}
 
+    /* SESSION CONTROL BOX */
+    .session-ctrl{padding:12px 14px;border-radius:var(--r);margin-bottom:14px;display:flex;flex-direction:column;gap:8px}
+    .session-ctrl-open{background:#e8f5ee;border:1px solid #b7dfc7}
+    .session-ctrl-closed{background:var(--faint);border:1px solid var(--line)}
+    .session-ctrl-status{display:flex;align-items:center;gap:8px;font-size:.85rem;margin-bottom:2px}
+    .session-ctrl-btns{display:flex;gap:7px;flex-wrap:wrap}
+    .session-ctrl-btns .btn{flex:1;min-width:80px}
+
+    /* RESULTS MOBILE */
+    .results-header{display:flex;align-items:flex-start;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+    .results-header h2{flex:1;min-width:120px}
+    .results-btns{display:flex;gap:6px;flex-wrap:wrap;width:100%}
+    .results-btns .btn{flex:1;min-width:90px;font-size:.75rem;padding:8px 10px}
+    .itbl-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;border:1px solid var(--line);border-radius:var(--r)}
+
     /* SESSION OPEN BANNER */
-    .session-open-banner{padding:10px 16px;background:#e8f5ee;border:1px solid #b7dfc7;border-radius:var(--r);margin-bottom:16px;display:flex;align-items:center;gap:10px}
-    .session-closed-banner{padding:10px 16px;background:var(--faint);border:1px solid var(--line);border-radius:var(--r);margin-bottom:16px;display:flex;align-items:center;gap:10px}
+    .session-open-banner{padding:10px 16px;background:#e8f5ee;border:1px solid #b7dfc7;border-radius:var(--r);margin-bottom:14px;display:flex;align-items:center;gap:10px}
+    .session-closed-banner{padding:10px 16px;background:var(--faint);border:1px solid var(--line);border-radius:var(--r);margin-bottom:14px;display:flex;align-items:center;gap:10px}
 
     /* HOME TABS */
     .home-tabs{display:flex;border:1px solid var(--line);border-radius:var(--r);overflow:hidden;margin-bottom:20px}
@@ -328,7 +348,12 @@
 <body>
 <div id="app">
   <nav id="main-nav" style="display:none">
-    <div class="brand">Shadab Coaching Centre<small>Live Quiz</small></div>
+    <div style="display:flex;align-items:center;gap:10px;min-width:0;flex:1">
+      <div id="nav-back-wrap" style="display:none">
+        <div class="nav-back" id="btn-nav-back">← Home</div>
+      </div>
+      <div class="brand" id="nav-brand">Shadab Coaching Centre<small>Live Quiz</small></div>
+    </div>
     <div class="nav-right">
       <div id="ci"></div>
       <span id="conn-lbl">connecting</span>
@@ -787,7 +812,9 @@ async function openFolderEdit(folderName){
     if(!res.ok) throw new Error(`GitHub API ${res.status}`);
     const data=await res.json();
     editingSha=data.sha;
-    editingContent=atob(data.content.replace(/\n/g,''));
+    // Properly decode UTF-8 content (handles Hindi and other non-ASCII)
+    const bytes=Uint8Array.from(atob(data.content.replace(/\n/g,'')),c=>c.charCodeAt(0));
+    editingContent=new TextDecoder('utf-8').decode(bytes);
     setUploadMsg('','');
     render();
     setTimeout(()=>{ const ta=document.getElementById('q-editor'); if(ta){ ta.value=editingContent; ta.focus(); } },50);
@@ -902,6 +929,9 @@ function render(){
   document.getElementById('p-name-lbl').textContent=u.name.split(' ')[0];
   document.getElementById('pd-full-name').textContent=u.name;
   document.getElementById('pd-email').textContent=u.email;
+  // Show back button when not on home
+  const showBack=!!(role||showingProfile||showingHalted);
+  document.getElementById('nav-back-wrap').style.display=showBack?'block':'none';
   const v=document.getElementById('view');
 
   if(showingHalted){ v.innerHTML=haltedHTML(); attach(); return; }
@@ -1203,10 +1233,6 @@ function hostSidebar(){
       <div class="sb-body${sidebarStudOpen?'':' closed'}" style="max-height:${sidebarStudOpen?'800px':'0'}"><div class="score-list" style="margin-bottom:8px">${studentRows}</div></div>
     </div>
     <hr/>
-    <div class="col gap2">
-      <button class="btn btn-bad btn-sm" id="btn-end">End session</button>
-      <button class="btn btn-ghost btn-sm" id="btn-reset">↺ Reset everything</button>
-    </div>
   </div>`;
 }
 
@@ -1265,7 +1291,14 @@ function hostMain(){
 
     return `<div class="host-main">
       ${voiceBar()}
-      ${sessionBanner}
+      <div class="session-ctrl ${S.sessionOpen?'session-ctrl-open':'session-ctrl-closed'}">
+        <div class="session-ctrl-status"><span style="font-size:.9rem">${S.sessionOpen?'🟢':'⚪'}</span><strong>${S.sessionOpen?'Session open':'Not started'}</strong>${S.sessionOpen?`<span class="muted small">· ${(S.participants||[]).length} joined</span>`:''}</div>
+        <div class="session-ctrl-btns">
+          ${!S.sessionOpen?'<button class="btn btn-good btn-sm" id="btn-open-session">▶ Start</button>':''}
+          <button class="btn btn-bad btn-sm" id="btn-end">⏹ End</button>
+          <button class="btn btn-ghost btn-sm" id="btn-reset">↺ Restart</button>
+        </div>
+      </div>
       <div style="display:flex;gap:0;border:1px solid var(--line);border-radius:var(--r);overflow:hidden;margin-bottom:16px;margin-top:4px">
         <button class="btn${uploadTab==='generate'?' btn-dark':' btn-ghost'}" style="flex:1;border-radius:0;border:none" id="tab-generate">📋 Generate Quiz</button>
         <button class="btn${uploadTab==='manage'?' btn-dark':' btn-ghost'}" style="flex:1;border-radius:0;border:none;border-left:1px solid var(--line)" id="tab-manage">📂 Upload Questions</button>
@@ -1296,33 +1329,40 @@ function hostMain(){
   if(isLive) return `<div class="host-main">${voiceBar()}${livePanel()}</div>`;
 
   const q=selIdx>=0?questions[selIdx]:null;
-  return `<div class="host-main" style="display:flex;flex-direction:column;min-height:calc(100vh - 54px)">
+  const sessionCtrl=S.sessionOpen
+    ?`<div class="session-ctrl session-ctrl-open">
+        <div class="session-ctrl-status"><span style="font-size:.9rem">🟢</span><strong>Session open</strong><span class="muted small">· ${(S.participants||[]).length} joined</span></div>
+        <div class="session-ctrl-btns">
+          <button class="btn btn-bad btn-sm" id="btn-end">⏹ End</button>
+          <button class="btn btn-ghost btn-sm" id="btn-reset">↺ Restart</button>
+        </div>
+      </div>`
+    :`<div class="session-ctrl session-ctrl-closed">
+        <div class="session-ctrl-status"><span style="font-size:.9rem">⚪</span><strong>Not started</strong></div>
+        <div class="session-ctrl-btns">
+          <button class="btn btn-good btn-sm" id="btn-open-session">▶ Start</button>
+          <button class="btn btn-bad btn-sm" id="btn-end">⏹ End</button>
+          <button class="btn btn-ghost btn-sm" id="btn-reset">↺ Restart</button>
+        </div>
+      </div>`;
+  return `<div class="host-main" style="display:flex;flex-direction:column">
     ${voiceBar()}
-    ${S.sessionOpen
-      ?`<div class="session-open-banner" style="margin-bottom:16px">
-          <span style="font-size:1rem">🟢</span>
-          <div style="flex:1"><strong>Session is open</strong> · <span class="muted small">${(S.participants||[]).length} student${(S.participants||[]).length!==1?'s':''} joined</span></div>
-        </div>`
-      :`<div class="session-closed-banner" style="margin-bottom:16px">
-          <span style="font-size:1rem">⚪</span>
-          <div style="flex:1"><strong>Session not started</strong></div>
-          <button class="btn btn-good btn-sm" id="btn-open-session">▶ Start Session</button>
-        </div>`}
+    ${sessionCtrl}
     <div class="row between mb2" style="flex-wrap:wrap;gap:8px">
-      <h2>${q?`Q${selIdx+1} of ${questions.length}${q.subject?' — '+q.subject:''}`:' Select a question'}</h2>
-      <button class="btn btn-ghost btn-sm" id="btn-reload">↻ Change questions</button>
+      <h2 style="font-size:1.1rem">${q?`Q${selIdx+1}/${questions.length}${q.subject?' · '+q.subject:''}`:' Select a question'}</h2>
+      <button class="btn btn-ghost btn-sm" id="btn-reload">↻ Change</button>
     </div>
-    <div class="timer-input-row mb3">
-      <span style="flex:1;font-size:.82rem;color:var(--mid)">⏱ Timer for this question</span>
+    <div class="timer-input-row mb2">
+      <span style="flex:1;font-size:.82rem;color:var(--mid)">⏱ Timer</span>
       <input type="number" min="0" max="300" value="${hostTimerSeconds}" id="timer-sec-live" class="q-count-input" style="width:70px"/>
       <span class="muted small">sec</span>
     </div>
     <div style="flex:1">
     ${!q
-      ?`<p class="muted">Click a question from the sidebar to select it.</p>`
-      :`<p style="font-size:.97rem;line-height:1.55;margin-bottom:20px">${esc(q.text)}</p>
+      ?`<p class="muted small">Select a question from the sidebar.</p>`
+      :`<p style="font-size:.9rem;line-height:1.55;margin-bottom:16px">${esc(q.text)}</p>
         <h3 class="mb2">Select correct answer</h3>
-        <div class="key-grid mb3">
+        <div class="key-grid mb2">
           ${q.options.map((o,i)=>`
             <div class="key-card${answerKey===i?' selected':''}" data-key="${i}">
               <div class="kl">${'ABCD'[i]}</div><div class="kt">${esc(o)}</div>
@@ -1331,10 +1371,10 @@ function hostMain(){
     }
     </div>
     <!-- ── Fixed bottom action bar ── -->
-    <div style="border-top:1px solid var(--line);padding:14px 0 4px;margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
-      <button class="btn btn-dark btn-lg" style="flex:1" id="btn-push" ${(!q||answerKey<0||pushing)?'disabled':''}>${pushing?'⏳ Pushing…':'🚀 Push question'}</button>
-      <button class="btn btn-good btn-lg" style="flex:1" id="btn-reveal" disabled>Reveal answer</button>
-      <button class="btn btn-accent btn-lg" style="flex:1" id="btn-next" disabled>Next →</button>
+    <div style="border-top:1px solid var(--line);padding:12px 0 4px;margin-top:8px;display:flex;gap:7px">
+      <button class="btn btn-dark btn-lg" style="flex:1;font-size:.8rem" id="btn-push" ${(!q||answerKey<0||pushing)?'disabled':''}>${pushing?'⏳…':'🚀 Push'}</button>
+      <button class="btn btn-good btn-lg" style="flex:1;font-size:.8rem" id="btn-reveal" disabled>Reveal</button>
+      <button class="btn btn-accent btn-lg" style="flex:1;font-size:.8rem" id="btn-next" disabled>Next →</button>
     </div>
   </div>`;
 }
@@ -1367,8 +1407,18 @@ function livePanel(){
   const sorted=[...(S.participants||[])].sort((a,b)=>(b.score||0)-(a.score||0));
   const medals=['🥇','🥈','🥉'];
   const isRevealed=S.status==='revealed';
+  const liveSessionCtrl=S.sessionOpen
+    ?`<div class="session-ctrl session-ctrl-open" style="margin-bottom:10px">
+        <div class="session-ctrl-status"><span>🟢</span><strong>Open</strong><span class="muted small">· ${totalParts} students</span></div>
+        <div class="session-ctrl-btns">
+          <button class="btn btn-bad btn-sm" id="btn-end">⏹ End</button>
+          <button class="btn btn-ghost btn-sm" id="btn-reset">↺ Restart</button>
+        </div>
+      </div>`
+    :'';
   return `
-    <div style="display:flex;flex-direction:column;min-height:calc(100vh - 120px)">
+    <div style="display:flex;flex-direction:column">
+      ${liveSessionCtrl}
       <div style="flex:1">
         <div class="row gap2 mb1">
           ${isRevealed?'<span class="tag tag-ink">Revealed</span>':`<span class="tag tag-green"><span class="dot-live"></span> Live</span>`}
@@ -1385,10 +1435,10 @@ function livePanel(){
         ${sorted.length?`<h3 class="mb2 mt3">Scores</h3><div class="score-list">${sorted.map((p,i)=>`<div class="score-row"><div class="score-rank">${medals[i]||i+1}</div><div class="score-name">${esc(p.name)}</div><div class="score-pts">${p.score||0}</div></div>`).join('')}</div>`:''}
       </div>
       <!-- ── Fixed bottom action bar ── -->
-      <div style="border-top:1px solid var(--line);padding:14px 0 4px;margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
-        <button class="btn btn-dark btn-lg" style="flex:1" id="btn-push" disabled>🚀 Push question</button>
-        <button class="btn btn-good btn-lg" style="flex:1" id="btn-reveal" ${isRevealed?'disabled':''}>Reveal answer</button>
-        <button class="btn btn-accent btn-lg" style="flex:1" id="btn-next" ${isRevealed?'':'disabled'}>Next →</button>
+      <div style="border-top:1px solid var(--line);padding:12px 0 4px;margin-top:8px;display:flex;gap:7px">
+        <button class="btn btn-dark btn-lg" style="flex:1;font-size:.8rem" id="btn-push" disabled>🚀 Push</button>
+        <button class="btn btn-good btn-lg" style="flex:1;font-size:.8rem" id="btn-reveal" ${isRevealed?'disabled':''}>Reveal</button>
+        <button class="btn btn-accent btn-lg" style="flex:1;font-size:.8rem" id="btn-next" ${isRevealed?'':'disabled'}>Next →</button>
       </div>
     </div>`;
 }
@@ -1415,20 +1465,19 @@ function hostEndedHTML(){
           return`<span class="ans-chip ${cls}" style="${oi===ans||oi===h.correct?'font-weight:600':''}">${'ABCD'[oi]}) ${esc(o)}${mark}</span>`;}).join('')}${ans===null?'<span class="ans-chip ac-none">No answer</span>':''}</div></div>`;}).join('')}
     </div>`;
   }
-  return `<div class="wide">
-    <div class="row between mb3" style="flex-wrap:wrap;gap:8px">
-      <h2>Session Results</h2>
-      <div class="row gap2">
-        <button class="btn btn-good btn-sm" id="btn-continue-session">▶ Continue Session</button>
+  return `<div class="wide" style="padding:16px">
+    <div class="results-header">
+      <h2>Results</h2>
+      <div class="results-btns">
+        <button class="btn btn-good btn-sm" id="btn-continue-session">▶ Continue</button>
         <button class="btn btn-warn btn-sm" id="btn-halt">⏹ Halt &amp; Dismiss</button>
-        <button class="btn btn-ghost btn-sm" id="btn-reset">↺ Full Reset</button>
+        <button class="btn btn-ghost btn-sm" id="btn-reset">↺ Reset</button>
       </div>
     </div>
-    <div class="notice n-neutral mb3" style="font-size:.82rem">
-      <strong>Continue session</strong> — go back to idle, students return to the waiting room.<br>
-      <strong>Halt &amp; Dismiss</strong> — send all students home with a goodbye message.
+    <div class="notice n-neutral mb3" style="font-size:.79rem">
+      <strong>Continue</strong> — return to waiting room &nbsp;·&nbsp; <strong>Halt</strong> — send students home
     </div>
-    <p class="muted small mb3">Click any row to inspect individual answers.</p>${table}${detail}</div>`;
+    <p class="muted small mb2">Tap any row to inspect answers.</p>${table}${detail}</div>`;
 }
 
 /* ══════════════════════════════════════
@@ -1580,10 +1629,14 @@ let _outsideClickReady=false;
 function setupOutsideClick(){
   if(_outsideClickReady) return;
   _outsideClickReady=true;
+  // Close on tap/click outside — works for both mobile and desktop
+  document.addEventListener('touchstart',e=>{
+    const wrap=document.getElementById('profile-wrap');
+    if(wrap&&!wrap.contains(e.target)) document.getElementById('p-dropdown')?.classList.add('hidden');
+  },{passive:true});
   document.addEventListener('click',e=>{
-    if(!document.getElementById('profile-wrap')?.contains(e.target)){
-      document.getElementById('p-dropdown')?.classList.add('hidden');
-    }
+    const wrap=document.getElementById('profile-wrap');
+    if(wrap&&!wrap.contains(e.target)) document.getElementById('p-dropdown')?.classList.add('hidden');
   });
 }
 
@@ -1601,16 +1654,35 @@ function attach(){
   document.getElementById('auth-pw')?.addEventListener('keydown',e=>{ if(e.key==='Enter'){ if(authTab==='login') doLogin(); else doRegister(); }});
   document.getElementById('auth-email')?.addEventListener('keydown',e=>{ if(e.key==='Enter'){ document.getElementById('auth-pw')?.focus(); }});
 
-  // Profile dropdown — fixed: set up outside click globally once
+  // Profile dropdown — works on both touch and click
   setupOutsideClick();
-  on('profile-btn',()=>{
-    const d=document.getElementById('p-dropdown');
-    if(d) d.classList.toggle('hidden');
-  });
+  const _profileBtn=document.getElementById('profile-btn');
+  if(_profileBtn){
+    const _toggleDropdown=(e)=>{
+      e.stopPropagation();
+      document.getElementById('p-dropdown')?.classList.toggle('hidden');
+    };
+    _profileBtn.addEventListener('click',_toggleDropdown);
+  }
   on('btn-logout', doLogout);
   on('btn-profile',()=>{ showingProfile=true; profileTab='overview'; document.getElementById('p-dropdown')?.classList.add('hidden'); render(); });
   on('btn-profile-back',()=>{ showingProfile=false; render(); });
   document.querySelectorAll('.ptab[data-ptab]').forEach(el=>el.addEventListener('click',()=>{ profileTab=el.dataset.ptab; render(); }));
+
+  // Nav back button
+  on('btn-nav-back',()=>{
+    if(showingProfile){ showingProfile=false; render(); return; }
+    if(role==='host'&&hostAuthed){
+      if(!confirm('Leave host panel and go home?')) return;
+      role=null; hostAuthed=false; HOST_PASSWORD_INPUT=''; stopMic(); render(); return;
+    }
+    if(role==='participant'&&myName){
+      if(!confirm('Leave the session and go home?')) return;
+      send({type:'leave'}); return;
+    }
+    // host not yet authed or other states — just go home
+    role=null; hostAuthed=false; myName=null; myPid=null; showingProfile=false; render();
+  });
 
   // Profile settings
   on('btn-save-disp', async ()=>{
