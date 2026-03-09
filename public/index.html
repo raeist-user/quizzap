@@ -161,8 +161,8 @@
     .score-row.top{background:var(--faint)}
 
     /* ANSWER KEY */
-    .key-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px}
-    .key-card{padding:11px 10px;border:1px solid var(--line);border-radius:var(--r);cursor:pointer;text-align:center;transition:background .1s,border-color .1s}
+    .key-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px;height:120px}
+    .key-card{padding:11px 10px;border:1px solid var(--line);border-radius:var(--r);cursor:pointer;text-align:center;transition:background .1s,border-color .1s;overflow:hidden;display:flex;flex-direction:column;justify-content:center}
     .key-card:hover{background:var(--faint)}
     .key-card.selected{background:var(--ink);color:#fff;border-color:var(--ink)}
     .key-card .kl{font-size:.67rem;font-weight:700;opacity:.6;margin-bottom:3px}
@@ -505,6 +505,39 @@ function loadStoredAuth(){
 function saveAuth(token,user){ authToken=token; currentUser=user; localStorage.setItem('scc_token',token); localStorage.setItem('scc_user',JSON.stringify(user)); }
 function clearAuth(){ authToken=null; currentUser=null; localStorage.removeItem('scc_token'); localStorage.removeItem('scc_user'); }
 
+/* ── Navigation-state persistence (survives reload) ─────────────────────── */
+const NAV_KEY='scc_nav';
+function saveNavState(){
+  try{
+    // Only persist states that make sense to restore after reload.
+    // We never restore a mid-question live session since WS reconnect handles that.
+    const st={
+      role: role,
+      hostAuthed: hostAuthed,
+      myName: myName,
+      showingProfile: showingProfile,
+      profileTab: profileTab,
+      homeSection: homeSection,
+    };
+    sessionStorage.setItem(NAV_KEY, JSON.stringify(st));
+  }catch(e){}
+}
+function loadNavState(){
+  try{
+    const raw=sessionStorage.getItem(NAV_KEY);
+    if(!raw) return;
+    const st=JSON.parse(raw);
+    role          = st.role          ?? null;
+    hostAuthed    = st.hostAuthed    ?? false;
+    myName        = st.myName        ?? null;
+    showingProfile= st.showingProfile?? false;
+    profileTab    = st.profileTab    ?? 'overview';
+    homeSection   = st.homeSection   ?? 'home';
+    // myPid already persisted separately in sessionStorage by existing code
+    if(myName) myPid = sessionStorage.getItem('qz_pid') || null;
+  }catch(e){}
+}
+
 async function apiPost(path,body,withAuth){
   const h={'Content-Type':'application/json'};
   if(withAuth&&authToken) h['Authorization']='Bearer '+authToken;
@@ -593,13 +626,13 @@ function connect(){
       case 'hello':     myCid=m.cid; break;
       case 'kicked':
         role=null; myName=null; myPid=null; showingProfile=false; prevMyScore=0; scoreGain=0;
-        sessionStorage.removeItem('qz_pid');
+        sessionStorage.removeItem('qz_pid'); sessionStorage.removeItem(NAV_KEY);
         alert('The host has shut down the session.');
         render(); break;
       case 'halted':
         // Host halted the session — auto-redirect students home with message
         role=null; myName=null; myPid=null; showingProfile=false; prevMyScore=0; scoreGain=0;
-        sessionStorage.removeItem('qz_pid');
+        sessionStorage.removeItem('qz_pid'); sessionStorage.removeItem(NAV_KEY);
         showingHalted=true; haltedCountdown=8;
         render();
         if(haltedTimer) clearInterval(haltedTimer);
@@ -937,6 +970,7 @@ function scoreBannerHTML(){
    RENDER
 ══════════════════════════════════════ */
 function render(){
+  saveNavState();
   const nav=document.getElementById('main-nav');
   if(!currentUser){nav.style.display='none'; document.getElementById('view').innerHTML=authHTML(); attach(); return;}
   const isParticipant=(role==='participant'&&myName);
@@ -1042,7 +1076,7 @@ function landingHTML(){
       </div>`
     :'';
   return `<div class="lb-full-screen">
-    <div class="lb-full-inner" style="justify-content:center">
+    <div class="lb-full-inner">
       ${tabs}
       <h1 class="mb1">Live Quiz</h1>
       <p class="muted mb3">Welcome, ${esc(currentUser.name.split(' ')[0])} 👋</p>
@@ -1576,15 +1610,24 @@ let _outsideClickReady=false;
 function setupOutsideClick(){
   if(_outsideClickReady) return;
   _outsideClickReady=true;
-  // Close on tap/click outside — works for both mobile and desktop
-  document.addEventListener('touchstart',e=>{
+  // Profile button toggle — attached once here, not in attach(), so it never stacks
+  document.addEventListener('click', e=>{
+    const wrap=document.getElementById('profile-wrap');
+    const btn=document.getElementById('profile-btn');
+    if(!wrap) return;
+    if(btn&&btn.contains(e.target)){
+      // Toggle dropdown
+      document.getElementById('p-dropdown')?.classList.toggle('hidden');
+      e.stopPropagation();
+      return;
+    }
+    // Click outside — close
+    if(!wrap.contains(e.target)) document.getElementById('p-dropdown')?.classList.add('hidden');
+  });
+  document.addEventListener('touchstart', e=>{
     const wrap=document.getElementById('profile-wrap');
     if(wrap&&!wrap.contains(e.target)) document.getElementById('p-dropdown')?.classList.add('hidden');
   },{passive:true});
-  document.addEventListener('click',e=>{
-    const wrap=document.getElementById('profile-wrap');
-    if(wrap&&!wrap.contains(e.target)) document.getElementById('p-dropdown')?.classList.add('hidden');
-  });
 }
 
 function attach(){
@@ -1601,16 +1644,8 @@ function attach(){
   document.getElementById('auth-pw')?.addEventListener('keydown',e=>{ if(e.key==='Enter'){ if(authTab==='login') doLogin(); else doRegister(); }});
   document.getElementById('auth-email')?.addEventListener('keydown',e=>{ if(e.key==='Enter'){ document.getElementById('auth-pw')?.focus(); }});
 
-  // Profile dropdown — works on both touch and click
+  // Profile dropdown — one-time setup handled in setupOutsideClick() above
   setupOutsideClick();
-  const _profileBtn=document.getElementById('profile-btn');
-  if(_profileBtn){
-    const _toggleDropdown=(e)=>{
-      e.stopPropagation();
-      document.getElementById('p-dropdown')?.classList.toggle('hidden');
-    };
-    _profileBtn.addEventListener('click',_toggleDropdown);
-  }
   on('btn-logout', doLogout);
   on('btn-profile',()=>{ showingProfile=true; profileTab='overview'; document.getElementById('p-dropdown')?.classList.add('hidden'); navPush(); render(); });
   on('btn-profile-back',()=>{ showingProfile=false; render(); });
@@ -1788,7 +1823,7 @@ function attach(){
 }
 
 function on(id,fn){ document.getElementById(id)?.addEventListener('click',fn); }
-function doLogout(){ clearAuth(); role=null; myPid=null; myName=null; hostAuthed=false; showingProfile=false; prevMyScore=0; scoreGain=0; allTimeLB=null; serverSchedules=null; hostSchedules=[]; render(); }
+function doLogout(){ clearAuth(); role=null; myPid=null; myName=null; hostAuthed=false; showingProfile=false; prevMyScore=0; scoreGain=0; allTimeLB=null; serverSchedules=null; hostSchedules=[]; sessionStorage.removeItem(NAV_KEY); render(); }
 
 /* Shared back navigation — used by nav button, host-home button, and mobile popstate */
 function doBack(){
@@ -1817,7 +1852,7 @@ function doHostLogin(){
   HOST_PASSWORD_INPUT=v;
   send({type:'set_host',password:v});
 }
-function doLeave(){ role=null; myName=null; myPid=null; showingProfile=false; prevMyScore=0; scoreGain=0; sessionStorage.removeItem('qz_pid'); render(); }
+function doLeave(){ role=null; myName=null; myPid=null; showingProfile=false; prevMyScore=0; scoreGain=0; sessionStorage.removeItem('qz_pid'); sessionStorage.removeItem(NAV_KEY); render(); }
 function doJoin(){
   const name=currentUser?.displayName||currentUser?.name||'';
   if(!name)return;
@@ -1870,13 +1905,14 @@ window.addEventListener('popstate', ()=>{
 });
 
 loadStoredAuth();
+loadNavState(); // restore navigation position from before reload
 // Seed the history stack so popstate always has a base entry
 history.replaceState({qz:true}, '', location.href);
 render();
 if(currentUser){
   connect();
-  fetchSchedules(); // load schedules for landing page hint
-  fetchLeaderboard(); // preload leaderboard
+  fetchSchedules();
+  fetchLeaderboard();
 }
 </script>
 </body>
