@@ -23,6 +23,19 @@
     /* NAV */
     @keyframes fadeIn{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}
     @keyframes slideUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+    @keyframes fadeIn{from{opacity:0;transform:translateY(-5px)}to{opacity:1;transform:translateY(0)}}
+    @keyframes slideUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+    /* SCHEDULE */
+    .sched-card{background:var(--white);border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px;display:flex;align-items:center;gap:14px}
+    .sched-date-block{background:var(--ink);color:#fff;border-radius:8px;padding:6px 10px;text-align:center;min-width:46px;flex-shrink:0}
+    .sched-day{font-size:1.2rem;font-weight:700;line-height:1}
+    .sched-mon{font-size:.62rem;text-transform:uppercase;letter-spacing:.05em;opacity:.8}
+    .sched-info{flex:1;min-width:0}
+    .sched-title{font-weight:600;font-size:.9rem;margin-bottom:2px}
+    .sched-meta{font-size:.75rem;color:var(--mid)}
+    .sched-countdown{font-size:.72rem;color:var(--accent);font-weight:600;margin-top:3px}
+    .sched-del{font-size:.8rem;color:var(--bad);cursor:pointer;padding:4px 8px;border-radius:6px;transition:background .1s}
+    .sched-del:hover{background:var(--bad-bg)}
     nav{display:flex;align-items:center;justify-content:space-between;padding:0 16px;height:54px;border-bottom:1px solid var(--line);background:var(--white);position:sticky;top:0;z-index:200;gap:8px}
     .brand{font-family:var(--serif);font-size:1.1rem;flex-shrink:0;line-height:1.2;min-width:0}
     .brand small{display:block;font-family:var(--sans);font-size:.62rem;font-weight:500;color:var(--mid);letter-spacing:.04em;text-transform:uppercase}
@@ -447,6 +460,19 @@ function computeStats(){
   return {totalSessions,totalCorrect,totalQs,accuracy,bestScore,bestRank,streak,bestStreak,subjectMap};
 }
 
+// ── SCHEDULED SESSIONS ───────────────────────────────────────────────────────
+function schedKey(){ return `scc_schedules_${currentUser?.id||'anon'}`; }
+function loadSchedules(){ try{ return JSON.parse(localStorage.getItem(schedKey())||'[]'); }catch{ return []; } }
+function saveSchedule(entry){ const s=loadSchedules(); s.push(entry); s.sort((a,b)=>a.ts-b.ts); localStorage.setItem(schedKey(),JSON.stringify(s)); }
+function deleteSchedule(id){ const s=loadSchedules().filter(x=>x.id!==id); localStorage.setItem(schedKey(),JSON.stringify(s)); }
+function schedCountdown(ts){
+  const diff=ts-Date.now(); if(diff<=0) return 'Now / Overdue';
+  const h=Math.floor(diff/3600000), m=Math.floor((diff%3600000)/60000);
+  if(h>48) return `in ${Math.floor(h/24)} days`;
+  if(h>0) return `in ${h}h ${m}m`;
+  return `in ${m}m`;
+}
+
 async function apiPost(path,body,auth){
   const headers={'Content-Type':'application/json'};
   if(auth) headers['Authorization']='Bearer '+authToken;
@@ -489,7 +515,30 @@ function connect(){
       case 'joined':    myPid=m.pid; sessionStorage.setItem('qz_pid',m.pid); break;
       case 'auth_ok':   hostAuthed=true; render(); break;
       case 'auth_fail': { const el=document.getElementById('pw-err'); if(el)el.textContent='Incorrect password.'; break; }
-      case 'left':      doLeave(); break;
+      case 'kicked':
+        role=null; myName=null; myPid=null; showPlusOne=false; prevMyScore=0;
+        sessionStorage.removeItem('qz_pid');
+        alert('The host has shut down the session.');
+        render(); break;
+      case 'state': {
+        const ns=m.payload.status, incomingScore=m.payload.myScore||0;
+        // When host reveals and score went up → flag +1 to show in wait leaderboard
+        if(ns==='idle' && prevStatus==='revealed' && incomingScore > prevMyScore) showPlusOne=true;
+        // Clear +1 when next question is pushed
+        if(ns==='question'){ showPlusOne=false; prevMyScore=incomingScore; }
+        if(ns==='idle' && prevStatus==='idle') prevMyScore=incomingScore;
+        prevStatus=ns;
+        // Save session on end
+        if(ns==='ended' && prevStatus!=='ended' && role==='participant' && myPid){
+          const parts=m.payload.participants||[];
+          const sorted2=[...parts].sort((a,b)=>(b.score||0)-(a.score||0));
+          const myRank2=sorted2.findIndex(p=>p.id===myPid)+1;
+          const hist2=m.payload.myHistory||[];
+          const correct2=hist2.filter(h=>h.myAnswer!==null&&h.myAnswer===h.correct).length;
+          saveSession({date:new Date().toISOString(),score:m.payload.myScore||0,total:hist2.length,rank:myRank2||0,participants:parts.length,correct:correct2});
+        }
+        S=m.payload; render(); break;
+      }
       case 'peer_list': for(const cid of m.cids) await hostCallPeer(cid); break;
       case 'rtc_new_peer': if(role==='host') await hostCallPeer(m.cid); break;
       case 'rtc_offer':    if(role==='participant') await studentHandleOffer(m.signal); break;
@@ -714,6 +763,21 @@ function registerFormHTML(){
 ══════════════════════════════════════ */
 function landingHTML(){
   const n=(S.participants||[]).length;
+  const scheds=loadSchedules().filter(s=>s.ts>Date.now()-3600000).slice(0,3); // show upcoming + last hour
+  const schedHTML=scheds.length?`
+    <div style="width:100%;max-width:360px;margin-top:20px">
+      <div style="font-size:.75rem;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--mid);margin-bottom:8px">📅 Upcoming Sessions</div>
+      ${scheds.map(s=>{
+        const d=new Date(s.ts);
+        return `<div class="sched-card">
+          <div class="sched-date-block"><div class="sched-day">${d.getDate()}</div><div class="sched-mon">${d.toLocaleString('en',{month:'short'})}</div></div>
+          <div class="sched-info">
+            <div class="sched-title">${esc(s.title)}</div>
+            <div class="sched-meta">${d.toLocaleTimeString('en',{hour:'2-digit',minute:'2-digit'})}${s.notes?` · ${esc(s.notes)}`:''}</div>
+            <div class="sched-countdown">${schedCountdown(s.ts)}</div>
+          </div>
+        </div>`;}).join('')}
+    </div>`:'';
   return `<div class="center"><div class="box">
     <h1 class="mb1">Live Quiz</h1>
     <p class="muted mb3">Welcome, ${esc(currentUser.name.split(' ')[0])} 👋</p>
@@ -722,6 +786,7 @@ function landingHTML(){
       <button class="btn btn-white btn-lg" id="go-join">🎓 Join as student</button>
     </div>
     ${n?`<p class="muted small mt3" style="text-align:center">${n} student${n!==1?'s':''} waiting</p>`:''}
+    ${schedHTML}
   </div></div>`;
 }
 
@@ -753,8 +818,8 @@ function profilePageHTML(){
   const initials=u.name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
   const stats=computeStats();
   const history=loadHistory();
-  const tabs=['overview','history','settings'];
-  const tabLabels={'overview':'📈 Overview','history':'📋 History','settings':'⚙️ Settings'};
+  const tabs=['overview','history','schedule','settings'];
+  const tabLabels={'overview':'📈 Overview','history':'📋 History','schedule':'📅 Schedule','settings':'⚙️ Settings'};
 
   const tabsHTML=tabs.map(t=>`<div class="profile-tab${profileTab===t?' active':''}" data-ptab="${t}">${tabLabels[t]}</div>`).join('');
 
@@ -807,6 +872,36 @@ function profilePageHTML(){
         </div>`;
       }).join('');
     }
+  }
+
+  if(profileTab==='schedule'){
+    const scheds=loadSchedules();
+    const upcomingScheds=scheds.filter(s=>s.ts>Date.now()-3600000);
+    const pastScheds=scheds.filter(s=>s.ts<=Date.now()-3600000).slice(0,5);
+    const schedRows=(list,showDel)=>list.map(s=>{
+      const d=new Date(s.ts);
+      return `<div class="sched-card">
+        <div class="sched-date-block"><div class="sched-day">${d.getDate()}</div><div class="sched-mon">${d.toLocaleString('en',{month:'short'})}</div></div>
+        <div class="sched-info">
+          <div class="sched-title">${esc(s.title)}</div>
+          <div class="sched-meta">${d.toLocaleTimeString('en',{hour:'2-digit',minute:'2-digit'})}${s.notes?` · ${esc(s.notes)}`:''}</div>
+          ${showDel?`<div class="sched-countdown">${schedCountdown(s.ts)}</div>`:'<div class="sched-meta" style="margin-top:2px">Past</div>'}
+        </div>
+        ${showDel?`<span class="sched-del" data-sdel="${s.id}">✕</span>`:''}
+      </div>`;}).join('');
+    body=`
+    <div class="settings-section">
+      <h3>➕ Schedule a Session</h3>
+      <div class="form-row"><label>Session title</label><input class="form-input" id="sched-title" placeholder="e.g. Chapter 5 Quiz" maxlength="60"/></div>
+      <div class="form-row"><label>Date &amp; time</label><input class="form-input" type="datetime-local" id="sched-dt"/></div>
+      <div class="form-row"><label>Notes (optional)</label><input class="form-input" id="sched-notes" placeholder="e.g. Covers algebra unit" maxlength="100"/></div>
+      <button class="btn btn-dark btn-sm" id="btn-sched-add">Add to schedule</button>
+      <div class="form-msg" id="sched-msg"></div>
+    </div>
+    ${upcomingScheds.length?`<div class="settings-section"><h3>🗓 Upcoming</h3>${schedRows(upcomingScheds,true)}</div>`:''}
+    ${pastScheds.length?`<div class="settings-section"><h3 style="color:var(--mid)">Past</h3>${schedRows(pastScheds,false)}</div>`:''}
+    ${!upcomingScheds.length&&!pastScheds.length?'<p class="muted" style="text-align:center;padding:20px 0">No sessions scheduled yet.</p>':''}
+    `;
   }
 
   if(profileTab==='settings'){
@@ -1041,7 +1136,11 @@ function hostEndedHTML(){
           return`<span class="ans-chip ${cls}" style="${oi===ans||oi===h.correct?'font-weight:600':''}">${'ABCD'[oi]}) ${esc(o)}${mark}</span>`;}).join('')}${ans===null?'<span class="ans-chip ac-none">No answer</span>':''}</div></div>`;}).join('')}
     </div>`;
   }
-  return `<div class="wide"><div class="row between mb3"><h2>Session Results</h2><button class="btn btn-ghost btn-sm" id="btn-reset">New session</button></div>
+  return `<div class="wide"><div class="row between mb3"><h2>Session Results</h2>
+    <div class="row gap2">
+      <button class="btn btn-ghost btn-sm" id="btn-reset">New session</button>
+      <button class="btn btn-bad btn-sm" id="btn-shutdown">⏹ Shut down &amp; dismiss all</button>
+    </div></div>
     <p class="muted small mb3">Click any row to inspect individual answers.</p>${table}${detail}</div>`;
 }
 
@@ -1079,7 +1178,7 @@ function waitHTML(){
       <div class="lb-row${p.id===myPid?' me':''}">
         <div class="score-rank">${['🥇','🥈','🥉'][i]||i+1}</div>
         <div style="flex:1">${esc(p.name)}${p.id===myPid?' <span style="font-size:.7rem;color:var(--mid)">← you</span>':''}</div>
-        <div class="score-pts">${p.score||0}</div>
+        <div class="score-pts">${p.score||0}${p.id===myPid&&showPlusOne?'<span style="color:#22c55e;font-size:.75rem;font-weight:700;margin-left:5px;animation:fadeIn .3s ease">+1</span>':''}</div>
       </div>`).join('')}
   </div>`:'';
   return `<div class="wait-shell">
@@ -1184,6 +1283,22 @@ function attach(){
   on('btn-logout', doLogout);
   on('btn-profile',()=>{ showingProfile=true; profileTab='overview'; document.getElementById('p-dropdown')?.classList.add('hidden'); render(); });
   on('btn-profile-back',()=>{ showingProfile=false; render(); });
+  // Schedule tab
+  on('btn-sched-add',()=>{
+    const title=document.getElementById('sched-title')?.value?.trim();
+    const dt=document.getElementById('sched-dt')?.value;
+    const notes=document.getElementById('sched-notes')?.value?.trim();
+    const msg=document.getElementById('sched-msg');
+    if(!title||!dt){if(msg){msg.className='form-msg err';msg.textContent='Title and date/time required.';}return;}
+    const ts=new Date(dt).getTime();
+    if(ts<=Date.now()){if(msg){msg.className='form-msg err';msg.textContent='Please choose a future date and time.';}return;}
+    saveSchedule({id:'s'+Date.now(),title,ts,notes:notes||''});
+    if(msg){msg.className='form-msg ok';msg.textContent='✓ Session scheduled!';}
+    setTimeout(()=>render(),600);
+  });
+  document.querySelectorAll('[data-sdel]').forEach(el=>
+    el.addEventListener('click',()=>{ deleteSchedule(el.dataset.sdel); render(); })
+  );
   // Profile tabs
   document.querySelectorAll('.profile-tab[data-ptab]').forEach(el=>
     el.addEventListener('click',()=>{ profileTab=el.dataset.ptab; render(); })
@@ -1274,6 +1389,7 @@ function attach(){
   on('btn-reveal',()=>send({type:'reveal'}));
   on('btn-next',  ()=>{ send({type:'clear'}); selIdx=selIdx+1<questions.length?selIdx+1:-1; answerKey=-1; });
   on('btn-end',   ()=>{ if(confirm('End session for all students?')) send({type:'end_session'}); });
+  on('btn-shutdown', ()=>{ if(confirm('Shut down the session? All students will be dismissed.')) send({type:'shutdown'}); });
   on('btn-reset', ()=>{ if(confirm('Reset everything?')){ send({type:'reset'}); questions=[]; selIdx=-1; answerKey=-1; inspectPid=null; subjects=[]; repoPath=null; stopMic(); render(); } });
   on('btn-close-inspect',()=>{ inspectPid=null; render(); });
   document.querySelectorAll('.itbl tbody tr[data-pid]').forEach(row=>
@@ -1300,7 +1416,7 @@ function attach(){
 }
 
 // Track previous answer state for sound effects
-let prevStatus=null, prevMyAnswer=null;
+let prevStatus=null, prevMyAnswer=null, showPlusOne=false, prevMyScore=0;
 const origRender=render;
 // Intercept state updates for sounds
 const _origOnMsg=ws?.onmessage;
