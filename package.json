@@ -12,5 +12,9 @@
     "bcryptjs": "^2.4.3",
     "jsonwebtoken": "^9.0.2",
     "dotenv": "^16.0.0"
+    "scripts": {
+  "build": "node build.js",
+  "start": "node server.js"
+}
   }
 }
