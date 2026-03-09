@@ -813,9 +813,10 @@ let editingSha=null;      // SHA of existing file (for update)
 let uploadMsg='';
 let uploadSubjects=[];    // folders list for manage tab
 
+function isValidToken(){ return GITHUB_TOKEN && !GITHUB_TOKEN.startsWith('%%'); }
 function ghHeaders(){
   const h={'Accept':'application/vnd.github+json','Content-Type':'application/json'};
-  if(GITHUB_TOKEN) h['Authorization']='Bearer '+GITHUB_TOKEN;
+  if(isValidToken()) h['Authorization']='Bearer '+GITHUB_TOKEN;
   return h;
 }
 
@@ -852,7 +853,7 @@ async function createFolder(){
   if(!inp) return;
   const name=inp.value.trim().replace(/[^a-zA-Z0-9_\- ]/g,'');
   if(!name){setUploadMsg('Folder name required','bad');return;}
-  if(!GITHUB_TOKEN){setUploadMsg('GitHub token not set','bad');return;}
+  if(!isValidToken()){setUploadMsg('GitHub token not configured — add it to the source to enable uploads','bad');return;}
   setUploadMsg('Creating folder…','neutral');
   try{
     const path=`resources/${name}/.gitkeep`;
@@ -868,7 +869,7 @@ async function createFolder(){
 }
 
 async function deleteFolder(folderName){
-  if(!GITHUB_TOKEN){setUploadMsg('GitHub token not set','bad');return;}
+  if(!isValidToken()){setUploadMsg('GitHub token not configured — add it to the source to enable uploads','bad');return;}
   setUploadMsg('Deleting folder…','neutral');
   try{
     // List all files in the folder
@@ -910,7 +911,7 @@ async function openFolderEdit(folderName){
 
 async function saveEditorContent(){
   if(!manageFolder){setUploadMsg('No folder selected','bad');return;}
-  if(!GITHUB_TOKEN){setUploadMsg('GitHub token not set','bad');return;}
+  if(!isValidToken()){setUploadMsg('GitHub token not configured — add it to the source to enable uploads','bad');return;}
   const ta=document.getElementById('q-editor');
   const content=ta?ta.value:'';
   if(!content.trim()){setUploadMsg('Content is empty','bad');return;}
@@ -931,7 +932,7 @@ async function saveEditorContent(){
 
 async function uploadQuestionsFile(){
   if(!manageFolder){setUploadMsg('Select a folder first','bad');return;}
-  if(!GITHUB_TOKEN){setUploadMsg('GitHub token not set','bad');return;}
+  if(!isValidToken()){setUploadMsg('GitHub token not configured — add it to the source to enable uploads','bad');return;}
   const inp=document.getElementById('file-upload-inp');
   if(!inp||!inp.files.length){setUploadMsg('Choose a .txt file first','bad');return;}
   const file=inp.files[0];
@@ -975,7 +976,7 @@ async function generateQuiz(){
   try{
     for(const s of chosen){
       const rawUrl=`https://raw.githubusercontent.com/${GITHUB_REPO}/${GITHUB_BRANCH}/${s.path}/questions.txt`;
-      const headers={}; if(GITHUB_TOKEN) headers['Authorization']='Bearer '+GITHUB_TOKEN;
+      const headers={}; if(isValidToken()) headers['Authorization']='Bearer '+GITHUB_TOKEN;
       const res=await fetch(rawUrl,{headers});
       if(!res.ok) throw new Error(`Could not fetch ${s.name}/questions.txt`);
       const parsed=parseQuestions(await res.text());
