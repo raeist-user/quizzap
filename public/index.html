@@ -432,7 +432,7 @@ let timerInterval=null;
 let pushing=false, pushTimeout=null;
 
 // Halt flow
-let showingHalted=false, haltedCountdown=0, haltedTimer=null;
+let showingHalted=false, haltedCountdown=0, haltedTimer=null, haltedSnapshot=[];
 
 // Home tabs
 let homeSection='home'; // 'home' | 'leaderboard'
@@ -630,19 +630,24 @@ function connect(){
         alert('The host has shut down the session.');
         render(); break;
       case 'halted':
-        // Host halted the session — auto-redirect students home with message
+        // Host halted the session — show leaderboard + goodbye for 30s
+        { const haltedParts=m.payload?.participants||S.participants||[];
+          haltedSnapshot=haltedParts; }
         role=null; myName=null; myPid=null; showingProfile=false; prevMyScore=0; scoreGain=0;
         sessionStorage.removeItem('qz_pid'); sessionStorage.removeItem(NAV_KEY);
-        showingHalted=true; haltedCountdown=8;
+        showingHalted=true; haltedCountdown=30;
         render();
         if(haltedTimer) clearInterval(haltedTimer);
         haltedTimer=setInterval(()=>{
           haltedCountdown--;
           const el=document.getElementById('halt-countdown');
           if(el) el.textContent=haltedCountdown;
+          // Animate the ring
+          const ring=document.getElementById('halt-ring');
+          if(ring){ const pct=(haltedCountdown/30)*283; ring.style.strokeDashoffset=283-pct; }
           if(haltedCountdown<=0){
             clearInterval(haltedTimer); haltedTimer=null;
-            showingHalted=false;
+            showingHalted=false; haltedSnapshot=[];
             fetchSchedules();
             render();
           }
@@ -757,13 +762,24 @@ function startTimerDisplay(){
     const remaining=Math.max(0, total-(Date.now()-start)/1000);
     const pct=(remaining/total)*100;
     const urgent=remaining<total*0.25;
+    // Student timer bar
     const bar=document.getElementById('timer-bar');
     const dig=document.getElementById('timer-digits');
-    if(!bar||!dig){clearInterval(timerInterval);timerInterval=null;return;}
-    bar.style.width=pct+'%';
-    bar.className='timer-bar-fill'+(urgent?' urgent':'');
-    dig.textContent=Math.ceil(remaining)+'s';
-    dig.className='timer-digits'+(urgent?' urgent':'');
+    if(bar&&dig){
+      bar.style.width=pct+'%';
+      bar.className='timer-bar-fill'+(urgent?' urgent':'');
+      dig.textContent=Math.ceil(remaining)+'s';
+      dig.className='timer-digits'+(urgent?' urgent':'');
+    }
+    // Host timer bar (in host controller)
+    const hBar=document.getElementById('host-timer-bar');
+    const hDig=document.getElementById('host-timer-digits');
+    if(hBar&&hDig){
+      hBar.style.width=pct+'%';
+      hBar.style.background=urgent?'var(--bad)':'var(--accent)';
+      hDig.textContent=Math.ceil(remaining)+'s';
+      hDig.style.color=urgent?'var(--bad)':'var(--ink)';
+    }
     if(remaining<=0){
       clearInterval(timerInterval);timerInterval=null;
       document.querySelectorAll('.opt-card').forEach(c=>c.classList.add('locked'));
@@ -1000,7 +1016,7 @@ function render(){
   else if(role==='host')              v.innerHTML=hostHTML();
   else                                v.innerHTML=participantHTML();
   attach();
-  if(role==='participant'&&S.status==='question') startTimerDisplay();
+  if(S.status==='question') startTimerDisplay();
 }
 
 /* ══════════════════════════════════════
@@ -1094,12 +1110,36 @@ function landingHTML(){
    HALTED SCREEN (students)
 ══════════════════════════════════════ */
 function haltedHTML(){
-  return `<div class="center"><div class="box" style="text-align:center">
-    <div style="font-size:3rem;margin-bottom:16px">👋</div>
-    <h2 class="mb2">Session has ended</h2>
-    <p class="muted mb3">The host has closed this session.<br>Join next time when a new session is scheduled.</p>
-    <div class="notice n-neutral" style="font-size:.85rem">Returning to home in <strong id="halt-countdown">${haltedCountdown}</strong> seconds…</div>
-  </div></div>`;
+  const sorted=[...haltedSnapshot].sort((a,b)=>(b.score||0)-(a.score||0));
+  const medals=['🥇','🥈','🥉'];
+  const rows=sorted.length
+    ?sorted.map((p,i)=>`
+      <div class="lb-row">
+        <div class="score-rank">${medals[i]||('#'+(i+1))}</div>
+        <div style="flex:1;font-weight:${i<3?'600':'400'}">${esc(p.name)}</div>
+        <div class="score-pts">${p.score||0} pts</div>
+      </div>`).join('')
+    :`<div style="padding:20px;text-align:center;color:var(--mid)">No scores recorded.</div>`;
+  const pct=(haltedCountdown/30)*283;
+  return `<div style="display:flex;flex-direction:column;height:calc(100vh - 54px);overflow:hidden;padding:16px 20px;max-width:520px;margin:0 auto">
+    <div style="text-align:center;padding:20px 0 16px;flex-shrink:0">
+      <div style="position:relative;display:inline-flex;align-items:center;justify-content:center;margin-bottom:12px">
+        <svg width="72" height="72" viewBox="0 0 100 100" style="transform:rotate(-90deg)">
+          <circle cx="50" cy="50" r="45" fill="none" stroke="var(--line)" stroke-width="6"/>
+          <circle id="halt-ring" cx="50" cy="50" r="45" fill="none" stroke="var(--ink)" stroke-width="6"
+            stroke-dasharray="283" stroke-dashoffset="${283-pct}" stroke-linecap="round"
+            style="transition:stroke-dashoffset 1s linear"/>
+        </svg>
+        <span id="halt-countdown" style="position:absolute;font-size:1.3rem;font-weight:700">${haltedCountdown}</span>
+      </div>
+      <h2 style="margin-bottom:4px">Session ended</h2>
+      <p class="muted small">Returning to home automatically</p>
+    </div>
+    <div class="lb-panel" style="flex:1;overflow:hidden;display:flex;flex-direction:column;max-width:100%">
+      <div class="lb-head"><span style="font-size:.82rem;font-weight:600">🏆 Final Leaderboard</span><span class="small muted">${sorted.length} students</span></div>
+      <div style="overflow-y:auto;flex:1">${rows}</div>
+    </div>
+  </div>`;
 }
 
 /* ══════════════════════════════════════
@@ -1211,8 +1251,43 @@ function hostPassHTML(){
 }
 
 /* ══════════════════════════════════════
-   HOST SHELL — FULL WINDOW
+   SCHEDULE OVERLAY (host)
 ══════════════════════════════════════ */
+function schedOverlayHTML(){
+  if(!sidebarSchedOpen) return '';
+  const upcoming=hostSchedules.filter(s=>s.ts>Date.now()-3600000);
+  const schedRows=upcoming.length
+    ?upcoming.map(s=>{
+      const d=new Date(s.ts);
+      return `<div class="sched-card" style="margin-bottom:6px;padding:8px 10px">
+        <div class="sched-date-blk" style="min-width:36px;padding:4px 7px"><div class="sched-day" style="font-size:.95rem">${d.getDate()}</div><div class="sched-mon">${d.toLocaleString('en',{month:'short'})}</div></div>
+        <div class="sched-info">
+          <div class="sched-title" style="font-size:.8rem">${esc(s.title)}</div>
+          <div class="sched-meta">${d.toLocaleTimeString('en',{hour:'2-digit',minute:'2-digit'})}${s.notes?' · '+esc(s.notes):''}</div>
+          <div class="sched-cd">${cdStr(s.ts)}</div>
+        </div>
+        <span class="sched-del" data-sdel="${s._id}">✕</span>
+      </div>`;
+    }).join('')
+    :'<p class="muted small" style="padding:4px 0 10px">No upcoming sessions.</p>';
+  return `<div id="sched-overlay" style="position:absolute;bottom:0;left:0;right:0;background:var(--white);border-top:2px solid var(--line);border-radius:12px 12px 0 0;padding:16px;z-index:300;max-height:70%;overflow-y:auto;box-shadow:0 -4px 24px rgba(0,0,0,.1)">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+      <span style="font-weight:700;font-size:.9rem">📅 Schedule</span>
+      <button class="btn btn-ghost btn-sm" id="btn-sched-close">✕</button>
+    </div>
+    ${schedRows}
+    <hr/>
+    <div style="display:flex;flex-direction:column;gap:6px;margin-top:10px">
+      <input class="form-input" id="sched-title" placeholder="Session title" maxlength="60" style="font-size:.82rem;padding:8px 10px"/>
+      <input class="form-input" type="datetime-local" id="sched-dt" style="font-size:.82rem;padding:8px 10px"/>
+      <input class="form-input" id="sched-notes" placeholder="Notes (optional)" maxlength="100" style="font-size:.82rem;padding:8px 10px"/>
+      <button class="btn btn-dark btn-sm btn-full" id="btn-sched-add">+ Add to schedule</button>
+      <div class="form-msg" id="sched-msg"></div>
+    </div>
+  </div>`;
+}
+
+
 function hostHTML(){
   if(S.status==='ended') return hostEndedHTML();
 
@@ -1229,18 +1304,23 @@ function hostHTML(){
   ).join('');
   const liveNav=`
     <div class="host-live-nav">
-      <button class="btn btn-ghost btn-sm" id="btn-host-home" style="flex-shrink:0;padding:4px 10px;font-size:.75rem">← Home</button>
+      <button class="btn btn-ghost btn-sm" id="btn-host-home" style="flex-shrink:0;padding:4px 8px;font-size:.75rem">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:3px"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9,22 9,12 15,12 15,22"/></svg>Home
+      </button>
       <div style="flex:1;min-width:0;overflow:hidden;display:flex;align-items:center;gap:5px;overflow-x:auto;scrollbar-width:none">
         ${parts.length?scoreChips:`<span class="muted small" style="white-space:nowrap">No students yet</span>`}
       </div>
-      <div style="flex-shrink:0;font-size:.75rem;font-weight:600;color:var(--mid);white-space:nowrap">${isLive?`${answered}/${parts.length} answered`:`${parts.length} joined`}</div>
+      <button class="btn btn-ghost btn-sm" id="btn-sched-nav" style="flex-shrink:0;padding:4px 8px;gap:4px;font-size:.75rem">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>Sched
+      </button>
+      <div style="flex-shrink:0;font-size:.75rem;font-weight:600;color:var(--mid);white-space:nowrap;padding-left:4px">${isLive?`${answered}/${parts.length}`:`${parts.length} joined`}</div>
     </div>`;
 
-  // SVG icons (inline, 16×16 stroke)
-  const iconNew=`<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>`;
-  const iconPlay=`<svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg>`;
-  const iconStop=`<svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>`;
-  const iconReset=`<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>`;
+  // SVG icons — refined set
+  const iconNew=`<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>`;
+  const iconPlay=`<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polygon points="10,8 16,12 10,16" fill="currentColor" stroke="none"/></svg>`;
+  const iconStop=`<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>`;
+  const iconReset=`<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><polyline points="1,4 1,10 7,10"/><path d="M3.51 15a9 9 0 1 0 .49-4.95"/></svg>`;
   const ctrlBar=`
     <div class="host-ctrl-bar">
       <button class="btn btn-sm" style="flex:1;justify-content:center;background:#eff6ff;color:#1d4ed8;border-color:#bfdbfe;gap:5px" id="btn-reload">${iconNew} New</button>
@@ -1335,7 +1415,7 @@ function hostHTML(){
         <button class="btn btn-dark btn-sm" id="btn-browse" style="margin-top:8px">${repoLoading?'⏳ Loading…':'Load subjects from GitHub →'}</button>
       `}`;
 
-    return `<div class="host-full">
+    return `<div class="host-full" style="position:relative">
       ${liveNav}
       ${ctrlBar}
       ${studentsPanel}
@@ -1346,6 +1426,7 @@ function hostHTML(){
         </div>
         <div class="host-bottom-scroll">${uploadTab==='generate'?generatePanel:managePanel}</div>
       </div>
+      ${schedOverlayHTML()}
     </div>`;
   }
 
@@ -1359,13 +1440,24 @@ function hostHTML(){
     ${selIdx<questions.length-1?`<button class="btn btn-ghost btn-sm" style="padding:3px 10px" id="btn-q-next">›</button>`:'<span style="width:32px"></span>'}
   </div>`;
 
-  // Timer row (only before push)
-  const timerRow=!isLive?`
+  // Timer row — shows input when idle, live countdown when question is live
+  const timerTotal=S.timerSeconds||hostTimerSeconds;
+  const timerLeft=timerTotal&&S.questionPushedAt&&isLive
+    ?Math.max(0,timerTotal-(Date.now()-S.questionPushedAt)/1000)
+    :null;
+  const timerRow=`
     <div class="timer-input-row" style="flex-shrink:0">
       <span style="flex:1;font-size:.8rem;color:var(--mid)">⏱ Timer per question</span>
-      <input type="number" min="0" max="300" value="${hostTimerSeconds}" id="timer-sec-live" class="q-count-input" style="width:60px"/>
-      <span class="muted small">sec</span>
-    </div>`:'';
+      ${isLive&&timerLeft!==null
+        ?`<div style="display:flex;align-items:center;gap:8px">
+            <div style="width:80px;height:6px;background:var(--line);border-radius:3px;overflow:hidden">
+              <div id="host-timer-bar" style="height:100%;background:${timerLeft<timerTotal*0.25?'var(--bad)':'var(--accent)'};border-radius:3px;width:${timerTotal?((timerLeft/timerTotal)*100).toFixed(1):0}%;transition:width .5s linear"></div>
+            </div>
+            <span id="host-timer-digits" style="font-size:.85rem;font-weight:700;color:${timerLeft<timerTotal*0.25?'var(--bad)':'var(--ink)'};min-width:28px;text-align:right">${Math.ceil(timerLeft)}s</span>
+          </div>`
+        :`<input type="number" min="0" max="300" value="${hostTimerSeconds}" id="timer-sec-live" class="q-count-input" style="width:60px"/>
+           <span class="muted small">sec</span>`}
+    </div>`;
 
   // Question text
   const qInfo=q?`<p style="font-size:.83rem;line-height:1.4;flex-shrink:0;color:var(--ink)">${esc(q.text.length>130?q.text.slice(0,128)+'…':q.text)}</p>`
@@ -1396,12 +1488,12 @@ function hostHTML(){
   // Mic/music state
   const micOn=!!localStream;
 
-  // SVG action icons
-  const iconSend=`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22,2 15,22 11,13 2,9"/></svg>`;
-  const iconEye=`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>`;
-  const iconNext=`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9,18 15,12 9,6"/></svg>`;
-  const iconMusic=`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>`;
-  const iconMute=`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="1" y1="1" x2="23" y2="23"/><path d="M9 9v9l-5-4H2V10h2l2-2m8-5v3M9 18V5l5 4"/></svg>`;
+  // SVG action icons — refined
+  const iconSend=`<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22,2 15,22 11,13 2,9" fill="currentColor" stroke="none"/></svg>`;
+  const iconEye=`<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>`;
+  const iconNext=`<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12,5 19,12 12,19"/></svg>`;
+  const iconMicOn=`<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>`;
+  const iconMicOff=`<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="1" y1="1" x2="23" y2="23"/><path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6"/><path d="M17 16.95A7 7 0 0 1 5 12v-2m14 0v2a7 7 0 0 1-.11 1.23"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>`;
 
   // Action buttons — no margin-top:auto (space goes below, not above)
   const actionBtns=`
@@ -1413,10 +1505,10 @@ function hostHTML(){
       <button class="btn btn-lg" style="flex:1;font-size:.78rem;padding:10px 4px;gap:5px;background:#0ea5e9;color:#fff;border-color:#0ea5e9;justify-content:center" id="btn-next"
         ${!isRevealed?'disabled':''}>${iconNext} Next</button>
       <button class="btn btn-lg" style="padding:10px 12px;flex-shrink:0;justify-content:center;${micOn?'background:#fee2e2;color:#be123c;border-color:#fecaca':'background:var(--faint);color:var(--mid);border-color:var(--line)'}"
-        id="${micOn?'btn-mic-stop':'btn-mic-start'}" title="${micOn?'Stop mic':'Start mic'}">${micOn?iconMute:iconMusic}</button>
+        id="${micOn?'btn-mic-stop':'btn-mic-start'}" title="${micOn?'Stop mic':'Start mic'}">${micOn?iconMicOff:iconMicOn}</button>
     </div>`;
 
-  return `<div class="host-full">
+  return `<div class="host-full" style="position:relative">
     ${liveNav}
     ${ctrlBar}
     ${studentsPanel}
@@ -1430,6 +1522,7 @@ function hostHTML(){
       ${actionBtns}
       <div style="flex:1;min-height:0"></div>
     </div>
+    ${schedOverlayHTML()}
   </div>`;
 }
 
@@ -1765,6 +1858,8 @@ function attach(){
   on('sb-toggle-q',     ()=>{ sidebarQOpen=!sidebarQOpen; render(); });
   on('sb-toggle-stud',  ()=>{ sidebarStudOpen=!sidebarStudOpen; render(); });
   on('sb-toggle-sched', ()=>{ sidebarSchedOpen=!sidebarSchedOpen; render(); });
+  on('btn-sched-nav',   ()=>{ sidebarSchedOpen=!sidebarSchedOpen; render(); });
+  on('btn-sched-close', ()=>{ sidebarSchedOpen=false; render(); });
 
   // Q selection
   document.querySelectorAll('.q-row[data-qi]').forEach(el=>
