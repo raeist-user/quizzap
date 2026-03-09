@@ -248,6 +248,18 @@ wss.on('connection', ws => {
         });
         broadcast(); break;
 
+      case 'shutdown':
+        if (client.role !== 'host') break;
+        // Boot every participant out then wipe state
+        clients.forEach((c) => {
+          if (c.role === 'participant') {
+            tx(c.ws, { type: 'kicked' });
+            c.role = null; c.pid = null;
+          }
+        });
+        state = fresh();
+        broadcast(); break;
+
       case 'leave':
         if (client.role !== 'participant' || !client.pid) break;
         delete state.participants[client.pid]; delete state.answers[client.pid];
