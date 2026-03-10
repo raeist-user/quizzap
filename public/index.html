@@ -452,6 +452,10 @@ let showingHalted=false, haltedCountdown=0, haltedTimer=null, haltedSnapshot=[];
 // Dismissed flow (host sent Stop & Dismiss)
 let showingDismissed=false, dismissedCountdown=30, dismissedTimer=null;
 
+// Cumulative scores across multiple sessions (survives host-triggered resets)
+// Map: pid → { name, score }
+let cumulativeScores={};
+
 // Home tabs
 let homeSection='home'; // 'home' | 'leaderboard'
 
@@ -704,7 +708,18 @@ function connect(){
         }
         prevStatus=ns;
         S=m.payload;
-        // If a new session state arrives (idle), exit any halt/dismiss screens
+        // Keep cumulativeScores up-to-date with every state that has participants
+        if(m.payload.participants){
+          m.payload.participants.forEach(p=>{
+            const prev=cumulativeScores[p.id];
+            cumulativeScores[p.id]={
+              name: p.name,
+              // accumulate: base (from prior resets) + current session score
+              score: (prev?prev.base||0:0) + (p.score||0)
+            };
+          });
+        }
+        // If a new session state arrives (idle after reset), freeze prior scores as base
         if(ns==='idle'&&showingHalted){ showingHalted=false; haltedSnapshot=[]; }
         render(); break;
       }
@@ -1235,22 +1250,41 @@ function landingHTML(){
   </div>`;
 
   if(homeSection==='leaderboard'){
+    const myEntry=allTimeLB?allTimeLB.find(e=>e.userId===currentUser?.id):null;
+    const myRankAll=allTimeLB?allTimeLB.findIndex(e=>e.userId===currentUser?.id)+1:0;
     const rows=allTimeLB===null
-      ?`<div style="padding:24px;text-align:center;color:var(--mid)">Loading…</div>`
+      ?`<div style="padding:32px;text-align:center;color:var(--mid)"><div class="spinner" style="margin:0 auto 12px"></div>Loading…</div>`
       :allTimeLB.length
         ?allTimeLB.slice(0,20).map((e,i)=>`
           <div class="lb-row${e.userId===currentUser?.id?' me':''}">
             <div class="score-rank">${['🥇','🥈','🥉'][i]||('#'+(i+1))}</div>
-            <div style="flex:1;font-weight:${e.userId===currentUser?.id?'600':'400'}">${esc(e.userName||'—')}</div>
+            <div style="flex:1;font-weight:${e.userId===currentUser?.id?'700':'400'}">${esc(e.userName||'—')}</div>
             <div class="lb-sessions">${e.sessionsPlayed||0} session${(e.sessionsPlayed||0)!==1?'s':''}</div>
             <div class="score-pts">${e.totalScore||0} pts</div>
           </div>`).join('')
-        :`<div style="padding:24px;text-align:center;color:var(--mid)">No scores yet — be the first!</div>`;
+        :`<div style="padding:32px;text-align:center;color:var(--mid)">
+            <div style="font-size:2rem;margin-bottom:10px">🏆</div>
+            No scores yet — be the first!
+          </div>`;
+    // If current user is outside top 20, pin their row at bottom
+    const myPinRow=myRankAll>20&&myEntry?`
+      <div style="border-top:2px solid var(--line)">
+        <div class="lb-row me">
+          <div class="score-rank">#${myRankAll}</div>
+          <div style="flex:1;font-weight:700">${esc(myEntry.userName||'—')}<span style="font-size:.7rem;color:var(--mid);margin-left:5px">← you</span></div>
+          <div class="lb-sessions">${myEntry.sessionsPlayed||0} session${(myEntry.sessionsPlayed||0)!==1?'s':''}</div>
+          <div class="score-pts">${myEntry.totalScore||0} pts</div>
+        </div>
+      </div>`:''
+    ;
     return `<div class="lb-full-screen">
       <div class="lb-full-inner">
         ${tabs}
-        <div style="margin-bottom:12px"><h2>All-time Leaderboard</h2><p class="muted small mt1">Cumulative scores across all sessions</p></div>
-        <div class="score-list" style="overflow-y:auto;flex:1">${rows}</div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+          <div><h2>All-time Leaderboard</h2><p class="muted small mt1">Cumulative scores across all sessions</p></div>
+          <button class="btn btn-ghost btn-sm" id="btn-lb-refresh" style="flex-shrink:0">↻ Refresh</button>
+        </div>
+        <div class="score-list" style="overflow-y:auto;flex:1">${rows}${myPinRow}</div>
       </div>
     </div>`;
   }
@@ -1369,44 +1403,12 @@ function profilePageHTML(){
 
   let body='';
 
-  if(profileTab==='overview'){
-    if(!stats){
-      body='<p class="muted" style="text-align:center;padding:32px 0">No sessions yet — join a quiz to see your stats here!</p>';
-    } else {
-      const accCol=stats.accuracy>=70?'var(--good)':stats.accuracy>=40?'#b45309':'var(--bad)';
-      body=`
-      <div class="stat-grid">
-        <div class="stat-card"><div class="stat-num">${stats.sessions}</div><div class="stat-lbl">Sessions</div></div>
-        <div class="stat-card"><div class="stat-num" style="color:${accCol}">${stats.accuracy}%</div><div class="stat-lbl">Accuracy</div><div class="stat-sub">${stats.totalCorrect}/${stats.totalQs} correct</div></div>
-        <div class="stat-card"><div class="stat-num" style="font-size:1.2rem">${stats.streak>0?'🔥'.repeat(Math.min(stats.streak,5)):'—'}</div><div class="stat-lbl">Day Streak</div><div class="stat-sub">${stats.streak} day${stats.streak!==1?'s':''}</div></div>
-      </div>
-      <div class="pcard">
-        <div class="pcard-head">🏆 Personal Bests</div>
-        <div class="prow"><span>Highest score</span><span class="prow-val">${stats.bestScore} pts</span></div>
-        <div class="prow"><span>Best rank</span><span class="prow-val">${stats.bestRank?'#'+stats.bestRank:'—'}</span></div>
-        <div class="prow"><span>Day streak</span><span class="prow-val">${stats.streak} day${stats.streak!==1?'s':''}</span></div>
-      </div>`;
-    }
-  }
-
-  if(profileTab==='history'){
-    if(!history.length){
-      body='<p class="muted" style="text-align:center;padding:32px 0">No sessions recorded yet.</p>';
-    } else {
-      body=history.map(e=>{
-        const d=new Date(e.date);
-        const dateStr=d.toLocaleDateString('en-GB',{day:'numeric',month:'short'});
-        const acc=e.total?Math.round(e.correct/e.total*100):0;
-        const cls=acc>=70?'good':acc>=40?'ok':'bad';
-        const medal=['🥇','🥈','🥉'][e.rank-1]||(e.rank?'#'+e.rank:'?');
-        return `<div class="hist-row">
-          <div class="hist-date">${dateStr}</div>
-          <div class="hist-score">${e.score} pts</div>
-          <div class="hist-rank">${medal} of ${e.participants||'?'}</div>
-          <div class="hist-acc ${cls}">${acc}%</div>
-        </div>`;
-      }).join('');
-    }
+  if(profileTab==='overview'||profileTab==='history'){
+    body=`<div style="text-align:center;padding:48px 20px;color:var(--mid)">
+      <div style="font-size:2.2rem;margin-bottom:12px">${profileTab==='overview'?'📈':'📋'}</div>
+      <div style="font-size:.95rem;font-weight:600;color:var(--ink);margin-bottom:6px">Coming soon</div>
+      <p class="muted small">This section is being built.<br>Check back later!</p>
+    </div>`;
   }
 
   if(profileTab==='settings'){
@@ -1429,7 +1431,6 @@ function profilePageHTML(){
   }
 
   const disp=u.displayName||u.name;
-  const summ=stats?`${stats.sessions} session${stats.sessions!==1?'s':''} · ${stats.accuracy}% accuracy${stats.streak>0?' · 🔥 '+stats.streak+' day streak':''}`:null;
   return `<div class="profile-page">
     <div class="row gap2 mb3">
       <span style="font-size:.95rem;font-weight:600">My Profile</span>
@@ -1439,7 +1440,6 @@ function profilePageHTML(){
       <div class="ph-info">
         <div class="ph-name">${esc(disp)}${u.displayName&&u.displayName!==u.name?`<span style="font-size:.72rem;color:var(--mid);font-weight:400;margin-left:6px">(${esc(u.name)})</span>`:''}</div>
         <div class="ph-email">${esc(u.email)}</div>
-        ${summ?`<div class="ph-summary">${summ}</div>`:''}
       </div>
     </div>
     <div class="ptabs">${tabsHTML}</div>
@@ -2189,9 +2189,12 @@ function attach(){
   on('ht-home',()=>{ homeSection='home'; render(); });
   on('ht-lb',()=>{
     homeSection='leaderboard';
-    if(allTimeLB===null) fetchLeaderboard();
-    render();
+    allTimeLB=null; // reset to null so loading indicator shows
+    render();       // show loading state immediately
+    fetchLeaderboard(); // always refetch for fresh data
   });
+
+  on('btn-lb-refresh',()=>{ allTimeLB=null; render(); fetchLeaderboard(); });
 
   // Landing nav
   on('go-host', ()=>{ role='host'; hostAuthed=false; navPush(); render(); });
@@ -2395,8 +2398,17 @@ function attach(){
 
   // Halt overlay: New Session — reset scores to 0, students stay joined and see wait screen
   on('btn-new-session',()=>{
+    // Freeze current session scores as a base before reset
+    (S.participants||[]).forEach(p=>{
+      const prev=cumulativeScores[p.id];
+      cumulativeScores[p.id]={
+        name: p.name,
+        base: (prev?prev.base||0:0) + (p.score||0),
+        score: (prev?prev.base||0:0) + (p.score||0)
+      };
+    });
     showingHaltMenu=false;
-    send({type:'reset'});          // server resets scores → sends idle state to all
+    send({type:'reset'});
     selIdx=questions.length>0?0:-1;
     answerKey=-1;
     inspectPid=null;
@@ -2405,8 +2417,17 @@ function attach(){
 
   // Halt overlay: Stop & Dismiss — ends session and sends 'kicked' to all students
   on('btn-stop-dismiss',()=>{
-    // Capture current snapshot before shutdown clears state
-    if((S.participants||[]).length) haltedSnapshot=[...S.participants];
+    // Build snapshot with CUMULATIVE scores across all sessions
+    const parts=S.participants||[];
+    const snap=parts.map(p=>{
+      const cum=cumulativeScores[p.id];
+      return { id:p.id, name:p.name, score: cum?cum.score:(p.score||0) };
+    });
+    // Also include anyone who was in cumulativeScores but dropped out
+    Object.entries(cumulativeScores).forEach(([pid,c])=>{
+      if(!snap.find(p=>p.id===pid)) snap.push({id:pid,name:c.name,score:c.score});
+    });
+    if(snap.length) haltedSnapshot=snap;
     showingHaltMenu=false;
     send({type:'shutdown'});
     render();
@@ -2415,7 +2436,7 @@ function attach(){
   // Halt overlay: Cancel — close overlay, session continues normally
   on('btn-halt-cancel',()=>{ showingHaltMenu=false; render(); });
 
-  on('btn-reset', ()=>{ if(confirm('Reset everything?')){ send({type:'reset'}); questions=[]; selIdx=-1; answerKey=-1; inspectPid=null; subjects=[]; repoPath=null; stopMic(); render(); } });
+  on('btn-reset', ()=>{ if(confirm('Reset everything?')){ send({type:'reset'}); questions=[]; selIdx=-1; answerKey=-1; inspectPid=null; subjects=[]; repoPath=null; cumulativeScores={}; stopMic(); render(); } });
   on('btn-shutdown',()=>{ if(confirm('Shut down session? All students will be dismissed immediately.')) send({type:'shutdown'}); });
 
   document.querySelectorAll('.itbl tbody tr[data-pid]').forEach(row=>
@@ -2442,7 +2463,7 @@ function attach(){
 function on(id,fn){ document.getElementById(id)?.addEventListener('click',fn); }
 function doDismissHome(){
   if(dismissedTimer){ clearInterval(dismissedTimer); dismissedTimer=null; }
-  showingDismissed=false; showingHalted=false; haltedSnapshot=[];
+  showingDismissed=false; showingHalted=false; haltedSnapshot=[]; cumulativeScores={};
   role=null; myName=null; myPid=null; showingProfile=false; prevMyScore=0; scoreGain=0;
   sessionStorage.removeItem('qz_pid'); sessionStorage.removeItem(NAV_KEY);
   render();
