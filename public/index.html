@@ -1456,33 +1456,15 @@ function hostPassHTML(){
 ══════════════════════════════════════ */
 function haltMenuOverlayHTML(){
   if(!showingHaltMenu) return '';
-  const parts=S.participants||[];
-  // Sort by score descending for the preview
-  const sorted=[...parts].sort((a,b)=>(b.score||0)-(a.score||0));
-  const medals=['🥇','🥈','🥉'];
-  const lbRows=sorted.length
-    ?sorted.slice(0,10).map((p,i)=>`
-        <div style="display:flex;align-items:center;gap:9px;padding:8px 14px;border-bottom:1px solid var(--line);font-size:.83rem">
-          <div style="min-width:22px;text-align:center;font-size:.72rem;color:var(--mid)">${medals[i]||('#'+(i+1))}</div>
-          <div style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:${i<3?'600':'400'}">${esc(p.name)}</div>
-          <div style="font-weight:700;color:var(--good);font-size:.85rem">${p.score||0} pts</div>
-        </div>`).join('')
-    :'<div style="padding:16px;text-align:center;color:var(--mid);font-size:.82rem">No students.</div>';
-  const extra=sorted.length>10?'<div style="padding:5px 14px;font-size:.72rem;color:var(--mid);text-align:center">+' + (sorted.length-10) + ' more</div>':'';
   return `<div style="position:absolute;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:flex-end;justify-content:center;z-index:500;backdrop-filter:blur(2px)">
-    <div style="background:var(--white);border-radius:18px 18px 0 0;width:100%;max-width:480px;max-height:88vh;display:flex;flex-direction:column;box-shadow:0 -8px 40px rgba(0,0,0,.25);animation:slideUp .22s ease">
+    <div style="background:var(--white);border-radius:18px 18px 0 0;width:100%;max-width:480px;display:flex;flex-direction:column;box-shadow:0 -8px 40px rgba(0,0,0,.25);animation:slideUp .22s ease">
       <div style="padding:16px 20px 12px;border-bottom:1px solid var(--line);flex-shrink:0;text-align:center">
         <div style="width:36px;height:4px;background:var(--line);border-radius:2px;margin:0 auto 14px"></div>
         <div style="font-size:1.6rem;margin-bottom:4px">⏸</div>
         <div style="font-size:1rem;font-weight:600;margin-bottom:2px">Session Halted</div>
         <p class="muted small">Students are on pause. What next?</p>
-
       </div>
-      <div style="flex:1;overflow-y:auto;min-height:0">
-        <div style="padding:10px 14px 4px;font-size:.67rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--mid)">🏆 Current Standings (${sorted.length})</div>
-        ${lbRows}${extra}
-      </div>
-      <div style="padding:14px 16px 24px;display:flex;flex-direction:column;gap:10px;flex-shrink:0;border-top:1px solid var(--line)">
+      <div style="padding:14px 16px 24px;display:flex;flex-direction:column;gap:10px;flex-shrink:0">
         <button class="btn btn-lg" id="btn-new-session" style="justify-content:center;gap:8px;background:#1a56db;color:#fff;border-color:#1a56db">
           🔄 New Session <span style="opacity:.75;font-weight:400;font-size:.78rem">· resets scores to 0</span>
         </button>
