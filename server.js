@@ -176,9 +176,9 @@ app.get('/api/leaderboard', async (req, res) => {
   } catch (e) { res.status(500).json({ error: 'Failed to fetch leaderboard' }); }
 });
 
-// POST /api/leaderboard — called by host client on Stop & Dismiss
-// Frontend sends the FULL cumulative total (e.g. A=27 across 3 sessions).
-// We use $max so the all-time record only ever goes up, never down.
+// POST /api/leaderboard — called once per game day on Stop & Dismiss
+// snap.score is the cumulative total for THIS game day only.
+// We $inc onto the all-time record so scores accumulate across separate game days.
 app.post('/api/leaderboard', requireAuth, async (req, res) => {
   try {
     const entries = req.body.entries;
@@ -190,8 +190,7 @@ app.post('/api/leaderboard', requireAuth, async (req, res) => {
       await LeaderboardEntry.findOneAndUpdate(
         { userId: e.userId },
         {
-          $max: { totalScore: e.totalScore || 0 },   // only raise the score, never lower
-          $inc: { sessionsPlayed: 1 },
+          $inc: { totalScore: e.totalScore || 0, sessionsPlayed: 1 },
           $set: { userName: e.userName, updatedAt: new Date() },
         },
         { upsert: true }
