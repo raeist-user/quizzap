@@ -635,6 +635,8 @@ const WS_URL=`${location.protocol==='https:'?'wss':'ws'}://${location.host}`;
 let prevStatus=null;
 
 function connect(){
+  if(ws&&(ws.readyState===0||ws.readyState===1)) return; // already connecting or open
+  if(!location.host) return; // guard against invalid URL (e.g. file:// context)
   ws=new WebSocket(WS_URL);
   ws.onopen=()=>{
     setConn(true);
@@ -754,8 +756,8 @@ function showToast(msg, type='neutral'){
   setTimeout(()=>{ t.style.opacity='0'; setTimeout(()=>t.remove(),220); },4000);
 }
 
-// Store host password input for reconnection
-let HOST_PASSWORD_INPUT='';
+// Store host password input for reconnection — persisted in sessionStorage to survive refresh
+let HOST_PASSWORD_INPUT = sessionStorage.getItem('scc_hpw') || '';
 
 /* ══════════════════════════════════════
    WEBRTC HOST
@@ -2409,7 +2411,7 @@ function doDismissHome(){
   render();
   fetchLeaderboard();
 }
-function doLogout(){ clearAuth(); role=null; myPid=null; myName=null; hostAuthed=false; showingProfile=false; prevMyScore=0; scoreGain=0; allTimeLB=null; serverSchedules=null; hostSchedules=[]; sessionStorage.removeItem(NAV_KEY); render(); }
+function doLogout(){ clearAuth(); role=null; myPid=null; myName=null; hostAuthed=false; HOST_PASSWORD_INPUT=''; showingProfile=false; prevMyScore=0; scoreGain=0; allTimeLB=null; serverSchedules=null; hostSchedules=[]; sessionStorage.removeItem(NAV_KEY); sessionStorage.removeItem('scc_hpw'); render(); }
 
 /* Shared back navigation */
 function doBack(){
@@ -2421,7 +2423,7 @@ function doBack(){
   }
   if(role==='host'&&hostAuthed){
     if(!confirm('Leave host panel and go home?')) return;
-    role=null; hostAuthed=false; HOST_PASSWORD_INPUT=''; stopMic();
+    role=null; hostAuthed=false; HOST_PASSWORD_INPUT=''; sessionStorage.removeItem('scc_hpw'); stopMic();
     navPush(); render(); return;
   }
   if(role==='host'&&!hostAuthed){
@@ -2437,6 +2439,7 @@ function doHostLogin(){
   const v=document.getElementById('pw-in')?.value?.trim();
   if(!v)return;
   HOST_PASSWORD_INPUT=v;
+  sessionStorage.setItem('scc_hpw', v);
   send({type:'set_host',password:v});
 }
 function doLeave(){ role=null; myName=null; myPid=null; showingProfile=false; prevMyScore=0; scoreGain=0; sessionStorage.removeItem('qz_pid'); sessionStorage.removeItem(NAV_KEY); render(); }
@@ -2496,8 +2499,9 @@ loadNavState(); // restore navigation position from before reload
 // Seed the history stack so popstate always has a base entry
 history.replaceState({qz:true}, '', location.href);
 render();
+// Always connect WebSocket — needed for host-only sessions (no currentUser) and participant reconnects
+connect();
 if(currentUser){
-  connect();
   fetchSchedules();
   fetchLeaderboard();
 }
