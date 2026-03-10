@@ -431,6 +431,7 @@ let manageEditMode=null;      // null | 'existing' | 'new'
 let manageFolderFiles=[];     // [{name, path, sha}] files in currently selected manage folder
 let manageFile=null;          // which specific .txt file is selected in manage tab
 let manageNewFileName='';
+let editorFullscreen=false;   // whether the editor is in fullscreen overlay mode
 
 // Voice (host)
 let localStream=null;
@@ -693,6 +694,13 @@ function connect(){
       case 'auth_ok':   hostAuthed=true; fetchHostSchedules(); browseRepo(); navPush(); render(); break;
       case 'auth_fail': { const el=document.getElementById('pw-err'); if(el)el.textContent='Incorrect password.'; break; }
       case 'left':      doLeave(); break;
+      case 'open_session_result':
+        if(m.ok){
+          showToast('✅ Session is open! Students can now join.','good');
+        } else {
+          showToast('❌ Failed to open session: '+m.reason+'\nTry refreshing the page.','bad');
+        }
+        break;
       case 'peer_list': for(const cid of m.cids) await hostCallPeer(cid); break;
       case 'rtc_new_peer': if(role==='host') await hostCallPeer(m.cid); break;
       case 'rtc_offer':    if(role==='participant') await studentHandleOffer(m.signal); break;
@@ -708,6 +716,24 @@ function connect(){
 }
 function send(d){ if(ws?.readyState===1) ws.send(JSON.stringify(d)); }
 function setConn(on){ document.getElementById('ci').className=on?'on':'off'; document.getElementById('conn-lbl').textContent=on?'connected':'reconnecting…'; }
+
+// Toast notifications
+function showToast(msg, type='neutral'){
+  let container=document.getElementById('toast-container');
+  if(!container){
+    container=document.createElement('div');
+    container.id='toast-container';
+    container.style.cssText='position:fixed;bottom:20px;left:50%;transform:translateX(-50%);z-index:9999;display:flex;flex-direction:column;align-items:center;gap:8px;pointer-events:none;max-width:90vw';
+    document.body.appendChild(container);
+  }
+  const t=document.createElement('div');
+  const bg=type==='good'?'#166534':type==='bad'?'#be123c':'#1e293b';
+  t.style.cssText=`background:${bg};color:#fff;padding:10px 18px;border-radius:8px;font-size:.85rem;font-weight:500;box-shadow:0 4px 16px rgba(0,0,0,.25);pointer-events:auto;line-height:1.4;white-space:pre-wrap;text-align:center;opacity:0;transition:opacity .2s`;
+  t.textContent=msg;
+  container.appendChild(t);
+  requestAnimationFrame(()=>{ t.style.opacity='1'; });
+  setTimeout(()=>{ t.style.opacity='0'; setTimeout(()=>t.remove(),220); },4000);
+}
 
 // Store host password input for reconnection
 let HOST_PASSWORD_INPUT='';
@@ -937,6 +963,29 @@ async function deleteFolder(folderName){
     manageFolder=null; manageEditMode=null; manageFile=null; manageFolderFiles=[]; manageNewFileName=''; editingContent=''; editingSha=null;
     setUploadMsg(`Folder "${folderName}" deleted.`,'good');
     await loadUploadFolders();
+  }catch(e){setUploadMsg(e.message,'bad');}
+}
+
+async function deleteFile(folderName, fileName){
+  if(!isValidToken()){setUploadMsg('GitHub token not configured','bad');return;}
+  setUploadMsg(`Deleting ${fileName}…`,'neutral');
+  try{
+    const encodedFolder=encodeURIComponent(folderName);
+    const encodedFile=encodeURIComponent(fileName);
+    const apiUrl=`https://api.github.com/repos/${GITHUB_REPO}/contents/resources/${encodedFolder}/${encodedFile}`;
+    // Get SHA
+    const chk=await fetch(`${apiUrl}?ref=${GITHUB_BRANCH}`,{headers:ghHeaders()});
+    if(!chk.ok) throw new Error(`Could not find file: ${chk.status}`);
+    const d=await chk.json();
+    const res=await fetch(apiUrl,{
+      method:'DELETE',headers:ghWriteHeaders(),
+      body:JSON.stringify({message:`Delete resources/${folderName}/${fileName}`,sha:d.sha,branch:GITHUB_BRANCH})
+    });
+    if(!res.ok) throw new Error(`GitHub API ${res.status}`);
+    // If the deleted file was being edited, close the editor
+    if(manageFile===fileName){ manageEditMode=null; manageFile=null; manageNewFileName=''; editingContent=''; editingSha=null; }
+    setUploadMsg(`"${fileName}" deleted.`,'good');
+    await loadFolderFiles(folderName);
   }catch(e){setUploadMsg(e.message,'bad');}
 }
 
@@ -1553,49 +1602,63 @@ function hostHTML(){
             <div style="font-size:.7rem;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--mid);margin-bottom:5px">Files in ${esc(manageFolder)}</div>
             <div style="display:flex;flex-direction:column;gap:3px">
               ${manageFolderFiles.map(f=>`
-                <div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:${manageFile===f.name?'#f0f7ff':'var(--white)'};border:1.5px solid ${manageFile===f.name?'var(--accent)':'var(--line)'};border-radius:8px">
+                <div style="display:flex;align-items:center;gap:7px;padding:7px 10px;background:${manageFile===f.name?'#f0f7ff':'var(--white)'};border:1.5px solid ${manageFile===f.name?'var(--accent)':'var(--line)'};border-radius:8px">
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="${manageFile===f.name?'var(--accent)':'var(--mid)'}" stroke-width="2" style="flex-shrink:0"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/></svg>
                   <span style="flex:1;font-size:.82rem;font-weight:${manageFile===f.name?'600':'400'};overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:${manageFile===f.name?'var(--accent)':'var(--ink)'}">${esc(f.name)}</span>
                   <button class="btn btn-ghost btn-sm" style="padding:3px 10px;font-size:.72rem;flex-shrink:0;${manageFile===f.name?'background:#e0edff;border-color:var(--accent);color:var(--accent)':''}" data-file-edit="${esc(f.name)}">${manageFile===f.name?'Editing':'Edit'}</button>
+                  <button class="btn btn-sm" style="padding:3px 7px;flex-shrink:0;background:#fff1f2;border-color:#fecdd3;color:#be123c" data-file-del="${esc(f.name)}" title="Delete this file">
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" style="pointer-events:none"><polyline points="3,6 5,6 21,6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>
+                  </button>
                 </div>`).join('')}
             </div>
           </div>`
         :`<div style="padding:10px 0;text-align:center;color:var(--mid);font-size:.82rem;background:var(--faint);border-radius:8px;margin-bottom:10px">No .txt files yet in this folder</div>`
     ):'';
 
-    // Editor panel
-    const editorHTML=manageEditMode?`
-      <div style="border:1.5px solid var(--ink);border-radius:10px;overflow:hidden;margin-bottom:10px;box-shadow:0 2px 10px rgba(0,0,0,.08)">
-        <div style="display:flex;align-items:center;gap:8px;padding:10px 12px;background:var(--ink);color:#fff">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-          <span style="font-size:.78rem;font-weight:600;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
-            ${esc(manageFolder)} /
-            ${manageEditMode==='new'
-              ?`<input id="new-file-name-editor" placeholder="chapter1.txt" maxlength="60"
-                  style="background:rgba(255,255,255,.18);border:none;border-bottom:1px solid rgba(255,255,255,.5);color:#fff;font-size:.78rem;font-weight:600;padding:1px 6px;outline:none;width:130px;border-radius:3px;margin-left:2px"
-                  value="${esc(manageNewFileName)}"/>`
-              :`<span style="opacity:.85">${esc(manageFile||'')}</span>`}
-          </span>
-          <button style="background:none;border:1px solid rgba(255,255,255,.3);color:#fff;padding:2px 8px;border-radius:5px;cursor:pointer;font-size:.72rem" id="btn-close-editor">✕ Close</button>
-        </div>
-        <div style="padding:5px 10px 5px;background:#fafaf9;border-bottom:1px solid var(--line);font-size:.69rem;color:var(--mid);line-height:1.7">
-          <strong style="color:var(--ink)">Format:</strong> Question text on one line, then options on the next line as:
-          <code style="background:#eee;padding:1px 4px;border-radius:3px;font-size:.68rem">(A)opt, (B)opt, (C)opt, (D)opt</code>
-        </div>
-        <textarea id="q-editor" rows="8" style="width:100%;font-family:monospace;font-size:.76rem;resize:vertical;padding:10px 12px;border:none;outline:none;border-bottom:1px solid var(--line);display:block;box-sizing:border-box;background:#fff"
-          placeholder="What is photosynthesis?&#10;(A)Making food from sunlight, (B)Breathing, (C)Digestion, (D)Transpiration&#10;&#10;Capital of India?&#10;(A)Mumbai, (B)Delhi, (C)Kolkata, (D)Chennai">${esc(editingContent)}</textarea>
-        <div style="display:flex;gap:8px;padding:9px 10px;background:#fafaf9;align-items:center;flex-wrap:wrap">
-          <button class="btn btn-good btn-sm" style="gap:5px" id="btn-save-editor">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17,21 17,13 7,13 7,21"/><polyline points="7,3 7,8 15,8"/></svg>
-            Save to GitHub
-          </button>
-          <label class="btn btn-white btn-sm" style="cursor:pointer;gap:5px">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17,8 12,3 7,8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-            Upload .txt
-            <input type="file" id="file-upload-inp" accept=".txt" style="display:none"/>
-          </label>
-        </div>
-      </div>`:'';
+    // Full-screen editor overlay or inline editor
+    const editorInner=`
+      <div style="display:flex;align-items:center;gap:8px;padding:10px 12px;background:var(--ink);color:#fff;flex-shrink:0">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+        <span style="font-size:.78rem;font-weight:600;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+          ${esc(manageFolder)} /
+          ${manageEditMode==='new'
+            ?`<input id="new-file-name-editor" placeholder="chapter1.txt" maxlength="60"
+                style="background:rgba(255,255,255,.18);border:none;border-bottom:1px solid rgba(255,255,255,.5);color:#fff;font-size:.78rem;font-weight:600;padding:1px 6px;outline:none;width:130px;border-radius:3px;margin-left:2px"
+                value="${esc(manageNewFileName)}"/>`
+            :`<span style="opacity:.85">${esc(manageFile||'')}</span>`}
+        </span>
+        <button id="btn-editor-fullscreen" style="background:none;border:1px solid rgba(255,255,255,.3);color:#fff;padding:2px 8px;border-radius:5px;cursor:pointer;font-size:.72rem" title="${editorFullscreen?'Exit fullscreen':'Fullscreen'}">
+          ${editorFullscreen
+            ?`<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3"/></svg>`
+            :`<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>`}
+        </button>
+        <button id="btn-close-editor" style="background:none;border:1px solid rgba(255,255,255,.3);color:#fff;padding:2px 8px;border-radius:5px;cursor:pointer;font-size:.72rem">✕</button>
+      </div>
+      <div style="padding:5px 10px;background:#fafaf9;border-bottom:1px solid var(--line);font-size:.69rem;color:var(--mid);flex-shrink:0">
+        <strong style="color:var(--ink)">Format:</strong>
+        Question text on one line, options on next:
+        <code style="background:#eee;padding:1px 4px;border-radius:3px">(A)opt, (B)opt, (C)opt, (D)opt</code>
+      </div>
+      <textarea id="q-editor" style="flex:1;width:100%;font-family:monospace;font-size:.78rem;resize:none;padding:12px 14px;border:none;outline:none;display:block;box-sizing:border-box;background:#fff;min-height:${editorFullscreen?'0':'260px'}"
+        placeholder="What is photosynthesis?&#10;(A)Making food from sunlight, (B)Breathing, (C)Digestion, (D)Transpiration&#10;&#10;Capital of India?&#10;(A)Mumbai, (B)Delhi, (C)Kolkata, (D)Chennai">${esc(editingContent)}</textarea>
+      <div style="display:flex;gap:8px;padding:9px 10px;background:#fafaf9;border-top:1px solid var(--line);align-items:center;flex-wrap:wrap;flex-shrink:0">
+        <button class="btn btn-good btn-sm" style="gap:5px" id="btn-save-editor">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17,21 17,13 7,13 7,21"/><polyline points="7,3 7,8 15,8"/></svg>
+          Save to GitHub
+        </button>
+        <label class="btn btn-white btn-sm" style="cursor:pointer;gap:5px">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17,8 12,3 7,8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          Upload .txt
+          <input type="file" id="file-upload-inp" accept=".txt" style="display:none"/>
+        </label>
+      </div>`;
+
+    const editorHTML=manageEditMode?(editorFullscreen
+      // Fullscreen overlay
+      ?`<div id="editor-fs-overlay" style="position:fixed;inset:0;z-index:800;background:#fff;display:flex;flex-direction:column;">${editorInner}</div>`
+      // Inline with min-height
+      :`<div style="border:1.5px solid var(--ink);border-radius:10px;overflow:hidden;margin-bottom:10px;box-shadow:0 2px 10px rgba(0,0,0,.08);display:flex;flex-direction:column;">${editorInner}</div>`
+    ):'';
 
     const managePanel=`
       <div style="display:flex;gap:6px;align-items:center;margin-bottom:10px">
@@ -2088,6 +2151,25 @@ function attach(){
     setTimeout(()=>document.getElementById('q-editor')?.focus(),50);
   });
 
+  // Editor fullscreen toggle
+  on('btn-editor-fullscreen', ()=>{
+    // Save textarea content before toggling so it isn't lost
+    const ta=document.getElementById('q-editor');
+    if(ta) editingContent=ta.value;
+    editorFullscreen=!editorFullscreen;
+    render();
+    setTimeout(()=>{ const t=document.getElementById('q-editor'); if(t){ t.value=editingContent; t.focus(); t.setSelectionRange(t.value.length,t.value.length); } },30);
+  });
+
+  // Manage tab — per-file delete buttons
+  document.querySelectorAll('[data-file-del]').forEach(el=>{
+    el.addEventListener('click', ()=>{
+      const fn=el.dataset.fileDel;
+      if(!confirm(`Delete "${fn}" from ${manageFolder}?\nThis cannot be undone.`)) return;
+      deleteFile(manageFolder, fn);
+    });
+  });
+
   on('btn-delete-folder', async ()=>{
     if(!manageFolder) return;
     if(!confirm(`Delete folder "${manageFolder}" and all its contents?`)) return;
@@ -2095,7 +2177,7 @@ function attach(){
   });
   on('btn-create-folder', createFolder);
   on('btn-save-editor', saveEditorContent);
-  on('btn-close-editor', ()=>{ manageEditMode=null; manageFile=null; manageNewFileName=''; editingContent=''; editingSha=null; uploadMsg=''; render(); });
+  on('btn-close-editor', ()=>{ manageEditMode=null; manageFile=null; manageNewFileName=''; editingContent=''; editingSha=null; uploadMsg=''; editorFullscreen=false; render(); });
   document.getElementById('file-upload-inp')?.addEventListener('change', uploadQuestionsFile);
 
   // Generate tab — subject accordion expand/collapse
@@ -2154,19 +2236,22 @@ function attach(){
     });
     generateQuiz();
   });
-  on('btn-reload',()=>{ questions=[]; selIdx=-1; answerKey=-1; subjects=[]; expandedSubject=null; repoPath=null; uploadTab='generate'; manageFolder=null; manageFile=null; manageFolderFiles=[]; manageEditMode=null; manageNewFileName=''; editingContent=''; editingSha=null; uploadMsg=''; render(); });
+  on('btn-reload',()=>{ questions=[]; selIdx=-1; answerKey=-1; subjects=[]; expandedSubject=null; repoPath=null; uploadTab='generate'; manageFolder=null; manageFile=null; manageFolderFiles=[]; manageEditMode=null; manageNewFileName=''; editingContent=''; editingSha=null; uploadMsg=''; editorFullscreen=false; render(); });
 
   // Timer input (live)
   document.getElementById('timer-sec-live')?.addEventListener('change',e=>{ hostTimerSeconds=Math.max(0,parseInt(e.target.value)||0); });
 
-  // Host open session — give immediate feedback, warn if WS not ready
+  // Host open session — re-authenticate if needed, then open
   on('btn-open-session',()=>{
     if(ws?.readyState===1){
-      send({type:'open_session'});
+      // Re-send set_host first to ensure server has host role, then open_session
+      // This handles edge cases where WS reconnected but role wasn't confirmed
+      if(HOST_PASSWORD_INPUT) send({type:'set_host',password:HOST_PASSWORD_INPUT});
+      setTimeout(()=>send({type:'open_session'}), HOST_PASSWORD_INPUT?80:0);
       const btn=document.getElementById('btn-open-session');
       if(btn){ btn.textContent='Opening…'; btn.disabled=true; btn.style.opacity='.6'; }
     } else {
-      alert('Not connected — check your connection and try again.');
+      showToast('Not connected to server.\nCheck your connection and try again.','bad');
     }
   });
 
