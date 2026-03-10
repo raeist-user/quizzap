@@ -860,7 +860,19 @@ function parseQuestions(text){
   for(let i=0;i<lines.length;i++){
     const qLine=lines[i],oLine=lines[i+1]||'';
     const m=oLine.match(/\(A\)([^,(]+)[,，]\s*\(B\)([^,(]+)[,，]\s*\(C\)([^,(]+)[,，]\s*\(D\)([^,(]+)/i);
-    if(m){out.push({text:qLine.replace(/^\d+[.)]\s*/,'').trim(),options:[m[1].trim(),m[2].trim(),m[3].trim(),m[4].trim()]});i++;}
+    if(m){
+      // Detect @ marker in any option to pre-select the correct answer
+      const rawOpts=[m[1],m[2],m[3],m[4]];
+      let preCorrect=-1;
+      const cleanOpts=rawOpts.map((o,idx)=>{
+        if(o.includes('@')){ preCorrect=idx; return o.replace(/@/g,'').trim(); }
+        return o.trim();
+      });
+      const entry={text:qLine.replace(/^\d+[.)]\s*/,'').trim(),options:cleanOpts};
+      if(preCorrect>=0) entry.correct=preCorrect;
+      out.push(entry);
+      i++;
+    }
   }
   return out;
 }
@@ -1148,7 +1160,7 @@ async function generateQuiz(){
       shuffled.forEach(q=>{ q.subject=subjName; q.chapter=file.name.replace(/\.txt$/i,''); });
       all=[...all,...shuffled];
     }
-    questions=all; selIdx=0; answerKey=-1;
+    questions=all; selIdx=0; answerKey=all[0]?.correct??-1;
     msg.innerHTML=''; render();
   }catch(e){ msg.innerHTML=`<div class="notice n-bad mt2">${esc(e.message)}</div>`; }
 }
@@ -2191,8 +2203,8 @@ function attach(){
   on('btn-host-home', doBack);
   on('btn-pw-back', doBack);
   // Question prev/next inside host controller
-  on('btn-q-prev',()=>{ if(selIdx>0){selIdx--;answerKey=-1;render();} });
-  on('btn-q-next',()=>{ if(selIdx<questions.length-1){selIdx++;answerKey=-1;render();} });
+  on('btn-q-prev',()=>{ if(selIdx>0){selIdx--;answerKey=questions[selIdx].correct??-1;render();} });
+  on('btn-q-next',()=>{ if(selIdx<questions.length-1){selIdx++;answerKey=questions[selIdx].correct??-1;render();} });
 
   // Nav back button — delegates to shared doBack()
   on('btn-nav-back', doBack);
@@ -2418,7 +2430,7 @@ function attach(){
 
   // Q selection
   document.querySelectorAll('.q-row[data-qi]').forEach(el=>
-    el.addEventListener('click',()=>{ if(S.status==='question'||S.status==='revealed') return; selIdx=+el.dataset.qi; answerKey=-1; render(); })
+    el.addEventListener('click',()=>{ if(S.status==='question'||S.status==='revealed') return; selIdx=+el.dataset.qi; answerKey=questions[selIdx]?.correct??-1; render(); })
   );
 
   // Answer key
@@ -2438,7 +2450,7 @@ function attach(){
   });
 
   on('btn-reveal',()=>send({type:'reveal'}));
-  on('btn-next',  ()=>{ send({type:'clear'}); selIdx=selIdx+1<questions.length?selIdx+1:-1; answerKey=-1; });
+  on('btn-next',  ()=>{ send({type:'clear'}); selIdx=selIdx+1<questions.length?selIdx+1:-1; answerKey=selIdx>=0?(questions[selIdx]?.correct??-1):-1; });
   on('btn-end',   ()=>{ if(confirm('End session and show results?')) send({type:'end_session'}); });
   on('btn-reset', ()=>{ if(confirm('Reset everything?')){ send({type:'reset'}); questions=[]; selIdx=-1; answerKey=-1; inspectPid=null; subjects=[]; repoPath=null; stopMic(); render(); } });
   on('btn-close-inspect',()=>{ inspectPid=null; render(); });
@@ -2452,7 +2464,7 @@ function attach(){
   on('btn-new-session',()=>{
     showingHaltMenu=false;
     send({type:'reset'});
-    selIdx=questions.length>0?0:-1; answerKey=-1; inspectPid=null;
+    selIdx=questions.length>0?0:-1; answerKey=selIdx>=0?(questions[0]?.correct??-1):-1; inspectPid=null;
     render();
   });
 
