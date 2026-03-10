@@ -452,11 +452,7 @@ let showingHalted=false, haltedCountdown=0, haltedTimer=null, haltedSnapshot=[];
 // Dismissed flow
 let showingDismissed=false, dismissedCountdown=30, dismissedTimer=null;
 
-// Cumulative scores within a game day — keyed by pid (stable across resets)
-// cumulativeScores[pid] = total banked points from previous sessions this day
-// cumulativeMeta[pid]   = { name, userId } for leaderboard attribution
-let cumulativeScores = {};
-let cumulativeMeta   = {};
+// Cumulative scoring is now handled server-side via gameScores in server.js
 
 // Home tabs
 let homeSection='home'; // 'home' | 'leaderboard'
@@ -1446,22 +1442,16 @@ function hostPassHTML(){
 function haltMenuOverlayHTML(){
   if(!showingHaltMenu) return '';
   const parts=S.participants||[];
+  // Sort by score descending for the preview
   const sorted=[...parts].sort((a,b)=>(b.score||0)-(a.score||0));
   const medals=['🥇','🥈','🥉'];
   const lbRows=sorted.length
-    ?sorted.slice(0,10).map((p,i)=>{
-        const banked=cumulativeScores[p.id]||0;
-        const cumTotal=banked+(p.score||0);
-        const hasPrior=banked>0;
-        return `<div style="display:flex;align-items:center;gap:9px;padding:8px 14px;border-bottom:1px solid var(--line);font-size:.83rem">
+    ?sorted.slice(0,10).map((p,i)=>`
+        <div style="display:flex;align-items:center;gap:9px;padding:8px 14px;border-bottom:1px solid var(--line);font-size:.83rem">
           <div style="min-width:22px;text-align:center;font-size:.72rem;color:var(--mid)">${medals[i]||('#'+(i+1))}</div>
           <div style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:${i<3?'600':'400'}">${esc(p.name)}</div>
-          <div style="text-align:right">
-            <div style="font-weight:700;color:var(--good);font-size:.85rem">${hasPrior?cumTotal:(p.score||0)} pts</div>
-            ${hasPrior?`<div style="font-size:.67rem;color:var(--mid)">${banked} + ${p.score||0}</div>`:''}
-          </div>
-        </div>`;
-      }).join('')
+          <div style="font-weight:700;color:var(--good);font-size:.85rem">${p.score||0} pts</div>
+        </div>`).join('')
     :'<div style="padding:16px;text-align:center;color:var(--mid);font-size:.82rem">No students.</div>';
   const extra=sorted.length>10?'<div style="padding:5px 14px;font-size:.72rem;color:var(--mid);text-align:center">+' + (sorted.length-10) + ' more</div>':'';
   return `<div style="position:absolute;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:flex-end;justify-content:center;z-index:500;backdrop-filter:blur(2px)">
@@ -1471,9 +1461,7 @@ function haltMenuOverlayHTML(){
         <div style="font-size:1.6rem;margin-bottom:4px">⏸</div>
         <div style="font-size:1rem;font-weight:600;margin-bottom:2px">Session Halted</div>
         <p class="muted small">Students are on pause. What next?</p>
-        ${Object.keys(cumulativeScores).length
-          ?'<div style="margin-top:6px;display:inline-block;background:#eff6ff;color:#1a56db;border:1px solid #bfdbfe;border-radius:20px;padding:3px 10px;font-size:.72rem;font-weight:600">Scores shown are cumulative across all sessions</div>'
-          :''}
+
       </div>
       <div style="flex:1;overflow-y:auto;min-height:0">
         <div style="padding:10px 14px 4px;font-size:.67rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--mid)">🏆 Current Standings (${sorted.length})</div>
@@ -2359,7 +2347,7 @@ function attach(){
   on('btn-reveal',()=>send({type:'reveal'}));
   on('btn-next',  ()=>{ send({type:'clear'}); selIdx=selIdx+1<questions.length?selIdx+1:-1; answerKey=-1; });
   on('btn-end',   ()=>{ if(confirm('End session and show results?')) send({type:'end_session'}); });
-  on('btn-reset', ()=>{ if(confirm('Reset everything?')){ send({type:'reset'}); questions=[]; selIdx=-1; answerKey=-1; inspectPid=null; subjects=[]; repoPath=null; cumulativeScores={}; cumulativeMeta={}; stopMic(); render(); } });
+  on('btn-reset', ()=>{ if(confirm('Reset everything?')){ send({type:'reset'}); questions=[]; selIdx=-1; answerKey=-1; inspectPid=null; subjects=[]; repoPath=null; stopMic(); render(); } });
   on('btn-close-inspect',()=>{ inspectPid=null; render(); });
 
   // Host ended — Continue
@@ -2367,48 +2355,19 @@ function attach(){
   // Halt: just show the local overlay — no server message yet
   on('btn-halt',()=>{ showingHaltMenu=true; render(); });
 
-  // New Session: bank scores by pid (stable across resets), then reset
+  // New Session: server banks current scores then resets to 0
   on('btn-new-session',()=>{
-    (S.participants||[]).forEach(p=>{
-      cumulativeScores[p.id] = (cumulativeScores[p.id]||0) + (p.score||0);
-      cumulativeMeta[p.id]   = { name: p.name, userId: p.userId||null };
-    });
     showingHaltMenu=false;
     send({type:'reset'});
     selIdx=questions.length>0?0:-1; answerKey=-1; inspectPid=null;
     render();
   });
 
-  // Stop & Dismiss: build final snap, send to students, update all-time LB
+  // Stop & Dismiss: server builds authoritative final leaderboard from its own gameScores
+  // and sends it to every student inside the kicked message
   on('btn-stop-dismiss',()=>{
-    const liveParts = S.participants||[];
-    const allPids   = new Set([
-      ...liveParts.map(p=>p.id),
-      ...Object.keys(cumulativeScores)
-    ]);
-
-    const snap = [];
-    allPids.forEach(pid=>{
-      const live   = liveParts.find(p=>p.id===pid);
-      const banked = cumulativeScores[pid]||0;
-      const meta   = cumulativeMeta[pid]||{};
-      snap.push({
-        id:     pid,
-        name:   live ? live.name   : (meta.name  ||'Unknown'),
-        userId: live ? (live.userId||null) : (meta.userId||null),
-        score:  banked + (live ? (live.score||0) : 0)
-      });
-    });
-
-    snap.sort((a,b)=>b.score-a.score);
-    haltedSnapshot  = snap;
-    showingHaltMenu = false;
-
-    // Update all-time leaderboard (only on Stop & Dismiss, not on New Session)
-    submitToAllTimeLeaderboard(snap);
-
-    // Forward snap to students so their dismiss screen shows the same leaderboard
-    send({ type:'shutdown', finalLeaderboard: snap });
+    showingHaltMenu=false;
+    send({type:'shutdown'});
     render();
   });
 
@@ -2439,35 +2398,16 @@ function attach(){
 function on(id,fn){ document.getElementById(id)?.addEventListener('click',fn); }
 // Submit cumulative scores to all-time leaderboard (POST /api/leaderboard)
 // Server uses $inc so these totals are ADDED to any existing all-time record.
-// Each entry must have userId (real MongoDB ObjectId) — guests without accounts are skipped server-side.
-// Called ONLY on Stop & Dismiss — adds this game day's cumulative scores to the all-time leaderboard
-async function submitToAllTimeLeaderboard(snap){
-  if(!snap||!snap.length) return;
-  const entries = snap
-    .filter(p=>p.userId)   // only registered users have leaderboard entries
-    .map(p=>({
-      userId:      p.userId,
-      userName:    p.name,
-      totalScore:  p.score  // game-day cumulative total — server $inc's onto all-time
-    }));
-  if(!entries.length) return;
-  try {
-    await apiPost('/api/leaderboard', { entries }, true);
-  } catch(e) {
-    console.warn('All-time leaderboard submit failed:', e.message);
-  } finally {
-    allTimeLB = null;
-    fetchLeaderboard();
-  }
-}
+// All-time leaderboard is now written server-side in persistLeaderboard() on shutdown
 
 function doDismissHome(){
   if(dismissedTimer){clearInterval(dismissedTimer);dismissedTimer=null;}
   showingDismissed=false; showingHalted=false; haltedSnapshot=[];
-  cumulativeScores={}; cumulativeMeta={};
   role=null; myName=null; myPid=null; showingProfile=false; prevMyScore=0; scoreGain=0;
+  allTimeLB=null;  // force refresh so updated all-time scores show immediately
   sessionStorage.removeItem('qz_pid'); sessionStorage.removeItem(NAV_KEY);
   render();
+  fetchLeaderboard();
 }
 function doLogout(){ clearAuth(); role=null; myPid=null; myName=null; hostAuthed=false; showingProfile=false; prevMyScore=0; scoreGain=0; allTimeLB=null; serverSchedules=null; hostSchedules=[]; sessionStorage.removeItem(NAV_KEY); render(); }
 
