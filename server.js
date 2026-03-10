@@ -202,6 +202,20 @@ app.post('/api/leaderboard', requireAuth, async (req, res) => {
 
 // ── QUIZ STATE ────────────────────────────────────────────────────────────────
 let state = fresh();
+// gameScores: pid → { name, userId, total } — accumulates across resets within one game day
+// Cleared only when the host explicitly does a full reset or shutdown
+let gameScores = {};
+
+function bankGameScores() {
+  Object.values(state.participants).forEach(p => {
+    if (!gameScores[p.id]) {
+      gameScores[p.id] = { name: p.name, userId: p.userId || null, total: 0 };
+    }
+    gameScores[p.id].total  += (p.score || 0);
+    gameScores[p.id].name    = p.name;    // keep name fresh in case displayName changed
+    gameScores[p.id].userId  = p.userId || gameScores[p.id].userId;
+  });
+}
 function fresh() {
   return {
     status:           'idle',
@@ -384,9 +398,8 @@ wss.on('connection', ws => {
 
       case 'reset':
         if (client.role !== 'host') break;
-        // NOTE: do NOT call persistLeaderboard here.
-        // Leaderboard is written exclusively by the frontend's submitCumulativeToLeaderboard
-        // on Stop & Dismiss, or by end_session for the normal flow.
+        // Bank current session scores before wiping
+        bankGameScores();
         state = fresh();
         clients.forEach((c) => {
           if (c.role === 'participant' && c.pid && c.name)
@@ -398,34 +411,41 @@ wss.on('connection', ws => {
       // FIX #4: halt was completely missing — "End & dismiss students" did nothing
       case 'halt':
         if (client.role !== 'host') break;
-        // First send halted event so students see the pause/standings screen briefly
         clients.forEach((c) => {
           if (c.role === 'participant')
             tx(c.ws, { type: 'halted', payload: { participants: Object.values(state.participants) } });
         });
-        // Then kick everyone and reset
         clients.forEach((c) => {
           if (c.role === 'participant') { tx(c.ws, { type: 'kicked' }); c.role = null; c.pid = null; }
         });
+        gameScores = {};
         state = fresh();
         broadcast();
         break;
 
       case 'shutdown':
         if (client.role !== 'host') break;
-        // NOTE: do NOT call persistLeaderboard here.
-        // The host frontend already called submitCumulativeToLeaderboard (POST /api/leaderboard)
-        // with the correct cumulative totals before sending this message.
-        // Calling persistLeaderboard here too would double-count scores.
+        // Bank the final session's scores into gameScores
+        bankGameScores();
         {
-          const finalLB = Array.isArray(msg.finalLeaderboard) ? msg.finalLeaderboard : null;
+          // Build the definitive final leaderboard from server-side gameScores
+          // This is authoritative — it cannot be lost due to host page refresh
+          const finalLeaderboard = Object.entries(gameScores)
+            .map(([pid, g]) => ({ id: pid, name: g.name, userId: g.userId, score: g.total }))
+            .sort((a, b) => b.score - a.score);
+
+          // Persist to all-time DB
+          persistLeaderboard(finalLeaderboard);
+
+          // Send to every participant so their dismiss screen shows correct cumulative totals
           clients.forEach((c) => {
             if (c.role === 'participant') {
-              tx(c.ws, { type: 'kicked', payload: { finalLeaderboard: finalLB } });
+              tx(c.ws, { type: 'kicked', payload: { finalLeaderboard } });
               c.role = null; c.pid = null;
             }
           });
         }
+        gameScores = {};   // clear for next game day
         state = fresh();
         broadcast();
         break;
@@ -475,13 +495,14 @@ wss.on('connection', ws => {
   });
 });
 
-// ── LEADERBOARD HELPER (FIX #12) ─────────────────────────────────────────────
-async function persistLeaderboard(participants) {
+// ── LEADERBOARD HELPER ───────────────────────────────────────────────────────
+async function persistLeaderboard(entries) {
   try {
-    for (const p of participants) {
-      if (!p.userId) continue;
+    for (const p of entries) {
+      const uid = p.userId || p.id;
+      if (!uid || uid.startsWith('p')) continue; // skip non-ObjectId pids (guests)
       await LeaderboardEntry.findOneAndUpdate(
-        { userId: p.userId },
+        { userId: uid },
         {
           $inc: { totalScore: p.score || 0, sessionsPlayed: 1 },
           $set: { userName: p.name, updatedAt: new Date() },
