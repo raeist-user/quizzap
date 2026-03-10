@@ -177,8 +177,8 @@ app.get('/api/leaderboard', async (req, res) => {
 });
 
 // POST /api/leaderboard — called by host client on Stop & Dismiss
-// Accepts { entries: [{userId, userName, totalScore}] }
-// Uses $inc so scores accumulate across separate game days
+// Frontend sends the FULL cumulative total (e.g. A=27 across 3 sessions).
+// We use $max so the all-time record only ever goes up, never down.
 app.post('/api/leaderboard', requireAuth, async (req, res) => {
   try {
     const entries = req.body.entries;
@@ -186,11 +186,12 @@ app.post('/api/leaderboard', requireAuth, async (req, res) => {
       return res.status(400).json({ error: 'entries array required' });
 
     for (const e of entries) {
-      if (!e.userId) continue;  // skip guests without accounts
+      if (!e.userId) continue;
       await LeaderboardEntry.findOneAndUpdate(
         { userId: e.userId },
         {
-          $inc: { totalScore: e.totalScore || 0, sessionsPlayed: e.sessionsPlayed || 1 },
+          $max: { totalScore: e.totalScore || 0 },   // only raise the score, never lower
+          $inc: { sessionsPlayed: 1 },
           $set: { userName: e.userName, updatedAt: new Date() },
         },
         { upsert: true }
@@ -384,8 +385,9 @@ wss.on('connection', ws => {
 
       case 'reset':
         if (client.role !== 'host') break;
-        // Persist current session scores before wiping — so New Session doesn't lose them
-        persistLeaderboard(Object.values(state.participants));
+        // NOTE: do NOT call persistLeaderboard here.
+        // Leaderboard is written exclusively by the frontend's submitCumulativeToLeaderboard
+        // on Stop & Dismiss, or by end_session for the normal flow.
         state = fresh();
         clients.forEach((c) => {
           if (c.role === 'participant' && c.pid && c.name)
@@ -412,11 +414,19 @@ wss.on('connection', ws => {
 
       case 'shutdown':
         if (client.role !== 'host') break;
-        // Persist final session scores before dismissing
-        persistLeaderboard(Object.values(state.participants));
-        clients.forEach((c) => {
-          if (c.role === 'participant') { tx(c.ws, { type: 'kicked' }); c.role = null; c.pid = null; }
-        });
+        // NOTE: do NOT call persistLeaderboard here.
+        // The host frontend already called submitCumulativeToLeaderboard (POST /api/leaderboard)
+        // with the correct cumulative totals before sending this message.
+        // Calling persistLeaderboard here too would double-count scores.
+        {
+          const finalLB = Array.isArray(msg.finalLeaderboard) ? msg.finalLeaderboard : null;
+          clients.forEach((c) => {
+            if (c.role === 'participant') {
+              tx(c.ws, { type: 'kicked', payload: { finalLeaderboard: finalLB } });
+              c.role = null; c.pid = null;
+            }
+          });
+        }
         state = fresh();
         broadcast();
         break;
