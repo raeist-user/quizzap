@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: shadabcoachingcenter
+    name: quizzap
     env: node
     plan: free
     buildCommand: npm install
@@ -8,5 +8,3 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
-      - key: MY_TOKEN
-        sync: false  # This will prompt you to enter the value in the Render UI

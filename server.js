@@ -52,6 +52,18 @@ const LeaderboardEntry = mongoose.model('LeaderboardEntry', leaderboardSchema);
 // ── EXPRESS ───────────────────────────────────────────────────────────────────
 const app = express();
 app.use(express.json());
+// Serve index.html with MY_TOKEN injected so the browser can use it safely
+const fs = require('fs');
+const indexPath = path.join(__dirname, 'public', 'index.html');
+app.get('/', (req, res) => {
+  try {
+    let html = fs.readFileSync(indexPath, 'utf8');
+    const token = process.env.MY_TOKEN || '';
+    html = html.replace("'%%MY_TOKEN%%'", JSON.stringify(token));
+    res.setHeader('Content-Type', 'text/html');
+    res.send(html);
+  } catch(e) { res.status(500).send('Server error loading page'); }
+});
 app.use(express.static(path.join(__dirname, 'public')));
 const server = http.createServer(app);
 
