@@ -176,6 +176,30 @@ app.get('/api/leaderboard', async (req, res) => {
   } catch (e) { res.status(500).json({ error: 'Failed to fetch leaderboard' }); }
 });
 
+// POST /api/leaderboard — called by host client on Stop & Dismiss
+// Accepts { entries: [{userId, userName, totalScore}] }
+// Uses $inc so scores accumulate across separate game days
+app.post('/api/leaderboard', requireAuth, async (req, res) => {
+  try {
+    const entries = req.body.entries;
+    if (!Array.isArray(entries) || !entries.length)
+      return res.status(400).json({ error: 'entries array required' });
+
+    for (const e of entries) {
+      if (!e.userId) continue;  // skip guests without accounts
+      await LeaderboardEntry.findOneAndUpdate(
+        { userId: e.userId },
+        {
+          $inc: { totalScore: e.totalScore || 0, sessionsPlayed: e.sessionsPlayed || 1 },
+          $set: { userName: e.userName, updatedAt: new Date() },
+        },
+        { upsert: true }
+      );
+    }
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: 'Failed to save leaderboard' }); }
+});
+
 // ── QUIZ STATE ────────────────────────────────────────────────────────────────
 let state = fresh();
 function fresh() {
@@ -360,6 +384,8 @@ wss.on('connection', ws => {
 
       case 'reset':
         if (client.role !== 'host') break;
+        // Persist current session scores before wiping — so New Session doesn't lose them
+        persistLeaderboard(Object.values(state.participants));
         state = fresh();
         clients.forEach((c) => {
           if (c.role === 'participant' && c.pid && c.name)
@@ -386,6 +412,8 @@ wss.on('connection', ws => {
 
       case 'shutdown':
         if (client.role !== 'host') break;
+        // Persist final session scores before dismissing
+        persistLeaderboard(Object.values(state.participants));
         clients.forEach((c) => {
           if (c.role === 'participant') { tx(c.ws, { type: 'kicked' }); c.role = null; c.pid = null; }
         });
