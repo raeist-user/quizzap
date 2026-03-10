@@ -449,6 +449,9 @@ let pushing=false, pushTimeout=null;
 // Halt flow
 let showingHalted=false, haltedCountdown=0, haltedTimer=null, haltedSnapshot=[];
 
+// Dismissed flow (session ended by host after halt)
+let showingDismissed=false, dismissedCountdown=30, dismissedTimer=null;
+
 // Home tabs
 let homeSection='home'; // 'home' | 'leaderboard'
 
@@ -641,17 +644,27 @@ function connect(){
     switch(m.type){
       case 'hello':     myCid=m.cid; break;
       case 'kicked':
-        role=null; myName=null; myPid=null; showingProfile=false; prevMyScore=0; scoreGain=0;
-        sessionStorage.removeItem('qz_pid'); sessionStorage.removeItem(NAV_KEY);
-        alert('The host has shut down the session.');
+        // Show a proper dismissal screen with leaderboard + 30s countdown
+        { const kickedParts=m.payload?.participants||haltedSnapshot||[];
+          if(kickedParts.length) haltedSnapshot=kickedParts; }
+        showingHalted=false;
+        showingDismissed=true;
+        dismissedCountdown=30;
+        if(dismissedTimer){clearInterval(dismissedTimer);dismissedTimer=null;}
+        dismissedTimer=setInterval(()=>{
+          dismissedCountdown=Math.max(0,dismissedCountdown-1);
+          const el=document.getElementById('dismissed-countdown');
+          if(el) el.textContent=dismissedCountdown;
+          const ring=document.getElementById('dismissed-ring');
+          if(ring) ring.style.strokeDashoffset=(126*(1-dismissedCountdown/30)).toFixed(2);
+          if(dismissedCountdown<=0){ clearInterval(dismissedTimer); dismissedTimer=null; doDismissHome(); }
+        },1000);
         render(); break;
       case 'halted':
         // Host halted — students see a "please wait" screen with snapshot LB.
-        // When host continues, new state updates will override.
-        // When host fully ends, a 'kicked' or 'ended' status arrives.
         { const haltedParts=m.payload?.participants||S.participants||[];
           haltedSnapshot=haltedParts; }
-        showingHalted=true; haltedCountdown=0; // no auto-dismiss — wait for host
+        showingHalted=true; showingDismissed=false; haltedCountdown=0;
         render();
         break;
       case 'session_resumed':
@@ -1146,7 +1159,7 @@ function render(){
   nav.style.display=(role==='host'&&hostAuthed)?'none':'flex';
   // Back button: show when not at plain home
   document.getElementById('nav-back-wrap').style.display=
-    (!isParticipant&&(role||showingProfile||showingHalted))?'block':'none';
+    (!isParticipant&&(role||showingProfile||showingHalted||showingDismissed))?'block':'none';
   // Profile: only visible on the home landing section
   document.getElementById('profile-wrap').style.display=isHome?'flex':'none';
   // Conn indicator: hide for participants and on profile page (clean look)
@@ -1161,6 +1174,7 @@ function render(){
   document.getElementById('pd-email').textContent=u.email;
   const v=document.getElementById('view');
 
+  if(showingDismissed){ v.innerHTML=studentDismissedHTML(); attach(); return; }
   if(showingHalted){ v.innerHTML=haltedHTML(); attach(); return; }
   if(showingProfile){ v.innerHTML=profilePageHTML(); attach(); return; }
   if(!role)                           v.innerHTML=landingHTML();
@@ -1264,30 +1278,79 @@ function landingHTML(){
 function haltedHTML(){
   const sorted=[...haltedSnapshot].sort((a,b)=>(b.score||0)-(a.score||0));
   const medals=['🥇','🥈','🥉'];
+  const myP=sorted.find(p=>p.id===myPid);
+  const myRank=sorted.findIndex(p=>p.id===myPid)+1;
   const rows=sorted.length
     ?sorted.map((p,i)=>`
-      <div class="lb-row">
+      <div class="lb-row${p.id===myPid?' me':''}">
         <div class="score-rank">${medals[i]||('#'+(i+1))}</div>
-        <div style="flex:1;font-weight:${i<3?'600':'400'}">${esc(p.name)}</div>
+        <div style="flex:1;font-weight:${i<3?'600':'400'}">${esc(p.name)}${p.id===myPid?'<span style="font-size:.68rem;color:var(--mid);margin-left:5px">← you</span>':''}</div>
         <div class="score-pts">${p.score||0} pts</div>
       </div>`).join('')
     :`<div style="padding:20px;text-align:center;color:var(--mid)">No scores yet.</div>`;
   return `<div style="display:flex;flex-direction:column;height:calc(100vh - 54px);overflow:hidden;padding:16px 20px;max-width:520px;margin:0 auto">
     <div style="text-align:center;padding:20px 0 16px;flex-shrink:0">
-      <div style="font-size:2.2rem;margin-bottom:8px">⏸</div>
-      <h2 style="margin-bottom:4px">Session paused</h2>
-      <p class="muted small">The host has paused the session.<br>Please wait — they may continue shortly.</p>
+      <div style="font-size:2.4rem;margin-bottom:10px;animation:blink 1.4s ease-in-out infinite">⏸</div>
+      <h2 style="margin-bottom:6px">Session paused</h2>
+      <p class="muted small" style="line-height:1.6">The host has paused the quiz.<br>They may start a <strong>new session</strong> or<br>continue — please wait patiently.</p>
+      ${myP?`<div style="margin-top:12px;display:inline-flex;align-items:center;gap:8px;padding:6px 14px;background:#e8f5ee;border:1px solid #b7dfc7;border-radius:20px;font-size:.78rem;font-weight:600;color:#166534">Your current score: ${myP.score||0} pts &nbsp;·&nbsp; Rank #${myRank}</div>`:''}
     </div>
     <div class="lb-panel" style="flex:1;overflow:hidden;display:flex;flex-direction:column">
-      <div class="lb-head"><span style="font-size:.82rem;font-weight:600">🏆 Current Standings</span><span class="small muted">${sorted.length} students</span></div>
+      <div class="lb-head"><span style="font-size:.82rem;font-weight:600">🏆 Current Standings</span><span class="small muted">${sorted.length} student${sorted.length!==1?'s':''}</span></div>
       <div style="overflow-y:auto;flex:1">${rows}</div>
     </div>
   </div>`;
 }
 
 /* ══════════════════════════════════════
-   PROFILE PAGE
+   DISMISSED SCREEN (students — session ended by host)
 ══════════════════════════════════════ */
+function studentDismissedHTML(){
+  const sorted=[...haltedSnapshot].sort((a,b)=>(b.score||0)-(a.score||0));
+  const medals=['🥇','🥈','🥉'];
+  const myP=sorted.find(p=>p.id===myPid);
+  const myRank=sorted.findIndex(p=>p.id===myPid)+1;
+  const rows=sorted.length
+    ?sorted.map((p,i)=>`
+      <div class="lb-row${p.id===myPid?' me':''}">
+        <div class="score-rank">${medals[i]||('#'+(i+1))}</div>
+        <div style="flex:1;font-weight:${i<3?'600':'400'}">${esc(p.name)}${p.id===myPid?'<span style="font-size:.68rem;color:var(--mid);margin-left:5px">← you</span>':''}</div>
+        <div class="score-pts">${p.score||0} pts</div>
+      </div>`).join('')
+    :`<div style="padding:20px;text-align:center;color:var(--mid)">No scores recorded.</div>`;
+  // SVG countdown ring: circumference of r=20 circle ≈ 125.7
+  const circ=125.7;
+  const offset=(circ*(1-dismissedCountdown/30)).toFixed(2);
+  return `<div style="display:flex;flex-direction:column;height:calc(100vh - 54px);overflow:hidden;padding:16px 20px;max-width:520px;margin:0 auto">
+    <div style="text-align:center;padding:18px 0 14px;flex-shrink:0">
+      <!-- Countdown ring -->
+      <div style="position:relative;width:80px;height:80px;margin:0 auto 14px">
+        <svg width="80" height="80" viewBox="0 0 80 80" style="transform:rotate(-90deg)">
+          <circle cx="40" cy="40" r="20" fill="none" stroke="var(--line)" stroke-width="4"/>
+          <circle id="dismissed-ring" cx="40" cy="40" r="20" fill="none" stroke="var(--bad)" stroke-width="4"
+            stroke-dasharray="${circ}" stroke-dashoffset="${offset}"
+            style="transition:stroke-dashoffset 1s linear"/>
+        </svg>
+        <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:1.4rem;font-weight:700;color:var(--bad)" id="dismissed-countdown">${dismissedCountdown}</div>
+      </div>
+      <div style="font-size:2rem;margin-bottom:8px">🎓</div>
+      <h2 style="margin-bottom:5px">Session has ended</h2>
+      <p class="muted small" style="line-height:1.6">The host has closed this session.<br>You'll be taken home in <strong id="dismissed-countdown-text">${dismissedCountdown}</strong> seconds.</p>
+      ${myP?`<div style="margin-top:10px;display:inline-flex;align-items:center;gap:8px;padding:5px 14px;background:#e8f5ee;border:1px solid #b7dfc7;border-radius:20px;font-size:.77rem;font-weight:600;color:#166534">Final: ${myP.score||0} pts &nbsp;·&nbsp; Rank #${myRank} of ${sorted.length}</div>`:''}
+      <div style="margin-top:14px">
+        <button class="btn btn-dark" id="btn-dismissed-home" style="gap:7px">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9,22 9,12 15,12 15,22"/></svg>
+          Go Home Now
+        </button>
+      </div>
+    </div>
+    <div style="font-size:.68rem;text-align:center;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--mid);margin-bottom:8px;flex-shrink:0">🏆 Final Leaderboard</div>
+    <div class="lb-panel" style="flex:1;overflow:hidden;display:flex;flex-direction:column;margin-top:0">
+      <div class="lb-head"><span style="font-size:.82rem;font-weight:600">Final Standings</span><span class="small muted">${sorted.length} student${sorted.length!==1?'s':''}</span></div>
+      <div style="overflow-y:auto;flex:1">${rows}</div>
+    </div>
+  </div>`;
+}
 function profilePageHTML(){
   const u=currentUser;
   const initials=u.name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
@@ -1398,21 +1461,26 @@ function hostPassHTML(){
 ══════════════════════════════════════ */
 function haltMenuOverlayHTML(){
   if(!showingHaltMenu) return '';
-  return `<div style="position:absolute;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;z-index:500;padding:20px">
-    <div style="background:var(--white);border-radius:12px;padding:24px;max-width:320px;width:100%;box-shadow:0 8px 32px rgba(0,0,0,.2)">
-      <div style="font-size:1.8rem;text-align:center;margin-bottom:12px">⏸</div>
-      <h3 style="text-align:center;margin-bottom:6px">Halt session?</h3>
-      <p class="muted small" style="text-align:center;margin-bottom:20px">Students will see a pause screen and wait. Choose your next action:</p>
+  return `<div style="position:absolute;inset:0;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;z-index:500;padding:20px;backdrop-filter:blur(2px)">
+    <div style="background:var(--white);border-radius:14px;padding:26px 24px;max-width:340px;width:100%;box-shadow:0 12px 40px rgba(0,0,0,.25);animation:fadeIn .18s ease">
+      <div style="font-size:2rem;text-align:center;margin-bottom:10px">⏸</div>
+      <h2 style="text-align:center;margin-bottom:4px;font-size:1.2rem">Session is paused</h2>
+      <p class="muted small" style="text-align:center;margin-bottom:22px;line-height:1.55">Students are seeing the pause screen.<br>What would you like to do next?</p>
       <div style="display:flex;flex-direction:column;gap:10px">
-        <button class="btn btn-dark btn-lg" style="justify-content:center" id="btn-continue-session">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5,3 19,12 5,21" fill="currentColor" stroke="none"/></svg>
-          Continue session
+        <button class="btn btn-lg" style="justify-content:center;gap:8px;background:#1a56db;color:#fff;border-color:#1a56db" id="btn-new-session">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><polyline points="1,4 1,10 7,10"/><path d="M3.51 15a9 9 0 1 0 .49-4.95"/></svg>
+          New Session <span style="font-size:.72rem;opacity:.8;font-weight:400">(resets scores to 0)</span>
         </button>
-        <button class="btn btn-lg" style="justify-content:center;background:#fff1f2;color:#be123c;border-color:#fecdd3" id="btn-halt-confirm">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
-          End &amp; dismiss students
+        <button class="btn btn-lg" style="justify-content:center;gap:8px;background:#fff1f2;color:#be123c;border-color:#fecdd3" id="btn-stop-dismiss">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
+          Stop &amp; Dismiss Students
         </button>
-        <button class="btn btn-ghost btn-sm" style="justify-content:center" id="btn-halt-cancel">Cancel</button>
+        <div style="border-top:1px solid var(--line);padding-top:10px;margin-top:2px">
+          <button class="btn btn-ghost btn-sm" style="width:100%;justify-content:center;gap:5px" id="btn-halt-resume">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><polygon points="5,3 19,12 5,21" fill="currentColor" stroke="none"/></svg>
+            Resume current session
+          </button>
+        </div>
       </div>
     </div>
   </div>`;
@@ -2031,6 +2099,9 @@ function attach(){
   on('btn-profile-back',()=>{ showingProfile=false; render(); });
   document.querySelectorAll('.ptab[data-ptab]').forEach(el=>el.addEventListener('click',()=>{ profileTab=el.dataset.ptab; render(); }));
 
+  // Dismissed screen home button
+  on('btn-dismissed-home', doDismissHome);
+
   // Host home button (inside full-window host nav)
   on('btn-host-home', doBack);
   on('btn-pw-back', doBack);
@@ -2291,7 +2362,35 @@ function attach(){
 
   // Host ended — Continue and Halt
   on('btn-continue-session',()=>{ send({type:'continue_session'}); });
-  on('btn-halt',()=>{ showingHaltMenu=true; render(); });
+  on('btn-halt',()=>{
+    // Immediately send halt so students see pause screen right away
+    send({type:'halt'});
+    showingHaltMenu=true;
+    render();
+  });
+  // Halt menu actions
+  on('btn-halt-resume',()=>{
+    // Resume the session — students return to normal flow
+    showingHaltMenu=false;
+    send({type:'continue_session'});
+    render();
+  });
+  on('btn-new-session',()=>{
+    // Reset scores to 0, keep questions, start fresh
+    showingHaltMenu=false;
+    send({type:'reset'});
+    selIdx=questions.length>0?0:-1;
+    answerKey=-1;
+    inspectPid=null;
+    render();
+  });
+  on('btn-stop-dismiss',()=>{
+    // End session and dismiss all students
+    showingHaltMenu=false;
+    send({type:'shutdown'});
+    render();
+  });
+  // Legacy halt confirm/cancel kept for backward compat
   on('btn-halt-confirm',()=>{ showingHaltMenu=false; send({type:'halt'}); });
   on('btn-halt-cancel',()=>{ showingHaltMenu=false; render(); });
   on('btn-shutdown',()=>{ if(confirm('Shut down session? All students will be dismissed immediately.')) send({type:'shutdown'}); });
@@ -2318,10 +2417,18 @@ function attach(){
 }
 
 function on(id,fn){ document.getElementById(id)?.addEventListener('click',fn); }
+function doDismissHome(){
+  if(dismissedTimer){ clearInterval(dismissedTimer); dismissedTimer=null; }
+  showingDismissed=false; haltedSnapshot=[];
+  role=null; myName=null; myPid=null; showingProfile=false; prevMyScore=0; scoreGain=0;
+  sessionStorage.removeItem('qz_pid'); sessionStorage.removeItem(NAV_KEY);
+  render();
+}
 function doLogout(){ clearAuth(); role=null; myPid=null; myName=null; hostAuthed=false; showingProfile=false; prevMyScore=0; scoreGain=0; allTimeLB=null; serverSchedules=null; hostSchedules=[]; sessionStorage.removeItem(NAV_KEY); render(); }
 
 /* Shared back navigation — used by nav button, host-home button, and mobile popstate */
 function doBack(){
+  if(showingDismissed){ doDismissHome(); return; }
   if(showingProfile){
     showingProfile=false;
     navPush(); // push a new state so further back press goes home
@@ -2392,7 +2499,7 @@ function navPush(){
 // Intercept browser/phone back button
 window.addEventListener('popstate', ()=>{
   // If we're somewhere deep, go back one level
-  if(showingProfile||role||showingHalted){
+  if(showingDismissed||showingProfile||role||showingHalted){
     doBack();
     // Re-push so the next back press also works
     history.pushState({qz:true}, '', location.href);
