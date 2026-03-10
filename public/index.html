@@ -1444,7 +1444,7 @@ function haltMenuOverlayHTML(){
   const medals=['🥇','🥈','🥉'];
   const lbRows=sorted.length
     ?sorted.slice(0,10).map((p,i)=>{
-        const banked=cumulativeScores[p.id]||0;
+        const banked=cumulativeScores[p.userId||p.id]||0;
         const cumTotal=banked+(p.score||0);
         const hasPrior=banked>0;
         return `<div style="display:flex;align-items:center;gap:9px;padding:8px 14px;border-bottom:1px solid var(--line);font-size:.83rem">
@@ -2364,11 +2364,11 @@ function attach(){
   // Halt overlay: New Session
   // → Bank each student's current score into cumulativeScores, then reset
   on('btn-new-session',()=>{
+    // Bank current session scores keyed by userId (real MongoDB id) for leaderboard accuracy
     (S.participants||[]).forEach(p=>{
-      const banked = (cumulativeScores[p.id]||0) + (p.score||0);
-      cumulativeScores[p.id] = banked;
-      // Store name separately for players who might leave later
-      cumulativeScores[p.id+'__name'] = p.name;
+      const key = p.userId || p.id;  // userId is real MongoDB ObjectId; p.id is session pid
+      cumulativeScores[key] = (cumulativeScores[key]||0) + (p.score||0);
+      cumulativeScores[key+'__meta'] = { name: p.name, userId: p.userId||null, pid: p.id };
     });
     showingHaltMenu=false;
     send({type:'reset'});
@@ -2377,29 +2377,32 @@ function attach(){
   });
 
   // Halt overlay: Stop & Dismiss
-  // → Final total = banked past sessions + current session score
+  // Final total = all banked sessions + current session score
   on('btn-stop-dismiss',()=>{
     const parts = S.participants||[];
 
-    // Build final cumulative snapshot
-    const allPids = new Set([
-      ...parts.map(p=>p.id),
-      ...Object.keys(cumulativeScores).filter(k=>!k.endsWith('__name'))
+    // Collect all known keys (from banked + live)
+    const allKeys = new Set([
+      ...parts.map(p => p.userId || p.id),
+      ...Object.keys(cumulativeScores).filter(k=>!k.endsWith('__meta'))
     ]);
+
     const snap = [];
-    allPids.forEach(pid=>{
-      const liveP   = parts.find(p=>p.id===pid);
-      const banked  = cumulativeScores[pid]||0;
+    allKeys.forEach(key=>{
+      const liveP   = parts.find(p=>(p.userId||p.id)===key);
+      const meta    = cumulativeScores[key+'__meta']||{};
+      const banked  = cumulativeScores[key]||0;
       const current = liveP ? (liveP.score||0) : 0;
-      const name    = liveP ? liveP.name : (cumulativeScores[pid+'__name']||'Unknown');
-      snap.push({ id:pid, name, score: banked + current });
+      const name    = liveP ? liveP.name : (meta.name||'Unknown');
+      const userId  = liveP ? (liveP.userId||null) : (meta.userId||null);
+      snap.push({ id: liveP?liveP.id:(meta.pid||key), userId, name, score: banked + current });
     });
 
     snap.sort((a,b)=>b.score-a.score);
     haltedSnapshot = snap;
     showingHaltMenu = false;
 
-    // Submit cumulative scores to all-time leaderboard API
+    // Submit to all-time leaderboard — server will $inc these totals onto existing records
     submitCumulativeToLeaderboard(snap);
 
     send({type:'shutdown'});
@@ -2431,20 +2434,27 @@ function attach(){
 }
 
 function on(id,fn){ document.getElementById(id)?.addEventListener('click',fn); }
-// Submit each student's cumulative score to the all-time leaderboard API
+// Submit cumulative scores to all-time leaderboard (POST /api/leaderboard)
+// Server uses $inc so these totals are ADDED to any existing all-time record.
+// Each entry must have userId (real MongoDB ObjectId) — guests without accounts are skipped server-side.
 async function submitCumulativeToLeaderboard(snap){
   if(!snap||!snap.length) return;
-  // The server /api/leaderboard expects a POST with the session results
-  // so each participant's cumulative total is recorded
+  const entries = snap
+    .filter(p=>p.userId)   // only registered users can have leaderboard entries
+    .map(p=>({
+      userId:        p.userId,
+      userName:      p.name,
+      totalScore:    p.score,   // this is the CUMULATIVE total across all sessions in this game
+      sessionsPlayed: 1         // server $inc's this — so each game = +1 session count
+    }));
+  if(!entries.length) return;
   try {
-    await apiPost('/api/leaderboard', {
-      results: snap.map(p=>({ userId:p.id, userName:p.name, score:p.score }))
-    }, true);
-    // Refresh the cached leaderboard
-    allTimeLB = null;
-    fetchLeaderboard();
+    await apiPost('/api/leaderboard', { entries }, true);
   } catch(e) {
     console.warn('Leaderboard submit failed:', e.message);
+  } finally {
+    allTimeLB = null;
+    fetchLeaderboard();
   }
 }
 
