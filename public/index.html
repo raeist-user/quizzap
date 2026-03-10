@@ -419,15 +419,18 @@ let hostTimerSeconds=0;
 
 // Resource browser
 let repoPath=null;
-let subjects=[];
-let selectedSubjects=new Set(); // for generate tab: which subjects are checked
+let subjects=[];          // [{name, path, files:[], filesLoaded:false}]
+let expandedSubject=null; // which subject accordion is open in generate tab
 let repoLoading=false;
 
 // Host halt confirmation menu state
 let showingHaltMenu=false;
 
 // Upload manage state
-let manageEditMode=null; // null | 'existing' | 'new'
+let manageEditMode=null;      // null | 'existing' | 'new'
+let manageFolderFiles=[];     // [{name, path, sha}] files in currently selected manage folder
+let manageFile=null;          // which specific .txt file is selected in manage tab
+let manageNewFileName='';
 
 // Voice (host)
 let localStream=null;
@@ -835,11 +838,32 @@ async function browseRepo(){
     const items=await res.json();
     const dirs=items.filter(i=>i.type==='dir');
     if(!dirs.length) throw new Error('No subject folders found inside "resources" folder.');
-    subjects=dirs.map(d=>({name:d.name,path:d.path,questions:[],count:0}));
+    // Keep existing file selections if subject already loaded
+    subjects=dirs.map(d=>{
+      const existing=subjects.find(s=>s.name===d.name);
+      return existing||{name:d.name,path:d.path,files:[],filesLoaded:false};
+    });
     repoLoading=false;
     if(msg) msg.innerHTML='';
     render();
   }catch(e){ repoLoading=false; if(msg) msg.innerHTML=`<div class="notice n-bad mt2">${esc(e.message)}</div>`; render(); }
+}
+
+// Load all .txt files inside a subject folder (called when subject is expanded)
+async function loadSubjectFiles(subjName){
+  const subj=subjects.find(s=>s.name===subjName);
+  if(!subj||subj.filesLoaded) return;
+  try{
+    const encodedPath=subj.path.split('/').map(encodeURIComponent).join('/');
+    const res=await fetch(`https://api.github.com/repos/${GITHUB_REPO}/contents/${encodedPath}?ref=${GITHUB_BRANCH}`,{headers:ghHeaders()});
+    if(!res.ok) throw new Error(`GitHub API ${res.status}`);
+    const items=await res.json();
+    subj.files=items
+      .filter(i=>i.type==='file'&&i.name.endsWith('.txt')&&i.name!=='.gitkeep')
+      .map(i=>({name:i.name,path:i.path,sha:i.sha,selected:false,count:0}));
+    subj.filesLoaded=true;
+    render();
+  }catch(e){ console.warn('Could not load files for',subjName,e.message); subj.filesLoaded=true; render(); }
 }
 
 async function loadUploadFolders(){
@@ -850,6 +874,20 @@ async function loadUploadFolders(){
     uploadSubjects=items.filter(i=>i.type==='dir').map(d=>({name:d.name,path:d.path}));
     render();
   }catch(e){ uploadSubjects=[]; render(); }
+}
+
+// Load all .txt files inside a folder for the manage tab
+async function loadFolderFiles(folderName){
+  try{
+    const encoded=folderName.split('/').map(encodeURIComponent).join('/');
+    const res=await fetch(`https://api.github.com/repos/${GITHUB_REPO}/contents/resources/${encoded}?ref=${GITHUB_BRANCH}`,{headers:ghHeaders()});
+    if(!res.ok) throw new Error(`GitHub API ${res.status}`);
+    const items=await res.json();
+    manageFolderFiles=items
+      .filter(i=>i.type==='file'&&i.name.endsWith('.txt')&&i.name!=='.gitkeep')
+      .map(i=>({name:i.name,path:i.path,sha:i.sha}));
+    render();
+  }catch(e){ manageFolderFiles=[]; render(); }
 }
 
 async function createFolder(){
@@ -888,23 +926,24 @@ async function deleteFolder(folderName){
       });
       if(!dr.ok) throw new Error(`Failed to delete ${item.name}`);
     }
-    manageFolder=null; manageEditMode=null; editingContent=''; editingSha=null;
+    manageFolder=null; manageEditMode=null; manageFile=null; manageFolderFiles=[]; manageNewFileName=''; editingContent=''; editingSha=null;
     setUploadMsg(`Folder "${folderName}" deleted.`,'good');
     await loadUploadFolders();
   }catch(e){setUploadMsg(e.message,'bad');}
 }
 
-async function openFolderEdit(folderName){
-  manageFolder=folderName; editingContent=''; editingSha=null;
-  setUploadMsg('Loading questions.txt…','neutral');
+async function openFolderEdit(folderName, fileName){
+  manageFolder=folderName; manageFile=fileName; editingContent=''; editingSha=null;
+  setUploadMsg(`Loading ${esc(fileName)}…`,'neutral');
   render();
   try{
-    const res=await fetch(`https://api.github.com/repos/${GITHUB_REPO}/contents/resources/${folderName}/questions.txt?ref=${GITHUB_BRANCH}`,{headers:ghHeaders()});
-    if(res.status===404){ editingContent=''; editingSha=null; setUploadMsg('No questions.txt yet. Write or upload one below.','neutral'); render(); return; }
+    const encodedFolder=encodeURIComponent(folderName);
+    const encodedFile=encodeURIComponent(fileName);
+    const res=await fetch(`https://api.github.com/repos/${GITHUB_REPO}/contents/resources/${encodedFolder}/${encodedFile}?ref=${GITHUB_BRANCH}`,{headers:ghHeaders()});
+    if(res.status===404){ editingContent=''; editingSha=null; setUploadMsg(`${fileName} not found. Write content below to create it.`,'neutral'); render(); return; }
     if(!res.ok) throw new Error(`GitHub API ${res.status}`);
     const data=await res.json();
     editingSha=data.sha;
-    // Properly decode UTF-8 content (handles Hindi and other non-ASCII)
     const bytes=Uint8Array.from(atob(data.content.replace(/\n/g,'')),c=>c.charCodeAt(0));
     editingContent=new TextDecoder('utf-8').decode(bytes);
     setUploadMsg('','');
@@ -915,22 +954,41 @@ async function openFolderEdit(folderName){
 
 async function saveEditorContent(){
   if(!manageFolder){setUploadMsg('No folder selected','bad');return;}
+  // For new files, get filename from input
+  let fileName=manageFile;
+  if(manageEditMode==='new'){
+    const inp=document.getElementById('new-file-name-editor');
+    let n=inp?inp.value.trim():manageNewFileName;
+    if(!n){setUploadMsg('Enter a file name','bad');return;}
+    if(!n.endsWith('.txt')) n+='.txt';
+    fileName=n;
+  }
+  if(!fileName){setUploadMsg('No file selected','bad');return;}
   if(!isValidToken()){setUploadMsg('GitHub token not configured — add it to the source to enable uploads','bad');return;}
   const ta=document.getElementById('q-editor');
   const content=ta?ta.value:'';
   if(!content.trim()){setUploadMsg('Content is empty','bad');return;}
   setUploadMsg('Saving…','neutral');
   try{
-    const path=`resources/${manageFolder}/questions.txt`;
-    const body={message:`Update ${manageFolder}/questions.txt`,content:btoa(unescape(encodeURIComponent(content))),branch:GITHUB_BRANCH};
-    if(editingSha) body.sha=editingSha;
-    const res=await fetch(`https://api.github.com/repos/${GITHUB_REPO}/contents/${path}`,{
-      method:'PUT',headers:ghHeaders(),body:JSON.stringify(body)
-    });
+    const encodedFolder=encodeURIComponent(manageFolder);
+    const encodedFile=encodeURIComponent(fileName);
+    const apiPath=`resources/${manageFolder}/${fileName}`;
+    const apiUrl=`https://api.github.com/repos/${GITHUB_REPO}/contents/resources/${encodedFolder}/${encodedFile}`;
+    // Always fetch latest SHA before saving to prevent 409 Conflict
+    let sha=editingSha;
+    if(!sha){
+      const chk=await fetch(`${apiUrl}?ref=${GITHUB_BRANCH}`,{headers:ghHeaders()});
+      if(chk.ok){ const d=await chk.json(); sha=d.sha; }
+    }
+    const body={message:`Update ${apiPath}`,content:btoa(unescape(encodeURIComponent(content))),branch:GITHUB_BRANCH};
+    if(sha) body.sha=sha;
+    const res=await fetch(apiUrl,{method:'PUT',headers:ghHeaders(),body:JSON.stringify(body)});
     if(!res.ok) throw new Error(`GitHub API ${res.status}`);
     const data=await res.json();
-    editingSha=data.content?.sha||editingSha;
+    editingSha=data.content?.sha||sha;
+    manageFile=fileName;
     setUploadMsg('Saved successfully!','good');
+    await loadFolderFiles(manageFolder);
   }catch(e){setUploadMsg(e.message,'bad');}
 }
 
@@ -941,25 +999,26 @@ async function uploadQuestionsFile(){
   if(!inp||!inp.files.length){setUploadMsg('Choose a .txt file first','bad');return;}
   const file=inp.files[0];
   if(!file.name.endsWith('.txt')){setUploadMsg('Only .txt files allowed','bad');return;}
+  const targetFile=file.name; // use the actual uploaded filename
   setUploadMsg('Reading file…','neutral');
   const reader=new FileReader();
-  reader.onload=async(e)=>{
-    const content=e.target.result;
+  reader.onload=async(ev)=>{
+    const content=ev.target.result;
     try{
       setUploadMsg('Uploading…','neutral');
-      const path=`resources/${manageFolder}/questions.txt`;
-      const body={message:`Upload ${manageFolder}/questions.txt`,content:btoa(unescape(encodeURIComponent(content))),branch:GITHUB_BRANCH};
-      if(editingSha) body.sha=editingSha;
-      const res=await fetch(`https://api.github.com/repos/${GITHUB_REPO}/contents/${path}`,{
-        method:'PUT',headers:ghHeaders(),body:JSON.stringify(body)
-      });
+      const encodedFolder=encodeURIComponent(manageFolder);
+      const encodedFile=encodeURIComponent(targetFile);
+      const apiUrl=`https://api.github.com/repos/${GITHUB_REPO}/contents/resources/${encodedFolder}/${encodedFile}`;
+      // Fetch existing SHA to avoid 409 if file exists
+      let sha=null;
+      const chk=await fetch(`${apiUrl}?ref=${GITHUB_BRANCH}`,{headers:ghHeaders()});
+      if(chk.ok){ const d=await chk.json(); sha=d.sha; }
+      const body={message:`Upload resources/${manageFolder}/${targetFile}`,content:btoa(unescape(encodeURIComponent(content))),branch:GITHUB_BRANCH};
+      if(sha) body.sha=sha;
+      const res=await fetch(apiUrl,{method:'PUT',headers:ghHeaders(),body:JSON.stringify(body)});
       if(!res.ok) throw new Error(`GitHub API ${res.status}`);
-      const data=await res.json();
-      editingSha=data.content?.sha||editingSha;
-      editingContent=content;
-      setUploadMsg('Uploaded successfully!','good');
-      render();
-      setTimeout(()=>{ const ta=document.getElementById('q-editor'); if(ta) ta.value=content; },50);
+      setUploadMsg(`Uploaded as ${targetFile}!`,'good');
+      await loadFolderFiles(manageFolder);
     }catch(err){setUploadMsg(err.message,'bad');}
   };
   reader.readAsText(file);
@@ -973,21 +1032,27 @@ function setUploadMsg(msg,type){
 
 async function generateQuiz(){
   const msg=document.getElementById('gen-msg'); if(!msg)return;
-  const chosen=subjects.filter(s=>s.count>0);
-  if(!chosen.length){msg.innerHTML='<div class="notice n-bad mt2">Set at least one subject count above 0.</div>';return;}
+  // Collect all selected files across all subjects
+  const selections=[];
+  subjects.forEach(s=>{
+    s.files.filter(f=>f.selected).forEach(f=>selections.push({file:f,subjName:s.name}));
+  });
+  if(!selections.length){msg.innerHTML='<div class="notice n-bad mt2">Select at least one chapter file above.</div>';return;}
   msg.innerHTML='<div class="notice n-neutral mt2">Fetching questions…</div>';
   let all=[];
   try{
-    for(const s of chosen){
-      const encodedPath=s.path.split('/').map(encodeURIComponent).join('/');
-      const rawUrl=`https://raw.githubusercontent.com/${GITHUB_REPO}/${GITHUB_BRANCH}/${encodedPath}/questions.txt`;
+    for(const {file,subjName} of selections){
+      const encodedPath=file.path.split('/').map(encodeURIComponent).join('/');
+      const rawUrl=`https://raw.githubusercontent.com/${GITHUB_REPO}/${GITHUB_BRANCH}/${encodedPath}`;
       const headers={}; if(isValidToken()) headers['Authorization']='Bearer '+MY_TOKEN;
       const res=await fetch(rawUrl,{headers});
-      if(!res.ok) throw new Error(`Could not fetch ${s.name}/questions.txt`);
+      if(!res.ok) throw new Error(`Could not fetch ${file.name} (${res.status})`);
       const parsed=parseQuestions(await res.text());
-      if(!parsed.length) throw new Error(`No valid questions in ${s.name}/questions.txt`);
-      const shuffled=parsed.sort(()=>Math.random()-.5).slice(0,s.count);
-      shuffled.forEach(q=>{q.subject=s.name;});
+      if(!parsed.length) throw new Error(`No valid questions in ${file.name}`);
+      // 0 means take all, otherwise take that many (random sample)
+      const take=(file.count>0)?Math.min(file.count,parsed.length):parsed.length;
+      const shuffled=[...parsed].sort(()=>Math.random()-.5).slice(0,take);
+      shuffled.forEach(q=>{ q.subject=subjName; q.chapter=file.name.replace(/\.txt$/i,''); });
       all=[...all,...shuffled];
     }
     questions=all; selIdx=0; answerKey=-1;
@@ -1406,53 +1471,81 @@ function hostHTML(){
 
   // No questions loaded → show upload/generate panel
   if(!questions.length){
-    const subjectBoxes=subjects.map(s=>{
-      const sel=selectedSubjects.has(s.name);
-      return `<div class="subject-box${sel?' selected':''}" data-subj="${esc(s.name)}" id="sbox-${esc(s.name)}">
-        <div class="subject-box-name" title="${esc(s.name)}">${esc(s.name)}</div>
-        <div class="subject-box-count">
-          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="pointer-events:none"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
-          <input class="q-count-input" type="number" min="1" max="50" value="${s.count||5}" data-subj="${esc(s.name)}" id="cnt-${esc(s.name)}"
-            style="width:44px;padding:2px 4px;font-size:.75rem${sel?'':';opacity:.45'}"
-            ${sel?'':''} onclick="event.stopPropagation()"/>
-          <span>q's</span>
-        </div>
-      </div>`;
-    }).join('');
-    const selCount=selectedSubjects.size;
+    const totalSelectedFiles=subjects.reduce((n,s)=>n+s.files.filter(f=>f.selected).length,0);
     const generatePanel=`
-      <p class="muted small mb2">Select subjects from your GitHub repo then generate a quiz.</p>
+      <p class="muted small mb2">Tap a subject to expand it, select chapters, then generate.</p>
       ${subjects.length?`
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
           <button class="btn btn-white btn-sm" id="btn-browse">${repoLoading?'⏳ Loading…':'↻ Refresh'}</button>
-          <span class="muted small">${selCount?selCount+' selected':'tap boxes to select'}</span>
+          <span class="muted small">${totalSelectedFiles?totalSelectedFiles+' file'+(totalSelectedFiles>1?'s':'')+' selected':'tap subjects below'}</span>
         </div>
         <div class="timer-input-row" style="margin-bottom:8px">
           <span class="muted small" style="flex:1">⏱ Timer per question</span>
           <input type="number" min="0" max="300" value="${hostTimerSeconds}" id="timer-sec-input" class="q-count-input" style="width:70px"/>
           <span class="muted small">sec</span>
         </div>
-        <div class="subject-grid">${subjectBoxes}</div>
+        <div style="display:flex;flex-direction:column;gap:5px;margin-bottom:8px">
+          ${subjects.map(s=>{
+            const isExp=(expandedSubject===s.name);
+            const selCount=s.files.filter(f=>f.selected).length;
+            return `<div style="border:1.5px solid ${selCount>0?'var(--ink)':'var(--line)'};border-radius:var(--r);overflow:hidden;background:var(--white)">
+              <div data-subj-expand="${esc(s.name)}" style="display:flex;align-items:center;gap:8px;padding:9px 12px;cursor:pointer;user-select:none;-webkit-user-select:none;${selCount>0?'background:#f0fdf4':''}">
+                <span style="flex:1;font-size:.84rem;font-weight:600">${esc(s.name)}</span>
+                ${selCount>0?`<span class="tag tag-green">${selCount} file${selCount>1?'s':''}</span>`:''}
+                ${isExp&&!s.filesLoaded?`<span class="muted small" style="font-size:.7rem">loading…</span>`:''}
+                <span style="font-size:.68rem;color:var(--mid);transition:transform .15s;display:inline-block;${isExp?'transform:rotate(180deg)':''}">▼</span>
+              </div>
+              ${isExp?`<div style="border-top:1px solid var(--line);background:var(--faint);padding:7px 10px;display:flex;flex-direction:column;gap:4px">
+                ${s.filesLoaded&&s.files.length?s.files.map(f=>`
+                  <div style="display:flex;align-items:center;gap:8px;padding:6px 8px;background:var(--white);border:1.5px solid ${f.selected?'var(--accent)':'var(--line)'};border-radius:6px;${f.selected?'background:#eff6ff':''}">
+                    <input type="checkbox" ${f.selected?'checked':''} data-file-check="${esc(s.name)}||${esc(f.name)}" style="flex-shrink:0;cursor:pointer;width:15px;height:15px;accent-color:var(--accent)"/>
+                    <span style="flex:1;font-size:.79rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;${f.selected?'font-weight:600':''}" title="${esc(f.name)}">${esc(f.name.replace(/\.txt$/i,''))}</span>
+                    <input type="number" min="0" max="999" value="${f.count||''}" placeholder="all"
+                      data-file-cnt="${esc(s.name)}||${esc(f.name)}"
+                      class="q-count-input" style="width:52px;font-size:.74rem;${f.selected?'':'opacity:.35'}"
+                      title="Leave 0 / blank for all questions"/>
+                    <span class="muted" style="font-size:.68rem">q's</span>
+                  </div>`).join('')
+                  :s.filesLoaded?`<p class="muted small" style="padding:4px 0;text-align:center">No .txt files in this folder.</p>`
+                  :`<p class="muted small" style="padding:4px 0;text-align:center">Loading…</p>`}
+              </div>`:''}
+            </div>`;
+          }).join('')}
+        </div>
         <div id="gen-msg"></div>
-        <button class="btn btn-accent btn-full mt2" id="btn-gen" ${selCount?'':'disabled'}>Generate quiz →</button>
+        <button class="btn btn-accent btn-full" id="btn-gen" ${totalSelectedFiles?'':'disabled'}>Generate quiz →</button>
       `:`
         <div id="repo-msg"></div>
         <button class="btn btn-dark btn-sm" id="btn-browse" style="margin-top:8px">${repoLoading?'⏳ Loading…':'Load subjects from GitHub →'}</button>
       `}`;
+
     const folderOptions=uploadSubjects.map(f=>`<option value="${esc(f.name)}"${manageFolder===f.name?' selected':''}>${esc(f.name)}</option>`).join('');
     const editorHTML=manageEditMode?`
-      <div style="background:var(--faint);border:1px solid var(--line);border-radius:var(--r);padding:10px;margin-top:10px">
+      <div style="background:var(--faint);border:1px solid var(--line);border-radius:var(--r);padding:10px;margin-bottom:8px">
         <div style="font-size:.75rem;font-weight:600;color:var(--mid);margin-bottom:6px">
-          📁 ${esc(manageFolder)} / questions.txt — ${manageEditMode==='existing'?'Editing existing':'New file'}
+          📝 ${esc(manageFolder)} /
+          ${manageEditMode==='new'
+            ?`<input class="form-input" id="new-file-name-editor" placeholder="chapter1.txt" style="font-size:.78rem;padding:3px 7px;display:inline-block;width:140px;margin-left:4px" value="${esc(manageNewFileName)}"/>`
+            :esc(manageFile||'')}
         </div>
         <textarea id="q-editor" rows="7" class="form-input" style="width:100%;font-family:monospace;font-size:.76rem;resize:vertical;padding:8px" placeholder="Paste or type questions here…">${esc(editingContent)}</textarea>
-        <div id="paste-hint" style="font-size:.73rem;color:var(--mid);margin:4px 0 8px">Tip: you can also paste a .txt file's content directly above.</div>
+        <div style="font-size:.72rem;color:var(--mid);margin:4px 0 8px">Format: Question on one line, options on next: (A)option, (B)option, (C)option, (D)option</div>
         <div style="display:flex;gap:6px;flex-wrap:wrap">
-          <button class="btn btn-good btn-sm" id="btn-save-editor">💾 Save to GitHub</button>
-          <label class="btn btn-white btn-sm" style="cursor:pointer">📂 Upload .txt<input type="file" id="file-upload-inp" accept=".txt" style="display:none"/></label>
+          <button class="btn btn-good btn-sm" id="btn-save-editor">💾 Save</button>
           <button class="btn btn-ghost btn-sm" id="btn-close-editor">✕ Close</button>
         </div>
       </div>`:'';
+    const fileListHTML=manageFolder?(
+      manageFolderFiles.length
+        ?`<div style="display:flex;flex-direction:column;gap:3px;margin-bottom:8px">
+            ${manageFolderFiles.map(f=>`
+              <div style="display:flex;align-items:center;gap:6px;padding:6px 8px;background:${manageFile===f.name?'var(--faint)':'var(--white)'};border:1px solid ${manageFile===f.name?'var(--ink)':'var(--line)'};border-radius:6px">
+                <span style="flex:1;font-size:.8rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(f.name)}</span>
+                <button class="btn btn-ghost btn-sm" style="padding:2px 8px;font-size:.72rem;flex-shrink:0" data-file-edit="${esc(f.name)}">Edit</button>
+              </div>`).join('')}
+          </div>`
+        :`<p class="muted small" style="margin-bottom:8px">No .txt files yet — create or upload one below.</p>`
+    ):'';
     const managePanel=`
       <div style="display:flex;gap:6px;align-items:center;margin-bottom:8px">
         <select class="form-input" id="manage-folder-sel" style="flex:1;font-size:.82rem;padding:7px 8px">
@@ -1463,22 +1556,24 @@ function hostHTML(){
         </button>
       </div>
       ${manageFolder?`
-        <div style="display:flex;gap:6px;margin-bottom:8px">
-          <button class="btn btn-sm${manageEditMode==='existing'?' btn-dark':''}" style="flex:1;justify-content:center;gap:4px" id="btn-edit-existing">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
-            Edit existing
-          </button>
-          <button class="btn btn-sm${manageEditMode==='new'?' btn-dark':''}" style="flex:1;justify-content:center;gap:4px" id="btn-edit-new">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
-            New file
-          </button>
-          <button class="btn btn-sm" style="flex-shrink:0;background:#fff1f2;color:#be123c;border-color:#fecdd3;padding:6px 10px" id="btn-delete-folder" title="Delete folder">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3,6 5,6 21,6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>
-          </button>
+        ${fileListHTML}
+        ${editorHTML}
+        <div style="display:flex;flex-direction:column;gap:6px;padding:8px 0;border-top:1px solid var(--line)">
+          <div style="display:flex;gap:6px">
+            <input class="form-input" id="new-file-name" placeholder="chapter2.txt" maxlength="60" style="flex:1;font-size:.82rem;padding:7px 8px"/>
+            <button class="btn btn-accent btn-sm" id="btn-create-file">+ New</button>
+          </div>
+          <label class="btn btn-white btn-sm btn-full" style="cursor:pointer;justify-content:center">
+            📂 Upload .txt file
+            <input type="file" id="file-upload-inp" accept=".txt" style="display:none"/>
+          </label>
         </div>
-        ${editorHTML}`
-      :`<p class="muted small" style="margin-bottom:8px">Select a folder to edit or manage.</p>`}
-      <div style="border-top:1px solid var(--line);padding-top:8px;margin-top:4px">
+        <div style="padding-top:6px;border-top:1px solid var(--line)">
+          <button class="btn btn-sm btn-full" style="background:#fff1f2;color:#be123c;border-color:#fecdd3;justify-content:center" id="btn-delete-folder">🗑 Delete folder &amp; all files</button>
+        </div>`
+        :`<p class="muted small" style="margin-bottom:8px">Select a folder above to manage its chapter files.</p>`}
+      <div style="border-top:1px solid var(--line);padding-top:8px;margin-top:8px">
+        <p class="muted small mb2">Create a new subject folder:</p>
         <div style="display:flex;gap:6px">
           <input class="form-input" id="new-folder-name" placeholder="New folder name…" maxlength="40" style="flex:1;font-size:.82rem;padding:7px 8px"/>
           <button class="btn btn-accent btn-sm" id="btn-create-folder">+ Create</button>
@@ -1911,15 +2006,33 @@ function attach(){
   const manageSel=document.getElementById('manage-folder-sel');
   if(manageSel) manageSel.addEventListener('change', e=>{
     manageFolder=e.target.value||null;
-    manageEditMode=null; editingContent=''; editingSha=null; uploadMsg='';
+    manageEditMode=null; manageFile=null; manageFolderFiles=[]; editingContent=''; editingSha=null; uploadMsg='';
+    if(manageFolder){ loadFolderFiles(manageFolder); }
     render();
   });
-  on('btn-folder-refresh', ()=>{ loadUploadFolders(); });
-  on('btn-edit-existing', ()=>{
-    manageEditMode='existing'; editingContent=''; editingSha=null;
-    openFolderEdit(manageFolder);
+  on('btn-folder-refresh', ()=>{ if(manageFolder) loadFolderFiles(manageFolder); loadUploadFolders(); });
+
+  // Manage tab — click a file row to edit it
+  document.querySelectorAll('[data-file-edit]').forEach(el=>{
+    el.addEventListener('click', ()=>{
+      const fn=el.dataset.fileEdit;
+      manageEditMode='existing'; manageNewFileName='';
+      openFolderEdit(manageFolder, fn);
+    });
   });
-  on('btn-edit-new', ()=>{ manageEditMode='new'; editingContent=''; editingSha=null; render(); setTimeout(()=>document.getElementById('q-editor')?.focus(),50); });
+
+  // Manage tab — create new file button
+  on('btn-create-file', ()=>{
+    const inp=document.getElementById('new-file-name');
+    let n=inp?inp.value.trim():'';
+    if(!n){setUploadMsg('Enter a file name first','bad');return;}
+    if(!n.endsWith('.txt')) n+='.txt';
+    manageEditMode='new'; manageFile=n; manageNewFileName=n; editingContent=''; editingSha=null;
+    setUploadMsg('','');
+    render();
+    setTimeout(()=>document.getElementById('q-editor')?.focus(),50);
+  });
+
   on('btn-delete-folder', async ()=>{
     if(!manageFolder) return;
     if(!confirm(`Delete folder "${manageFolder}" and all its contents?`)) return;
@@ -1927,32 +2040,66 @@ function attach(){
   });
   on('btn-create-folder', createFolder);
   on('btn-save-editor', saveEditorContent);
-  on('btn-close-editor', ()=>{ manageEditMode=null; editingContent=''; editingSha=null; uploadMsg=''; render(); });
+  on('btn-close-editor', ()=>{ manageEditMode=null; manageFile=null; manageNewFileName=''; editingContent=''; editingSha=null; uploadMsg=''; render(); });
   document.getElementById('file-upload-inp')?.addEventListener('change', uploadQuestionsFile);
 
-  // Subject boxes — toggle selection + save count
-  document.querySelectorAll('.subject-box[data-subj]').forEach(box=>{
-    box.addEventListener('click', ()=>{
-      const name=box.dataset.subj;
-      if(selectedSubjects.has(name)) selectedSubjects.delete(name);
-      else selectedSubjects.add(name);
+  // Generate tab — subject accordion expand/collapse
+  document.querySelectorAll('[data-subj-expand]').forEach(el=>{
+    el.addEventListener('click', ()=>{
+      const name=el.dataset.subjExpand;
+      if(expandedSubject===name){ expandedSubject=null; }
+      else{
+        expandedSubject=name;
+        const s=subjects.find(x=>x.name===name);
+        if(s&&!s.filesLoaded) loadSubjectFiles(name);
+      }
       render();
     });
   });
 
-  on('btn-gen', ()=>{
-    hostTimerSeconds=Math.max(0,parseInt(document.getElementById('timer-sec-input')?.value)||0);
-    subjects.forEach(s=>{
-      const inp=document.getElementById('cnt-'+s.name);
-      if(inp) s.count=Math.max(1,parseInt(inp.value)||5);
+  // Generate tab — file checkboxes
+  document.querySelectorAll('[data-file-check]').forEach(inp=>{
+    inp.addEventListener('change', e=>{
+      e.stopPropagation();
+      const parts=inp.dataset.fileCheck.split('||');
+      const subjName=parts[0], fileName=parts[1];
+      const subj=subjects.find(s=>s.name===subjName);
+      if(!subj) return;
+      const file=subj.files.find(f=>f.name===fileName);
+      if(!file) return;
+      file.selected=inp.checked;
+      render();
     });
-    // only generate for selected subjects
-    const prev=subjects;
-    subjects=subjects.filter(s=>selectedSubjects.has(s.name));
-    generateQuiz();
-    subjects=prev;
+    inp.addEventListener('click', e=>e.stopPropagation());
   });
-  on('btn-reload',()=>{ questions=[]; selIdx=-1; answerKey=-1; subjects=[]; selectedSubjects=new Set(); repoPath=null; uploadTab='generate'; manageFolder=null; manageEditMode=null; editingContent=''; editingSha=null; uploadMsg=''; render(); });
+
+  // Generate tab — file count inputs (save on change, don't re-render to keep focus)
+  document.querySelectorAll('[data-file-cnt]').forEach(inp=>{
+    inp.addEventListener('change', e=>{
+      e.stopPropagation();
+      const parts=inp.dataset.fileCnt.split('||');
+      const subjName=parts[0], fileName=parts[1];
+      const subj=subjects.find(s=>s.name===subjName);
+      if(!subj) return;
+      const file=subj.files.find(f=>f.name===fileName);
+      if(file) file.count=Math.max(0,parseInt(inp.value)||0);
+    });
+    inp.addEventListener('click', e=>e.stopPropagation());
+  });
+
+  on('btn-gen', ()=>{
+    // Save timer and any unsaved count inputs before generating
+    hostTimerSeconds=Math.max(0,parseInt(document.getElementById('timer-sec-input')?.value)||0);
+    document.querySelectorAll('[data-file-cnt]').forEach(inp=>{
+      const parts=inp.dataset.fileCnt.split('||');
+      const subj=subjects.find(s=>s.name===parts[0]);
+      if(!subj) return;
+      const file=subj.files.find(f=>f.name===parts[1]);
+      if(file) file.count=Math.max(0,parseInt(inp.value)||0);
+    });
+    generateQuiz();
+  });
+  on('btn-reload',()=>{ questions=[]; selIdx=-1; answerKey=-1; subjects=[]; expandedSubject=null; repoPath=null; uploadTab='generate'; manageFolder=null; manageFile=null; manageFolderFiles=[]; manageEditMode=null; manageNewFileName=''; editingContent=''; editingSha=null; uploadMsg=''; render(); });
 
   // Timer input (live)
   document.getElementById('timer-sec-live')?.addEventListener('change',e=>{ hostTimerSeconds=Math.max(0,parseInt(e.target.value)||0); });
