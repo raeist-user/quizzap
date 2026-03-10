@@ -282,11 +282,14 @@ wss.on('connection', ws => {
         break;
       }
 
-      // FIX #3: open_session was completely missing — the "Start" button did nothing
       case 'open_session':
-        if (client.role !== 'host') break;
+        if (client.role !== 'host') {
+          tx(ws, { type: 'open_session_result', ok: false, reason: 'Not authenticated as host' });
+          break;
+        }
         state.sessionOpen = true;
         broadcast();
+        tx(ws, { type: 'open_session_result', ok: true });
         break;
 
       case 'push_question':
