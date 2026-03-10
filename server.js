@@ -298,7 +298,13 @@ wss.on('connection', ws => {
       case 'join': {
         if (!msg.name?.trim()) break;
         let pid = msg.pid;
-        if (!pid || !state.participants[pid]) {
+        // Reconnect path: participant already exists in state (disconnected but not removed)
+        if (pid && state.participants[pid]) {
+          // Restore their session — keep score and userId intact
+          state.participants[pid].name = msg.name.trim().slice(0, 32); // refresh name in case of display name change
+          if (!state.participants[pid].userId && msg.userId) state.participants[pid].userId = msg.userId;
+        } else {
+          // New join — assign a fresh pid
           pid = `p${cid}_${Date.now()}`;
           // FIX #10: store userId on participant so leaderboard can attribute scores
           state.participants[pid] = { id: pid, name: msg.name.trim().slice(0, 32), score: 0, userId: msg.userId || null };
@@ -483,11 +489,13 @@ wss.on('connection', ws => {
   });
 
   ws.on('close', () => {
-    // FIX: clean up disconnected participant from state so counts stay accurate
     const c = clients.get(cid);
+    // When a participant disconnects we intentionally keep their entry in
+    // state.participants so their score survives a page refresh / reconnect.
+    // We only clear their answers so the answer-count stays accurate.
     if (c?.role === 'participant' && c.pid) {
-      delete state.participants[c.pid];
       delete state.answers[c.pid];
+      // Mark as offline so host can see who is still connected (optional broadcast)
       broadcast();
     }
     if (cid === hostCid) hostCid = null;
