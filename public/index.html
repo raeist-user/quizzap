@@ -979,7 +979,8 @@ async function generateQuiz(){
   let all=[];
   try{
     for(const s of chosen){
-      const rawUrl=`https://raw.githubusercontent.com/${GITHUB_REPO}/${GITHUB_BRANCH}/${s.path}/questions.txt`;
+      const encodedPath=s.path.split('/').map(encodeURIComponent).join('/');
+      const rawUrl=`https://raw.githubusercontent.com/${GITHUB_REPO}/${GITHUB_BRANCH}/${encodedPath}/questions.txt`;
       const headers={}; if(isValidToken()) headers['Authorization']='Bearer '+MY_TOKEN;
       const res=await fetch(rawUrl,{headers});
       if(!res.ok) throw new Error(`Could not fetch ${s.name}/questions.txt`);
