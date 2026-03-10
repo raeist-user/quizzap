@@ -458,7 +458,7 @@ let hostSchedules=[]; // schedules shown in host panel
 const STUN={iceServers:[{urls:'stun:stun.l.google.com:19302'},{urls:'stun:stun1.l.google.com:19302'}]};
 
 // ── GITHUB CONFIG ─────────────────────────────────────────────────────────
-let MY_TOKEN = process.env.MY_TOKEN || ''; // Add the || '' as a fallback
+const MY_TOKEN = '%%MY_TOKEN%%';
 
 const GITHUB_REPO  = 'raeist-user/quizzap';
 const GITHUB_BRANCH = 'main';
@@ -815,18 +815,13 @@ let uploadMsg='';
 let uploadSubjects=[];    // folders list for manage tab
 
 function isValidToken() { 
-  return MY_TOKEN && !MY_TOKEN.startsWith('%%'); 
+  return MY_TOKEN && !MY_TOKEN.startsWith('%%') && MY_TOKEN.length > 0;
 }
-
-// 3. Update the headers function
-function ghHeaders() {
-  return {
-    'Accept': 'application/vnd.github+json',
-    'Content-Type': 'application/json',
-    'User-Agent': 'shadab-app', // Ensure no trailing comma errors here
-    'Authorization': isValidToken() ? `Bearer ${MY_TOKEN}` : undefined
-  };
-  }
+function ghHeaders(){
+  const h={'Accept':'application/vnd.github+json','Content-Type':'application/json'};
+  if(isValidToken()) h['Authorization']='Bearer '+MY_TOKEN;
+  return h;
+}
 
 
 async function browseRepo(){
