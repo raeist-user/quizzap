@@ -256,6 +256,19 @@
     .lb-row{display:flex;align-items:center;gap:10px;padding:9px 14px;border-bottom:1px solid var(--line);font-size:.85rem}
     .lb-row:last-child{border-bottom:none}
     .lb-row.me{background:#e8f5ee}
+    /* Standings overlay */
+    .standings-overlay{position:fixed;inset:0;z-index:900;display:flex;flex-direction:column;background:var(--white)}
+    .standings-overlay-head{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--line);background:var(--white);flex-shrink:0}
+    .standings-overlay-body{flex:1;overflow:auto;-webkit-overflow-scrolling:touch}
+    .standings-tbl{width:100%;border-collapse:collapse;font-size:.82rem}
+    .standings-tbl th{padding:8px 10px;text-align:center;background:var(--faint);border-bottom:2px solid var(--line);border-right:1px solid var(--line);font-size:.68rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--mid);white-space:nowrap;position:sticky;top:0;z-index:2}
+    .standings-tbl th:first-child{text-align:left;position:sticky;left:0;z-index:3;background:var(--faint)}
+    .standings-tbl td{padding:8px 10px;text-align:center;border-bottom:1px solid var(--line);border-right:1px solid var(--line);vertical-align:middle;white-space:nowrap}
+    .standings-tbl td:first-child{text-align:left;font-weight:600;position:sticky;left:0;background:var(--white);z-index:1}
+    .standings-tbl tr:last-child td{border-bottom:none}
+    .standings-tbl td.total-col{font-weight:700;background:#f0faf4;border-left:2px solid #b7dfc7;color:#166534}
+    .standings-tbl th.total-col{background:#e8f5ee;border-left:2px solid #b7dfc7;color:#166534}
+    .standings-tbl .zero{color:var(--line)}
     .lb-sessions{font-size:.72rem;color:var(--mid);margin-right:6px}
 
     /* ANIMATIONS */
@@ -414,7 +427,7 @@ let prevMyScore=0, scoreGain=0;
 
 // Host
 let questions=[], selIdx=-1, answerKey=-1, inspectPid=null;
-let sidebarQOpen=false, sidebarStudOpen=false, sidebarScoreOpen=false, sidebarSchedOpen=false;
+let sidebarQOpen=false, sidebarStudOpen=false, sidebarScoreOpen=false, sidebarSchedOpen=false, showStandingsOverlay=false;
 let hostTimerSeconds=0;
 
 // Resource browser
@@ -1517,6 +1530,95 @@ function schedOverlayHTML(){
   </div>`;
 }
 
+function standingsOverlayHTML(){
+  if(!showStandingsOverlay) return '';
+  const snaps  = S.sessionSnapshots || [];
+  const gcores = S.gameScores || [];       // [{id,name,total}] cumulative
+  const parts  = S.participants || [];
+  const medals = ['🥇','🥈','🥉'];
+
+  // Build a master list of all known students (union of all sessions + current)
+  const nameMap = {};
+  snaps.forEach(sn => sn.scores.forEach(s => { nameMap[s.id] = s.name; }));
+  parts.forEach(p => { nameMap[p.id] = p.name; });
+  gcores.forEach(g => { nameMap[g.id] = g.name; });
+
+  // For cumulative total use gameScores (already banked past sessions)
+  // Add current live session scores on top
+  const liveScoreMap = {};
+  parts.forEach(p => { liveScoreMap[p.id] = p.score || 0; });
+
+  const totalMap = {};
+  gcores.forEach(g => { totalMap[g.id] = (g.total || 0); });
+  // Add current session live scores (not yet banked)
+  parts.forEach(p => { totalMap[p.id] = (totalMap[p.id]||0) + (p.score||0); });
+
+  // Sort students by grand total descending
+  const allIds = Object.keys(nameMap);
+  allIds.sort((a,b)=>(totalMap[b]||0)-(totalMap[a]||0));
+
+  const numSessions = snaps.length;
+  const currentSessionNum = numSessions + 1;
+  const hasCurrentSession = parts.length > 0;
+
+  if(allIds.length === 0){
+    return `<div class="standings-overlay">
+      <div class="standings-overlay-head">
+        <span style="font-weight:700;font-size:.95rem">📊 Current Standings</span>
+        <button class="btn btn-ghost btn-sm" id="btn-standings-close">✕ Close</button>
+      </div>
+      <div style="padding:40px;text-align:center;color:var(--mid)">No data yet</div>
+    </div>`;
+  }
+
+  // Header row: Name | S1 | S2 | … | Current | Total
+  let thCells = `<th>Student</th>`;
+  snaps.forEach((sn,i) => { thCells += `<th>${i+1}</th>`; });
+  if(hasCurrentSession){ thCells += `<th>${currentSessionNum}</th>`; }
+  thCells += `<th class="total-col">∑</th>`;
+
+  // Data rows
+  const rows = allIds.map((id,i) => {
+    const name = nameMap[id] || '—';
+    let tds = `<td><span style="min-width:20px;display:inline-block;text-align:center;font-size:.72rem;color:var(--mid)">${medals[i]||'#'+(i+1)}</span> ${esc(name)}</td>`;
+    snaps.forEach(sn => {
+      const entry = sn.scores.find(s=>s.id===id);
+      const pts = entry ? entry.score : null;
+      tds += pts===null
+        ? `<td class="zero">—</td>`
+        : `<td>${pts}</td>`;
+    });
+    if(hasCurrentSession){
+      const pts = liveScoreMap[id];
+      tds += pts===undefined
+        ? `<td class="zero">—</td>`
+        : `<td>${pts}</td>`;
+    }
+    const grand = totalMap[id] || 0;
+    tds += `<td class="total-col">${grand}</td>`;
+    return `<tr>${tds}</tr>`;
+  }).join('');
+
+  // Session separator legend below table
+  const sessionCount = numSessions + (hasCurrentSession?1:0);
+
+  return `<div class="standings-overlay">
+    <div class="standings-overlay-head">
+      <div>
+        <span style="font-weight:700;font-size:.95rem">📊 Current Standings</span>
+        <span style="margin-left:10px;font-size:.75rem;color:var(--mid)">${allIds.length} students · ${sessionCount} session${sessionCount!==1?'s':''}</span>
+      </div>
+      <button class="btn btn-ghost btn-sm" id="btn-standings-close">✕ Close</button>
+    </div>
+    <div class="standings-overlay-body">
+      <table class="standings-tbl">
+        <thead><tr>${thCells}</tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+  </div>`;
+}
+
 
 function hostHTML(){
   if(S.status==='ended') return hostEndedHTML();
@@ -1529,21 +1631,24 @@ function hostHTML(){
   const medals=['🥇','🥈','🥉'];
 
   // ── 1. LIVE SCORE NAV ──────────────────────────────────────────────────
-  const scoreChips=sorted.slice(0,7).map((p,i)=>
-    `<div class="sb-chip">${medals[i]||'#'+(i+1)} ${esc(p.name.split(' ')[0])} <span class="sb-pts">${p.score||0}</span></div>`
-  ).join('');
+  const snaps = S.sessionSnapshots || [];
+  const currentSessionLabel = snaps.length > 0 ? `S${snaps.length + 1}` : 'S1';
+  const standingsLabel = parts.length
+    ? `📊 ${currentSessionLabel} · ${parts.length} joined`
+    : `📊 Standings`;
   const liveNav=`
     <div class="host-live-nav">
       <button class="btn btn-ghost btn-sm" id="btn-host-home" style="flex-shrink:0;padding:4px 8px;font-size:.75rem">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:3px"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9,22 9,12 15,12 15,22"/></svg>Home
       </button>
-      <div style="flex:1;min-width:0;overflow:hidden;display:flex;align-items:center;gap:5px;overflow-x:auto;scrollbar-width:none">
-        ${parts.length?scoreChips:`<span class="muted small" style="white-space:nowrap">No students yet</span>`}
+      <div style="flex:1;min-width:0;display:flex;align-items:center;justify-content:center">
+        <button class="btn btn-ghost btn-sm" id="btn-standings-open" style="padding:5px 14px;font-size:.8rem;font-weight:600;border-color:var(--line)">
+          ${standingsLabel}
+        </button>
       </div>
       <button class="btn btn-ghost btn-sm" id="btn-sched-nav" style="flex-shrink:0;padding:4px 8px;gap:4px;font-size:.75rem">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>Sched
       </button>
-      <div style="flex-shrink:0;font-size:.75rem;font-weight:600;color:var(--mid);white-space:nowrap;padding-left:4px">${isLive?`${answered}/${parts.length}`:`${parts.length} joined`}</div>
     </div>`;
 
   // SVG icons — refined set
@@ -1776,6 +1881,7 @@ function hostHTML(){
       </div>
       ${schedOverlayHTML()}
       ${haltMenuOverlayHTML()}
+      ${standingsOverlayHTML()}
     </div>`;
   }
 
@@ -1874,6 +1980,7 @@ function hostHTML(){
     </div>
     ${schedOverlayHTML()}
     ${haltMenuOverlayHTML()}
+    ${standingsOverlayHTML()}
   </div>`;
 }
 
@@ -2324,6 +2431,8 @@ function attach(){
   on('sb-toggle-sched', ()=>{ sidebarSchedOpen=!sidebarSchedOpen; render(); });
   on('btn-sched-nav',   ()=>{ sidebarSchedOpen=!sidebarSchedOpen; render(); });
   on('btn-sched-close', ()=>{ sidebarSchedOpen=false; render(); });
+  on('btn-standings-open',  ()=>{ showStandingsOverlay=true;  render(); });
+  on('btn-standings-close', ()=>{ showStandingsOverlay=false; render(); });
 
   // Q selection
   document.querySelectorAll('.q-row[data-qi]').forEach(el=>
