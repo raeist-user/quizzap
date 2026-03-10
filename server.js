@@ -424,34 +424,25 @@ wss.on('connection', ws => {
         broadcast();
         break;
 
-      // FIX #4: halt was completely missing — "End & dismiss students" did nothing
+      // halt: sends halted message to students, host sees the halt menu
       case 'halt':
         if (client.role !== 'host') break;
         clients.forEach((c) => {
           if (c.role === 'participant')
             tx(c.ws, { type: 'halted', payload: { participants: Object.values(state.participants) } });
         });
-        clients.forEach((c) => {
-          if (c.role === 'participant') { tx(c.ws, { type: 'kicked' }); c.role = null; c.pid = null; }
-        });
-        gameScores = {};
-        sessionSnapshots = [];
-        sessionCounter = 0;
-        state = fresh();
+        broadcast();
+        break;
+
+      // shutdown: bank scores, persist to DB, dismiss all students, reset state
+      case 'shutdown':
         if (client.role !== 'host') break;
-        // Bank the final session's scores into gameScores
         bankGameScores();
         {
-          // Build the definitive final leaderboard from server-side gameScores
-          // This is authoritative — it cannot be lost due to host page refresh
           const finalLeaderboard = Object.entries(gameScores)
             .map(([pid, g]) => ({ id: pid, name: g.name, userId: g.userId, score: g.total }))
             .sort((a, b) => b.score - a.score);
-
-          // Persist to all-time DB
           persistLeaderboard(finalLeaderboard);
-
-          // Send to every participant so their dismiss screen shows correct cumulative totals
           clients.forEach((c) => {
             if (c.role === 'participant') {
               tx(c.ws, { type: 'kicked', payload: { finalLeaderboard } });
@@ -459,7 +450,7 @@ wss.on('connection', ws => {
             }
           });
         }
-        gameScores = {};   // clear for next game day
+        gameScores = {};
         sessionSnapshots = [];
         sessionCounter = 0;
         state = fresh();
