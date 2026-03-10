@@ -449,11 +449,10 @@ let pushing=false, pushTimeout=null;
 // Halt flow
 let showingHalted=false, haltedCountdown=0, haltedTimer=null, haltedSnapshot=[];
 
-// Dismissed flow (host sent Stop & Dismiss)
+// Dismissed flow
 let showingDismissed=false, dismissedCountdown=30, dismissedTimer=null;
 
-// Cumulative scores across multiple sessions (survives host-triggered resets)
-// Map: pid → { name, score }
+// Cumulative scores across resets: pid -> {name, base, score}
 let cumulativeScores={};
 
 // Home tabs
@@ -648,20 +647,17 @@ function connect(){
     switch(m.type){
       case 'hello':     myCid=m.cid; break;
       case 'kicked':
-        // Capture current participants for the dismissal leaderboard
-        { const kickParts=m.payload?.participants||S.participants||[];
-          if(kickParts.length) haltedSnapshot=kickParts; }
-        showingHalted=false;
-        showingDismissed=true;
-        dismissedCountdown=30;
+        { const kp=m.payload&&m.payload.participants||haltedSnapshot||[];
+          if(kp.length) haltedSnapshot=[...kp]; }
+        showingHalted=false; showingDismissed=true; dismissedCountdown=30;
         if(dismissedTimer){clearInterval(dismissedTimer);dismissedTimer=null;}
         dismissedTimer=setInterval(()=>{
           dismissedCountdown=Math.max(0,dismissedCountdown-1);
           const cd=document.getElementById('dismissed-cd-num');
           if(cd) cd.textContent=dismissedCountdown;
           const ring=document.getElementById('dismissed-ring');
-          if(ring) ring.style.strokeDashoffset=((125.7*(dismissedCountdown/30))).toFixed(2);
-          if(dismissedCountdown<=0){ clearInterval(dismissedTimer); dismissedTimer=null; doDismissHome(); }
+          if(ring) ring.style.strokeDashoffset=(125.7*(dismissedCountdown/30)).toFixed(2);
+          if(dismissedCountdown<=0){clearInterval(dismissedTimer);dismissedTimer=null;doDismissHome();}
         },1000);
         render(); break;
       case 'halted':
@@ -706,20 +702,8 @@ function connect(){
             }
           }
         }
-        prevStatus=ns;
-        S=m.payload;
-        // Keep cumulativeScores up-to-date with every state that has participants
-        if(m.payload.participants){
-          m.payload.participants.forEach(p=>{
-            const prev=cumulativeScores[p.id];
-            cumulativeScores[p.id]={
-              name: p.name,
-              // accumulate: base (from prior resets) + current session score
-              score: (prev?prev.base||0:0) + (p.score||0)
-            };
-          });
-        }
-        // If a new session state arrives (idle after reset), freeze prior scores as base
+        prevStatus=ns; S=m.payload;
+        // Exit halted screen when new session state arrives
         if(ns==='idle'&&showingHalted){ showingHalted=false; haltedSnapshot=[]; }
         render(); break;
       }
@@ -1194,8 +1178,8 @@ function render(){
   document.getElementById('pd-email').textContent=u.email;
   const v=document.getElementById('view');
 
-  if(showingHalted){ v.innerHTML=haltedHTML(); attach(); return; }
   if(showingDismissed){ v.innerHTML=studentDismissedHTML(); attach(); return; }
+  if(showingHalted){ v.innerHTML=haltedHTML(); attach(); return; }
   if(showingProfile){ v.innerHTML=profilePageHTML(); attach(); return; }
   if(!role)                           v.innerHTML=landingHTML();
   else if(role==='host'&&!hostAuthed) v.innerHTML=hostPassHTML();
@@ -1253,7 +1237,7 @@ function landingHTML(){
     const myEntry=allTimeLB?allTimeLB.find(e=>e.userId===currentUser?.id):null;
     const myRankAll=allTimeLB?allTimeLB.findIndex(e=>e.userId===currentUser?.id)+1:0;
     const rows=allTimeLB===null
-      ?`<div style="padding:32px;text-align:center;color:var(--mid)"><div class="spinner" style="margin:0 auto 12px"></div>Loading…</div>`
+      ?'<div style="padding:32px;text-align:center;color:var(--mid)"><div class="spinner" style="margin:0 auto 12px"></div>Loading…</div>'
       :allTimeLB.length
         ?allTimeLB.slice(0,20).map((e,i)=>`
           <div class="lb-row${e.userId===currentUser?.id?' me':''}">
@@ -1262,27 +1246,21 @@ function landingHTML(){
             <div class="lb-sessions">${e.sessionsPlayed||0} session${(e.sessionsPlayed||0)!==1?'s':''}</div>
             <div class="score-pts">${e.totalScore||0} pts</div>
           </div>`).join('')
-        :`<div style="padding:32px;text-align:center;color:var(--mid)">
-            <div style="font-size:2rem;margin-bottom:10px">🏆</div>
-            No scores yet — be the first!
-          </div>`;
-    // If current user is outside top 20, pin their row at bottom
-    const myPinRow=myRankAll>20&&myEntry?`
-      <div style="border-top:2px solid var(--line)">
-        <div class="lb-row me">
+        :'<div style="padding:32px;text-align:center;color:var(--mid)"><div style="font-size:2rem;margin-bottom:10px">🏆</div>No scores yet — be the first!</div>';
+    const myPinRow=myRankAll>20&&myEntry
+      ?`<div style="border-top:2px solid var(--line)"><div class="lb-row me">
           <div class="score-rank">#${myRankAll}</div>
-          <div style="flex:1;font-weight:700">${esc(myEntry.userName||'—')}<span style="font-size:.7rem;color:var(--mid);margin-left:5px">← you</span></div>
+          <div style="flex:1;font-weight:700">${esc(myEntry.userName||'—')} <span style="font-size:.7rem;color:var(--mid)">← you</span></div>
           <div class="lb-sessions">${myEntry.sessionsPlayed||0} session${(myEntry.sessionsPlayed||0)!==1?'s':''}</div>
           <div class="score-pts">${myEntry.totalScore||0} pts</div>
-        </div>
-      </div>`:''
-    ;
+        </div></div>`
+      :'';
     return `<div class="lb-full-screen">
       <div class="lb-full-inner">
         ${tabs}
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
           <div><h2>All-time Leaderboard</h2><p class="muted small mt1">Cumulative scores across all sessions</p></div>
-          <button class="btn btn-ghost btn-sm" id="btn-lb-refresh" style="flex-shrink:0">↻ Refresh</button>
+          <button class="btn btn-ghost btn-sm" id="btn-lb-refresh" style="flex-shrink:0">↻</button>
         </div>
         <div class="score-list" style="overflow-y:auto;flex:1">${rows}${myPinRow}</div>
       </div>
@@ -1323,7 +1301,7 @@ function haltedHTML(){
     ?sorted.map((p,i)=>`
       <div class="lb-row${p.id===myPid?' me':''}">
         <div class="score-rank">${medals[i]||('#'+(i+1))}</div>
-        <div style="flex:1;font-weight:${i<3?'600':'400'}">${esc(p.name)}${p.id===myPid?'<span style="font-size:.68rem;color:var(--mid);margin-left:5px">← you</span>':''}</div>
+        <div style="flex:1;font-weight:${i<3?'600':'400'}">${esc(p.name)}${p.id===myPid?' <span style="font-size:.68rem;color:var(--mid)">(you)</span>':''}</div>
         <div class="score-pts">${p.score||0} pts</div>
       </div>`).join('')
     :`<div style="padding:20px;text-align:center;color:var(--mid)">No scores yet.</div>`;
@@ -1331,8 +1309,8 @@ function haltedHTML(){
     <div style="text-align:center;padding:20px 0 16px;flex-shrink:0">
       <div style="font-size:2.4rem;margin-bottom:10px;animation:blink 1.4s ease-in-out infinite">⏸</div>
       <h2 style="margin-bottom:6px">Session paused</h2>
-      <p class="muted small" style="line-height:1.6">The host has paused the quiz.<br>Please wait patiently — they will continue shortly<br>or start a new session.</p>
-      ${myP?`<div style="margin-top:12px;display:inline-flex;align-items:center;gap:8px;padding:6px 14px;background:#e8f5ee;border:1px solid #b7dfc7;border-radius:20px;font-size:.78rem;font-weight:600;color:#166534">Your score: ${myP.score||0} pts &nbsp;·&nbsp; Rank #${myRank}</div>`:''}
+      <p class="muted small">The host has paused the quiz.<br>Please wait patiently — they may continue<br>or start a new session shortly.</p>
+      ${myP?'<div style="margin-top:10px;display:inline-flex;align-items:center;gap:7px;padding:5px 13px;background:#e8f5ee;border:1px solid #b7dfc7;border-radius:20px;font-size:.77rem;font-weight:600;color:#166534">Score: '+myP.score+' pts &nbsp;·&nbsp; Rank #'+myRank+'</div>':''}
     </div>
     <div class="lb-panel" style="flex:1;overflow:hidden;display:flex;flex-direction:column">
       <div class="lb-head"><span style="font-size:.82rem;font-weight:600">🏆 Current Standings</span><span class="small muted">${sorted.length} student${sorted.length!==1?'s':''}</span></div>
@@ -1342,7 +1320,7 @@ function haltedHTML(){
 }
 
 /* ══════════════════════════════════════
-   DISMISSED SCREEN (session ended by host)
+   DISMISSED SCREEN
 ══════════════════════════════════════ */
 function studentDismissedHTML(){
   const sorted=[...haltedSnapshot].sort((a,b)=>(b.score||0)-(a.score||0));
@@ -1353,37 +1331,31 @@ function studentDismissedHTML(){
     ?sorted.map((p,i)=>`
       <div class="lb-row${p.id===myPid?' me':''}">
         <div class="score-rank">${medals[i]||('#'+(i+1))}</div>
-        <div style="flex:1;font-weight:${i<3?'600':'400'}">${esc(p.name)}${p.id===myPid?'<span style="font-size:.68rem;color:var(--mid);margin-left:5px">← you</span>':''}</div>
+        <div style="flex:1;font-weight:${i<3?'600':'400'}">${esc(p.name)}${p.id===myPid?' <span style="font-size:.68rem;color:var(--mid)">(you)</span>':''}</div>
         <div class="score-pts">${p.score||0} pts</div>
       </div>`).join('')
     :`<div style="padding:20px;text-align:center;color:var(--mid)">No scores recorded.</div>`;
-  // SVG ring: r=20, circumference ≈ 125.7; dashoffset decreases as time passes
   const circ=125.7;
   const offset=(circ*(dismissedCountdown/30)).toFixed(1);
   return `<div style="display:flex;flex-direction:column;height:calc(100vh - 54px);overflow:hidden;padding:16px 20px;max-width:520px;margin:0 auto">
     <div style="text-align:center;padding:18px 0 12px;flex-shrink:0">
-      <!-- Countdown ring -->
       <div style="position:relative;width:72px;height:72px;margin:0 auto 14px">
         <svg width="72" height="72" viewBox="0 0 72 72" style="transform:rotate(-90deg)">
           <circle cx="36" cy="36" r="20" fill="none" stroke="var(--line)" stroke-width="4"/>
           <circle id="dismissed-ring" cx="36" cy="36" r="20" fill="none" stroke="var(--bad)" stroke-width="4"
-            stroke-dasharray="${circ}" stroke-dashoffset="${offset}"
-            style="transition:stroke-dashoffset 1s linear"/>
+            stroke-dasharray="${circ}" stroke-dashoffset="${offset}" style="transition:stroke-dashoffset 1s linear"/>
         </svg>
         <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:1.3rem;font-weight:700;color:var(--bad)" id="dismissed-cd-num">${dismissedCountdown}</div>
       </div>
       <div style="font-size:2rem;margin-bottom:8px">🎓</div>
       <h2 style="margin-bottom:5px">Session has ended</h2>
-      <p class="muted small" style="line-height:1.6">The host has closed this session.<br>You'll be taken home in <strong>${dismissedCountdown}</strong> seconds.</p>
-      ${myP?`<div style="margin-top:10px;display:inline-flex;align-items:center;gap:8px;padding:5px 14px;background:#e8f5ee;border:1px solid #b7dfc7;border-radius:20px;font-size:.77rem;font-weight:600;color:#166534">Final: ${myP.score||0} pts &nbsp;·&nbsp; #${myRank} of ${sorted.length}</div>`:''}
+      <p class="muted small">The host has closed this session.<br>Going home in ${dismissedCountdown} seconds.</p>
+      ${myP?'<div style="margin-top:10px;display:inline-flex;align-items:center;gap:7px;padding:5px 13px;background:#e8f5ee;border:1px solid #b7dfc7;border-radius:20px;font-size:.77rem;font-weight:600;color:#166534">Final: '+myP.score+' pts &nbsp;·&nbsp; #'+myRank+' of '+sorted.length+'</div>':''}
       <div style="margin-top:14px">
-        <button class="btn btn-dark" id="btn-dismissed-home" style="gap:7px;padding:9px 22px">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9,22 9,12 15,12 15,22"/></svg>
-          Go Home Now
-        </button>
+        <button class="btn btn-dark" id="btn-dismissed-home" style="gap:7px;padding:9px 22px">🏠 Go Home Now</button>
       </div>
     </div>
-    <div style="font-size:.67rem;text-align:center;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--mid);margin-bottom:6px;flex-shrink:0">🏆 Final Leaderboard</div>
+    <div style="font-size:.67rem;text-align:center;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--mid);margin-bottom:6px;flex-shrink:0">🏆 Final Leaderboard (Cumulative)</div>
     <div class="lb-panel" style="flex:1;overflow:hidden;display:flex;flex-direction:column;margin-top:0">
       <div class="lb-head"><span style="font-size:.82rem;font-weight:600">Final Standings</span><span class="small muted">${sorted.length} student${sorted.length!==1?'s':''}</span></div>
       <div style="overflow-y:auto;flex:1">${rows}</div>
@@ -1391,7 +1363,9 @@ function studentDismissedHTML(){
   </div>`;
 }
 
-
+/* ══════════════════════════════════════
+   PROFILE PAGE
+══════════════════════════════════════ */
 function profilePageHTML(){
   const u=currentUser;
   const initials=u.name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
@@ -1404,11 +1378,8 @@ function profilePageHTML(){
   let body='';
 
   if(profileTab==='overview'||profileTab==='history'){
-    body=`<div style="text-align:center;padding:48px 20px;color:var(--mid)">
-      <div style="font-size:2.2rem;margin-bottom:12px">${profileTab==='overview'?'📈':'📋'}</div>
-      <div style="font-size:.95rem;font-weight:600;color:var(--ink);margin-bottom:6px">Coming soon</div>
-      <p class="muted small">This section is being built.<br>Check back later!</p>
-    </div>`;
+    const icon=profileTab==='overview'?'📈':'📋';
+    body='<div style="text-align:center;padding:48px 20px;color:var(--mid)"><div style="font-size:2.4rem;margin-bottom:12px">'+icon+'</div><div style="font-size:.95rem;font-weight:600;color:var(--ink);margin-bottom:6px">Coming soon</div><p class="muted small">This section is being built.</p></div>';
   }
 
   if(profileTab==='settings'){
@@ -1468,45 +1439,46 @@ function hostPassHTML(){
 ══════════════════════════════════════ */
 function haltMenuOverlayHTML(){
   if(!showingHaltMenu) return '';
-  // Build mini leaderboard from current participants
   const parts=S.participants||[];
   const sorted=[...parts].sort((a,b)=>(b.score||0)-(a.score||0));
   const medals=['🥇','🥈','🥉'];
   const lbRows=sorted.length
-    ?sorted.slice(0,8).map((p,i)=>`
-      <div style="display:flex;align-items:center;gap:9px;padding:8px 14px;border-bottom:1px solid var(--line);font-size:.83rem;background:${i<3?'var(--faint)':'var(--white)'}">
-        <div style="min-width:22px;text-align:center;font-size:.73rem;color:var(--mid)">${medals[i]||('#'+(i+1))}</div>
-        <div style="flex:1;font-weight:${i<3?'600':'400'};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(p.name)}</div>
-        <div style="font-weight:600;color:var(--good)">${p.score||0} pts</div>
-      </div>`).join('')
-    :`<div style="padding:16px;text-align:center;color:var(--mid);font-size:.82rem">No students in session.</div>`;
-  const extraNote=sorted.length>8?`<div style="padding:5px 14px;font-size:.72rem;color:var(--mid);text-align:center">+${sorted.length-8} more students</div>`:'';
-  return `<div style="position:absolute;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:flex-end;justify-content:center;z-index:500;padding:0;backdrop-filter:blur(3px)"
-      id="halt-overlay-bg">
-    <div style="background:var(--white);border-radius:18px 18px 0 0;padding:0;width:100%;max-width:480px;max-height:88vh;display:flex;flex-direction:column;box-shadow:0 -8px 40px rgba(0,0,0,.25);animation:slideUp .22s ease">
-      <!-- Header -->
+    ?sorted.slice(0,10).map((p,i)=>{
+        const banked=cumulativeScores[p.id]||0;
+        const cumTotal=banked+(p.score||0);
+        const hasPrior=banked>0;
+        return `<div style="display:flex;align-items:center;gap:9px;padding:8px 14px;border-bottom:1px solid var(--line);font-size:.83rem">
+          <div style="min-width:22px;text-align:center;font-size:.72rem;color:var(--mid)">${medals[i]||('#'+(i+1))}</div>
+          <div style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:${i<3?'600':'400'}">${esc(p.name)}</div>
+          <div style="text-align:right">
+            <div style="font-weight:700;color:var(--good);font-size:.85rem">${hasPrior?cumTotal:(p.score||0)} pts</div>
+            ${hasPrior?`<div style="font-size:.67rem;color:var(--mid)">${banked} + ${p.score||0}</div>`:''}
+          </div>
+        </div>`;
+      }).join('')
+    :'<div style="padding:16px;text-align:center;color:var(--mid);font-size:.82rem">No students.</div>';
+  const extra=sorted.length>10?'<div style="padding:5px 14px;font-size:.72rem;color:var(--mid);text-align:center">+' + (sorted.length-10) + ' more</div>':'';
+  return `<div style="position:absolute;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:flex-end;justify-content:center;z-index:500;backdrop-filter:blur(2px)">
+    <div style="background:var(--white);border-radius:18px 18px 0 0;width:100%;max-width:480px;max-height:88vh;display:flex;flex-direction:column;box-shadow:0 -8px 40px rgba(0,0,0,.25);animation:slideUp .22s ease">
       <div style="padding:16px 20px 12px;border-bottom:1px solid var(--line);flex-shrink:0;text-align:center">
         <div style="width:36px;height:4px;background:var(--line);border-radius:2px;margin:0 auto 14px"></div>
-        <div style="font-size:1.6rem;margin-bottom:6px">⏸</div>
-        <div style="font-size:1rem;font-weight:600;margin-bottom:3px">Halt Session</div>
-        <p class="muted small">Session is paused for students. Choose what happens next.</p>
+        <div style="font-size:1.6rem;margin-bottom:4px">⏸</div>
+        <div style="font-size:1rem;font-weight:600;margin-bottom:2px">Session Halted</div>
+        <p class="muted small">Students are on pause. What next?</p>
+        ${Object.keys(cumulativeScores).filter(k=>!k.endsWith('__name')).length
+          ?'<div style="margin-top:6px;display:inline-block;background:#eff6ff;color:#1a56db;border:1px solid #bfdbfe;border-radius:20px;padding:3px 10px;font-size:.72rem;font-weight:600">Scores shown are cumulative across all sessions</div>'
+          :''}
       </div>
-      <!-- Leaderboard -->
       <div style="flex:1;overflow-y:auto;min-height:0">
-        <div style="padding:10px 14px 4px;font-size:.67rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--mid)">🏆 Current Standings (${sorted.length} students)</div>
-        ${lbRows}${extraNote}
+        <div style="padding:10px 14px 4px;font-size:.67rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--mid)">🏆 Current Standings (${sorted.length})</div>
+        ${lbRows}${extra}
       </div>
-      <!-- Action buttons -->
       <div style="padding:14px 16px 24px;display:flex;flex-direction:column;gap:10px;flex-shrink:0;border-top:1px solid var(--line)">
-        <button class="btn btn-lg" id="btn-new-session"
-          style="justify-content:center;gap:9px;background:#1a56db;color:#fff;border-color:#1a56db;font-size:.88rem">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><polyline points="1,4 1,10 7,10"/><path d="M3.51 15a9 9 0 1 0 .49-4.95"/></svg>
-          New Session <span style="opacity:.75;font-weight:400;font-size:.78rem">· resets scores to 0</span>
+        <button class="btn btn-lg" id="btn-new-session" style="justify-content:center;gap:8px;background:#1a56db;color:#fff;border-color:#1a56db">
+          🔄 New Session <span style="opacity:.75;font-weight:400;font-size:.78rem">· resets scores to 0</span>
         </button>
-        <button class="btn btn-lg" id="btn-stop-dismiss"
-          style="justify-content:center;gap:9px;background:#be123c;color:#fff;border-color:#be123c;font-size:.88rem">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" fill="currentColor" stroke="none"/></svg>
-          Stop &amp; Dismiss Students
+        <button class="btn btn-lg" id="btn-stop-dismiss" style="justify-content:center;gap:8px;background:#be123c;color:#fff;border-color:#be123c">
+          ⏹ Stop &amp; Dismiss Students
         </button>
         <button class="btn btn-ghost btn-sm" id="btn-halt-cancel" style="justify-content:center;margin-top:2px">Cancel — keep session going</button>
       </div>
@@ -2127,8 +2099,8 @@ function attach(){
   on('btn-profile-back',()=>{ showingProfile=false; render(); });
   document.querySelectorAll('.ptab[data-ptab]').forEach(el=>el.addEventListener('click',()=>{ profileTab=el.dataset.ptab; render(); }));
 
-  // Dismissed screen — home button
   on('btn-dismissed-home', doDismissHome);
+  on('btn-lb-refresh',()=>{ allTimeLB=null; render(); fetchLeaderboard(); });
 
   // Host home button (inside full-window host nav)
   on('btn-host-home', doBack);
@@ -2187,14 +2159,7 @@ function attach(){
 
   // Landing tabs
   on('ht-home',()=>{ homeSection='home'; render(); });
-  on('ht-lb',()=>{
-    homeSection='leaderboard';
-    allTimeLB=null; // reset to null so loading indicator shows
-    render();       // show loading state immediately
-    fetchLeaderboard(); // always refetch for fresh data
-  });
-
-  on('btn-lb-refresh',()=>{ allTimeLB=null; render(); fetchLeaderboard(); });
+  on('ht-lb',()=>{ homeSection='leaderboard'; allTimeLB=null; render(); fetchLeaderboard(); });
 
   // Landing nav
   on('go-host', ()=>{ role='host'; hostAuthed=false; navPush(); render(); });
@@ -2388,56 +2353,61 @@ function attach(){
   on('btn-reveal',()=>send({type:'reveal'}));
   on('btn-next',  ()=>{ send({type:'clear'}); selIdx=selIdx+1<questions.length?selIdx+1:-1; answerKey=-1; });
   on('btn-end',   ()=>{ if(confirm('End session and show results?')) send({type:'end_session'}); });
+  on('btn-reset', ()=>{ if(confirm('Reset everything?')){ send({type:'reset'}); questions=[]; selIdx=-1; answerKey=-1; inspectPid=null; subjects=[]; repoPath=null; cumulativeScores={}; stopMic(); render(); } });
   on('btn-close-inspect',()=>{ inspectPid=null; render(); });
 
   // Host ended — Continue
   on('btn-continue-session',()=>{ send({type:'continue_session'}); });
-
-  // Halt button — just shows the local decision overlay, students see NOTHING yet
+  // Halt: just show the local overlay — no server message yet
   on('btn-halt',()=>{ showingHaltMenu=true; render(); });
 
-  // Halt overlay: New Session — reset scores to 0, students stay joined and see wait screen
+  // Halt overlay: New Session
+  // → Bank each student's current score into cumulativeScores, then reset
   on('btn-new-session',()=>{
-    // Freeze current session scores as a base before reset
     (S.participants||[]).forEach(p=>{
-      const prev=cumulativeScores[p.id];
-      cumulativeScores[p.id]={
-        name: p.name,
-        base: (prev?prev.base||0:0) + (p.score||0),
-        score: (prev?prev.base||0:0) + (p.score||0)
-      };
+      const banked = (cumulativeScores[p.id]||0) + (p.score||0);
+      cumulativeScores[p.id] = banked;
+      // Store name separately for players who might leave later
+      cumulativeScores[p.id+'__name'] = p.name;
     });
     showingHaltMenu=false;
     send({type:'reset'});
-    selIdx=questions.length>0?0:-1;
-    answerKey=-1;
-    inspectPid=null;
+    selIdx=questions.length>0?0:-1; answerKey=-1; inspectPid=null;
     render();
   });
 
-  // Halt overlay: Stop & Dismiss — ends session and sends 'kicked' to all students
+  // Halt overlay: Stop & Dismiss
+  // → Final total = banked past sessions + current session score
   on('btn-stop-dismiss',()=>{
-    // Build snapshot with CUMULATIVE scores across all sessions
-    const parts=S.participants||[];
-    const snap=parts.map(p=>{
-      const cum=cumulativeScores[p.id];
-      return { id:p.id, name:p.name, score: cum?cum.score:(p.score||0) };
+    const parts = S.participants||[];
+
+    // Build final cumulative snapshot
+    const allPids = new Set([
+      ...parts.map(p=>p.id),
+      ...Object.keys(cumulativeScores).filter(k=>!k.endsWith('__name'))
+    ]);
+    const snap = [];
+    allPids.forEach(pid=>{
+      const liveP   = parts.find(p=>p.id===pid);
+      const banked  = cumulativeScores[pid]||0;
+      const current = liveP ? (liveP.score||0) : 0;
+      const name    = liveP ? liveP.name : (cumulativeScores[pid+'__name']||'Unknown');
+      snap.push({ id:pid, name, score: banked + current });
     });
-    // Also include anyone who was in cumulativeScores but dropped out
-    Object.entries(cumulativeScores).forEach(([pid,c])=>{
-      if(!snap.find(p=>p.id===pid)) snap.push({id:pid,name:c.name,score:c.score});
-    });
-    if(snap.length) haltedSnapshot=snap;
-    showingHaltMenu=false;
+
+    snap.sort((a,b)=>b.score-a.score);
+    haltedSnapshot = snap;
+    showingHaltMenu = false;
+
+    // Submit cumulative scores to all-time leaderboard API
+    submitCumulativeToLeaderboard(snap);
+
     send({type:'shutdown'});
     render();
   });
 
-  // Halt overlay: Cancel — close overlay, session continues normally
   on('btn-halt-cancel',()=>{ showingHaltMenu=false; render(); });
-
-  on('btn-reset', ()=>{ if(confirm('Reset everything?')){ send({type:'reset'}); questions=[]; selIdx=-1; answerKey=-1; inspectPid=null; subjects=[]; repoPath=null; cumulativeScores={}; stopMic(); render(); } });
-  on('btn-shutdown',()=>{ if(confirm('Shut down session? All students will be dismissed immediately.')) send({type:'shutdown'}); });
+  on('btn-shutdown',()=>{ if(confirm('Shut down session?')) send({type:'shutdown'}); });
 
   document.querySelectorAll('.itbl tbody tr[data-pid]').forEach(row=>
     row.addEventListener('click',()=>{ inspectPid=row.dataset.pid; render(); })
@@ -2461,17 +2431,33 @@ function attach(){
 }
 
 function on(id,fn){ document.getElementById(id)?.addEventListener('click',fn); }
+// Submit each student's cumulative score to the all-time leaderboard API
+async function submitCumulativeToLeaderboard(snap){
+  if(!snap||!snap.length) return;
+  // The server /api/leaderboard expects a POST with the session results
+  // so each participant's cumulative total is recorded
+  try {
+    await apiPost('/api/leaderboard', {
+      results: snap.map(p=>({ userId:p.id, userName:p.name, score:p.score }))
+    }, true);
+    // Refresh the cached leaderboard
+    allTimeLB = null;
+    fetchLeaderboard();
+  } catch(e) {
+    console.warn('Leaderboard submit failed:', e.message);
+  }
+}
+
 function doDismissHome(){
-  if(dismissedTimer){ clearInterval(dismissedTimer); dismissedTimer=null; }
+  if(dismissedTimer){clearInterval(dismissedTimer);dismissedTimer=null;}
   showingDismissed=false; showingHalted=false; haltedSnapshot=[]; cumulativeScores={};
   role=null; myName=null; myPid=null; showingProfile=false; prevMyScore=0; scoreGain=0;
   sessionStorage.removeItem('qz_pid'); sessionStorage.removeItem(NAV_KEY);
   render();
 }
-
 function doLogout(){ clearAuth(); role=null; myPid=null; myName=null; hostAuthed=false; showingProfile=false; prevMyScore=0; scoreGain=0; allTimeLB=null; serverSchedules=null; hostSchedules=[]; sessionStorage.removeItem(NAV_KEY); render(); }
 
-/* Shared back navigation — used by nav button, host-home button, and mobile popstate */
+/* Shared back navigation */
 function doBack(){
   if(showingDismissed){ doDismissHome(); return; }
   if(showingProfile){
@@ -2543,8 +2529,10 @@ function navPush(){
 
 // Intercept browser/phone back button
 window.addEventListener('popstate', ()=>{
+  // If we're somewhere deep, go back one level
   if(showingDismissed||showingProfile||role||showingHalted){
     doBack();
+    // Re-push so the next back press also works
     history.pushState({qz:true}, '', location.href);
   }
 });
