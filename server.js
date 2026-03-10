@@ -205,16 +205,26 @@ let state = fresh();
 // gameScores: pid → { name, userId, total } — accumulates across resets within one game day
 // Cleared only when the host explicitly does a full reset or shutdown
 let gameScores = {};
+// sessionSnapshots: array of { sessionNum, scores: [{id,name,score}] } — one entry per completed session
+let sessionSnapshots = [];
+let sessionCounter = 0;
 
 function bankGameScores() {
+  const snap = [];
   Object.values(state.participants).forEach(p => {
     if (!gameScores[p.id]) {
       gameScores[p.id] = { name: p.name, userId: p.userId || null, total: 0 };
     }
-    gameScores[p.id].total  += (p.score || 0);
-    gameScores[p.id].name    = p.name;    // keep name fresh in case displayName changed
+    const pts = p.score || 0;
+    gameScores[p.id].total  += pts;
+    gameScores[p.id].name    = p.name;
     gameScores[p.id].userId  = p.userId || gameScores[p.id].userId;
+    snap.push({ id: p.id, name: p.name, score: pts });
   });
+  if (snap.length) {
+    sessionCounter += 1;
+    sessionSnapshots.push({ sessionNum: sessionCounter, scores: snap });
+  }
 }
 function fresh() {
   return {
@@ -257,7 +267,7 @@ function project(role, pid) {
     timerSeconds:     state.timerSeconds,
     questionPushedAt: state.questionPushedAt,
   };
-  if (role === 'host') return { ...base, correct: state.correct, answers: state.answers, history: state.history };
+  if (role === 'host') return { ...base, correct: state.correct, answers: state.answers, history: state.history, sessionSnapshots, gameScores: Object.entries(gameScores).map(([pid,g])=>({id:pid,name:g.name,total:g.total})) };
   if (role === 'participant') {
     const myHistory = state.history.map(h => ({
       question: h.question, correct: h.correct, myAnswer: h.answers[pid] ?? null,
@@ -425,11 +435,9 @@ wss.on('connection', ws => {
           if (c.role === 'participant') { tx(c.ws, { type: 'kicked' }); c.role = null; c.pid = null; }
         });
         gameScores = {};
+        sessionSnapshots = [];
+        sessionCounter = 0;
         state = fresh();
-        broadcast();
-        break;
-
-      case 'shutdown':
         if (client.role !== 'host') break;
         // Bank the final session's scores into gameScores
         bankGameScores();
@@ -452,6 +460,8 @@ wss.on('connection', ws => {
           });
         }
         gameScores = {};   // clear for next game day
+        sessionSnapshots = [];
+        sessionCounter = 0;
         state = fresh();
         broadcast();
         break;
