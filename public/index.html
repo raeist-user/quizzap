@@ -2594,13 +2594,18 @@ function esc(s){ return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;')
 function renderMath(str){
   if(!str) return '';
   const out=[];
-  const re=/(\$\$[\s\S]+?\$\$|\$[^$\n]+?\$)/g;
+  // Match in priority order:
+  // 1. $$...$$ display LaTeX  2. $...$ inline LaTeX
+  // 3. Bare _/^ notation: Na_2O, H_2SO_4, x^2, Fe^3+
+  //    Starts with a letter, has at least one _X or ^X group, ends with optional trailing chars
+  const re=/(\$\$[\s\S]+?\$\$|\$[^$\n]+?\$|[A-Za-z][A-Za-z0-9]*(?:[_^][A-Za-z0-9+\-]+)+[A-Za-z0-9]*)/g;
   let last=0, m;
   while((m=re.exec(str))!==null){
     if(m.index>last) out.push(esc(str.slice(last,m.index)));
     const raw=m[0];
-    const display=raw.startsWith('$$');
-    const inner=display?raw.slice(2,-2):raw.slice(1,-1);
+    let inner=raw, display=false;
+    if(raw.startsWith('$$')){ display=true; inner=raw.slice(2,-2); }
+    else if(raw.startsWith('$')){ inner=raw.slice(1,-1); }
     try{ out.push(katex.renderToString(inner,{displayMode:display,throwOnError:false,output:'html'})); }
     catch(e){ out.push(esc(raw)); }
     last=m.index+raw.length;
