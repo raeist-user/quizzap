@@ -1,0 +1,3102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>Shadab Coaching Centre</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Nastaliq+Urdu:wght@400..700&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css"/>
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    :root{
+      --bg:#f9f8f6;--white:#fff;--ink:#111110;--mid:#6b6b66;
+      --line:#e4e3df;--faint:#f4f3f0;
+      --good:#2d6a4f;--bad:#c1121f;--good-bg:#d8f3dc;--bad-bg:#ffe0e0;
+      --accent:#1a56db;--accent-bg:#eff6ff;
+      --serif:'DM Serif Display',Georgia,serif;
+      --sans:'DM Sans',system-ui,sans-serif;
+      --r:8px;
+    }
+    html,body{height:100%}
+    body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased}
+    .urdu{font-family:'Noto Nastaliq Urdu',serif;direction:rtl;line-height:2.2;text-align:right;unicode-bidi:embed}
+
+    /* NAV */
+    nav{display:flex;align-items:center;justify-content:space-between;padding:0 20px;height:54px;border-bottom:1px solid var(--line);background:var(--white);position:sticky;top:0;z-index:200;gap:12px}
+    .brand{font-family:var(--serif);font-size:1.1rem;flex-shrink:0;line-height:1.2}
+    .brand small{display:block;font-family:var(--sans);font-size:.62rem;font-weight:500;color:var(--mid);letter-spacing:.04em;text-transform:uppercase}
+    .nav-right{display:flex;align-items:center;gap:10px;flex-shrink:0}
+    #ci{width:7px;height:7px;border-radius:50%;background:#ccc}
+    #ci.on{background:#2d9e6b}#ci.off{background:#c1121f}
+    #conn-lbl{font-size:.77rem;color:var(--mid)}
+
+    /* NAV BACK BUTTON */
+    .nav-back{display:flex;align-items:center;gap:5px;font-size:.8rem;font-weight:500;color:var(--mid);cursor:pointer;padding:5px 8px;border-radius:var(--r);border:1px solid var(--line);background:var(--white);white-space:nowrap;flex-shrink:0}
+    .nav-back:hover{background:var(--faint)}
+
+    /* PROFILE */
+    .profile-wrap{position:relative}
+    .profile-btn{display:flex;align-items:center;gap:8px;cursor:pointer;padding:5px 10px;border-radius:var(--r);border:1px solid var(--line);background:var(--white);font-size:.82rem;font-weight:500;transition:background .15s;user-select:none;-webkit-user-select:none}
+    .profile-btn:hover{background:var(--faint)}
+    .p-avatar{width:28px;height:28px;border-radius:50%;background:var(--ink);color:#fff;display:flex;align-items:center;justify-content:center;font-size:.75rem;font-weight:600;flex-shrink:0}
+    .p-dropdown{position:fixed;right:8px;top:60px;background:var(--white);border:1px solid var(--line);border-radius:var(--r);padding:8px 0;min-width:200px;max-width:calc(100vw - 16px);box-shadow:0 8px 24px rgba(0,0,0,.12);z-index:9999}
+    .p-dropdown.hidden{display:none}
+    .pd-info{padding:10px 16px;border-bottom:1px solid var(--line)}
+    .pd-name{font-weight:600;font-size:.9rem}
+    .pd-email{font-size:.77rem;color:var(--mid)}
+    .pd-item{display:flex;align-items:center;gap:8px;padding:12px 16px;font-size:.83rem;cursor:pointer;transition:background .1s}
+    .pd-item:hover{background:var(--faint)}
+    .pd-item:active{background:var(--line)}
+    .pd-item.danger{color:var(--bad)}
+
+    /* AUTH */
+    .auth-page{display:flex;align-items:center;justify-content:center;min-height:100vh;padding:24px 20px;background:var(--faint)}
+    .auth-box{background:var(--white);border:1px solid var(--line);border-radius:12px;padding:36px;width:100%;max-width:400px;box-shadow:0 4px 32px rgba(0,0,0,.06)}
+    .auth-logo{font-family:var(--serif);font-size:1.5rem;margin-bottom:4px}
+    .auth-sub{font-size:.78rem;color:var(--mid);margin-bottom:28px}
+    .auth-tabs{display:flex;gap:0;margin-bottom:24px;border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+    .auth-tab{flex:1;padding:9px;text-align:center;font-size:.83rem;font-weight:500;cursor:pointer;background:var(--faint);color:var(--mid);border:none;transition:background .15s}
+    .auth-tab.active{background:var(--ink);color:#fff}
+    .form-group{margin-bottom:14px}
+    .form-label{display:block;font-size:.78rem;font-weight:500;color:var(--mid);margin-bottom:5px;text-transform:uppercase;letter-spacing:.06em}
+    .form-input{width:100%;padding:10px 12px;font-family:var(--sans);font-size:.88rem;background:var(--white);color:var(--ink);border:1px solid var(--line);border-radius:var(--r);outline:none;transition:border-color .15s}
+    .form-input:focus{border-color:#999}
+    .form-input::placeholder{color:#bbb}
+    .form-input[readonly]{background:var(--faint);cursor:default;color:var(--mid)}
+    .form-error{color:var(--bad);font-size:.8rem;margin-top:10px;min-height:1.2em}
+
+    /* LAYOUT */
+    #app{min-height:100vh;display:flex;flex-direction:column}
+    main{flex:1}
+    h1{font-family:var(--serif);font-size:1.9rem;font-weight:400;line-height:1.15}
+    h2{font-family:var(--serif);font-size:1.3rem;font-weight:400;line-height:1.2}
+    h3{font-size:.66rem;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--mid)}
+    .center{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:calc(100vh - 54px);padding:28px 20px}
+    .box{background:var(--white);border:1px solid var(--line);border-radius:var(--r);padding:32px;width:100%;max-width:400px}
+    .page{width:100%;max-width:640px;margin:0 auto;padding:28px 20px}
+    .wide{width:100%;max-width:960px;margin:0 auto;padding:24px 20px}
+
+    /* BUTTONS */
+    .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;font-family:var(--sans);font-size:.82rem;font-weight:500;padding:8px 16px;border-radius:var(--r);border:1px solid transparent;cursor:pointer;transition:opacity .15s,transform .1s;white-space:nowrap}
+    .btn:disabled{opacity:.35;cursor:not-allowed}
+    .btn:not(:disabled):hover{opacity:.82}
+    .btn:not(:disabled):active{transform:scale(.97)}
+    .btn-dark{background:var(--ink);color:#fff}
+    .btn-white{background:var(--white);color:var(--ink);border-color:var(--line)}
+    .btn-ghost{background:transparent;color:var(--mid);border-color:var(--line)}
+    .btn-good{background:var(--good);color:#fff}
+    .btn-bad{background:var(--bad);color:#fff}
+    .btn-accent{background:var(--accent);color:#fff}
+    .btn-warn{background:#d97706;color:#fff}
+    .btn-sm{padding:5px 12px;font-size:.74rem}
+    .btn-lg{padding:11px 24px;font-size:.9rem}
+    .btn-full{width:100%}
+
+    /* UTILS */
+    .row{display:flex;align-items:center}.col{display:flex;flex-direction:column}
+    .gap2{gap:8px}.gap3{gap:12px}.between{justify-content:space-between}
+    .mt1{margin-top:6px}.mt2{margin-top:12px}.mt3{margin-top:20px}.mt4{margin-top:32px}
+    .mb1{margin-bottom:6px}.mb2{margin-bottom:12px}.mb3{margin-bottom:20px}
+    .muted{color:var(--mid);font-size:.84rem}.small{font-size:.77rem}
+    hr{border:none;border-top:1px solid var(--line);margin:16px 0}
+    .notice{padding:10px 14px;border-radius:var(--r);font-size:.83rem}
+    .n-good{background:var(--good-bg);color:var(--good)}
+    .n-bad{background:var(--bad-bg);color:var(--bad)}
+    .n-neutral{background:var(--faint);color:var(--ink)}
+    .n-accent{background:var(--accent-bg);color:var(--accent)}
+    .tag{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:20px;font-size:.7rem;font-weight:500}
+    .tag-green{background:var(--good-bg);color:var(--good)}
+    .tag-ink{background:#e8e8e6;color:var(--ink)}
+    .dot-live{width:6px;height:6px;border-radius:50%;background:#2d9e6b;animation:blink 1.2s ease-in-out infinite;display:inline-block}
+    @keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+    code{font-size:.75rem;background:var(--faint);padding:1px 5px;border-radius:3px;font-family:monospace}
+
+    /* SCORE BANNER */
+    .score-banner{position:sticky;top:54px;z-index:90;background:var(--white);border-bottom:1px solid var(--line);padding:0 16px;display:flex;align-items:center;gap:6px;height:40px;overflow-x:auto;overflow-y:hidden;scrollbar-width:none}
+    .score-banner::-webkit-scrollbar{display:none}
+    .sb-chip{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:20px;font-size:.71rem;font-weight:500;background:var(--faint);border:1px solid var(--line);white-space:nowrap;flex-shrink:0}
+    .sb-chip.me{background:#e8f5ee;border-color:#b7dfc7;font-weight:600}
+    .sb-pts{color:var(--good);font-weight:700}
+
+    /* HOST SHELL */
+    .host-shell{display:grid;grid-template-columns:260px 1fr;min-height:calc(100vh - 54px)}
+    .host-sidebar{border-right:1px solid var(--line);background:var(--white);padding:14px;overflow-y:auto;display:flex;flex-direction:column;gap:0}
+    .host-main{padding:22px 26px;overflow-y:auto}
+    @media(max-width:700px){.host-shell{grid-template-columns:1fr}.host-sidebar{border-right:none;border-bottom:1px solid var(--line)}}
+
+    /* SIDEBAR SECTIONS */
+    .sb-sec{border-bottom:1px solid var(--line)}
+    .sb-sec-head{display:flex;align-items:center;justify-content:space-between;padding:9px 2px;cursor:pointer;user-select:none}
+    .sb-sec-head:hover h3{color:var(--ink)}
+    .sb-sec-head h3{transition:color .1s;margin:0}
+    .sb-chevron{font-size:.7rem;color:var(--mid);transition:transform .2s;display:inline-block}
+    .sb-chevron.open{transform:rotate(90deg)}
+    .sb-body{overflow:hidden;transition:max-height .25s ease}
+    .sb-body.closed{max-height:0!important}
+
+    /* Q LIST */
+    .q-list{display:flex;flex-direction:column;gap:3px;padding-bottom:8px}
+    .q-row{display:flex;align-items:flex-start;gap:8px;padding:7px 8px;border-radius:var(--r);cursor:pointer;border:1px solid transparent;transition:background .1s}
+    .q-row:hover{background:var(--faint)}
+    .q-row.active{background:var(--faint);border-color:var(--line)}
+    .q-row.done{opacity:.38}
+    .q-row.live{border-color:var(--good);background:var(--good-bg)}
+    .q-idx{font-size:.66rem;font-weight:600;color:var(--mid);padding-top:2px;min-width:16px}
+    .q-snippet{font-size:.79rem;line-height:1.35;flex:1}
+    .q-subj{font-size:.62rem;color:var(--mid);background:var(--faint);border-radius:3px;padding:1px 5px;margin-top:2px;display:inline-block}
+
+    /* JOIN FEED */
+    .join-feed{display:flex;flex-direction:column;gap:3px;padding-bottom:8px}
+    .join-chip{display:flex;align-items:center;gap:7px;padding:5px 7px;border-radius:var(--r);background:var(--faint);font-size:.78rem;animation:fadeUp .3s ease}
+    @keyframes fadeUp{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
+    .j-av{width:22px;height:22px;border-radius:50%;background:var(--line);display:flex;align-items:center;justify-content:center;font-size:.63rem;font-weight:600;flex-shrink:0}
+
+    /* SCORES */
+    .score-list{border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+    .score-row{display:flex;align-items:center;gap:10px;padding:9px 12px;border-bottom:1px solid var(--line);background:var(--white);font-size:.85rem}
+    .score-row:last-child{border-bottom:none}
+    .score-rank{min-width:22px;text-align:center;font-size:.73rem;color:var(--mid)}
+    .score-name{flex:1}
+    .score-pts{font-weight:600}
+    .score-row.me{background:#e8f5ee}
+    .score-row.top{background:var(--faint)}
+
+    /* ANSWER KEY */
+    .key-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:6px;min-height:120px}
+    .key-card{padding:11px 10px;border:1px solid var(--line);border-radius:var(--r);cursor:pointer;text-align:center;transition:background .1s,border-color .1s;overflow:hidden;display:flex;flex-direction:column;justify-content:center}
+    .key-card:hover{background:var(--faint)}
+    .key-card.selected{background:var(--ink);color:#fff;border-color:var(--ink)}
+    .key-card .kl{font-size:.67rem;font-weight:700;opacity:.6;margin-bottom:3px}
+    .key-card .kt{font-size:.81rem;line-height:1.3}
+
+    /* LIVE BARS */
+    .bar-row{margin-bottom:10px}
+    .bar-meta{display:flex;justify-content:space-between;font-size:.76rem;color:var(--mid);margin-bottom:3px}
+    .bar-track{height:6px;background:var(--line);border-radius:3px;overflow:hidden}
+    .bar-fill{height:100%;background:var(--ink);border-radius:3px;transition:width .4s ease}
+    .bar-fill.correct{background:var(--good)}
+    .bar-names{font-size:.69rem;color:var(--mid);margin-top:2px;line-height:1.5}
+
+    /* PARTICIPANT OPTIONS */
+    .opt-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+    .opt-card{display:flex;align-items:center;gap:10px;padding:13px;border:1.5px solid var(--line);border-radius:var(--r);cursor:pointer;background:var(--white);transition:border-color .15s,background .15s,transform .1s;font-size:.86rem}
+    .opt-card:not(.locked):hover{border-color:#999;transform:translateY(-1px)}
+    .opt-card:not(.locked):active{transform:scale(.98)}
+    .opt-card.chosen{border-color:var(--ink);background:var(--faint)}
+    .opt-card.correct{border-color:var(--good);background:var(--good-bg)}
+    .opt-card.wrong{opacity:.4}
+    .opt-card.locked{cursor:default}
+    .opt-key{width:26px;height:26px;flex-shrink:0;border-radius:4px;background:var(--line);display:flex;align-items:center;justify-content:center;font-size:.72rem;font-weight:600}
+    .opt-card.chosen .opt-key{background:var(--ink);color:#fff}
+    .opt-card.correct .opt-key{background:var(--good);color:#fff}
+    @media(max-width:480px){.opt-grid{grid-template-columns:1fr}}
+
+    /* TIMER */
+    .timer-wrap{margin-bottom:14px}
+    .timer-bar-track{height:5px;background:var(--line);border-radius:3px;overflow:hidden;margin-bottom:6px}
+    .timer-bar-fill{height:100%;background:var(--accent);border-radius:3px;transition:width .1s linear}
+    .timer-bar-fill.urgent{background:var(--bad)}
+    .timer-digits{font-size:.8rem;font-weight:600;color:var(--mid);text-align:right}
+    .timer-digits.urgent{color:var(--bad)}
+
+    /* STAT STRIP */
+    .stat-strip{display:flex;gap:20px;padding:10px 0;border-bottom:1px solid var(--line);margin-bottom:16px;flex-wrap:wrap}
+    .stat-item .stat-val{font-weight:600;font-size:1.05rem}
+    .stat-item .stat-lbl{font-size:.67rem;color:var(--mid);text-transform:uppercase;letter-spacing:.07em}
+
+    /* WAITING */
+    .wait-shell{display:flex;flex-direction:column;align-items:center;min-height:calc(100vh - 54px);padding:36px 20px}
+    .wait-header{text-align:center;margin-bottom:24px}
+    .spinner{width:34px;height:34px;border:3px solid var(--line);border-top-color:var(--ink);border-radius:50%;animation:spin .7s linear infinite;margin:0 auto 14px}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    .student-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:7px;width:100%;max-width:560px}
+    .student-chip{display:flex;align-items:center;gap:8px;padding:8px 11px;background:var(--white);border:1px solid var(--line);border-radius:var(--r);font-size:.82rem;animation:fadeUp .35s ease}
+    .s-av{width:25px;height:25px;border-radius:50%;background:var(--faint);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:.7rem;font-weight:600;flex-shrink:0}
+
+    /* VOICE */
+    .voice-bar{display:flex;align-items:center;gap:10px;padding:8px 12px;background:var(--faint);border-radius:var(--r);font-size:.8rem;margin-bottom:12px;border:1px solid var(--line)}
+    .btn svg, .host-ctrl-bar svg, .host-live-nav svg { pointer-events: none; }
+    .mic-dot{width:8px;height:8px;border-radius:50%;background:#ccc;flex-shrink:0;transition:background .3s}
+    .mic-dot.live{background:#2d9e6b;box-shadow:0 0 0 3px rgba(45,158,107,.18);animation:blink 1s infinite}
+    .mic-dot.err{background:var(--bad)}
+
+    /* RESOURCE BROWSER */
+    .subject-list{display:flex;flex-direction:column;gap:8px;margin:14px 0}
+    .subject-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:10px 0}
+    .subject-box{border:1.5px solid var(--line);border-radius:var(--r);padding:10px 10px 8px;cursor:pointer;transition:border-color .15s,background .15s;background:var(--white);user-select:none;-webkit-user-select:none}
+    .subject-box.selected{border-color:var(--ink);background:var(--faint)}
+    .subject-box-name{font-size:.82rem;font-weight:600;margin-bottom:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .subject-box-count{display:flex;align-items:center;gap:5px;font-size:.75rem;color:var(--mid)}
+    .subject-count{font-size:.74rem;color:var(--mid)}
+    .q-count-input{width:60px;padding:5px 8px;font-size:.83rem;border:1px solid var(--line);border-radius:var(--r);text-align:center;outline:none}
+    .q-count-input:focus{border-color:#999}
+    .timer-input-row{display:flex;align-items:center;gap:10px;margin-bottom:16px;padding:10px 12px;background:var(--faint);border-radius:var(--r);border:1px solid var(--line)}
+
+    /* INSPECT TABLE */
+    .itbl-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:var(--r)}
+    .itbl{border-collapse:collapse;width:100%;font-size:.79rem}
+    .itbl th{padding:8px 12px;text-align:left;border-bottom:1px solid var(--line);background:var(--faint);font-size:.65rem;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--mid);white-space:nowrap}
+    .itbl td{padding:8px 12px;border-bottom:1px solid var(--line);vertical-align:middle}
+    .itbl tr:last-child td{border-bottom:none}
+    .itbl tbody tr:hover td{background:#fafaf8;cursor:pointer}
+    .c-ok{color:var(--good);font-weight:600}.c-bad{color:var(--bad)}.c-nil{color:#ccc}
+    .detail-wrap{border:1px solid var(--line);border-radius:var(--r);overflow:hidden;margin-top:14px}
+    .detail-head{padding:11px 14px;border-bottom:1px solid var(--line);background:var(--faint);display:flex;align-items:center;justify-content:space-between}
+    .detail-row{padding:10px 14px;border-bottom:1px solid var(--line);font-size:.83rem}
+    .detail-row:last-child{border-bottom:none}
+    .detail-q{color:var(--mid);font-size:.74rem;margin-bottom:4px}
+    .ans-chips{display:flex;gap:5px;flex-wrap:wrap}
+    .ans-chip{padding:2px 8px;border-radius:20px;font-size:.73rem;font-weight:500}
+    .ac-good{background:var(--good-bg);color:var(--good)}
+    .ac-bad{background:var(--bad-bg);color:var(--bad)}
+    .ac-none{background:var(--faint);color:var(--mid)}
+
+    /* LEADERBOARD PANEL */
+    .lb-panel{background:var(--white);border:1px solid var(--line);border-radius:var(--r);overflow:hidden;width:100%;max-width:480px;margin-top:20px}
+    .lb-head{padding:11px 14px;border-bottom:1px solid var(--line);background:var(--faint);display:flex;align-items:center;justify-content:space-between}
+    .lb-row{display:flex;align-items:center;gap:10px;padding:9px 14px;border-bottom:1px solid var(--line);font-size:.85rem}
+    .lb-row:last-child{border-bottom:none}
+    .lb-row.me{background:#e8f5ee}
+    /* Standings overlay */
+    .standings-overlay{position:fixed;inset:0;z-index:900;display:flex;flex-direction:column;background:var(--white)}
+    .standings-overlay-head{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--line);background:var(--white);flex-shrink:0}
+    .standings-overlay-body{flex:1;overflow:auto;-webkit-overflow-scrolling:touch}
+    .standings-tbl{width:100%;border-collapse:collapse;font-size:.82rem}
+    .standings-tbl th{padding:8px 10px;text-align:center;background:var(--faint);border-bottom:2px solid var(--line);border-right:1px solid var(--line);font-size:.68rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--mid);white-space:nowrap;position:sticky;top:0;z-index:2}
+    .standings-tbl th:first-child{text-align:left;position:sticky;left:0;z-index:3;background:var(--faint)}
+    .standings-tbl td{padding:8px 10px;text-align:center;border-bottom:1px solid var(--line);border-right:1px solid var(--line);vertical-align:middle;white-space:nowrap}
+    .standings-tbl td:first-child{text-align:left;font-weight:600;position:sticky;left:0;background:var(--white);z-index:1}
+    .standings-tbl tr:last-child td{border-bottom:none}
+    .standings-tbl td.total-col{font-weight:700;background:#f0faf4;border-left:2px solid #b7dfc7;color:#166534}
+    .standings-tbl th.total-col{background:#e8f5ee;border-left:2px solid #b7dfc7;color:#166534}
+    .standings-tbl .zero{color:var(--line)}
+    .lb-sessions{font-size:.72rem;color:var(--mid);margin-right:6px}
+
+    /* ANIMATIONS */
+    @keyframes fadeIn{from{opacity:0;transform:translateY(-5px)}to{opacity:1;transform:translateY(0)}}
+    @keyframes slideUp{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:translateY(0)}}
+
+    /* NAV RESPONSIVE */
+    @media(max-width:480px){
+      nav{padding:0 10px;gap:6px}
+      .brand small{display:none}
+      #conn-lbl{display:none}
+      .profile-btn>span:last-child{display:none}
+    }
+
+    /* SCHEDULE CARDS */
+    .sched-card{background:var(--white);border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin-bottom:8px;display:flex;align-items:center;gap:12px}
+    .sched-date-blk{background:var(--ink);color:#fff;border-radius:7px;padding:5px 9px;text-align:center;min-width:42px;flex-shrink:0}
+    .sched-day{font-size:1.1rem;font-weight:700;line-height:1}
+    .sched-mon{font-size:.59rem;text-transform:uppercase;letter-spacing:.04em;opacity:.75}
+    .sched-info{flex:1;min-width:0}
+    .sched-title{font-weight:600;font-size:.88rem;margin-bottom:1px}
+    .sched-meta{font-size:.74rem;color:var(--mid)}
+    .sched-cd{font-size:.71rem;color:var(--accent);font-weight:600;margin-top:2px}
+    .sched-del{font-size:.75rem;color:var(--bad);cursor:pointer;padding:4px 8px;border-radius:5px;flex-shrink:0}
+    .sched-del:hover{background:var(--bad-bg)}
+
+    /* PROFILE PAGE */
+    .profile-page{max-width:620px;margin:0 auto;padding:24px 20px;animation:slideUp .22s ease}
+    .profile-hero{display:flex;align-items:center;gap:16px;margin-bottom:24px;padding:18px;background:var(--white);border:1px solid var(--line);border-radius:12px}
+    .ph-avatar{width:58px;height:58px;border-radius:50%;background:var(--ink);color:#fff;display:flex;align-items:center;justify-content:center;font-size:1.4rem;font-weight:600;flex-shrink:0}
+    .ph-info{min-width:0}
+    .ph-name{font-size:1.05rem;font-weight:600;line-height:1.3}
+    .ph-email{font-size:.75rem;color:var(--mid)}
+    .ph-summary{font-size:.75rem;color:var(--mid);margin-top:4px}
+    .ptabs{display:flex;border-bottom:2px solid var(--line);margin-bottom:20px;overflow-x:auto}
+    .ptab{padding:8px 16px;font-size:.82rem;font-weight:500;color:var(--mid);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;white-space:nowrap;transition:color .15s,border-color .15s}
+    .ptab.active{color:var(--ink);border-bottom-color:var(--ink)}
+    .ptab:hover:not(.active){color:var(--ink)}
+    .stat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px}
+    .stat-card{background:var(--white);border:1px solid var(--line);border-radius:10px;padding:14px 12px;text-align:center}
+    .stat-num{font-size:1.55rem;font-weight:700;line-height:1;margin-bottom:3px}
+    .stat-lbl{font-size:.7rem;color:var(--mid);text-transform:uppercase;letter-spacing:.04em}
+    .stat-sub{font-size:.7rem;color:var(--mid);margin-top:1px}
+    .pcard{background:var(--white);border:1px solid var(--line);border-radius:10px;padding:14px;margin-bottom:10px}
+    .pcard-head{font-size:.7rem;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--mid);margin-bottom:8px}
+    .prow{display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid var(--faint);font-size:.83rem}
+    .prow:last-child{border:none}
+    .prow-val{font-weight:600}
+    .hist-row{display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--white);border:1px solid var(--line);border-radius:8px;margin-bottom:7px;font-size:.81rem}
+    .hist-date{color:var(--mid);font-size:.73rem;min-width:66px}
+    .hist-score{font-weight:700;font-size:.92rem}
+    .hist-rank{color:var(--mid);flex:1}
+    .hist-acc{font-size:.73rem;padding:2px 7px;border-radius:11px;font-weight:500;flex-shrink:0}
+    .hist-acc.good{background:var(--good-bg);color:var(--good)}
+    .hist-acc.ok{background:#fef9c3;color:#854d0e}
+    .hist-acc.bad{background:var(--bad-bg);color:var(--bad)}
+    .psec{background:var(--white);border:1px solid var(--line);border-radius:10px;padding:16px;margin-bottom:12px}
+    .psec h3{font-size:.84rem;font-weight:600;margin-bottom:12px}
+    .form-row{display:flex;flex-direction:column;gap:5px;margin-bottom:11px}
+    .form-row label{font-size:.76rem;font-weight:500;color:var(--mid)}
+    .form-msg{font-size:.77rem;margin-top:5px;min-height:16px}
+    .form-msg.ok{color:var(--good)}.form-msg.err{color:var(--bad)}
+
+    /* SESSION CONTROL BOX */
+    .session-ctrl{padding:12px 14px;border-radius:var(--r);margin-bottom:14px;display:flex;flex-direction:column;gap:8px}
+    .session-ctrl-open{background:#e8f5ee;border:1px solid #b7dfc7}
+    .session-ctrl-closed{background:var(--faint);border:1px solid var(--line)}
+    .session-ctrl-status{display:flex;align-items:center;gap:8px;font-size:.85rem;margin-bottom:2px}
+    .session-ctrl-btns{display:flex;gap:7px;flex-wrap:wrap}
+    .session-ctrl-btns .btn{flex:1;min-width:80px}
+
+    /* RESULTS MOBILE */
+    .results-header{display:flex;align-items:flex-start;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+    .results-header h2{flex:1;min-width:120px}
+    .results-btns{display:flex;gap:6px;flex-wrap:wrap;width:100%}
+    .results-btns .btn{flex:1;min-width:90px;font-size:.75rem;padding:8px 10px}
+    .itbl-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;border:1px solid var(--line);border-radius:var(--r)}
+
+    /* SESSION OPEN BANNER */
+    .session-open-banner{padding:10px 16px;background:#e8f5ee;border:1px solid #b7dfc7;border-radius:var(--r);margin-bottom:14px;display:flex;align-items:center;gap:10px}
+    .session-closed-banner{padding:10px 16px;background:var(--faint);border:1px solid var(--line);border-radius:var(--r);margin-bottom:14px;display:flex;align-items:center;gap:10px}
+
+    /* HOME TABS */
+    .home-tabs{display:flex;border:1px solid var(--line);border-radius:var(--r);overflow:hidden;margin-bottom:20px}
+    .home-tab{flex:1;padding:9px;text-align:center;font-size:.83rem;font-weight:500;cursor:pointer;background:var(--faint);color:var(--mid);border:none;transition:background .15s}
+    .home-tab.active{background:var(--ink);color:#fff}
+
+    /* ALL-TIME LEADERBOARD PAGE */
+    .lb-full{width:100%;max-width:520px;margin:0 auto;padding:28px 20px}
+
+    @media(max-width:480px){.stat-grid{grid-template-columns:repeat(2,1fr)}}
+
+    /* FOLDER GRID — generate tab */
+    .folder-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:5px;margin-bottom:8px}
+    @media(max-width:320px){.folder-grid{grid-template-columns:repeat(3,1fr)}}
+    .folder-card{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;aspect-ratio:1/1;border:1.5px solid var(--line);border-radius:10px;background:var(--white);cursor:pointer;padding:8px 4px;transition:border-color .15s,background .15s,transform .1s;user-select:none;position:relative}
+    .folder-card:hover{border-color:#999;background:var(--faint);transform:translateY(-1px)}
+    .folder-card:active{transform:scale(.96)}
+    .folder-card.has-sel{border-color:var(--accent);background:#f0f7ff}
+    .folder-card .fc-icon{font-size:1.25rem;line-height:1}
+    .folder-card .fc-name{font-size:.62rem;font-weight:600;text-align:center;line-height:1.2;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;word-break:break-word;color:var(--ink)}
+    .folder-card .fc-badge{position:absolute;top:5px;right:6px;background:var(--accent);color:#fff;font-size:.58rem;font-weight:700;padding:1px 5px;border-radius:10px;line-height:1.5}
+    /* FOLDER CARD EDIT BUTTON */
+    .folder-card-add{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;aspect-ratio:1/1;border:1.5px dashed var(--line);border-radius:10px;background:var(--faint);cursor:pointer;padding:6px;transition:border-color .15s,background .15s}
+    .folder-card-add:hover{border-color:#999;background:#eeede9}
+    .folder-card-add.active{border-color:var(--accent);background:#eff6ff;border-style:solid}
+    /* MANAGE OVERLAY */
+    .manage-overlay-backdrop{position:fixed;inset:0;z-index:860;background:rgba(15,15,15,.45);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);display:flex;align-items:flex-end;justify-content:center;animation:fadeIn .08s ease}
+    .manage-overlay-panel{background:var(--white);border-radius:18px 18px 0 0;width:100%;max-width:480px;max-height:88vh;display:flex;flex-direction:column;animation:slideUp .1s ease;overflow:hidden}
+    .manage-overlay-head{display:flex;align-items:center;padding:13px 16px 10px;flex-shrink:0;border-bottom:1px solid var(--line);gap:8px}
+    .manage-overlay-body{overflow-y:auto;flex:1;padding:10px 14px;display:flex;flex-direction:column;gap:6px}
+    .mfile-row{display:flex;align-items:center;gap:7px;padding:8px 10px;border:1px solid var(--line);border-radius:7px;background:var(--white)}
+    .mfile-row.editing{border-color:var(--accent);background:#eff6ff}
+    /* CHAPTER OVERLAY */
+    .chapter-overlay-backdrop{position:fixed;inset:0;z-index:850;background:rgba(15,15,15,.45);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);display:flex;align-items:flex-end;justify-content:center;animation:fadeIn .08s ease}
+    .chapter-overlay-panel{background:var(--white);border-radius:18px 18px 0 0;width:100%;max-width:480px;max-height:82vh;display:flex;flex-direction:column;animation:slideUp .1s ease;overflow:hidden}
+    .chapter-overlay-head{display:flex;align-items:center;padding:14px 16px 10px;flex-shrink:0;border-bottom:1px solid var(--line)}
+    .chapter-overlay-title{font-size:.95rem;font-weight:700;flex:1;display:flex;align-items:center;gap:8px}
+    .chapter-overlay-body{overflow-y:auto;flex:1;padding:10px 14px;display:flex;flex-direction:column;gap:5px}
+    .chapter-row{display:flex;align-items:center;gap:10px;padding:9px 12px;border:1.5px solid var(--line);border-radius:8px;cursor:pointer;background:var(--white);transition:border-color .12s,background .12s}
+    .chapter-row.sel{border-color:var(--accent);background:#eff6ff}
+    .chapter-row:active{background:var(--faint)}
+    .ch-check{width:16px;height:16px;border-radius:4px;border:2px solid var(--line);display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:border-color .12s,background .12s}
+    .chapter-row.sel .ch-check{border-color:var(--accent);background:var(--accent)}
+    .ch-name{flex:1;font-size:.82rem;line-height:1.3}
+    .chapter-row.sel .ch-name{font-weight:600;color:var(--accent)}
+    .ch-count{width:44px;font-size:.75rem;padding:3px 5px;border:1px solid var(--line);border-radius:5px;text-align:center;outline:none;background:var(--white)}
+    .chapter-row.sel .ch-count{border-color:var(--accent)}
+    .chapter-overlay-foot{padding:10px 14px 20px;flex-shrink:0;border-top:1px solid var(--line);display:flex;gap:8px}
+    /* KEYBOARD ACCESSIBILITY — focus rings */
+    :focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:3px}
+    .key-card:focus-visible{outline:2px solid var(--accent);outline-offset:1px;border-radius:var(--r)}
+    [data-subj-expand]:focus-visible{outline:2px solid var(--accent);outline-offset:1px;border-radius:var(--r)}
+    .opt-card:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+
+    /* HOST SETTINGS OVERLAY */
+    .host-settings-overlay{position:fixed;inset:0;z-index:950;background:rgba(0,0,0,.42);display:flex;align-items:flex-end;justify-content:center;animation:fadeIn .08s ease}
+    .host-settings-panel{background:var(--white);border-radius:14px 14px 0 0;width:100%;max-width:500px;padding:22px 22px 32px;max-height:80vh;overflow-y:auto;animation:slideUp .1s ease}
+    .kbd{display:inline-flex;align-items:center;justify-content:center;min-width:26px;height:22px;padding:0 6px;background:var(--faint);border:1.5px solid #d1d0cb;border-radius:4px;font-family:monospace;font-size:.7rem;font-weight:700;color:var(--ink);flex-shrink:0;box-shadow:0 1px 0 #bbb}
+    .shortcut-row{display:flex;align-items:center;gap:12px;padding:9px 0;border-bottom:1px solid var(--faint)}
+    .shortcut-row:last-child{border-bottom:none}
+    .shortcut-keys{display:flex;align-items:center;gap:4px;flex-shrink:0;min-width:110px;flex-wrap:wrap}
+    .shortcut-desc{font-size:.82rem;color:var(--ink)}
+    .shortcut-section{font-size:.66rem;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--mid);margin:16px 0 6px;padding-bottom:4px;border-bottom:1px solid var(--line)}
+
+    /* HOST FULL-SCREEN LAYOUT */
+    .host-full{display:flex;flex-direction:column;height:100vh;overflow:hidden}
+    .host-live-nav{background:var(--white);border-bottom:1px solid var(--line);padding:0 12px;height:48px;display:flex;align-items:center;gap:8px;overflow:hidden;flex-shrink:0}
+    .host-ctrl-bar{display:flex;gap:6px;padding:8px 12px;border-bottom:1px solid var(--line);background:var(--faint);flex-shrink:0}
+    .host-ctrl-bar .btn{flex:1;justify-content:center}
+    .host-students-panel{margin:8px 12px;border:1px solid var(--line);border-radius:var(--r);overflow:hidden;flex-shrink:0;height:230px;display:flex;flex-direction:column}
+    .host-students-head{padding:6px 10px;border-bottom:1px solid var(--line);background:var(--faint);display:flex;justify-content:space-between;align-items:center;flex-shrink:0}
+    .host-students-inner{overflow-y:auto;flex:1}
+    .host-bottom{flex:1;padding:6px 10px 10px;display:flex;flex-direction:column;gap:5px;overflow:hidden;min-height:0}
+    .host-bottom-scroll{overflow-y:auto;flex:1;display:flex;flex-direction:column;gap:6px}
+
+    /* HOME / LB FULLSCREEN */
+    .home-full{height:calc(100vh - 54px);display:flex;align-items:center;justify-content:center;padding:20px;overflow:hidden}
+    .lb-full-screen{height:calc(100vh - 54px);display:flex;flex-direction:column;overflow:hidden;padding:16px 20px}
+    .lb-full-inner{max-width:520px;width:100%;margin:0 auto;display:flex;flex-direction:column;flex:1;overflow:hidden}
+  </style>
+</head>
+<body>
+<div id="app">
+  <nav id="main-nav" style="display:none">
+    <div style="display:flex;align-items:center;gap:10px;min-width:0;flex:1">
+      <div id="nav-back-wrap" style="display:none">
+        <div class="nav-back" id="btn-nav-back">← Home</div>
+      </div>
+      <div class="brand" id="nav-brand">Shadab Coaching Centre<small>Live Quiz</small></div>
+    </div>
+    <div class="nav-right">
+      <div id="ci"></div>
+      <span id="conn-lbl">connecting</span>
+      <div class="profile-wrap" id="profile-wrap">
+        <div class="profile-btn" id="profile-btn">
+          <div class="p-avatar" id="p-avatar">?</div>
+          <span id="p-name-lbl"></span>
+          <span style="font-size:.7rem;color:var(--mid)">▾</span>
+        </div>
+        <div class="p-dropdown hidden" id="p-dropdown">
+          <div class="pd-info">
+            <div class="pd-name" id="pd-full-name"></div>
+            <div class="pd-email" id="pd-email"></div>
+          </div>
+          <div class="pd-item" id="btn-profile">📊 My Profile</div>
+          <div class="pd-item danger" id="btn-logout">🚪 Sign out</div>
+        </div>
+      </div>
+    </div>
+  </nav>
+  <main><div id="view"></div></main>
+</div>
+<audio id="remote-audio" autoplay playsinline style="display:none"></audio>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"></script>
+<script>
+/* ══════════════════════════════════════
+   STATE
+══════════════════════════════════════ */
+let S={}, role=null, myPid=null, myName=null, hostAuthed=false;
+let currentUser=null;
+let authToken=null;
+
+// Profile page
+let showingProfile=false, profileTab='overview';
+
+// Score tracking for +N badge
+let prevMyScore=0, scoreGain=0;
+
+// Host
+let questions=[], selIdx=-1, answerKey=-1, inspectPid=null;
+let sidebarQOpen=false, sidebarStudOpen=false, sidebarScoreOpen=false, sidebarSchedOpen=false, showStandingsOverlay=false;
+let hostTimerSeconds=0;
+
+// Resource browser
+let repoPath=null;
+let subjects=[];          // [{name, path, files:[], filesLoaded:false}]
+let expandedSubject=null; // which subject accordion is open in generate tab
+let folderOverlaySubject=null;   // subject name whose chapter overlay is open
+let folderOverlayDraft={};       // {fileName: {selected, count}} — pending selections inside overlay
+let folderManageSubject=null;    // subject name whose manage overlay is open
+let showNewFolderCard=false;     // whether the + new folder card input is shown
+let repoLoading=false;
+
+// Host halt confirmation menu state
+let showingHaltMenu=false;
+
+// Host settings/shortcuts overlay
+let hostSettingsOpen=false;
+
+// Upload manage state
+let manageEditMode=null;      // null | 'existing' | 'new'
+let manageFolderFiles=[];     // [{name, path, sha}] files in currently selected manage folder
+let manageFile=null;          // which specific .txt file is selected in manage tab
+let manageNewFileName='';
+let editorFullscreen=false;   // whether the editor is in fullscreen overlay mode
+
+// Voice (host)
+let localStream=null;
+const peerConns={};
+
+// Voice (student)
+let remoteConn=null;
+
+// Timer
+let timerInterval=null;
+
+// Push question debounce
+let pushing=false, pushTimeout=null;
+
+// Halt flow
+let showingHalted=false, haltedCountdown=0, haltedTimer=null, haltedSnapshot=[];
+let haltedTotalQuestions=0;   // total questions asked in the session (for score/total display)
+let haltedTotalLabel='';      // denominator label for final leaderboard: 'all' or specific count string
+
+// Dismissed flow
+let showingDismissed=false, dismissedCountdown=120, dismissedTimer=null;
+
+// Answer timing (client-side — seconds taken to answer current question)
+let myLastAnswerTime=null;
+let localAnswerTimes={};   // {pid: secs} built client-side from S.answers appearance time
+
+// Cumulative scoring is now handled server-side via gameScores in server.js
+
+// Home tabs
+let homeSection='home'; // 'home' | 'leaderboard'
+
+// All-time leaderboard cache
+let allTimeLB=null;
+
+// Server schedules (shared between students and host)
+let serverSchedules=null;
+let hostSchedules=[]; // schedules shown in host panel
+
+const STUN={iceServers:[{urls:'stun:stun.l.google.com:19302'},{urls:'stun:stun1.l.google.com:19302'}]};
+
+// ── GITHUB CONFIG ─────────────────────────────────────────────────────────
+const MY_TOKEN = '%%MY_TOKEN%%';
+
+const GITHUB_REPO  = 'raeist-user/quizzap';
+const GITHUB_BRANCH = 'main';
+
+/* ══════════════════════════════════════
+   SOUNDS (Web Audio API)
+══════════════════════════════════════ */
+let audioCtx=null;
+function getAudio(){ return audioCtx||(audioCtx=new(window.AudioContext||window.webkitAudioContext)()); }
+
+const SOUND_BASE='https://raw.githubusercontent.com/raeist-user/quizzap/main/Utility/Sounds/';
+function playMp3(name){
+  try{ const a=new Audio(SOUND_BASE+name); a.volume=1; a.play().catch(()=>{}); }catch(e){}
+}
+function playClick(){
+  try{
+    const a=getAudio(),o=a.createOscillator(),g=a.createGain();
+    o.connect(g);g.connect(a.destination);
+    o.frequency.value=900;o.type='sine';
+    g.gain.setValueAtTime(.15,a.currentTime);
+    g.gain.exponentialRampToValueAtTime(.001,a.currentTime+.08);
+    o.start();o.stop(a.currentTime+.08);
+  }catch(e){}
+}
+function playCorrect(){
+  try{
+    const a=getAudio(); const t=a.currentTime;
+    [523,659,784,1047].forEach((f,i)=>{
+      const o=a.createOscillator(),g=a.createGain();
+      o.connect(g);g.connect(a.destination);
+      o.frequency.value=f;o.type='sine';
+      const s=t+i*.13;
+      g.gain.setValueAtTime(0,s);
+      g.gain.linearRampToValueAtTime(.25,s+.05);
+      g.gain.exponentialRampToValueAtTime(.001,s+.35);
+      o.start(s);o.stop(s+.35);
+    });
+  }catch(e){}
+}
+function playWrong(){
+  try{
+    const a=getAudio(),o=a.createOscillator(),g=a.createGain();
+    o.connect(g);g.connect(a.destination);
+    o.type='sawtooth';o.frequency.value=160;
+    g.gain.setValueAtTime(.2,a.currentTime);
+    g.gain.exponentialRampToValueAtTime(.001,a.currentTime+.5);
+    o.start();o.stop(a.currentTime+.5);
+  }catch(e){}
+}
+
+/* ══════════════════════════════════════
+   AUTH
+══════════════════════════════════════ */
+function loadStoredAuth(){
+  try{
+    const t=localStorage.getItem('scc_token');
+    const u=localStorage.getItem('scc_user');
+    if(t&&u){ authToken=t; currentUser=JSON.parse(u); }
+  }catch(e){}
+}
+function saveAuth(token,user){ authToken=token; currentUser=user; localStorage.setItem('scc_token',token); localStorage.setItem('scc_user',JSON.stringify(user)); }
+function clearAuth(){ authToken=null; currentUser=null; localStorage.removeItem('scc_token'); localStorage.removeItem('scc_user'); }
+
+/* ── Navigation-state persistence (survives reload) ─────────────────────── */
+const NAV_KEY='scc_nav';
+function saveNavState(){
+  try{
+    // Only persist states that make sense to restore after reload.
+    // We never restore a mid-question live session since WS reconnect handles that.
+    const st={
+      role: role,
+      hostAuthed: hostAuthed,
+      myName: myName,
+      showingProfile: showingProfile,
+      profileTab: profileTab,
+      homeSection: homeSection,
+    };
+    sessionStorage.setItem(NAV_KEY, JSON.stringify(st));
+  }catch(e){}
+}
+function loadNavState(){
+  try{
+    const raw=sessionStorage.getItem(NAV_KEY);
+    if(!raw) return;
+    const st=JSON.parse(raw);
+    role          = st.role          ?? null;
+    hostAuthed    = st.hostAuthed    ?? false;
+    myName        = st.myName        ?? null;
+    showingProfile= st.showingProfile?? false;
+    profileTab    = st.profileTab    ?? 'overview';
+    homeSection   = st.homeSection   ?? 'home';
+    // myPid already persisted separately in sessionStorage by existing code
+    if(myName) myPid = sessionStorage.getItem('qz_pid') || null;
+  }catch(e){}
+}
+
+async function apiPost(path,body,withAuth){
+  const h={'Content-Type':'application/json'};
+  if(withAuth&&authToken) h['Authorization']='Bearer '+authToken;
+  const r=await fetch(path,{method:'POST',headers:h,body:JSON.stringify(body)});
+  const d=await r.json();
+  if(!r.ok) throw new Error(d.error||'Request failed');
+  return d;
+}
+async function apiDel(path){
+  const h={'Authorization':'Bearer '+authToken};
+  const r=await fetch(path,{method:'DELETE',headers:h});
+  const d=await r.json();
+  if(!r.ok) throw new Error(d.error||'Failed');
+  return d;
+}
+
+// ── SESSION HISTORY ──────────────────────────────────────────────────────
+function histKey(){ return 'scc_history_'+(currentUser?.id||'x'); }
+function loadHistory(){ try{ return JSON.parse(localStorage.getItem(histKey())||'[]'); }catch{ return []; } }
+function saveSession(e){ const h=loadHistory(); h.unshift(e); localStorage.setItem(histKey(),JSON.stringify(h.slice(0,100))); }
+function computeStats(){
+  const h=loadHistory(); if(!h.length) return null;
+  const totalCorrect=h.reduce((s,e)=>s+(e.correct||0),0);
+  const totalQs=h.reduce((s,e)=>s+(e.total||0),0);
+  const accuracy=totalQs?Math.round(totalCorrect/totalQs*100):0;
+  const bestScore=Math.max(...h.map(e=>e.score||0));
+  const bestRank=Math.min(...h.map(e=>e.rank||999));
+  const today=new Date(); today.setHours(0,0,0,0);
+  const dayMs=86400000;
+  const days=[...new Set(h.map(e=>{ const d=new Date(e.date); d.setHours(0,0,0,0); return d.getTime(); }))].sort((a,b)=>b-a);
+  let streak=0;
+  if(days.length&&(today.getTime()-days[0])<=dayMs){
+    for(let i=0;i<days.length;i++){ if(Math.abs(days[i]-(today.getTime()-i*dayMs))<=dayMs) streak++; else break; }
+  }
+  return {sessions:h.length,totalCorrect,totalQs,accuracy,bestScore,bestRank:bestRank===999?null:bestRank,streak};
+}
+
+// ── SCHEDULES (server-side) ───────────────────────────────────────────────
+function cdStr(ts){ const d=ts-Date.now(); if(d<=0)return'Now/Overdue'; const h=Math.floor(d/3600000),m=Math.floor((d%3600000)/60000); if(h>48)return'in '+Math.floor(h/24)+' days'; if(h>0)return'in '+h+'h '+m+'m'; return'in '+m+'m'; }
+
+async function fetchSchedules(){
+  try{
+    const r=await fetch('/api/schedules');
+    const d=await r.json();
+    serverSchedules=d.schedules||[];
+    render();
+  }catch(e){ serverSchedules=[]; }
+}
+
+async function fetchHostSchedules(){
+  try{
+    const r=await fetch('/api/schedules');
+    const d=await r.json();
+    hostSchedules=d.schedules||[];
+    render();
+  }catch(e){ hostSchedules=[]; }
+}
+
+// ── ALL-TIME LEADERBOARD ──────────────────────────────────────────────────
+async function fetchLeaderboard(){
+  try{
+    const r=await fetch('/api/leaderboard');
+    const d=await r.json();
+    allTimeLB=d.leaderboard||[];
+    render();
+  }catch(e){ allTimeLB=[]; }
+}
+
+/* ══════════════════════════════════════
+   WEBSOCKET
+══════════════════════════════════════ */
+let ws, myCid=null;
+const WS_URL=`${location.protocol==='https:'?'wss':'ws'}://${location.host}`;
+let prevStatus=null;
+
+function connect(){
+  if(ws&&(ws.readyState===0||ws.readyState===1)) return; // already connecting or open
+  if(!location.host) return; // guard against invalid URL (e.g. file:// context)
+  ws=new WebSocket(WS_URL);
+  ws.onopen=()=>{
+    setConn(true);
+    if(role==='host'&&hostAuthed)          send({type:'set_host',password:HOST_PASSWORD_INPUT||''});
+    else if(role==='participant'&&myName)  send({type:'join',name:myName,pid:myPid,userId:currentUser?.id});
+  };
+  ws.onmessage=async e=>{
+    const m=JSON.parse(e.data);
+    switch(m.type){
+      case 'hello':     myCid=m.cid; break;
+      case 'kicked':
+        { // Use cumulative finalLeaderboard sent by host if present, otherwise fall back
+          const fl = m.payload?.finalLeaderboard;
+          if(fl && fl.length) haltedSnapshot = fl;
+          else { const fp = m.payload?.participants||S.participants||[]; if(fp.length) haltedSnapshot=[...fp]; }
+          // Capture total questions asked (from live history or payload)
+          haltedTotalQuestions = (S.history||[]).length || m.payload?.totalQuestions || 0;
+        }
+        showingHalted=false; showingDismissed=true; dismissedCountdown=120;
+        if(dismissedTimer){clearInterval(dismissedTimer);dismissedTimer=null;}
+        dismissedTimer=setInterval(()=>{
+          dismissedCountdown=Math.max(0,dismissedCountdown-1);
+          const cd=document.getElementById('dismissed-cd-num');
+          if(cd) cd.textContent=`${Math.floor(dismissedCountdown/60)}:${String(dismissedCountdown%60).padStart(2,'0')}`;
+          const ring=document.getElementById('dismissed-ring');
+          if(ring) ring.style.strokeDashoffset=(125.7*(dismissedCountdown/120)).toFixed(2);
+          if(dismissedCountdown<=0){clearInterval(dismissedTimer);dismissedTimer=null;doDismissHome();}
+        },1000);
+        render(); break;
+      case 'halted':
+        // Host halted — students see a "please wait" screen with snapshot LB.
+        // When host continues, new state updates will override.
+        // When host fully ends, a 'kicked' or 'ended' status arrives.
+        { const haltedParts=m.payload?.participants||S.participants||[];
+          haltedSnapshot=haltedParts;
+          haltedTotalQuestions = (S.history||[]).length || m.payload?.totalQuestions || 0; }
+        showingHalted=true; haltedCountdown=0; // no auto-dismiss — wait for host
+        render();
+        break;
+      case 'session_resumed':
+        // Host chose Continue — return students to the session
+        showingHalted=false; haltedSnapshot=[];
+        render(); break;
+      case 'state': {
+        const ns=m.payload.status, inc=m.payload.myScore||0;
+        if(ns==='idle'&&prevStatus==='revealed'){ scoreGain=inc-prevMyScore; if(scoreGain<0)scoreGain=0; }
+        if(ns==='question'){
+          scoreGain=0; prevMyScore=inc;
+          myLastAnswerTime=null;  // reset timing for new question
+          localAnswerTimes={};    // clear per-student times for new question
+          startTimerDisplay._lastStart=null; // force timer restart for new question
+          // Clear push-stuck state
+          pushing=false;
+          if(pushTimeout){ clearTimeout(pushTimeout); pushTimeout=null; }
+        }
+        // Track per-student answer times client-side as answers arrive.
+        // When a new pid appears in answers (wasn't there before), record elapsed secs.
+        if(m.payload.questionPushedAt && m.payload.answers){
+          const prevAnswers=S.answers||{};
+          Object.entries(m.payload.answers).forEach(([pid,ans])=>{
+            if(ans!=null && !(pid in localAnswerTimes) && !(pid in prevAnswers)){
+              const secs=Math.round((Date.now()-m.payload.questionPushedAt)/1000);
+              localAnswerTimes[pid]=Math.max(0,secs);
+            }
+          });
+        }
+        // For current user, prefer the precise client-side click time
+        if(myPid && myLastAnswerTime!==null) localAnswerTimes[myPid]=myLastAnswerTime;
+        if(ns==='idle'&&prevStatus==='idle'){ prevMyScore=inc; }
+        // Save session on end
+        if(ns==='ended'&&prevStatus!=='ended'&&role==='participant'&&myPid){
+          const pts=m.payload.participants||[];
+          const sorted2=[...pts].sort((a,b)=>(b.score||0)-(a.score||0));
+          const myRank2=sorted2.findIndex(p=>p.id===myPid)+1;
+          const hist2=m.payload.myHistory||[];
+          const correct2=hist2.filter(h=>h.myAnswer!==null&&h.myAnswer===h.correct).length;
+          saveSession({date:new Date().toISOString(),score:inc,total:hist2.length,rank:myRank2||0,participants:pts.length,correct:correct2});
+        }
+        // Detect answer reveal sounds
+        if(role==='participant'){
+          if(ns==='revealed'&&prevStatus==='question'){
+            const myAns=m.payload.myAnswer;
+            const correct=m.payload.correct;
+            if(myAns!==null&&myAns!==undefined){
+              setTimeout(()=>{ myAns===correct?playCorrect():playWrong(); },200);
+            }
+          }
+        }
+        prevStatus=ns; S=m.payload;
+        // Exit halted screen when new session state arrives
+        if(ns==='idle'&&showingHalted){ showingHalted=false; haltedSnapshot=[]; }
+        render(); break;
+      }
+      case 'joined':    myPid=m.pid; sessionStorage.setItem('qz_pid',m.pid); break;
+      case 'auth_ok':   hostAuthed=true; fetchHostSchedules(); browseRepo(); navPush(); render(); break;
+      case 'auth_fail': { const el=document.getElementById('pw-err'); if(el)el.textContent='Incorrect password.'; break; }
+      case 'left':      doLeave(); break;
+      case 'open_session_result':
+        if(m.ok){
+          playMp3('start.mp3');
+          showToast('✅ Session is open! Students can now join.','good');
+        } else {
+          showToast('❌ Failed to open session: '+m.reason+'\nTry refreshing the page.','bad');
+        }
+        break;
+      case 'peer_list': for(const cid of m.cids) await hostCallPeer(cid); break;
+      case 'rtc_new_peer': if(role==='host') await hostCallPeer(m.cid); break;
+      case 'rtc_offer':    if(role==='participant') await studentHandleOffer(m.signal); break;
+      case 'rtc_answer':   if(role==='host') await hostHandleAnswer(m.fromCid,m.signal); break;
+      case 'rtc_ice':
+        if(role==='host'&&peerConns[m.fromCid]) peerConns[m.fromCid].addIceCandidate(new RTCIceCandidate(m.signal)).catch(()=>{});
+        if(role==='participant'&&remoteConn)     remoteConn.addIceCandidate(new RTCIceCandidate(m.signal)).catch(()=>{});
+        break;
+    }
+  };
+  ws.onclose=()=>{ setConn(false); setTimeout(connect,2000); };
+  ws.onerror=()=>ws.close();
+}
+function send(d){ if(ws?.readyState===1) ws.send(JSON.stringify(d)); }
+function setConn(on){ document.getElementById('ci').className=on?'on':'off'; document.getElementById('conn-lbl').textContent=on?'connected':'reconnecting…'; }
+
+// Toast notifications
+function showToast(msg, type='neutral'){
+  let container=document.getElementById('toast-container');
+  if(!container){
+    container=document.createElement('div');
+    container.id='toast-container';
+    container.style.cssText='position:fixed;bottom:20px;left:50%;transform:translateX(-50%);z-index:9999;display:flex;flex-direction:column;align-items:center;gap:8px;pointer-events:none;max-width:90vw';
+    document.body.appendChild(container);
+  }
+  const t=document.createElement('div');
+  const bg=type==='good'?'#166534':type==='bad'?'#be123c':'#1e293b';
+  t.style.cssText=`background:${bg};color:#fff;padding:10px 18px;border-radius:8px;font-size:.85rem;font-weight:500;box-shadow:0 4px 16px rgba(0,0,0,.25);pointer-events:auto;line-height:1.4;white-space:pre-wrap;text-align:center;opacity:0;transition:opacity .2s`;
+  t.textContent=msg;
+  container.appendChild(t);
+  requestAnimationFrame(()=>{ t.style.opacity='1'; });
+  setTimeout(()=>{ t.style.opacity='0'; setTimeout(()=>t.remove(),220); },4000);
+}
+
+// Store host password input for reconnection — persisted in sessionStorage to survive refresh
+let HOST_PASSWORD_INPUT = sessionStorage.getItem('scc_hpw') || '';
+
+/* ══════════════════════════════════════
+   WEBRTC HOST
+══════════════════════════════════════ */
+async function startMic(){
+  try{
+    if(localStream){localStream.getTracks().forEach(t=>t.stop());localStream=null;}
+    localStream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true},video:false});
+    render(); send({type:'get_peers'});
+  }catch(e){ alert('Microphone access denied.'); }
+}
+function stopMic(){
+  if(localStream){localStream.getTracks().forEach(t=>t.stop());localStream=null;}
+  Object.values(peerConns).forEach(pc=>pc.close());
+  Object.keys(peerConns).forEach(k=>delete peerConns[k]);
+  render();
+}
+async function hostCallPeer(cid){
+  if(!localStream) return;
+  if(peerConns[cid]){peerConns[cid].close();delete peerConns[cid];}
+  const pc=new RTCPeerConnection(STUN); peerConns[cid]=pc;
+  localStream.getTracks().forEach(t=>pc.addTrack(t,localStream));
+  pc.onicecandidate=ev=>{ if(ev.candidate) send({type:'rtc_ice_to_peer',toCid:cid,signal:ev.candidate.toJSON()}); };
+  pc.onconnectionstatechange=()=>{ if(['failed','closed','disconnected'].includes(pc.connectionState)){pc.close();delete peerConns[cid];} };
+  try{ const offer=await pc.createOffer(); await pc.setLocalDescription(offer); send({type:'rtc_offer',toCid:cid,signal:{type:pc.localDescription.type,sdp:pc.localDescription.sdp}}); }catch(e){}
+}
+async function hostHandleAnswer(cid,sdp){
+  const pc=peerConns[cid]; if(!pc||pc.signalingState==='stable') return;
+  try{ await pc.setRemoteDescription(new RTCSessionDescription(sdp)); }catch(e){}
+}
+
+/* ══════════════════════════════════════
+   WEBRTC STUDENT
+══════════════════════════════════════ */
+async function studentHandleOffer(sdp){
+  if(remoteConn){try{remoteConn.close();}catch(e){} remoteConn=null;}
+  const pc=new RTCPeerConnection(STUN); remoteConn=pc;
+  pc.onicecandidate=ev=>{ if(ev.candidate) send({type:'rtc_ice_to_host',signal:ev.candidate.toJSON()}); };
+  pc.ontrack=ev=>{ const a=document.getElementById('remote-audio'); if(a&&a.srcObject!==ev.streams[0]){a.srcObject=ev.streams[0];a.play().catch(()=>{});} updateMicDot(); };
+  pc.oniceconnectionstatechange=()=>updateMicDot();
+  try{ await pc.setRemoteDescription(new RTCSessionDescription(sdp)); const ans=await pc.createAnswer(); await pc.setLocalDescription(ans); send({type:'rtc_answer',signal:{type:pc.localDescription.type,sdp:pc.localDescription.sdp}}); }catch(e){}
+}
+function updateMicDot(){ const d=document.getElementById('mic-dot'); if(!d)return; const st=remoteConn?.iceConnectionState; d.className='mic-dot'+(st==='connected'||st==='completed'?' live':st==='failed'?' err':''); }
+
+/* ══════════════════════════════════════
+   TIMER
+══════════════════════════════════════ */
+function startTimerDisplay(){
+  const total=S.timerSeconds, start=S.questionPushedAt;
+  if(!total||!start||S.status!=='question'){
+    if(timerInterval){clearInterval(timerInterval);timerInterval=null;}
+    return;
+  }
+  // Don't restart interval if already running for the same question push time
+  if(timerInterval && startTimerDisplay._lastStart===start) return;
+  if(timerInterval){clearInterval(timerInterval);timerInterval=null;}
+  startTimerDisplay._lastStart=start;
+  function tick(){
+    const remaining=Math.max(0, total-(Date.now()-start)/1000);
+    const pct=(remaining/total)*100;
+    const urgent=remaining<total*0.25;
+    // Student timer bar
+    const bar=document.getElementById('timer-bar');
+    const dig=document.getElementById('timer-digits');
+    if(bar&&dig){
+      bar.style.width=pct+'%';
+      bar.className='timer-bar-fill'+(urgent?' urgent':'');
+      dig.textContent=Math.ceil(remaining)+'s';
+      dig.className='timer-digits'+(urgent?' urgent':'');
+    }
+    // Host timer bar (in host controller)
+    const hBar=document.getElementById('host-timer-bar');
+    const hDig=document.getElementById('host-timer-digits');
+    if(hBar&&hDig){
+      hBar.style.width=pct+'%';
+      hBar.style.background=urgent?'var(--bad)':'var(--accent)';
+      hDig.textContent=Math.ceil(remaining)+'s';
+      hDig.style.color=urgent?'var(--bad)':'var(--ink)';
+    }
+    if(remaining<=0){
+      clearInterval(timerInterval);timerInterval=null;
+      document.querySelectorAll('.opt-card').forEach(c=>c.classList.add('locked'));
+    }
+  }
+  tick(); timerInterval=setInterval(tick,100);
+}
+
+/* ══════════════════════════════════════
+   PARSER
+══════════════════════════════════════ */
+function urduCls(q){ return q?.subject?.toLowerCase()==='urdu'?' urdu':''; }
+
+function parseQuestions(text){
+  const out=[],lines=text.split('\n').map(l=>l.trim()).filter(Boolean);
+  for(let i=0;i<lines.length;i++){
+    const qLine=lines[i],oLine=lines[i+1]||'';
+    const m=oLine.match(/\(A\)([^,(]+)[,，]\s*\(B\)([^,(]+)[,，]\s*\(C\)([^,(]+)[,，]\s*\(D\)([^,(]+)/i);
+    if(m){
+      // Detect @ marker in any option to pre-select the correct answer
+      const rawOpts=[m[1],m[2],m[3],m[4]];
+      let preCorrect=-1;
+      const cleanOpts=rawOpts.map((o,idx)=>{
+        if(o.includes('@')){ preCorrect=idx; return o.replace(/@/g,'').trim(); }
+        return o.trim();
+      });
+      const entry={text:qLine.replace(/^\d+[.)]\s*/,'').trim(),options:cleanOpts};
+      if(preCorrect>=0) entry.correct=preCorrect;
+      out.push(entry);
+      i++;
+    }
+  }
+  return out;
+}
+
+/* ══════════════════════════════════════
+   RESOURCE BROWSER / GITHUB MANAGER
+══════════════════════════════════════ */
+
+// Upload panel state
+let uploadTab='generate'; // 'generate' | 'manage'
+let manageFolder=null;    // currently selected folder for editing
+let editingContent='';    // textarea content while editing
+let editingSha=null;      // SHA of existing file (for update)
+let uploadMsg='';
+let uploadSubjects=[];    // folders list for manage tab
+
+function isValidToken() { 
+  return MY_TOKEN && !MY_TOKEN.startsWith('%%') && MY_TOKEN.length > 0;
+}
+// GET requests must NOT include Content-Type — triggers CORS preflight that GitHub rejects
+function ghReadHeaders(){
+  const h={'Accept':'application/vnd.github+json'};
+  if(isValidToken()) h['Authorization']='Bearer '+MY_TOKEN;
+  return h;
+}
+// PUT/POST/DELETE can and should include Content-Type
+function ghWriteHeaders(){
+  const h={'Accept':'application/vnd.github+json','Content-Type':'application/json'};
+  if(isValidToken()) h['Authorization']='Bearer '+MY_TOKEN;
+  return h;
+}
+function ghHeaders(){ return ghReadHeaders(); } // legacy alias
+
+
+async function browseRepo(){
+  repoPath=GITHUB_REPO;
+  const msg=document.getElementById('repo-msg');
+  if(msg) msg.innerHTML='<div class="notice n-neutral mt2">Loading subjects…</div>';
+  repoLoading=true; render();
+  try{
+    const res=await fetch(`https://api.github.com/repos/${GITHUB_REPO}/contents/resources?ref=${GITHUB_BRANCH}`,{headers:ghHeaders()});
+    if(!res.ok) throw new Error(`GitHub API ${res.status}: Check token and repo.`);
+    const items=await res.json();
+    const dirs=items.filter(i=>i.type==='dir');
+    if(!dirs.length) throw new Error('No subject folders found inside "resources" folder.');
+    // Keep existing file selections if subject already loaded
+    subjects=dirs.map(d=>{
+      const existing=subjects.find(s=>s.name===d.name);
+      return existing||{name:d.name,path:d.path,files:[],filesLoaded:false};
+    });
+    repoLoading=false;
+    if(msg) msg.innerHTML='';
+    render();
+  }catch(e){ repoLoading=false; if(msg) msg.innerHTML=`<div class="notice n-bad mt2">${esc(e.message)}</div>`; render(); }
+}
+
+// Load all .txt files inside a subject folder (called when subject is expanded)
+async function loadSubjectFiles(subjName){
+  const subj=subjects.find(s=>s.name===subjName);
+  if(!subj||subj.filesLoaded) return;
+  try{
+    const encodedPath=subj.path.split('/').map(encodeURIComponent).join('/');
+    const res=await fetch(`https://api.github.com/repos/${GITHUB_REPO}/contents/${encodedPath}?ref=${GITHUB_BRANCH}`,{headers:ghHeaders()});
+    if(!res.ok) throw new Error(`GitHub API ${res.status}`);
+    const items=await res.json();
+    subj.files=items
+      .filter(i=>i.type==='file'&&i.name.endsWith('.txt')&&i.name!=='.gitkeep')
+      .map(i=>({name:i.name,path:i.path,sha:i.sha,selected:false,count:0}));
+    subj.filesLoaded=true;
+    // If folder overlay is open for this subject, seed draft with newly loaded files
+    if(folderOverlaySubject===subjName){
+      subj.files.forEach(f=>{ if(!folderOverlayDraft[f.name]) folderOverlayDraft[f.name]={selected:f.selected,count:f.count||0}; });
+      // Patch only the overlay body to avoid full-page re-render flicker
+      const body=document.querySelector('.chapter-overlay-body');
+      if(body){
+        body.innerHTML=subj.files.length
+          ?subj.files.map(f=>{
+              const d=folderOverlayDraft[f.name]||{selected:false,count:0};
+              return `<div class="chapter-row${d.selected?' sel':''}" data-ch-toggle="${esc(f.name)}">
+                <div class="ch-check">${d.selected?'<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20,6 9,17 4,12"/></svg>':''}</div>
+                <span class="ch-name">${esc(f.name.replace(/\.txt$/i,''))}</span>
+                ${d.selected?`<input class="ch-count" type="number" min="0" max="999" value="${d.count||''}" placeholder="all" data-ch-cnt="${esc(f.name)}" title="0 or blank = all questions" onclick="event.stopPropagation()"/>`:'<span style="width:44px"></span>'}
+              </div>`;
+            }).join('')
+          :'<p class="muted" style="padding:20px;text-align:center;font-size:.84rem">No .txt files in this folder.</p>';
+        // Re-attach event listeners for the newly injected rows
+        body.querySelectorAll('[data-ch-toggle]').forEach(el=>{
+          el.addEventListener('click',e=>{
+            if(e.target.tagName==='INPUT') return;
+            const fn=el.dataset.chToggle;
+            if(!folderOverlayDraft[fn]) folderOverlayDraft[fn]={selected:false,count:0};
+            const nowSel=!folderOverlayDraft[fn].selected;
+            folderOverlayDraft[fn].selected=nowSel;
+            el.classList.toggle('sel',nowSel);
+            const chk=el.querySelector('.ch-check');
+            if(chk) chk.innerHTML=nowSel?'<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20,6 9,17 4,12"/></svg>':'';
+            const existingInput=el.querySelector('.ch-count');
+            const existingSpacer=el.querySelector('span[style*="width:44px"]');
+            if(nowSel&&!existingInput){
+              if(existingSpacer) existingSpacer.remove();
+              const inp=document.createElement('input');
+              inp.className='ch-count'; inp.type='number'; inp.min='0'; inp.max='999';
+              inp.value=folderOverlayDraft[fn].count||''; inp.placeholder='all';
+              inp.dataset.chCnt=fn; inp.title='0 or blank = all questions';
+              inp.onclick=ev=>ev.stopPropagation();
+              inp.addEventListener('change',()=>{ folderOverlayDraft[fn].count=Math.max(0,parseInt(inp.value)||0); });
+              el.appendChild(inp);
+            } else if(!nowSel&&existingInput){
+              existingInput.remove();
+              const sp=document.createElement('span'); sp.style.width='44px'; el.appendChild(sp);
+            }
+          });
+        });
+      }
+    }
+    render();
+  }catch(e){ console.warn('Could not load files for',subjName,e.message); subj.filesLoaded=true; render(); }
+}
+
+async function loadUploadFolders(){
+  try{
+    const res=await fetch(`https://api.github.com/repos/${GITHUB_REPO}/contents/resources?ref=${GITHUB_BRANCH}`,{headers:ghHeaders()});
+    if(!res.ok) throw new Error(`GitHub API ${res.status}`);
+    const items=await res.json();
+    uploadSubjects=items.filter(i=>i.type==='dir').map(d=>({name:d.name,path:d.path}));
+    render();
+  }catch(e){ uploadSubjects=[]; render(); }
+}
+
+// Load all .txt files inside a folder for the manage tab
+async function loadFolderFiles(folderName){
+  try{
+    const encoded=folderName.split('/').map(encodeURIComponent).join('/');
+    const res=await fetch(`https://api.github.com/repos/${GITHUB_REPO}/contents/resources/${encoded}?ref=${GITHUB_BRANCH}`,{headers:ghHeaders()});
+    if(!res.ok) throw new Error(`GitHub API ${res.status}`);
+    const items=await res.json();
+    manageFolderFiles=items
+      .filter(i=>i.type==='file'&&i.name.endsWith('.txt')&&i.name!=='.gitkeep')
+      .map(i=>({name:i.name,path:i.path,sha:i.sha}));
+    render();
+  }catch(e){ manageFolderFiles=[]; render(); }
+}
+
+async function createFolder(){
+  const inp=document.getElementById('new-folder-name');
+  if(!inp) return;
+  const name=inp.value.trim().replace(/[^a-zA-Z0-9_\- ]/g,'');
+  if(!name){setUploadMsg('Folder name required','bad');return;}
+  if(!isValidToken()){setUploadMsg('GitHub token not configured — add it to the source to enable uploads','bad');return;}
+  setUploadMsg('Creating folder…','neutral');
+  try{
+    const path=`resources/${name}/.gitkeep`;
+    const res=await fetch(`https://api.github.com/repos/${GITHUB_REPO}/contents/${path}`,{
+      method:'PUT',headers:ghWriteHeaders(),
+      body:JSON.stringify({message:`Create ${name} folder`,content:btoa(''),branch:GITHUB_BRANCH})
+    });
+    if(!res.ok) throw new Error(`GitHub API ${res.status}`);
+    setUploadMsg(`Folder "${name}" created!`,'good');
+    inp.value='';
+    await loadUploadFolders();
+  }catch(e){setUploadMsg(e.message,'bad');}
+}
+
+async function deleteFolder(folderName){
+  if(!isValidToken()){setUploadMsg('GitHub token not configured — add it to the source to enable uploads','bad');return;}
+  setUploadMsg('Deleting folder…','neutral');
+  try{
+    // List all files in the folder
+    const res=await fetch(`https://api.github.com/repos/${GITHUB_REPO}/contents/resources/${folderName}?ref=${GITHUB_BRANCH}`,{headers:ghHeaders()});
+    if(!res.ok) throw new Error(`GitHub API ${res.status}`);
+    const items=await res.json();
+    // Delete each file
+    for(const item of items){
+      const dr=await fetch(`https://api.github.com/repos/${GITHUB_REPO}/contents/${item.path}`,{
+        method:'DELETE',headers:ghWriteHeaders(),
+        body:JSON.stringify({message:`Delete ${item.path}`,sha:item.sha,branch:GITHUB_BRANCH})
+      });
+      if(!dr.ok) throw new Error(`Failed to delete ${item.name}`);
+    }
+    manageFolder=null; manageEditMode=null; manageFile=null; manageFolderFiles=[]; manageNewFileName=''; editingContent=''; editingSha=null;
+    setUploadMsg(`Folder "${folderName}" deleted.`,'good');
+    await loadUploadFolders();
+  }catch(e){setUploadMsg(e.message,'bad');}
+}
+
+async function deleteFile(folderName, fileName){
+  if(!isValidToken()){setUploadMsg('GitHub token not configured','bad');return;}
+  setUploadMsg(`Deleting ${fileName}…`,'neutral');
+  try{
+    const encodedFolder=encodeURIComponent(folderName);
+    const encodedFile=encodeURIComponent(fileName);
+    const apiUrl=`https://api.github.com/repos/${GITHUB_REPO}/contents/resources/${encodedFolder}/${encodedFile}`;
+    // Get SHA
+    const chk=await fetch(`${apiUrl}?ref=${GITHUB_BRANCH}`,{headers:ghHeaders()});
+    if(!chk.ok) throw new Error(`Could not find file: ${chk.status}`);
+    const d=await chk.json();
+    const res=await fetch(apiUrl,{
+      method:'DELETE',headers:ghWriteHeaders(),
+      body:JSON.stringify({message:`Delete resources/${folderName}/${fileName}`,sha:d.sha,branch:GITHUB_BRANCH})
+    });
+    if(!res.ok) throw new Error(`GitHub API ${res.status}`);
+    // If the deleted file was being edited, close the editor
+    if(manageFile===fileName){ manageEditMode=null; manageFile=null; manageNewFileName=''; editingContent=''; editingSha=null; }
+    setUploadMsg(`"${fileName}" deleted.`,'good');
+    await loadFolderFiles(folderName);
+  }catch(e){setUploadMsg(e.message,'bad');}
+}
+
+async function openFolderEdit(folderName, fileName){
+  manageFolder=folderName; manageFile=fileName; editingContent=''; editingSha=null;
+  setUploadMsg(`Loading ${esc(fileName)}…`,'neutral');
+  render();
+  try{
+    const encodedFolder=encodeURIComponent(folderName);
+    const encodedFile=encodeURIComponent(fileName);
+    const res=await fetch(`https://api.github.com/repos/${GITHUB_REPO}/contents/resources/${encodedFolder}/${encodedFile}?ref=${GITHUB_BRANCH}`,{headers:ghHeaders()});
+    if(res.status===404){ editingContent=''; editingSha=null; setUploadMsg(`${fileName} not found. Write content below to create it.`,'neutral'); render(); return; }
+    if(!res.ok) throw new Error(`GitHub API ${res.status}`);
+    const data=await res.json();
+    editingSha=data.sha;
+    const bytes=Uint8Array.from(atob(data.content.replace(/\n/g,'')),c=>c.charCodeAt(0));
+    editingContent=new TextDecoder('utf-8').decode(bytes);
+    setUploadMsg('','');
+    render();
+    setTimeout(()=>{ const ta=document.getElementById('q-editor'); if(ta){ ta.value=editingContent; ta.focus(); } },50);
+  }catch(e){setUploadMsg(e.message,'bad');}
+}
+
+async function saveEditorContent(){
+  if(!manageFolder){setUploadMsg('No folder selected','bad');return;}
+  // For new files, get filename from input
+  let fileName=manageFile;
+  if(manageEditMode==='new'){
+    const inp=document.getElementById('new-file-name-editor');
+    let n=inp?inp.value.trim():manageNewFileName;
+    if(!n){setUploadMsg('Enter a file name','bad');return;}
+    if(!n.endsWith('.txt')) n+='.txt';
+    fileName=n;
+  }
+  if(!fileName){setUploadMsg('No file selected','bad');return;}
+  if(!isValidToken()){setUploadMsg('GitHub token not configured — add it to the source to enable uploads','bad');return;}
+  const ta=document.getElementById('q-editor');
+  const content=ta?ta.value:'';
+  if(!content.trim()){setUploadMsg('Content is empty','bad');return;}
+  setUploadMsg('Saving…','neutral');
+  try{
+    const encodedFolder=encodeURIComponent(manageFolder);
+    const encodedFile=encodeURIComponent(fileName);
+    const apiPath=`resources/${manageFolder}/${fileName}`;
+    const apiUrl=`https://api.github.com/repos/${GITHUB_REPO}/contents/resources/${encodedFolder}/${encodedFile}`;
+    // Always fetch latest SHA before saving to prevent 409 Conflict
+    let sha=editingSha;
+    if(!sha){
+      const chk=await fetch(`${apiUrl}?ref=${GITHUB_BRANCH}`,{headers:ghHeaders()});
+      if(chk.ok){ const d=await chk.json(); sha=d.sha; }
+    }
+    const body={message:`Update ${apiPath}`,content:btoa(unescape(encodeURIComponent(content))),branch:GITHUB_BRANCH};
+    if(sha) body.sha=sha;
+    const res=await fetch(apiUrl,{method:'PUT',headers:ghWriteHeaders(),body:JSON.stringify(body)});
+    if(!res.ok) throw new Error(`GitHub API ${res.status}`);
+    const data=await res.json();
+    editingSha=data.content?.sha||sha;
+    manageFile=fileName;
+    setUploadMsg('Saved successfully!','good');
+    await loadFolderFiles(manageFolder);
+  }catch(e){setUploadMsg(e.message,'bad');}
+}
+
+async function uploadQuestionsFile(){
+  if(!manageFolder){setUploadMsg('Select a folder first','bad');return;}
+  if(!isValidToken()){setUploadMsg('GitHub token not configured — add it to the source to enable uploads','bad');return;}
+  const inp=document.getElementById('file-upload-inp');
+  if(!inp||!inp.files.length){setUploadMsg('Choose a .txt file first','bad');return;}
+  const file=inp.files[0];
+  if(!file.name.endsWith('.txt')){setUploadMsg('Only .txt files allowed','bad');return;}
+  const targetFile=file.name; // use the actual uploaded filename
+  setUploadMsg('Reading file…','neutral');
+  const reader=new FileReader();
+  reader.onload=async(ev)=>{
+    const content=ev.target.result;
+    try{
+      setUploadMsg('Uploading…','neutral');
+      const encodedFolder=encodeURIComponent(manageFolder);
+      const encodedFile=encodeURIComponent(targetFile);
+      const apiUrl=`https://api.github.com/repos/${GITHUB_REPO}/contents/resources/${encodedFolder}/${encodedFile}`;
+      // Fetch existing SHA to avoid 409 if file exists
+      let sha=null;
+      const chk=await fetch(`${apiUrl}?ref=${GITHUB_BRANCH}`,{headers:ghHeaders()});
+      if(chk.ok){ const d=await chk.json(); sha=d.sha; }
+      const body={message:`Upload resources/${manageFolder}/${targetFile}`,content:btoa(unescape(encodeURIComponent(content))),branch:GITHUB_BRANCH};
+      if(sha) body.sha=sha;
+      const res=await fetch(apiUrl,{method:'PUT',headers:ghWriteHeaders(),body:JSON.stringify(body)});
+      if(!res.ok) throw new Error(`GitHub API ${res.status}`);
+      setUploadMsg(`Uploaded as ${targetFile}!`,'good');
+      await loadFolderFiles(manageFolder);
+    }catch(err){setUploadMsg(err.message,'bad');}
+  };
+  reader.readAsText(file);
+}
+
+function setUploadMsg(msg,type){
+  uploadMsg=msg?`<div class="notice n-${type} mt2">${esc(msg)}</div>`:'';
+  const el=document.getElementById('upload-msg');
+  if(el) el.innerHTML=uploadMsg;
+}
+
+async function generateQuiz(){
+  const msg=document.getElementById('gen-msg'); if(!msg)return;
+  const selections=[];
+  subjects.forEach(s=>{
+    s.files.filter(f=>f.selected).forEach(f=>selections.push({file:f,subjName:s.name}));
+  });
+  if(!selections.length){msg.innerHTML='<div class="notice n-bad mt2">Select at least one chapter file above.</div>';return;}
+  // Determine denominator label for final leaderboard
+  const anyAll=selections.some(({file})=>!file.count||file.count===0);
+  haltedTotalLabel=anyAll?'all':String(selections.reduce((s,{file})=>s+(file.count||0),0));
+  msg.innerHTML='<div class="notice n-neutral mt2">Fetching questions…</div>';
+  let all=[];
+  try{
+    for(const {file,subjName} of selections){
+      // Use GitHub contents API (not raw.githubusercontent.com) — avoids CORS preflight rejection
+      const encodedPath=file.path.split('/').map(encodeURIComponent).join('/');
+      const apiUrl=`https://api.github.com/repos/${GITHUB_REPO}/contents/${encodedPath}?ref=${GITHUB_BRANCH}`;
+      const res=await fetch(apiUrl,{headers:ghHeaders()});
+      if(!res.ok) throw new Error(`Could not fetch ${file.name} (HTTP ${res.status})`);
+      const data=await res.json();
+      // Decode base64 content (handles UTF-8 / Hindi / Urdu etc.)
+      const bytes=Uint8Array.from(atob(data.content.replace(/\n/g,'')),c=>c.charCodeAt(0));
+      const text=new TextDecoder('utf-8').decode(bytes);
+      const parsed=parseQuestions(text);
+      if(!parsed.length) throw new Error(`No valid questions found in ${file.name}`);
+      const take=(file.count>0)?Math.min(file.count,parsed.length):parsed.length;
+      const shuffled=[...parsed].sort(()=>Math.random()-.5).slice(0,take);
+      shuffled.forEach(q=>{ q.subject=subjName; q.chapter=file.name.replace(/\.txt$/i,''); });
+      all=[...all,...shuffled];
+    }
+    questions=all; selIdx=0; answerKey=all[0]?.correct??-1;
+    msg.innerHTML=''; render();
+  }catch(e){ msg.innerHTML=`<div class="notice n-bad mt2">${esc(e.message)}</div>`; }
+}
+
+/* ══════════════════════════════════════
+   SCORE BANNER (student)
+══════════════════════════════════════ */
+function scoreBannerHTML(){
+  if(!myPid||(S.status!=='question'&&S.status!=='revealed')) return '';
+  const sorted=[...(S.participants||[])].sort((a,b)=>(b.score||0)-(a.score||0));
+  if(!sorted.length) return '';
+  const medals=['🥇','🥈','🥉'];
+  const myRank=sorted.findIndex(p=>p.id===myPid)+1;
+  const myP=sorted.find(p=>p.id===myPid);
+  let chips=sorted.slice(0,5).map((p,i)=>`<div class="sb-chip${p.id===myPid?' me':''}"><span>${medals[i]||'#'+(i+1)}</span><span>${esc(p.name.length>12?p.name.slice(0,11)+'…':p.name)}</span><span class="sb-pts">${p.score||0}</span></div>`).join('');
+  if(myRank>5&&myP) chips+=`<span style="color:var(--line);font-size:.8rem">···</span><div class="sb-chip me"><span>#${myRank}</span><span>${esc(myP.name.slice(0,11))}</span><span class="sb-pts">${myP.score||0}</span></div>`;
+  return `<div class="score-banner">${chips}</div>`;
+}
+
+/* ══════════════════════════════════════
+   RENDER
+══════════════════════════════════════ */
+function render(){
+  saveNavState();
+  const nav=document.getElementById('main-nav');
+  if(!currentUser){nav.style.display='none'; document.getElementById('view').innerHTML=authHTML(); attach(); return;}
+  const isParticipant=(role==='participant'&&myName);
+  const isHome=(!role&&!showingProfile&&!showingHalted&&homeSection==='home');
+  nav.style.display=(role==='host'&&hostAuthed)?'none':'flex';
+  // Back button: show when not at plain home
+  document.getElementById('nav-back-wrap').style.display=
+    (!isParticipant&&(role||showingProfile||showingHalted))?'block':'none';
+  // Profile: only visible on the home landing section
+  document.getElementById('profile-wrap').style.display=isHome?'flex':'none';
+  // Conn indicator: hide for participants and on profile page (clean look)
+  document.getElementById('ci').style.display=(isParticipant||showingProfile)?'none':'';
+  document.getElementById('conn-lbl').style.display=(isParticipant||showingProfile)?'none':'';
+  // Center brand for participants
+  document.getElementById('nav-brand').style.cssText=isParticipant?'flex:1;text-align:center;font-size:1rem':'';
+  const u=currentUser;
+  document.getElementById('p-avatar').textContent=u.name[0].toUpperCase();
+  document.getElementById('p-name-lbl').textContent=u.name.split(' ')[0];
+  document.getElementById('pd-full-name').textContent=u.name;
+  document.getElementById('pd-email').textContent=u.email;
+  const v=document.getElementById('view');
+
+  if(showingDismissed){ v.innerHTML=studentDismissedHTML(); attach(); return; }
+  if(showingHalted){ v.innerHTML=haltedHTML(); attach(); return; }
+  if(showingProfile){ v.innerHTML=profilePageHTML(); attach(); return; }
+  if(!role)                           v.innerHTML=landingHTML();
+  else if(role==='host'&&!hostAuthed) v.innerHTML=hostPassHTML();
+  else if(role==='host')              v.innerHTML=hostHTML();
+  else                                v.innerHTML=participantHTML();
+  attach();
+  if(S.status==='question') startTimerDisplay();
+}
+
+/* ══════════════════════════════════════
+   AUTH SCREENS
+══════════════════════════════════════ */
+let authTab='login';
+function authHTML(){
+  return `<div class="auth-page">
+    <div class="auth-box">
+      <div class="auth-logo">📚 Shadab Coaching Centre</div>
+      <div class="auth-sub">Sign in to join or host live quizzes</div>
+      <div class="auth-tabs">
+        <button class="auth-tab${authTab==='login'?' active':''}" id="tab-login">Sign in</button>
+        <button class="auth-tab${authTab==='register'?' active':''}" id="tab-register">Register</button>
+      </div>
+      ${authTab==='login'?loginFormHTML():registerFormHTML()}
+    </div>
+  </div>`;
+}
+function loginFormHTML(){
+  return `<div>
+    <div class="form-group"><label class="form-label">Email</label><input class="form-input" type="text" id="auth-email" placeholder="you@example.com" autocomplete="email"/></div>
+    <div class="form-group"><label class="form-label">Password</label><input class="form-input" type="password" id="auth-pw" placeholder="••••••••" autocomplete="current-password"/></div>
+    <div id="auth-err" class="form-error"></div>
+    <button class="btn btn-dark btn-full mt2" id="btn-login">Sign in →</button>
+  </div>`;
+}
+function registerFormHTML(){
+  return `<div>
+    <div class="form-group"><label class="form-label">Full name</label><input class="form-input" type="text" id="auth-name" placeholder="Your name" autocomplete="name"/></div>
+    <div class="form-group"><label class="form-label">Email</label><input class="form-input" type="text" id="auth-email" placeholder="you@example.com" autocomplete="email"/></div>
+    <div class="form-group"><label class="form-label">Password <span style="font-weight:400;text-transform:none;letter-spacing:0">(min 6 chars)</span></label><input class="form-input" type="password" id="auth-pw" placeholder="••••••••" autocomplete="new-password"/></div>
+    <div id="auth-err" class="form-error"></div>
+    <button class="btn btn-dark btn-full mt2" id="btn-register">Create account →</button>
+  </div>`;
+}
+
+/* ══════════════════════════════════════
+   LANDING (HOME)
+══════════════════════════════════════ */
+function landingHTML(){
+  const tabs=`<div class="home-tabs mb3">
+    <button class="home-tab${homeSection==='home'?' active':''}" id="ht-home">🏠 Home</button>
+    <button class="home-tab${homeSection==='leaderboard'?' active':''}" id="ht-lb">🏆 Leaderboard</button>
+  </div>`;
+
+  if(homeSection==='leaderboard'){
+    const myEntry=allTimeLB?allTimeLB.find(e=>e.userId===currentUser?.id):null;
+    const myRankAll=allTimeLB?allTimeLB.findIndex(e=>e.userId===currentUser?.id)+1:0;
+    const rows=allTimeLB===null
+      ?'<div style="padding:32px;text-align:center;color:var(--mid)"><div class="spinner" style="margin:0 auto 12px"></div>Loading…</div>'
+      :allTimeLB.length
+        ?allTimeLB.slice(0,20).map((e,i)=>`
+          <div class="lb-row${e.userId===currentUser?.id?' me':''}">
+            <div class="score-rank">${['🥇','🥈','🥉'][i]||('#'+(i+1))}</div>
+            <div style="flex:1;font-weight:${e.userId===currentUser?.id?'700':'400'}">${esc(e.userName||'—')}</div>
+            <div class="lb-sessions">${e.sessionsPlayed||0} session${(e.sessionsPlayed||0)!==1?'s':''}</div>
+            <div class="score-pts">${e.totalScore||0} pts</div>
+          </div>`).join('')
+        :'<div style="padding:32px;text-align:center;color:var(--mid)"><div style="font-size:2rem;margin-bottom:10px">🏆</div>No scores yet — be the first!</div>';
+    const myPinRow=myRankAll>20&&myEntry
+      ?`<div style="border-top:2px solid var(--line)"><div class="lb-row me">
+          <div class="score-rank">#${myRankAll}</div>
+          <div style="flex:1;font-weight:700">${esc(myEntry.userName||'—')} <span style="font-size:.7rem;color:var(--mid)">← you</span></div>
+          <div class="lb-sessions">${myEntry.sessionsPlayed||0} session${(myEntry.sessionsPlayed||0)!==1?'s':''}</div>
+          <div class="score-pts">${myEntry.totalScore||0} pts</div>
+        </div></div>`
+      :'';
+    return `<div class="lb-full-screen">
+      <div class="lb-full-inner">
+        ${tabs}
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+          <div><h2>All-time Leaderboard</h2><p class="muted small mt1">Cumulative scores across all sessions</p></div>
+          <button class="btn btn-ghost btn-sm" id="btn-lb-refresh" style="flex-shrink:0">↻</button>
+        </div>
+        <div class="score-list" style="overflow-y:auto;flex:1">${rows}${myPinRow}</div>
+      </div>
+    </div>`;
+  }
+
+  const n=(S.participants||[]).length;
+  const nextS=serverSchedules&&serverSchedules.length?serverSchedules[0]:null;
+  const schedHint=nextS
+    ?`<div class="notice n-accent mt3" style="text-align:left;font-size:.8rem">
+        📅 Next: <strong>${esc(nextS.title)}</strong> · ${new Date(nextS.ts).toLocaleDateString('en-GB',{day:'numeric',month:'short'})} at ${new Date(nextS.ts).toLocaleTimeString('en',{hour:'2-digit',minute:'2-digit'})} (${cdStr(nextS.ts)})
+      </div>`
+    :'';
+  return `<div class="lb-full-screen">
+    <div class="lb-full-inner">
+      ${tabs}
+      <h1 class="mb1">Live Quiz</h1>
+      <p class="muted mb3">Welcome, ${esc(currentUser.name.split(' ')[0])} 👋</p>
+      <div class="col gap3">
+        <button class="btn btn-dark btn-lg" id="go-host">🖥 Join as a host</button>
+        <button class="btn btn-white btn-lg" id="go-join">🎓 Join as student</button>
+      </div>
+      ${n?`<p class="muted small mt3" style="text-align:center">${n} student${n!==1?'s':''} in session</p>`:''}
+      ${schedHint}
+    </div>
+  </div>`;
+}
+
+/* ══════════════════════════════════════
+   HALTED SCREEN (students)
+══════════════════════════════════════ */
+function haltedHTML(){
+  const sorted=[...haltedSnapshot].sort((a,b)=>(b.score||0)-(a.score||0));
+  const medals=['🥇','🥈','🥉'];
+  const myP=sorted.find(p=>p.id===myPid);
+  const myRank=sorted.findIndex(p=>p.id===myPid)+1;
+  const total=haltedTotalQuestions||0;
+  const totalStr=haltedTotalLabel||(total>0?String(total):'?');
+  const rows=sorted.length
+    ?sorted.map((p,i)=>`
+      <div class="lb-row${p.id===myPid?' me':''}">
+        <div class="score-rank">${medals[i]||('#'+(i+1))}</div>
+        <div style="flex:1;font-weight:${i<3?'600':'400'}">${esc(p.name)}${p.id===myPid?' <span style="font-size:.68rem;color:var(--mid)">(you)</span>':''}</div>
+        <div class="score-pts"><span style="font-weight:700">${p.score||0}</span><span style="font-size:.7rem;color:var(--mid);font-weight:400">/${totalStr}</span></div>
+      </div>`).join('')
+    :`<div style="padding:20px;text-align:center;color:var(--mid)">No scores yet.</div>`;
+  return `<div style="display:flex;flex-direction:column;height:calc(100vh - 54px);overflow:hidden;padding:16px 20px;max-width:520px;margin:0 auto">
+    <div style="text-align:center;padding:20px 0 16px;flex-shrink:0">
+      <div style="font-size:2.4rem;margin-bottom:10px;animation:blink 1.4s ease-in-out infinite">⏸</div>
+      <h2 style="margin-bottom:6px">Session paused</h2>
+      <p class="muted small">The host has paused the quiz.<br>Please wait patiently — they may continue<br>or start a new session shortly.</p>
+      ${myP?`<div style="margin-top:10px;display:inline-flex;align-items:center;gap:7px;padding:5px 13px;background:#e8f5ee;border:1px solid #b7dfc7;border-radius:20px;font-size:.77rem;font-weight:600;color:#166534">Score: ${myP.score||0}/${totalStr} &nbsp;·&nbsp; Rank #${myRank}</div>`:''}
+    </div>
+    <div class="lb-panel" style="flex:1;overflow:hidden;display:flex;flex-direction:column">
+      <div class="lb-head"><span style="font-size:.82rem;font-weight:600">🏆 Current Standings</span><span class="small muted">${sorted.length} student${sorted.length!==1?'s':''}</span></div>
+      <div style="overflow-y:auto;flex:1">${rows}</div>
+    </div>
+  </div>`;
+}
+
+/* ══════════════════════════════════════
+   DISMISSED SCREEN
+══════════════════════════════════════ */
+function studentDismissedHTML(){
+  const sorted=[...haltedSnapshot].sort((a,b)=>(b.score||0)-(a.score||0));
+  const medals=['🥇','🥈','🥉'];
+  const myP=sorted.find(p=>p.id===myPid);
+  const myRank=sorted.findIndex(p=>p.id===myPid)+1;
+  const total=haltedTotalQuestions||0;
+  const totalStr=haltedTotalLabel||(total>0?String(total):'?');
+  const rows=sorted.length
+    ?sorted.map((p,i)=>`
+      <div class="lb-row${p.id===myPid?' me':''}">
+        <div class="score-rank">${medals[i]||('#'+(i+1))}</div>
+        <div style="flex:1;font-weight:${i<3?'600':'400'}">${esc(p.name)}${p.id===myPid?' <span style="font-size:.68rem;color:var(--mid)">(you)</span>':''}</div>
+        <div class="score-pts"><span style="font-weight:700">${p.score||0}</span><span style="font-size:.7rem;color:var(--mid);font-weight:400">/${totalStr}</span></div>
+      </div>`).join('')
+    :`<div style="padding:20px;text-align:center;color:var(--mid)">No scores recorded.</div>`;
+  const circ=125.7;
+  const offset=(circ*(dismissedCountdown/120)).toFixed(1);
+  return `<div style="display:flex;flex-direction:column;height:calc(100vh - 54px);overflow:hidden;padding:16px 20px;max-width:520px;margin:0 auto">
+    <div style="text-align:center;padding:18px 0 12px;flex-shrink:0">
+      <div style="position:relative;width:72px;height:72px;margin:0 auto 14px">
+        <svg width="72" height="72" viewBox="0 0 72 72" style="transform:rotate(-90deg)">
+          <circle cx="36" cy="36" r="20" fill="none" stroke="var(--line)" stroke-width="4"/>
+          <circle id="dismissed-ring" cx="36" cy="36" r="20" fill="none" stroke="var(--bad)" stroke-width="4"
+            stroke-dasharray="${circ}" stroke-dashoffset="${offset}" style="transition:stroke-dashoffset 1s linear"/>
+        </svg>
+        <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:.85rem;font-weight:700;color:var(--bad);line-height:1" id="dismissed-cd-num">${Math.floor(dismissedCountdown/60)}:${String(dismissedCountdown%60).padStart(2,'0')}</div>
+      </div>
+      <div style="font-size:2rem;margin-bottom:8px">🎓</div>
+      <h2 style="margin-bottom:5px">Session has ended</h2>
+      <p class="muted small">The host has closed this session.<br>Going home in ${Math.floor(dismissedCountdown/60)}m ${dismissedCountdown%60}s.</p>
+      ${myP?`<div style="margin-top:10px;display:inline-flex;align-items:center;gap:7px;padding:5px 13px;background:#e8f5ee;border:1px solid #b7dfc7;border-radius:20px;font-size:.77rem;font-weight:600;color:#166534">Final: ${myP.score||0}/${totalStr} &nbsp;·&nbsp; #${myRank} of ${sorted.length}</div>`:''}
+      <div style="margin-top:14px">
+        <button class="btn btn-dark" id="btn-dismissed-home" style="gap:7px;padding:9px 22px">🏠 Go Home Now</button>
+      </div>
+    </div>
+    <div style="font-size:.67rem;text-align:center;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--mid);margin-bottom:6px;flex-shrink:0">🏆 Final Leaderboard</div>
+    <div class="lb-panel" style="flex:1;overflow:hidden;display:flex;flex-direction:column;margin-top:0">
+      <div class="lb-head"><span style="font-size:.82rem;font-weight:600">Final Standings</span><span class="small muted">${sorted.length} student${sorted.length!==1?'s':''}</span></div>
+      <div style="overflow-y:auto;flex:1">${rows}</div>
+    </div>
+  </div>`;
+}
+
+/* ══════════════════════════════════════
+   PROFILE PAGE
+══════════════════════════════════════ */
+function profilePageHTML(){
+  const u=currentUser;
+  const initials=u.name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+  const stats=computeStats();
+  const history=loadHistory();
+  // Schedule tab removed — only in host panel
+  const TABS=[['overview','📈 Overview'],['history','📋 History'],['settings','⚙️ Settings']];
+  const tabsHTML=TABS.map(([t,l])=>`<div class="ptab${profileTab===t?' active':''}" data-ptab="${t}">${l}</div>`).join('');
+
+  let body='';
+
+  if(profileTab==='overview'||profileTab==='history'){
+    const icon=profileTab==='overview'?'📈':'📋';
+    body='<div style="text-align:center;padding:48px 20px;color:var(--mid)"><div style="font-size:2.4rem;margin-bottom:12px">'+icon+'</div><div style="font-size:.95rem;font-weight:600;color:var(--ink);margin-bottom:6px">Coming soon</div><p class="muted small">This section is being built.</p></div>';
+  }
+
+  if(profileTab==='settings'){
+    body=`
+    <div class="psec">
+      <h3>🎭 Session Display Name</h3>
+      <p class="muted small mb2" style="font-size:.77rem">Shown during quizzes instead of your full name.</p>
+      <div class="form-row"><label>Display name</label><input class="form-input" id="p-disp-in" maxlength="32" value="${esc(u.displayName||u.name)}" placeholder="Your quiz nickname"/></div>
+      <button class="btn btn-dark btn-sm" id="btn-save-disp">Save</button>
+      <div class="form-msg" id="p-disp-msg"></div>
+    </div>
+    <div class="psec">
+      <h3>🔑 Change Password</h3>
+      <div class="form-row"><label>Current password</label><input class="form-input" type="password" id="p-pw-cur" placeholder="Current password"/></div>
+      <div class="form-row"><label>New password</label><input class="form-input" type="password" id="p-pw-new" placeholder="Min 6 characters"/></div>
+      <div class="form-row"><label>Confirm new</label><input class="form-input" type="password" id="p-pw-new2" placeholder="Repeat new password"/></div>
+      <button class="btn btn-dark btn-sm" id="btn-save-pw">Update password</button>
+      <div class="form-msg" id="p-pw-msg"></div>
+    </div>`;
+  }
+
+  const disp=u.displayName||u.name;
+  return `<div class="profile-page">
+    <div class="row gap2 mb3">
+      <span style="font-size:.95rem;font-weight:600">My Profile</span>
+    </div>
+    <div class="profile-hero">
+      <div class="ph-avatar">${initials}</div>
+      <div class="ph-info">
+        <div class="ph-name">${esc(disp)}${u.displayName&&u.displayName!==u.name?`<span style="font-size:.72rem;color:var(--mid);font-weight:400;margin-left:6px">(${esc(u.name)})</span>`:''}</div>
+        <div class="ph-email">${esc(u.email)}</div>
+      </div>
+    </div>
+    <div class="ptabs">${tabsHTML}</div>
+    ${body}
+  </div>`;
+}
+
+/* ══════════════════════════════════════
+   HOST PASSWORD
+══════════════════════════════════════ */
+function hostPassHTML(){
+  return `<div class="center"><div class="box">
+    <h2 class="mb1">Join as a host</h2>
+    <p class="muted mb3">Enter the host password to continue.</p>
+    <input type="password" id="pw-in" placeholder="Password" maxlength="20" autocomplete="off" class="form-input"/>
+    <p id="pw-err" style="color:var(--bad);font-size:.8rem;min-height:1.2em;margin-top:5px"></p>
+    <div class="row gap2 mt2">
+      <button class="btn btn-ghost btn-sm" id="btn-pw-back">← Back</button>
+      <button class="btn btn-dark" id="btn-pw-ok" style="flex:1">Enter →</button>
+    </div>
+  </div></div>`;
+}
+
+/* ══════════════════════════════════════
+   HALT CONFIRMATION OVERLAY (host)
+══════════════════════════════════════ */
+function haltMenuOverlayHTML(){
+  if(!showingHaltMenu) return '';
+  return `<div style="position:absolute;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:flex-end;justify-content:center;z-index:500;backdrop-filter:blur(2px)">
+    <div style="background:var(--white);border-radius:18px 18px 0 0;width:100%;max-width:480px;display:flex;flex-direction:column;box-shadow:0 -8px 40px rgba(0,0,0,.25);animation:slideUp .22s ease">
+      <div style="padding:16px 20px 12px;border-bottom:1px solid var(--line);flex-shrink:0;text-align:center">
+        <div style="width:36px;height:4px;background:var(--line);border-radius:2px;margin:0 auto 14px"></div>
+        <div style="font-size:1.6rem;margin-bottom:4px">⏸</div>
+        <div style="font-size:1rem;font-weight:600;margin-bottom:2px">Session Halted</div>
+        <p class="muted small">Students are on pause. What next?</p>
+      </div>
+      <div style="padding:14px 16px 24px;display:flex;flex-direction:column;gap:10px;flex-shrink:0">
+        <button class="btn btn-lg" id="btn-new-session" style="justify-content:center;gap:8px;background:#1a56db;color:#fff;border-color:#1a56db">
+          🔄 New Session <span style="opacity:.75;font-weight:400;font-size:.78rem">· resets scores to 0</span>
+        </button>
+        <button class="btn btn-lg" id="btn-stop-dismiss" style="justify-content:center;gap:8px;background:#be123c;color:#fff;border-color:#be123c">
+          ⏹ Stop &amp; Dismiss Students
+        </button>
+        <button class="btn btn-ghost btn-sm" id="btn-halt-cancel" style="justify-content:center;margin-top:2px">Cancel — keep session going</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+
+function schedOverlayHTML(){
+  if(!sidebarSchedOpen) return '';
+  const upcoming=hostSchedules.filter(s=>s.ts>Date.now()-3600000);
+  const schedRows=upcoming.length
+    ?upcoming.map(s=>{
+      const d=new Date(s.ts);
+      return `<div class="sched-card" style="margin-bottom:6px;padding:8px 10px">
+        <div class="sched-date-blk" style="min-width:36px;padding:4px 7px"><div class="sched-day" style="font-size:.95rem">${d.getDate()}</div><div class="sched-mon">${d.toLocaleString('en',{month:'short'})}</div></div>
+        <div class="sched-info">
+          <div class="sched-title" style="font-size:.8rem">${esc(s.title)}</div>
+          <div class="sched-meta">${d.toLocaleTimeString('en',{hour:'2-digit',minute:'2-digit'})}${s.notes?' · '+esc(s.notes):''}</div>
+          <div class="sched-cd">${cdStr(s.ts)}</div>
+        </div>
+        <span class="sched-del" data-sdel="${s._id}">✕</span>
+      </div>`;
+    }).join('')
+    :'<p class="muted small" style="padding:4px 0 10px">No upcoming sessions.</p>';
+  return `<div id="sched-overlay" style="position:absolute;bottom:0;left:0;right:0;background:var(--white);border-top:2px solid var(--line);border-radius:12px 12px 0 0;padding:16px;z-index:300;max-height:70%;overflow-y:auto;box-shadow:0 -4px 24px rgba(0,0,0,.1)">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+      <span style="font-weight:700;font-size:.9rem">📅 Schedule</span>
+      <button class="btn btn-ghost btn-sm" id="btn-sched-close">✕</button>
+    </div>
+    ${schedRows}
+    <hr/>
+    <div style="display:flex;flex-direction:column;gap:6px;margin-top:10px">
+      <input class="form-input" id="sched-title" placeholder="Session title" maxlength="60" style="font-size:.82rem;padding:8px 10px"/>
+      <input class="form-input" type="datetime-local" id="sched-dt" style="font-size:.82rem;padding:8px 10px"/>
+      <input class="form-input" id="sched-notes" placeholder="Notes (optional)" maxlength="100" style="font-size:.82rem;padding:8px 10px"/>
+      <button class="btn btn-dark btn-sm btn-full" id="btn-sched-add">+ Add to schedule</button>
+      <div class="form-msg" id="sched-msg"></div>
+    </div>
+  </div>`;
+}
+
+function standingsOverlayHTML(){
+  if(!showStandingsOverlay) return '';
+  const snaps  = S.sessionSnapshots || [];
+  const gcores = S.gameScores || [];       // [{id,name,total}] cumulative
+  const parts  = S.participants || [];
+  const medals = ['🥇','🥈','🥉'];
+
+  // Build a master list of all known students (union of all sessions + current)
+  const nameMap = {};
+  snaps.forEach(sn => sn.scores.forEach(s => { nameMap[s.id] = s.name; }));
+  parts.forEach(p => { nameMap[p.id] = p.name; });
+  gcores.forEach(g => { nameMap[g.id] = g.name; });
+
+  // For cumulative total use gameScores (already banked past sessions)
+  // Add current live session scores on top
+  const liveScoreMap = {};
+  parts.forEach(p => { liveScoreMap[p.id] = p.score || 0; });
+
+  const totalMap = {};
+  gcores.forEach(g => { totalMap[g.id] = (g.total || 0); });
+  // Add current session live scores (not yet banked)
+  parts.forEach(p => { totalMap[p.id] = (totalMap[p.id]||0) + (p.score||0); });
+
+  // Sort students by grand total descending
+  const allIds = Object.keys(nameMap);
+  allIds.sort((a,b)=>(totalMap[b]||0)-(totalMap[a]||0));
+
+  const numSessions = snaps.length;
+  const currentSessionNum = numSessions + 1;
+  const hasCurrentSession = parts.length > 0;
+
+  if(allIds.length === 0){
+    return `<div class="standings-overlay">
+      <div class="standings-overlay-head">
+        <span style="font-weight:700;font-size:.95rem">📊 Current Standings</span>
+        <button class="btn btn-ghost btn-sm" id="btn-standings-close">✕ Close</button>
+      </div>
+      <div style="padding:40px;text-align:center;color:var(--mid)">No data yet</div>
+    </div>`;
+  }
+
+  // Header row: Name | S1 | S2 | … | Current | Total
+  let thCells = `<th>Student</th>`;
+  snaps.forEach((sn,i) => { thCells += `<th>${i+1}</th>`; });
+  if(hasCurrentSession){ thCells += `<th>${currentSessionNum}</th>`; }
+  thCells += `<th class="total-col">∑</th>`;
+
+  // Data rows
+  const rows = allIds.map((id,i) => {
+    const name = nameMap[id] || '—';
+    let tds = `<td><span style="min-width:20px;display:inline-block;text-align:center;font-size:.72rem;color:var(--mid)">${medals[i]||'#'+(i+1)}</span> ${esc(name)}</td>`;
+    snaps.forEach(sn => {
+      const entry = sn.scores.find(s=>s.id===id);
+      const pts = entry ? entry.score : null;
+      tds += pts===null
+        ? `<td class="zero">—</td>`
+        : `<td>${pts}</td>`;
+    });
+    if(hasCurrentSession){
+      const pts = liveScoreMap[id];
+      tds += pts===undefined
+        ? `<td class="zero">—</td>`
+        : `<td>${pts}</td>`;
+    }
+    const grand = totalMap[id] || 0;
+    tds += `<td class="total-col">${grand}</td>`;
+    return `<tr>${tds}</tr>`;
+  }).join('');
+
+  // Session separator legend below table
+  const sessionCount = numSessions + (hasCurrentSession?1:0);
+
+  return `<div class="standings-overlay">
+    <div class="standings-overlay-head">
+      <div>
+        <span style="font-weight:700;font-size:.95rem">📊 Current Standings</span>
+        <span style="margin-left:10px;font-size:.75rem;color:var(--mid)">${allIds.length} students · ${sessionCount} session${sessionCount!==1?'s':''}</span>
+      </div>
+      <button class="btn btn-ghost btn-sm" id="btn-standings-close">✕ Close</button>
+    </div>
+    <div class="standings-overlay-body">
+      <table class="standings-tbl">
+        <thead><tr>${thCells}</tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+  </div>`;
+}
+
+
+function manageOverlayHTML(){
+  if(!folderManageSubject) return '';
+  // Set manageFolder to match overlay subject so existing editor logic works
+  const fName=folderManageSubject;
+
+  // File list
+  const fileRows=manageFolderFiles.length
+    ?manageFolderFiles.map(f=>`
+      <div class="mfile-row${manageFile===f.name?' editing':''}">
+        <span style="flex:1;font-size:.8rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:${manageFile===f.name?'var(--accent)':'var(--ink)'};font-weight:${manageFile===f.name?'600':'400'}">${esc(f.name)}</span>
+        <button class="btn btn-ghost btn-sm" style="padding:2px 9px;font-size:.7rem;flex-shrink:0;${manageFile===f.name?'background:#e0edff;border-color:var(--accent);color:var(--accent)':''}" data-file-edit="${esc(f.name)}">${manageFile===f.name?'✎ Editing':'Edit'}</button>
+        <button class="btn btn-sm" style="padding:2px 7px;flex-shrink:0;background:#fff1f2;border-color:#fecdd3;color:#be123c;font-size:.68rem" data-file-del="${esc(f.name)}" title="Delete">✕</button>
+      </div>`).join('')
+    :(manageFolderFiles.length===0&&manageFile===null
+      ?`<div style="padding:12px;text-align:center;color:var(--mid);font-size:.78rem;background:var(--faint);border-radius:7px">No .txt files yet — create one below</div>`
+      :'');
+
+  // Inline editor (when a file is open)
+  const editorBlock=manageEditMode?`
+    <div style="border:1.5px solid var(--ink);border-radius:9px;overflow:hidden;box-shadow:0 2px 10px rgba(0,0,0,.07);display:flex;flex-direction:column;">
+      <div style="display:flex;align-items:center;gap:6px;padding:7px 10px;background:var(--ink);color:#fff;flex-shrink:0">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+        <span style="font-size:.75rem;font-weight:600;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+          ${esc(fName)} / ${manageEditMode==='new'
+            ?`<input id="new-file-name-editor" placeholder="chapter1.txt" maxlength="60"
+                style="background:rgba(255,255,255,.18);border:none;border-bottom:1px solid rgba(255,255,255,.5);color:#fff;font-size:.75rem;font-weight:600;padding:1px 5px;outline:none;width:120px;border-radius:3px"
+                value="${esc(manageNewFileName)}"/>`
+            :`<span style="opacity:.85">${esc(manageFile||'')}</span>`}
+        </span>
+        <button id="btn-editor-fullscreen" style="background:none;border:1px solid rgba(255,255,255,.3);color:#fff;padding:2px 7px;border-radius:4px;cursor:pointer;font-size:.68rem" title="${editorFullscreen?'Exit fullscreen':'Fullscreen'}">
+          ${editorFullscreen
+            ?`<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3"/></svg>`
+            :`<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>`}
+        </button>
+        <button id="btn-close-editor" style="background:none;border:1px solid rgba(255,255,255,.3);color:#fff;padding:2px 7px;border-radius:4px;cursor:pointer;font-size:.68rem">✕</button>
+      </div>
+      <div style="padding:3px 10px;background:#fafaf9;border-bottom:1px solid var(--line);font-size:.63rem;color:var(--mid);flex-shrink:0">
+        <strong style="color:var(--ink)">Format:</strong> Question · <code style="background:#eee;padding:0 3px;border-radius:2px">(A)opt, (B)opt, (C)opt, (D)opt</code>
+      </div>
+      <textarea id="q-editor" style="width:100%;font-family:monospace;font-size:.76rem;resize:none;padding:10px 12px;border:none;outline:none;display:block;min-height:160px;box-sizing:border-box"
+        placeholder="What is photosynthesis?&#10;(A)Making food from sunlight, (B)Breathing, (C)Digestion, (D)Transpiration">${esc(editingContent)}</textarea>
+      <div style="display:flex;gap:6px;padding:6px 10px;background:#fafaf9;border-top:1px solid var(--line);align-items:center;flex-shrink:0">
+        <button class="btn btn-good btn-sm" style="gap:4px;font-size:.75rem" id="btn-save-editor">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17,21 17,13 7,13 7,21"/></svg>Save to GitHub
+        </button>
+        <label class="btn btn-white btn-sm" style="cursor:pointer;gap:4px;font-size:.75rem">
+          ↑ Upload .txt<input type="file" id="file-upload-inp" accept=".txt" style="display:none"/>
+        </label>
+      </div>
+    </div>`:
+    // Fullscreen editor (separate overlay)
+    (editorFullscreen?`<div id="editor-fs-overlay" style="position:fixed;inset:0;z-index:900;background:#fff;display:flex;flex-direction:column;">
+      <div style="display:flex;align-items:center;gap:6px;padding:7px 10px;background:var(--ink);color:#fff;flex-shrink:0">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+        <span style="font-size:.75rem;font-weight:600;flex:1">${esc(fName)} / ${esc(manageFile||'')}</span>
+        <button id="btn-editor-fullscreen" style="background:none;border:1px solid rgba(255,255,255,.3);color:#fff;padding:2px 7px;border-radius:4px;cursor:pointer;font-size:.68rem">⤡ Exit</button>
+        <button id="btn-close-editor" style="background:none;border:1px solid rgba(255,255,255,.3);color:#fff;padding:2px 7px;border-radius:4px;cursor:pointer;font-size:.68rem">✕</button>
+      </div>
+      <textarea id="q-editor" style="flex:1;width:100%;font-family:monospace;font-size:.8rem;resize:none;padding:12px 14px;border:none;outline:none;display:block;box-sizing:border-box">${esc(editingContent)}</textarea>
+      <div style="display:flex;gap:6px;padding:8px 10px;background:#fafaf9;border-top:1px solid var(--line);align-items:center;flex-shrink:0">
+        <button class="btn btn-good btn-sm" id="btn-save-editor">Save to GitHub</button>
+      </div>
+    </div>`:'');
+
+  return `<div class="manage-overlay-backdrop" id="manage-overlay-backdrop">
+    <div class="manage-overlay-panel">
+      <div class="manage-overlay-head">
+        <span style="font-size:1.2rem">📁</span>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:.9rem;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(fName)}</div>
+          <div style="font-size:.68rem;color:var(--mid)">${manageFolderFiles.length} file${manageFolderFiles.length!==1?'s':''}</div>
+        </div>
+        <button class="btn btn-ghost btn-sm" id="btn-manage-close" style="font-size:.75rem;flex-shrink:0">✕ Close</button>
+      </div>
+      <div class="manage-overlay-body">
+        ${fileRows}
+        ${editorBlock}
+        ${!manageEditMode?`
+        <div style="display:flex;gap:5px;margin-top:2px">
+          <input class="form-input" id="new-file-name" placeholder="chapter.txt" maxlength="60" style="flex:1;font-size:.76rem;padding:5px 8px"/>
+          <button class="btn btn-dark btn-sm" id="btn-create-file" style="font-size:.73rem;white-space:nowrap">+ New</button>
+          <label class="btn btn-white btn-sm" style="cursor:pointer;font-size:.73rem;white-space:nowrap">
+            ↑ Upload<input type="file" id="file-upload-inp" accept=".txt" style="display:none"/>
+          </label>
+        </div>`:''}
+        <div id="upload-msg" style="font-size:.75rem">${uploadMsg}</div>
+      </div>
+      <div style="padding:8px 14px 22px;border-top:1px solid var(--line);flex-shrink:0">
+        <button class="btn btn-sm btn-full" style="background:#fff1f2;color:#be123c;border-color:#fecdd3;font-size:.73rem;justify-content:center" id="btn-delete-folder">✕ Delete folder &amp; all files</button>
+      </div>
+    </div>
+    ${editorFullscreen?editorBlock:''}
+  </div>`;
+}
+
+function hostSettingsOverlayHTML(){
+  if(!hostSettingsOpen) return '';
+  return `<div class="host-settings-overlay" id="host-settings-overlay" role="dialog" aria-modal="true" aria-label="Keyboard shortcuts and settings">
+    <div class="host-settings-panel">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">
+        <div>
+          <div style="font-weight:700;font-size:1rem">⌨️ Keyboard Shortcuts</div>
+          <div class="muted small mt1">Navigate the host panel without a mouse</div>
+        </div>
+        <button class="btn btn-ghost btn-sm" id="btn-settings-close" style="flex-shrink:0">✕ Close</button>
+      </div>
+
+      <div class="shortcut-section">Quiz Controls</div>
+      <div class="shortcut-row">
+        <div class="shortcut-keys"><kbd class="kbd">←</kbd><kbd class="kbd">→</kbd></div>
+        <div class="shortcut-desc">Previous / next question</div>
+      </div>
+      <div class="shortcut-row">
+        <div class="shortcut-keys"><kbd class="kbd">P</kbd></div>
+        <div class="shortcut-desc">Push current question to students</div>
+      </div>
+      <div class="shortcut-row">
+        <div class="shortcut-keys"><kbd class="kbd">R</kbd></div>
+        <div class="shortcut-desc">Reveal the correct answer</div>
+      </div>
+      <div class="shortcut-row">
+        <div class="shortcut-keys"><kbd class="kbd">N</kbd></div>
+        <div class="shortcut-desc">Advance to next question (after reveal)</div>
+      </div>
+      <div class="shortcut-row">
+        <div class="shortcut-keys"><kbd class="kbd">1</kbd>–<kbd class="kbd">4</kbd></div>
+        <div class="shortcut-desc">Set answer key to option A – D</div>
+      </div>
+
+      <div class="shortcut-section">Tab Navigation</div>
+      <div class="shortcut-row">
+        <div class="shortcut-keys"><kbd class="kbd">Tab</kbd></div>
+        <div class="shortcut-desc">Move focus to next control</div>
+      </div>
+      <div class="shortcut-row">
+        <div class="shortcut-keys"><kbd class="kbd">⇧ Shift</kbd><kbd class="kbd">Tab</kbd></div>
+        <div class="shortcut-desc">Move focus to previous control</div>
+      </div>
+      <div class="shortcut-row">
+        <div class="shortcut-keys"><kbd class="kbd">Enter</kbd></div>
+        <div class="shortcut-desc">Activate focused button or item</div>
+      </div>
+      <div class="shortcut-row">
+        <div class="shortcut-keys"><kbd class="kbd">Space</kbd></div>
+        <div class="shortcut-desc">Toggle checkbox or activate button</div>
+      </div>
+      <div class="shortcut-row">
+        <div class="shortcut-keys"><kbd class="kbd">Esc</kbd></div>
+        <div class="shortcut-desc">Close overlays and panels</div>
+      </div>
+
+      <div class="shortcut-section">Generate Tab — Subject Picker</div>
+      <div class="shortcut-row">
+        <div class="shortcut-keys"><kbd class="kbd">Tab</kbd></div>
+        <div class="shortcut-desc">Focus each subject folder</div>
+      </div>
+      <div class="shortcut-row">
+        <div class="shortcut-keys"><kbd class="kbd">Enter</kbd> / <kbd class="kbd">Space</kbd></div>
+        <div class="shortcut-desc">Expand or collapse subject folder</div>
+      </div>
+      <div class="shortcut-row">
+        <div class="shortcut-keys"><kbd class="kbd">↑</kbd> / <kbd class="kbd">↓</kbd></div>
+        <div class="shortcut-desc">Move between subject folders</div>
+      </div>
+
+      <div class="shortcut-section">Answer Key Grid</div>
+      <div class="shortcut-row">
+        <div class="shortcut-keys"><kbd class="kbd">Tab</kbd></div>
+        <div class="shortcut-desc">Focus each answer option</div>
+      </div>
+      <div class="shortcut-row">
+        <div class="shortcut-keys"><kbd class="kbd">←</kbd><kbd class="kbd">→</kbd><kbd class="kbd">↑</kbd><kbd class="kbd">↓</kbd></div>
+        <div class="shortcut-desc">Move between options A–D</div>
+      </div>
+      <div class="shortcut-row">
+        <div class="shortcut-keys"><kbd class="kbd">Enter</kbd> / <kbd class="kbd">Space</kbd></div>
+        <div class="shortcut-desc">Select this option as the answer key</div>
+      </div>
+    </div>
+  </div>`;
+}
+
+/* ══════════════════════════════════════
+   HOST KEYBOARD SHORTCUTS (global handler — added/removed by attach)
+══════════════════════════════════════ */
+function hostKeyDown(e){
+  if(!hostAuthed||role!=='host') return;
+  // Close settings with Escape
+  if(hostSettingsOpen&&e.key==='Escape'){ hostSettingsOpen=false; render(); return; }
+  if(folderManageSubject&&e.key==='Escape'){ folderManageSubject=null; manageFolder=null; manageEditMode=null; manageFile=null; manageFolderFiles=[]; editingContent=''; editingSha=null; uploadMsg=''; editorFullscreen=false; render(); return; }
+  if(folderOverlaySubject&&e.key==='Escape'){ folderOverlaySubject=null; folderOverlayDraft={}; render(); return; }
+  // Close halt/sched overlays with Escape
+  if((showingHaltMenu||sidebarSchedOpen)&&e.key==='Escape'){
+    showingHaltMenu=false; sidebarSchedOpen=false; render(); return;
+  }
+  // Don't fire shortcuts when typing in an input/textarea/select
+  const tag=document.activeElement?.tagName;
+  if(tag==='INPUT'||tag==='TEXTAREA'||tag==='SELECT') return;
+  // Don't fire when inside an overlay other than the main panel
+  if(hostSettingsOpen||showingHaltMenu||sidebarSchedOpen) return;
+  switch(e.key){
+    case 'ArrowLeft':
+      e.preventDefault();
+      document.getElementById('btn-q-prev')?.click(); break;
+    case 'ArrowRight':
+      e.preventDefault();
+      document.getElementById('btn-q-next')?.click(); break;
+    case 'p': case 'P':
+      e.preventDefault();
+      document.getElementById('btn-push')?.click(); break;
+    case 'r': case 'R':
+      e.preventDefault();
+      document.getElementById('btn-reveal')?.click(); break;
+    case 'n': case 'N':
+      e.preventDefault();
+      document.getElementById('btn-next')?.click(); break;
+    case '1': case '2': case '3': case '4':{
+      e.preventDefault();
+      const idx=parseInt(e.key)-1;
+      const cards=[...document.querySelectorAll('.key-card[data-key]')];
+      if(cards[idx]) cards[idx].click();
+      break;
+    }
+  }
+}
+
+function hostHTML(){
+  if(S.status==='ended') return hostEndedHTML();
+
+  const parts=S.participants||[];
+  const sorted=[...parts].sort((a,b)=>(b.score||0)-(a.score||0));
+  const isLive=S.status==='question'||S.status==='revealed';
+  const isRevealed=S.status==='revealed';
+  const answered=S.totalAnswered||0;
+  const medals=['🥇','🥈','🥉'];
+
+  // ── 1. LIVE SCORE NAV ──────────────────────────────────────────────────
+  const snaps = S.sessionSnapshots || [];
+  const currentSessionLabel = snaps.length > 0 ? `S${snaps.length + 1}` : 'S1';
+  const standingsLabel = parts.length
+    ? `📊 ${currentSessionLabel} · ${parts.length} joined`
+    : `📊 Standings`;
+  const liveNav=`
+    <div class="host-live-nav">
+      <button class="btn btn-ghost btn-sm" id="btn-host-home" style="flex-shrink:0;padding:4px 8px;font-size:.75rem">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:3px"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9,22 9,12 15,12 15,22"/></svg>Home
+      </button>
+      <div style="flex:1;min-width:0;display:flex;align-items:center;justify-content:center">
+        <button class="btn btn-ghost btn-sm" id="btn-standings-open" style="padding:5px 14px;font-size:.8rem;font-weight:600;border-color:var(--line)">
+          ${standingsLabel}
+        </button>
+      </div>
+      <button class="btn btn-ghost btn-sm" id="btn-sched-nav" style="flex-shrink:0;padding:4px 8px;gap:4px;font-size:.75rem">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>Sched
+      </button>
+      <button class="btn btn-ghost btn-sm" id="btn-host-settings" title="Keyboard shortcuts &amp; settings" aria-label="Open keyboard shortcuts" style="flex-shrink:0;padding:4px 9px;font-size:.75rem">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      </button>
+    </div>`;
+
+  // SVG icons — refined set
+  const iconNew=`<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>`;
+  const iconPlay=`<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polygon points="10,8 16,12 10,16" fill="currentColor" stroke="none"/></svg>`;
+  const iconStop=`<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>`;
+  const iconReset=`<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><polyline points="1,4 1,10 7,10"/><path d="M3.51 15a9 9 0 1 0 .49-4.95"/></svg>`;
+
+  // Session status banner — shows clearly whether students can join
+  const sessionBanner=!isLive?(S.sessionOpen
+    ?`<div style="display:flex;align-items:center;gap:8px;padding:7px 12px;background:#e8f5ee;border-bottom:1px solid #b7dfc7;font-size:.8rem;flex-shrink:0">
+        <span class="dot-live"></span>
+        <span style="color:#166534;font-weight:600">Session open — students can join now</span>
+        <span style="color:#166534;opacity:.7;margin-left:auto">${parts.length} joined</span>
+      </div>`
+    :`<div style="display:flex;align-items:center;gap:8px;padding:7px 12px;background:var(--faint);border-bottom:1px solid var(--line);font-size:.8rem;flex-shrink:0">
+        <span style="width:8px;height:8px;border-radius:50%;background:var(--mid);flex-shrink:0;display:inline-block"></span>
+        <span style="color:var(--mid)">Session closed — press <strong>Start</strong> to let students join</span>
+      </div>`)
+    :'';
+
+  const ctrlBar=`
+    <div class="host-ctrl-bar">
+      <button class="btn btn-sm" style="flex:1;justify-content:center;background:#eff6ff;color:#1d4ed8;border-color:#bfdbfe;gap:5px" id="btn-reload">${iconNew} New</button>
+      ${!S.sessionOpen
+        ?`<button class="btn btn-sm" style="flex:1;justify-content:center;background:#f0fdf4;color:#15803d;border-color:#bbf7d0;gap:5px;font-weight:600" id="btn-open-session">${iconPlay} Start</button>`
+        :`<button class="btn btn-sm" style="flex:1;justify-content:center;background:#dcfce7;color:#15803d;border-color:#86efac;gap:5px;opacity:.6;cursor:default" disabled>${iconPlay} Open ✓</button>`}
+      <button class="btn btn-sm" style="flex:1;justify-content:center;background:#fff1f2;color:#be123c;border-color:#fecdd3;gap:5px" id="btn-halt">${iconStop} Halt</button>
+      <button class="btn btn-sm" style="flex:1;justify-content:center;background:var(--faint);color:var(--mid);border-color:var(--line);gap:5px" id="btn-reset">${iconReset} Reset</button>
+    </div>
+    ${sessionBanner}`;
+
+  // ── 3. STUDENTS PANEL ────────────────────────────────────────────────
+  function initials(n){return n.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();}
+  const studentRows=sorted.length
+    ?sorted.map((p,i)=>{
+        const ans=S.answers?.[p.id];
+        const ansStr=ans!==undefined&&ans!==null?'ABCD'[ans]:'—';
+        const ansTime = S.answerTimes?.[p.id] ?? localAnswerTimes[p.id];
+        const isCorrect=ans!==undefined&&ans!==null&&ans===S.correct;
+        const isWrong=ans!==undefined&&ans!==null&&ans!==S.correct;
+        return `<div style="display:flex;align-items:center;gap:8px;padding:7px 10px;border-bottom:1px solid var(--line);font-size:.83rem">
+          <div style="min-width:22px;text-align:center;font-size:.72rem;color:var(--mid)">${medals[i]||('#'+(i+1))}</div>
+          <div class="j-av" style="flex-shrink:0">${initials(p.name)}</div>
+          <div style="flex:1;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">${esc(p.name)}</div>
+          <div style="font-size:.75rem;font-weight:600;min-width:18px;text-align:center;color:${isCorrect?'#16a34a':isWrong?'var(--bad)':'var(--mid)'}">${ansStr}</div>
+          ${ansTime!=null?`<div style="font-size:.7rem;color:var(--mid);min-width:28px;text-align:right">${ansTime}s</div>`:'<div style="min-width:28px"></div>'}
+          <div style="font-weight:600;min-width:44px;text-align:right">${p.score||0} <span style="font-size:.68rem;color:var(--mid)">pts</span></div>
+        </div>`;
+      }).join('')
+    :`<div style="padding:20px;text-align:center;color:var(--mid);font-size:.83rem">Waiting for students to join…</div>`;
+
+  const studentsPanel=`
+    <div class="host-students-panel">
+      <div class="host-students-head">
+        <h3 style="margin:0">Students${parts.length?' ('+parts.length+')':''}</h3>
+        ${isLive
+          ?`<span class="small muted">${answered}/${parts.length} answered</span>`
+          :S.sessionOpen
+            ?`<span class="tag tag-green"><span class="dot-live"></span> Open</span>`
+            :`<span class="small muted">Session not started</span>`}
+      </div>
+      <div class="host-students-inner">${studentRows}</div>
+    </div>`;
+
+  // ── 4. BOTTOM CONTROLS ───────────────────────────────────────────────
+
+  // No questions loaded → show upload/generate panel
+  if(!questions.length){
+    const totalSelectedFiles=subjects.reduce((n,s)=>n+s.files.filter(f=>f.selected).length,0);
+    // Chapter overlay HTML (rendered on top of everything when a folder is tapped)
+    const chapterOverlayHTML=(()=>{
+      if(!folderOverlaySubject) return '';
+      const subj=subjects.find(s=>s.name===folderOverlaySubject);
+      if(!subj) return '';
+      const draft=folderOverlayDraft;
+      const selCount=Object.values(draft).filter(d=>d.selected).length;
+      const rows=subj.filesLoaded
+        ?(subj.files.length
+          ?subj.files.map(f=>{
+              const d=draft[f.name]||{selected:false,count:0};
+              return `<div class="chapter-row${d.selected?' sel':''}" data-ch-toggle="${esc(f.name)}">
+                <div class="ch-check">${d.selected?'<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20,6 9,17 4,12"/></svg>':''}</div>
+                <span class="ch-name">${esc(f.name.replace(/\.txt$/i,''))}</span>
+                ${d.selected?`<input class="ch-count" type="number" min="0" max="999" value="${d.count||''}" placeholder="all" data-ch-cnt="${esc(f.name)}" title="0 or blank = all questions" onclick="event.stopPropagation()"/>`:
+                  '<span style="width:44px"></span>'}
+              </div>`;
+            }).join('')
+          :'<p class="muted" style="padding:20px;text-align:center;font-size:.84rem">No .txt files in this folder.</p>')
+        :'<div style="padding:32px;text-align:center"><div class="spinner" style="margin:0 auto 10px"></div><p class="muted small">Loading chapters…</p></div>';
+      return `<div class="chapter-overlay-backdrop" id="ch-overlay-backdrop">
+        <div class="chapter-overlay-panel">
+          <div class="chapter-overlay-head">
+            <div class="chapter-overlay-title">
+              <span style="font-size:1.3rem">📁</span>
+              <span>${esc(folderOverlaySubject)}</span>
+
+            </div>
+            <div style="display:flex;gap:6px;flex-shrink:0">
+              <button class="btn btn-ghost btn-sm" id="btn-ch-clear" style="font-size:.72rem;color:var(--mid)">✕ Clear</button>
+              <button class="btn btn-ghost btn-sm" id="btn-ch-cancel" style="font-size:.76rem">Cancel</button>
+              <button class="btn btn-accent btn-sm" id="btn-ch-save" style="font-size:.76rem;font-weight:600">Save ✓</button>
+            </div>
+          </div>
+          <div class="chapter-overlay-body">${rows}</div>
+        </div>
+      </div>`;
+    })();
+
+    const generatePanel=`
+      ${chapterOverlayHTML}
+      ${subjects.length?`
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">
+          <button class="btn btn-ghost btn-sm" id="btn-browse" style="padding:4px 9px;font-size:.72rem">${repoLoading?'⏳ Loading':'↻ Refresh'}</button>
+          <div style="display:flex;align-items:center;gap:5px;margin-left:auto">
+            <span style="font-size:.72rem;color:var(--mid)">⏱</span>
+            <input type="number" min="0" max="300" value="${hostTimerSeconds}" id="timer-sec-input" class="q-count-input" style="width:46px;font-size:.75rem;padding:3px 6px"/>
+            <span style="font-size:.72rem;color:var(--mid)">s</span>
+          </div>
+        </div>
+        <button class="btn btn-accent btn-sm btn-full" id="btn-gen" style="font-size:.8rem;margin-bottom:7px" ${subjects.some(s=>s.files.some(f=>f.selected))?'':'disabled'}>Generate quiz →</button>
+        <div class="folder-grid">
+          ${subjects.map(s=>{
+            const selCount=s.files.filter(f=>f.selected).length;
+            return `<div class="folder-card${selCount?' has-sel':''}" data-folder-name="${esc(s.name)}" style="position:relative" tabindex="0" role="button" aria-label="${esc(s.name)}">
+              ${selCount?`<div class="fc-badge">${selCount}</div>`:''}
+              <div class="fc-icon">${selCount?'📂':'📁'}</div>
+              <div class="fc-name">${esc(s.name)}</div>
+            </div>`;
+          }).join('')}
+          <div class="folder-card-add${showNewFolderCard?' active':''}" id="btn-new-folder-card" tabindex="0" role="button" aria-label="Create new folder">
+            ${showNewFolderCard
+              ?`<input id="new-folder-name" placeholder="Folder name" maxlength="40" autofocus
+                  style="width:100%;font-size:.68rem;padding:3px 5px;border:1px solid var(--accent);border-radius:5px;outline:none;text-align:center"
+                  onclick="event.stopPropagation()"/>`
+              :`<div style="font-size:1.1rem;color:var(--mid)">＋</div>
+                <div style="font-size:.62rem;font-weight:600;color:var(--mid)">New folder</div>`}
+          </div>
+        </div>
+        ${showNewFolderCard?`<div style="display:flex;gap:5px;margin-top:-4px;margin-bottom:6px">
+          <button class="btn btn-accent btn-sm" id="btn-create-folder" style="flex:1;font-size:.74rem">Create</button>
+          <button class="btn btn-ghost btn-sm" id="btn-cancel-new-folder" style="font-size:.74rem">Cancel</button>
+        </div>`:''}
+        <div id="gen-msg"></div>
+      `:`
+        <div id="repo-msg"></div>
+        <button class="btn btn-dark btn-sm" id="btn-browse" style="margin-top:6px;width:100%">${repoLoading?'⏳ Loading…':'Load subjects from GitHub →'}</button>
+      `}`;
+
+    return `<div class="host-full" style="position:relative">
+      ${liveNav}
+      ${ctrlBar}
+      ${studentsPanel}
+      <div class="host-bottom">
+        <div class="host-bottom-scroll" style="padding-top:5px">${generatePanel}</div>
+      </div>
+      ${manageOverlayHTML()}
+      ${schedOverlayHTML()}
+      ${haltMenuOverlayHTML()}
+      ${standingsOverlayHTML()}
+      ${hostSettingsOverlayHTML()}
+    </div>`;
+  }
+
+  // Questions loaded — build controller
+  const q=selIdx>=0?questions[selIdx]:(isLive?S.question:null);
+
+  // Question navigation bar
+  const qNav=`<div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
+    ${selIdx>0?`<button class="btn btn-ghost btn-sm" style="padding:3px 10px" id="btn-q-prev">‹</button>`:'<span style="width:32px"></span>'}
+    <span class="muted small" style="flex:1;text-align:center">Q${selIdx>=0?selIdx+1:'?'}/${questions.length}${q&&q.subject?' · '+esc(q.subject):''}</span>
+    ${selIdx<questions.length-1?`<button class="btn btn-ghost btn-sm" style="padding:3px 10px" id="btn-q-next">›</button>`:'<span style="width:32px"></span>'}
+  </div>`;
+
+  // Timer row — shows input when idle, live countdown when question is live
+  const timerTotal=S.timerSeconds||hostTimerSeconds;
+  const timerLeft=timerTotal&&S.questionPushedAt&&isLive
+    ?Math.max(0,timerTotal-(Date.now()-S.questionPushedAt)/1000)
+    :null;
+  const timerRow=`
+    <div class="timer-input-row" style="flex-shrink:0">
+      <span style="flex:1;font-size:.8rem;color:var(--mid)">⏱ Timer per question</span>
+      ${isLive&&timerLeft!==null
+        ?`<div style="display:flex;align-items:center;gap:8px">
+            <div style="width:80px;height:6px;background:var(--line);border-radius:3px;overflow:hidden">
+              <div id="host-timer-bar" style="height:100%;background:${timerLeft<timerTotal*0.25?'var(--bad)':'var(--accent)'};border-radius:3px;width:${timerTotal?((timerLeft/timerTotal)*100).toFixed(1):0}%;transition:width .5s linear"></div>
+            </div>
+            <span id="host-timer-digits" style="font-size:.85rem;font-weight:700;color:${timerLeft<timerTotal*0.25?'var(--bad)':'var(--ink)'};min-width:28px;text-align:right">${Math.ceil(timerLeft)}s</span>
+          </div>`
+        :`<input type="number" min="0" max="300" value="${hostTimerSeconds}" id="timer-sec-live" class="q-count-input" style="width:60px"/>
+           <span class="muted small">sec</span>`}
+    </div>`;
+
+  // Question text
+  const qInfo=q?`<p class="${''+urduCls(q)}" style="font-size:.83rem;line-height:${urduCls(q)?'2.2':'1.4'};flex-shrink:0;color:var(--ink)">${renderMath(q.text.length>130?q.text.slice(0,128)+'…':q.text)}</p>`
+    :`<p class="muted small" style="flex-shrink:0">Select a question above or use ‹ › to navigate.</p>`;
+
+  // Live response bars (shown when live instead of key)
+  let liveBars='';
+  if(isLive&&q){
+    const counts=S.answerCounts||[], total=Math.max(1,counts.reduce((a,b)=>a+b,0));
+    liveBars=q.options.map((o,i)=>{
+      const cnt=counts[i]||0,pct=(cnt/total*100).toFixed(0);
+      return `<div class="bar-row">
+        <div class="bar-meta"><span class="${''+urduCls(q)}">${'ABCD'[i]}) ${renderMath(o)}${S.correct===i?' ✓':''}</span><span>${cnt}</span></div>
+        <div class="bar-track"><div class="bar-fill${S.correct===i?' correct':''}" style="width:${pct}%"></div></div>
+      </div>`;
+    }).join('');
+  }
+
+  // Answer key (shown when not live)
+  const keyGrid=(!isLive&&q)?`
+    <div class="key-grid" style="flex-shrink:0">
+      ${q.options.map((o,i)=>`
+        <div class="key-card${answerKey===i?' selected':''}" data-key="${i}" tabindex="0" role="button" aria-pressed="${answerKey===i}" aria-label="Option ${'ABCD'[i]}">
+          <div class="kl">${'ABCD'[i]}</div><div class="kt${urduCls(q)}">${renderMath(o)}</div>
+        </div>`).join('')}
+    </div>`:'';
+
+  // Mic/music state
+  const micOn=!!localStream;
+
+  // SVG action icons — refined
+  const iconSend=`<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22,2 15,22 11,13 2,9" fill="currentColor" stroke="none"/></svg>`;
+  const iconEye=`<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>`;
+  const iconNext=`<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12,5 19,12 12,19"/></svg>`;
+  const iconMicOn=`<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>`;
+  const iconMicOff=`<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="1" y1="1" x2="23" y2="23"/><path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6"/><path d="M17 16.95A7 7 0 0 1 5 12v-2m14 0v2a7 7 0 0 1-.11 1.23"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>`;
+
+  // Action buttons — no margin-top:auto (space goes below, not above)
+  const actionBtns=`
+    <div style="display:flex;gap:6px;flex-shrink:0;padding-top:8px;border-top:1px solid var(--line);margin-top:4px">
+      <button class="btn btn-lg" style="flex:1;font-size:.78rem;padding:10px 4px;gap:5px;background:#1e293b;color:#fff;border-color:#1e293b;justify-content:center" id="btn-push"
+        ${(!q||answerKey<0||pushing||isLive)?'disabled':''}>${iconSend}${pushing?'Sending…':'Push'}</button>
+      <button class="btn btn-lg" style="flex:1;font-size:.78rem;padding:10px 4px;gap:5px;background:#f59e0b;color:#fff;border-color:#f59e0b;justify-content:center" id="btn-reveal"
+        ${(!isLive||isRevealed)?'disabled':''}>${iconEye} Reveal</button>
+      <button class="btn btn-lg" style="flex:1;font-size:.78rem;padding:10px 4px;gap:5px;background:#0ea5e9;color:#fff;border-color:#0ea5e9;justify-content:center" id="btn-next"
+        ${!isRevealed?'disabled':''}>${iconNext} Next</button>
+      <button class="btn btn-lg" style="padding:10px 12px;flex-shrink:0;justify-content:center;${micOn?'background:#fee2e2;color:#be123c;border-color:#fecaca':'background:var(--faint);color:var(--mid);border-color:var(--line)'}"
+        id="${micOn?'btn-mic-stop':'btn-mic-start'}" title="${micOn?'Stop mic':'Start mic'}">${micOn?iconMicOff:iconMicOn}</button>
+    </div>`;
+
+  return `<div class="host-full" style="position:relative">
+    ${liveNav}
+    ${ctrlBar}
+    ${studentsPanel}
+    <div class="host-bottom">
+      ${qNav}
+      ${timerRow}
+      ${qInfo}
+      <div style="flex:1;overflow-y:auto;min-height:0">
+        ${isLive
+          ?`<div>${liveBars}</div>`
+          :keyGrid}
+      </div>
+      ${actionBtns}
+    </div>
+    ${schedOverlayHTML()}
+    ${haltMenuOverlayHTML()}
+    ${standingsOverlayHTML()}
+    ${hostSettingsOverlayHTML()}
+  </div>`;
+}
+
+
+/* ══════════════════════════════════════
+   HOST ENDED
+══════════════════════════════════════ */
+function hostEndedHTML(){
+  const history=S.history||[], parts=S.participants||[];
+  const sorted=[...parts].sort((a,b)=>(b.score||0)-(a.score||0));
+  const partMap={}; parts.forEach(p=>partMap[p.id]=p);
+  const totalQs=history.length;
+  const totalLabel=haltedTotalLabel||(totalQs>0?String(totalQs):'?');
+  const table=parts.length&&history.length?`<div class="itbl-wrap"><table class="itbl">
+    <thead><tr><th>Student</th>${history.map((_,i)=>`<th>Q${i+1}</th>`).join('')}<th>Score</th></tr></thead>
+    <tbody>${sorted.map(p=>`<tr data-pid="${p.id}"><td><strong>${esc(p.name)}</strong></td>
+      ${history.map(h=>{const ans=h.answers[p.id]??null;if(ans===null)return'<td class="c-nil">—</td>';return`<td class="${ans===h.correct?'c-ok':'c-bad'}">${'ABCD'[ans]}${ans===h.correct?' ✓':' ✗'}</td>`;}).join('')}
+      <td><strong>${p.score||0}</strong><span style="font-size:.7rem;color:var(--mid)">/${totalLabel}</span></td></tr>`).join('')}</tbody>
+  </table></div>`:'<div class="notice n-neutral">No data recorded.</div>';
+  let detail='';
+  if(inspectPid&&partMap[inspectPid]){
+    const p=partMap[inspectPid];
+    detail=`<div class="detail-wrap"><div class="detail-head"><span><strong>${esc(p.name)}</strong> — ${p.score||0}/${totalLabel}</span><button class="btn btn-ghost btn-sm" id="btn-close-inspect">Close</button></div>
+      ${history.map((h,i)=>{const ans=h.answers[p.id]??null;return`<div class="detail-row"><div class="detail-q">Q${i+1}: ${renderMath(h.question.text)}</div>
+        <div class="ans-chips">${h.question.options.map((o,oi)=>{let cls='ac-none';if(oi===h.correct)cls='ac-good';if(ans===oi&&oi!==h.correct)cls='ac-bad';const mark=oi===ans?(oi===h.correct?' ✓':' ✗'):'';
+          return`<span class="ans-chip ${cls}" style="${oi===ans||oi===h.correct?'font-weight:600':''}">${'ABCD'[oi]}) ${renderMath(o)}${mark}</span>`;}).join('')}${ans===null?'<span class="ans-chip ac-none">No answer</span>':''}</div></div>`;}).join('')}
+    </div>`;
+  }
+  return `<div class="wide" style="padding:16px">
+    <div class="results-header">
+      <h2>Results</h2>
+      <div class="results-btns">
+        <button class="btn btn-good btn-sm" id="btn-continue-session">▶ Continue</button>
+        <button class="btn btn-warn btn-sm" id="btn-halt">⏹ Halt &amp; Dismiss</button>
+        <button class="btn btn-ghost btn-sm" id="btn-reset">↺ Reset</button>
+      </div>
+    </div>
+    <div class="notice n-neutral mb3" style="font-size:.79rem">
+      <strong>Continue</strong> — return to waiting room &nbsp;·&nbsp; <strong>Halt</strong> — send students home
+    </div>
+    <p class="muted small mb2">Tap any row to inspect answers.</p>${table}${detail}</div>`;
+}
+
+/* ══════════════════════════════════════
+   PARTICIPANT
+══════════════════════════════════════ */
+function participantHTML(){
+  // Gate: if session not open and not yet joined, show no-session screen
+  if(!S.sessionOpen&&!myName) return noSessionHTML();
+  if(!myName)            return joinHTML();
+  if(S.status==='idle')  return waitHTML();
+  if(S.status==='ended') return studentEndHTML();
+  return questionViewHTML();
+}
+
+function noSessionHTML(){
+  const scheds=serverSchedules;
+  const next=scheds&&scheds.length?scheds[0]:null;
+  return `<div class="center"><div class="box" style="text-align:center">
+    <div style="font-size:2.5rem;margin-bottom:16px">📚</div>
+    <h2 class="mb2">No session active</h2>
+    ${next
+      ?`<p class="muted mb3">The next scheduled session:</p>
+        <div class="sched-card" style="text-align:left;margin:0 auto 20px;max-width:320px">
+          <div class="sched-date-blk"><div class="sched-day">${new Date(next.ts).getDate()}</div><div class="sched-mon">${new Date(next.ts).toLocaleString('en',{month:'short'})}</div></div>
+          <div class="sched-info">
+            <div class="sched-title">${esc(next.title)}</div>
+            <div class="sched-meta">${new Date(next.ts).toLocaleTimeString('en',{hour:'2-digit',minute:'2-digit'})}${next.notes?' · '+esc(next.notes):''}</div>
+            <div class="sched-cd">${cdStr(next.ts)}</div>
+          </div>
+        </div>`
+      :`<p class="muted mb3">There are no sessions scheduled.<br>Wait till the host starts a session.</p>`}
+    <button class="btn btn-ghost btn-sm" id="btn-back-home">← Back</button>
+  </div></div>`;
+}
+
+function joinHTML(){
+  const name=currentUser?.displayName||currentUser?.name||'';
+  const initials=name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase()||'?';
+  return `<div class="center"><div class="box">
+    <h2 class="mb1">Join session</h2>
+    <p class="muted mb3">You'll join as:</p>
+    <div style="display:flex;align-items:center;gap:12px;padding:14px;background:var(--faint);border:1px solid var(--line);border-radius:var(--r);margin-bottom:20px">
+      <div style="width:38px;height:38px;border-radius:50%;background:var(--ink);color:#fff;display:flex;align-items:center;justify-content:center;font-size:.9rem;font-weight:600;flex-shrink:0">${initials}</div>
+      <div style="min-width:0">
+        <div style="font-weight:600;font-size:.95rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(name)}</div>
+        <div class="muted small">${esc(currentUser?.email||'')}</div>
+      </div>
+    </div>
+    <button class="btn btn-dark btn-full" id="btn-enter">Join →</button>
+  </div></div>`;
+}
+
+function waitHTML(){
+  const parts=S.participants||[];
+  const myP=parts.find(p=>p.id===myPid);
+  function initials(n){return n.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();}
+  const chips=[...(myP?[myP]:[]),...parts.filter(p=>p.id!==myPid)].map(p=>`
+    <div class="student-chip"><div class="s-av" style="${p.id===myPid?'background:#d8f3dc;border-color:#b7dfc7':''}">${initials(p.name)}</div>
+    <span>${esc(p.name)}${p.id===myPid?' <span style="font-size:.7rem;color:var(--mid)">(you)</span>':''}</span></div>`).join('');
+  const history=S.myHistory||[];
+  const waitMsg=history.length?'Wait for next question…':'Waiting for host to start…';
+  const lbHTML=history.length?`<div class="lb-panel">
+    <div class="lb-head"><span style="font-size:.82rem;font-weight:600">🏆 Leaderboard</span><span class="small muted">${parts.length} students</span></div>
+    ${[...parts].sort((a,b)=>(b.score||0)-(a.score||0)).map((p,i)=>{
+      const isMe=p.id===myPid;
+      const ansTime = S.answerTimes?.[p.id] ?? localAnswerTimes[p.id] ?? null;
+      // Score colour: green = gained points, red = answered but no gain (wrong), default = no data
+      const scoreColor=isMe?(scoreGain>0?'#16a34a':prevMyScore>=0&&scoreGain===0&&myLastAnswerTime!==null?'var(--bad)':'inherit'):'inherit';
+      // Gain badge shown only for self: +1 green or ✗ red
+      const gainBadge=isMe&&myLastAnswerTime!==null
+        ?(scoreGain>0
+          ?`<span style="font-size:.68rem;font-weight:700;color:#16a34a;background:#dcfce7;padding:1px 5px;border-radius:8px;margin-right:3px">+${scoreGain}</span>`
+          :`<span style="font-size:.68rem;font-weight:700;color:#be123c;background:#fee2e2;padding:1px 5px;border-radius:8px;margin-right:3px">✗</span>`)
+        :'';
+      return `<div class="lb-row${isMe?' me':''}">
+        <div class="score-rank">${['🥇','🥈','🥉'][i]||i+1}</div>
+        <div style="flex:1">${esc(p.name)}${isMe?' <span style="font-size:.7rem;color:var(--mid)">← you</span>':''}</div>
+        ${ansTime!==null?`<span style="font-size:.72rem;color:var(--mid);margin-right:4px">${ansTime}s</span>`:''}
+        ${gainBadge}<div class="score-pts" style="color:${scoreColor}">${p.score||0}</div>
+      </div>`;
+    }).join('')}
+  </div>`:'';
+  return `<div class="wait-shell">
+    <div class="wait-header">
+      <div class="spinner"></div>
+      <h2>${waitMsg}</h2>
+      <p class="muted mt1">${parts.length} student${parts.length!==1?'s':''} in the room</p>
+    </div>
+    <div class="voice-bar" style="max-width:480px;width:100%;margin-bottom:16px">
+      <div id="mic-dot" class="mic-dot"></div>
+      <span style="flex:1;color:var(--mid);font-size:.8rem">Host voice</span>
+    </div>
+    <div class="student-grid" style="max-width:560px;margin-bottom:8px">${chips}</div>
+    ${lbHTML}
+    <button class="btn btn-ghost btn-sm mt3" id="btn-leave">Leave session</button>
+  </div>`;
+}
+
+function questionViewHTML(){
+  const q=S.question; if(!q) return waitHTML();
+  const answered=S.myAnswer!==null&&S.myAnswer!==undefined;
+  const revealed=S.status==='revealed', correct=S.correct;
+  const opts=q.options.map((o,i)=>{
+    let cls='opt-card';
+    if(revealed){cls+=' locked';if(i===correct)cls+=' correct';else if(i===S.myAnswer)cls+=' wrong';}
+    else if(answered){cls+=' locked';if(i===S.myAnswer)cls+=' chosen';}
+    else if(i===S.myAnswer) cls+=' chosen';
+    return `<div class="${cls}" data-opt="${i}"><div class="opt-key">${'ABCD'[i]}</div><span class="${''+urduCls(q)}">${renderMath(o)}</span></div>`;
+  }).join('');
+  let notice='';
+  if(revealed&&answered){ const ok=S.myAnswer===correct; notice=`<div class="notice ${ok?'n-good':'n-bad'} mt3">${ok?'✓ Correct — +1 point':`✗ Wrong. Correct: ${esc(q.options[correct])}`}</div>`; }
+  else if(answered&&!revealed){ notice=`<div class="notice n-neutral mt3">Answer submitted — waiting for reveal.</div>`; }
+  const hasTimer=S.timerSeconds&&S.status==='question';
+  return `${scoreBannerHTML()}<div class="page">
+    <div class="row between mb2">
+      <div class="row gap2"><div id="mic-dot" class="mic-dot"></div><span class="small muted">Score: <strong>${S.myScore||0}</strong> pts</span></div>
+      <button class="btn btn-ghost btn-sm" id="btn-leave">Leave</button>
+    </div>
+    ${hasTimer?`<div class="timer-wrap"><div class="timer-bar-track"><div id="timer-bar" class="timer-bar-fill" style="width:100%"></div></div><div id="timer-digits" class="timer-digits">${S.timerSeconds}s</div></div>`:''}
+    <h2 class="mb3${urduCls(q)}">${renderMath(q.text)}</h2>
+    <div class="opt-grid">${opts}</div>
+    ${notice}
+  </div>`;
+}
+
+function studentEndHTML(){
+  const sorted=[...(S.participants||[])].sort((a,b)=>(b.score||0)-(a.score||0));
+  const myRank=sorted.findIndex(p=>p.id===myPid)+1;
+  const medals=['🥇','🥈','🥉'];
+  return `<div class="page">
+    <h1 class="mb1">Session ended</h1>
+    <p class="muted mb2">You finished <strong>#${myRank}</strong> of ${sorted.length}</p>
+    <div class="notice n-neutral mb4" style="font-size:.82rem">The host may continue the session or close it. Please wait…</div>
+    <h3 class="mb2">Leaderboard</h3>
+    <div class="score-list">
+      ${sorted.map((p,i)=>`<div class="score-row${p.id===myPid?' me':i<3?' top':''}">
+        <div class="score-rank">${medals[i]||i+1}</div>
+        <div class="score-name">${esc(p.name)}${p.id===myPid?' <span style="font-size:.7rem;color:var(--mid)">← you</span>':''}</div>
+        <div class="score-pts">${p.score||0}</div>
+      </div>`).join('')}
+    </div>
+  </div>`;
+}
+
+/* ══════════════════════════════════════
+   EVENTS
+══════════════════════════════════════ */
+
+// Set up outside-click for profile dropdown once at boot
+let _outsideClickReady=false;
+function setupOutsideClick(){
+  if(_outsideClickReady) return;
+  _outsideClickReady=true;
+  // Profile button toggle — attached once here, not in attach(), so it never stacks
+  document.addEventListener('click', e=>{
+    const wrap=document.getElementById('profile-wrap');
+    const btn=document.getElementById('profile-btn');
+    if(!wrap) return;
+    if(btn&&btn.contains(e.target)){
+      // Toggle dropdown
+      document.getElementById('p-dropdown')?.classList.toggle('hidden');
+      e.stopPropagation();
+      return;
+    }
+    // Click outside — close
+    if(!wrap.contains(e.target)) document.getElementById('p-dropdown')?.classList.add('hidden');
+  });
+  document.addEventListener('touchstart', e=>{
+    const wrap=document.getElementById('profile-wrap');
+    if(wrap&&!wrap.contains(e.target)) document.getElementById('p-dropdown')?.classList.add('hidden');
+  },{passive:true});
+}
+
+function attach(){
+  // Click sounds
+  document.querySelectorAll('.btn,.key-card,.auth-tab,.home-tab').forEach(el=>
+    el.addEventListener('click',playClick,{capture:true,once:true})
+  );
+
+  // Auth
+  on('tab-login',  ()=>{ authTab='login';  render(); });
+  on('tab-register',()=>{ authTab='register'; render(); });
+  on('btn-login',   doLogin);
+  on('btn-register',doRegister);
+  document.getElementById('auth-pw')?.addEventListener('keydown',e=>{ if(e.key==='Enter'){ if(authTab==='login') doLogin(); else doRegister(); }});
+  document.getElementById('auth-email')?.addEventListener('keydown',e=>{ if(e.key==='Enter'){ document.getElementById('auth-pw')?.focus(); }});
+
+  // Profile dropdown — one-time setup handled in setupOutsideClick() above
+  setupOutsideClick();
+  on('btn-logout', doLogout);
+  on('btn-profile',()=>{ showingProfile=true; profileTab='overview'; document.getElementById('p-dropdown')?.classList.add('hidden'); navPush(); render(); });
+  on('btn-profile-back',()=>{ showingProfile=false; render(); });
+  document.querySelectorAll('.ptab[data-ptab]').forEach(el=>el.addEventListener('click',()=>{ profileTab=el.dataset.ptab; render(); }));
+
+  on('btn-dismissed-home', doDismissHome);
+  on('btn-lb-refresh',()=>{ allTimeLB=null; render(); fetchLeaderboard(); });
+
+  // Host home button (inside full-window host nav)
+  on('btn-host-home', doBack);
+  on('btn-pw-back', doBack);
+  // Question prev/next inside host controller
+  on('btn-q-prev',()=>{ if(selIdx>0){selIdx--;answerKey=questions[selIdx].correct??-1;render();} });
+  on('btn-q-next',()=>{ if(selIdx<questions.length-1){selIdx++;answerKey=questions[selIdx].correct??-1;render();} });
+
+  // Nav back button — delegates to shared doBack()
+  on('btn-nav-back', doBack);
+
+  // Profile settings
+  on('btn-save-disp', async ()=>{
+    const v=document.getElementById('p-disp-in')?.value?.trim();
+    const msg=document.getElementById('p-disp-msg'); if(!msg)return;
+    if(!v){msg.className='form-msg err';msg.textContent='Name required';return;}
+    try{
+      const d=await apiPost('/api/update-name',{displayName:v},true);
+      saveAuth(d.token,d.user); msg.className='form-msg ok'; msg.textContent='✓ Saved!';
+      setTimeout(()=>render(),700);
+    }catch(e){msg.className='form-msg err';msg.textContent=e.message;}
+  });
+  on('btn-save-pw', async ()=>{
+    const cur=document.getElementById('p-pw-cur')?.value;
+    const nw=document.getElementById('p-pw-new')?.value;
+    const nw2=document.getElementById('p-pw-new2')?.value;
+    const msg=document.getElementById('p-pw-msg'); if(!msg)return;
+    if(!cur||!nw||!nw2){msg.className='form-msg err';msg.textContent='Fill all fields';return;}
+    if(nw!==nw2){msg.className='form-msg err';msg.textContent='New passwords do not match';return;}
+    try{
+      await apiPost('/api/change-password',{currentPassword:cur,newPassword:nw},true);
+      msg.className='form-msg ok'; msg.textContent='✓ Password updated!';
+      ['p-pw-cur','p-pw-new','p-pw-new2'].forEach(id=>{ const el=document.getElementById(id); if(el)el.value=''; });
+    }catch(e){msg.className='form-msg err';msg.textContent=e.message;}
+  });
+
+  // Host schedule (sidebar)
+  on('btn-sched-add', async ()=>{
+    const title=document.getElementById('sched-title')?.value?.trim();
+    const dt=document.getElementById('sched-dt')?.value;
+    const notes=document.getElementById('sched-notes')?.value?.trim();
+    const msg=document.getElementById('sched-msg'); if(!msg)return;
+    if(!title||!dt){msg.className='form-msg err';msg.textContent='Title and date required';return;}
+    const ts=new Date(dt).getTime();
+    if(ts<=Date.now()){msg.className='form-msg err';msg.textContent='Choose a future date';return;}
+    try{
+      await apiPost('/api/schedules',{title,ts,notes:notes||''},true);
+      msg.className='form-msg ok'; msg.textContent='✓ Scheduled!';
+      await fetchHostSchedules();
+      setTimeout(()=>{ if(document.getElementById('sched-msg')) document.getElementById('sched-msg').textContent=''; },2000);
+    }catch(e){ msg.className='form-msg err'; msg.textContent=e.message; }
+  });
+  document.querySelectorAll('[data-sdel]').forEach(el=>el.addEventListener('click', async()=>{
+    try{ await apiDel('/api/schedules/'+el.dataset.sdel); await fetchHostSchedules(); }catch(e){}
+  }));
+
+  // Landing tabs
+  on('ht-home',()=>{ homeSection='home'; render(); });
+  on('ht-lb',()=>{ homeSection='leaderboard'; allTimeLB=null; render(); fetchLeaderboard(); });
+
+  // Landing nav
+  on('go-host', ()=>{ role='host'; hostAuthed=false; navPush(); render(); });
+  on('go-join',  ()=>{
+    role='participant';
+    if(!serverSchedules) fetchSchedules();
+    navPush(); render();
+  });
+  on('btn-back-home',()=>{ role=null; myName=null; myPid=null; render(); });
+
+  // Host pass
+  // btn-pw-back handled above via doBack
+  on('btn-pw-ok',  doHostLogin);
+  document.getElementById('pw-in')?.addEventListener('keydown',e=>{ if(e.key==='Enter') doHostLogin(); });
+  document.getElementById('pw-in')?.focus();
+
+  // Student join (no name input now — uses account name)
+  on('btn-enter', doJoin);
+
+  // Leave
+  on('btn-leave',()=>{ if(confirm('Leave the session?')) send({type:'leave'}); });
+
+  // Resource browser / upload panel
+  on('btn-browse', browseRepo);
+
+  // Folder cards — single tap = chapter overlay, long press (400ms) = manage overlay
+  document.querySelectorAll('.folder-card[data-folder-name]').forEach(el=>{
+    const name=el.dataset.folderName;
+    let pressTimer=null, didLongPress=false;
+
+    // Single tap: natural click opens chapter overlay
+    el.addEventListener('click', ()=>{ if(!didLongPress) openFolderOverlay(name); });
+
+    // 1.2s hold opens manage overlay — does NOT interfere with click
+    let pressStartX=0, pressStartY=0;
+    el.addEventListener('pointerdown', e=>{
+      didLongPress=false;
+      pressStartX=e.clientX; pressStartY=e.clientY;
+      pressTimer=setTimeout(()=>{
+        didLongPress=true;
+        navigator.vibrate&&navigator.vibrate(40);
+        el.style.transform='scale(.93)';
+        setTimeout(()=>{ el.style.transform=''; },150);
+        folderManageSubject=name; manageFolder=name;
+        manageEditMode=null; manageFile=null; manageFolderFiles=[]; editingContent=''; editingSha=null; uploadMsg='';
+        loadFolderFiles(name);
+        render();
+      }, 1200);
+    });
+    el.addEventListener('pointerup',     ()=>{ clearTimeout(pressTimer); pressTimer=null; setTimeout(()=>{ didLongPress=false; },50); });
+    el.addEventListener('pointercancel', ()=>{ clearTimeout(pressTimer); pressTimer=null; didLongPress=false; });
+    el.addEventListener('pointermove', e=>{
+      const dx=e.clientX-pressStartX, dy=e.clientY-pressStartY;
+      if(dx*dx+dy*dy>100){ clearTimeout(pressTimer); pressTimer=null; }
+    });
+
+    // Keyboard: Enter/Space = open selection, Shift+Enter = manage
+    el.addEventListener('keydown', e=>{
+      if(e.key==='Enter'||e.key===' '){
+        e.preventDefault();
+        if(e.shiftKey){
+          folderManageSubject=name; manageFolder=name;
+          manageEditMode=null; manageFile=null; manageFolderFiles=[]; editingContent=''; editingSha=null; uploadMsg='';
+          loadFolderFiles(name); render();
+        } else {
+          openFolderOverlay(name);
+        }
+        return;
+      }
+      const all=[...document.querySelectorAll('.folder-card[data-folder-name]')];
+      const i=all.indexOf(el);
+      if(e.key==='ArrowRight'||e.key==='ArrowDown'){ e.preventDefault(); all[(i+1)%all.length]?.focus(); }
+      if(e.key==='ArrowLeft'||e.key==='ArrowUp')  { e.preventDefault(); all[(i-1+all.length)%all.length]?.focus(); }
+    });
+  });
+
+  // + New folder card
+  on('btn-new-folder-card', ()=>{
+    if(!showNewFolderCard){ showNewFolderCard=true; render(); setTimeout(()=>document.getElementById('new-folder-name')?.focus(),40); }
+  });
+  on('btn-cancel-new-folder', ()=>{ showNewFolderCard=false; render(); });
+  on('btn-create-folder', async ()=>{
+    await createFolder();
+    showNewFolderCard=false;
+    // also refresh subjects list
+    browseRepo();
+  });
+
+  // Manage overlay — close
+  on('btn-manage-close', ()=>{ folderManageSubject=null; manageFolder=null; manageEditMode=null; manageFile=null; manageFolderFiles=[]; editingContent=''; editingSha=null; uploadMsg=''; editorFullscreen=false; render(); });
+  document.getElementById('manage-overlay-backdrop')?.addEventListener('click', e=>{
+    if(e.target.id==='manage-overlay-backdrop'){ folderManageSubject=null; manageFolder=null; manageEditMode=null; manageFile=null; manageFolderFiles=[]; editingContent=''; editingSha=null; uploadMsg=''; editorFullscreen=false; render(); }
+  });
+
+  // Manage overlay — file edit button
+  document.querySelectorAll('[data-file-edit]').forEach(el=>{
+    el.addEventListener('click', ()=>{
+      const fn=el.dataset.fileEdit;
+      manageEditMode='existing'; manageNewFileName='';
+      openFolderEdit(manageFolder, fn);
+    });
+  });
+
+  // Manage overlay — file delete button
+  document.querySelectorAll('[data-file-del]').forEach(el=>{
+    el.addEventListener('click', ()=>{
+      const fn=el.dataset.fileDel;
+      if(!confirm(`Delete "${fn}" from ${manageFolder}?\nThis cannot be undone.`)) return;
+      deleteFile(manageFolder, fn);
+    });
+  });
+
+  // Manage overlay — create new file
+  on('btn-create-file', ()=>{
+    const inp=document.getElementById('new-file-name');
+    let n=inp?inp.value.trim():'';
+    if(!n){setUploadMsg('Enter a file name first','bad');return;}
+    if(!n.endsWith('.txt')) n+='.txt';
+    manageEditMode='new'; manageFile=n; manageNewFileName=n; editingContent=''; editingSha=null;
+    setUploadMsg('',''); render();
+    setTimeout(()=>document.getElementById('q-editor')?.focus(),50);
+  });
+
+  // Editor fullscreen toggle
+  on('btn-editor-fullscreen', ()=>{
+    const ta=document.getElementById('q-editor');
+    if(ta) editingContent=ta.value;
+    editorFullscreen=!editorFullscreen;
+    render();
+    setTimeout(()=>{ const t=document.getElementById('q-editor'); if(t){ t.value=editingContent; t.focus(); t.setSelectionRange(t.value.length,t.value.length); } },30);
+  });
+
+  on('btn-delete-folder', async ()=>{
+    if(!manageFolder) return;
+    if(!confirm(`Delete folder "${manageFolder}" and all its contents?`)) return;
+    await deleteFolder(manageFolder);
+    folderManageSubject=null; render();
+  });
+  on('btn-save-editor', saveEditorContent);
+  on('btn-close-editor', ()=>{ manageEditMode=null; manageFile=null; manageNewFileName=''; editingContent=''; editingSha=null; uploadMsg=''; editorFullscreen=false; render(); });
+  document.getElementById('file-upload-inp')?.addEventListener('change', uploadQuestionsFile);
+
+  // Host settings overlay
+  on('btn-host-settings', ()=>{ hostSettingsOpen=true; render(); setTimeout(()=>document.getElementById('btn-settings-close')?.focus(),50); });
+  on('btn-settings-close', ()=>{ hostSettingsOpen=false; render(); });
+  document.getElementById('host-settings-overlay')?.addEventListener('click', e=>{
+    if(e.target.id==='host-settings-overlay'){ hostSettingsOpen=false; render(); }
+  });
+
+  // Generate tab — folder card: open chapter overlay
+  function openFolderOverlay(name){
+    folderOverlaySubject=name;
+    const subj=subjects.find(s=>s.name===name);
+    folderOverlayDraft={};
+    if(subj){ subj.files.forEach(f=>{ folderOverlayDraft[f.name]={selected:f.selected,count:f.count||0}; }); }
+    if(subj&&!subj.filesLoaded) loadSubjectFiles(name);
+    render();
+  }
+  document.querySelectorAll('[data-folder-open]').forEach(el=>{
+    el.addEventListener('click', ()=> openFolderOverlay(el.dataset.folderOpen));
+    el.addEventListener('keydown', e=>{
+      if(e.key==='Enter'||e.key===' '){ e.preventDefault(); openFolderOverlay(el.dataset.folderOpen); return; }
+      const all=[...document.querySelectorAll('[data-folder-open]')];
+      const i=all.indexOf(el);
+      if(e.key==='ArrowRight'||e.key==='ArrowDown'){ e.preventDefault(); all[(i+1)%all.length]?.focus(); }
+      if(e.key==='ArrowLeft'||e.key==='ArrowUp'){ e.preventDefault(); all[(i-1+all.length)%all.length]?.focus(); }
+    });
+  });
+
+  // Chapter overlay — cancel
+  on('btn-ch-cancel', ()=>{ folderOverlaySubject=null; folderOverlayDraft={}; render(); });
+
+  // Chapter overlay — save (commit draft back to subjects)
+  on('btn-ch-save', ()=>{
+    const subj=subjects.find(s=>s.name===folderOverlaySubject);
+    if(subj){
+      document.querySelectorAll('[data-ch-cnt]').forEach(inp=>{
+        const fn=inp.dataset.chCnt;
+        if(folderOverlayDraft[fn]) folderOverlayDraft[fn].count=Math.max(0,parseInt(inp.value)||0);
+      });
+      subj.files.forEach(f=>{
+        const d=folderOverlayDraft[f.name];
+        if(d){ f.selected=d.selected; f.count=d.count; }
+      });
+    }
+    folderOverlaySubject=null; folderOverlayDraft={};
+    render();
+  });
+
+  // Chapter overlay — clear all (patch in place, no full re-render)
+  on('btn-ch-clear', ()=>{
+    Object.keys(folderOverlayDraft).forEach(k=>{ folderOverlayDraft[k].selected=false; });
+    document.querySelectorAll('[data-ch-toggle]').forEach(el=>{
+      el.classList.remove('sel');
+      const chk=el.querySelector('.ch-check'); if(chk) chk.innerHTML='';
+      const inp=el.querySelector('.ch-count');
+      if(inp){ inp.remove(); const sp=document.createElement('span'); sp.style.width='44px'; el.appendChild(sp); }
+    });
+  });
+
+  // Chapter overlay — backdrop click to cancel
+  document.getElementById('ch-overlay-backdrop')?.addEventListener('click', e=>{
+    if(e.target.id==='ch-overlay-backdrop'){ folderOverlaySubject=null; folderOverlayDraft={}; render(); }
+  });
+
+  // Chapter overlay — toggle chapter row (no full re-render — patch in place to prevent flicker)
+  document.querySelectorAll('[data-ch-toggle]').forEach(el=>{
+    el.addEventListener('click', e=>{
+      if(e.target.tagName==='INPUT') return;
+      const fn=el.dataset.chToggle;
+      if(!folderOverlayDraft[fn]) folderOverlayDraft[fn]={selected:false,count:0};
+      const nowSel=!folderOverlayDraft[fn].selected;
+      folderOverlayDraft[fn].selected=nowSel;
+
+      // Patch the row class
+      el.classList.toggle('sel', nowSel);
+
+      // Patch the checkbox
+      const chk=el.querySelector('.ch-check');
+      if(chk) chk.innerHTML=nowSel?'<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20,6 9,17 4,12"/></svg>':'';
+
+      // Patch the count input / spacer
+      const existingInput=el.querySelector('.ch-count');
+      const existingSpacer=el.querySelector('span[style*="width:44px"]');
+      if(nowSel && !existingInput){
+        if(existingSpacer) existingSpacer.remove();
+        const inp=document.createElement('input');
+        inp.className='ch-count'; inp.type='number'; inp.min='0'; inp.max='999';
+        inp.value=folderOverlayDraft[fn].count||''; inp.placeholder='all';
+        inp.dataset.chCnt=fn; inp.title='0 or blank = all questions';
+        inp.onclick=ev=>ev.stopPropagation();
+        inp.addEventListener('change',()=>{ folderOverlayDraft[fn].count=Math.max(0,parseInt(inp.value)||0); });
+        el.appendChild(inp);
+      } else if(!nowSel && existingInput){
+        existingInput.remove();
+        const sp=document.createElement('span');
+        sp.style.width='44px'; el.appendChild(sp);
+      }
+    });
+  });
+
+  // Chapter overlay — count inputs (update draft without re-render)
+  document.querySelectorAll('[data-ch-cnt]').forEach(inp=>{
+    inp.addEventListener('change', ()=>{
+      const fn=inp.dataset.chCnt;
+      if(!folderOverlayDraft[fn]) folderOverlayDraft[fn]={selected:true,count:0};
+      folderOverlayDraft[fn].count=Math.max(0,parseInt(inp.value)||0);
+    });
+  });
+
+  on('btn-gen', ()=>{
+    hostTimerSeconds=Math.max(0,parseInt(document.getElementById('timer-sec-input')?.value)||0);
+    generateQuiz();
+  });
+  on('btn-reload',()=>{ questions=[]; selIdx=-1; answerKey=-1; subjects=[]; expandedSubject=null; repoPath=null; folderOverlaySubject=null; folderOverlayDraft={}; folderManageSubject=null; showNewFolderCard=false; manageFolder=null; manageFile=null; manageFolderFiles=[]; manageEditMode=null; manageNewFileName=''; editingContent=''; editingSha=null; uploadMsg=''; editorFullscreen=false; haltedTotalLabel=''; render(); });
+
+  // Timer input (live)
+  document.getElementById('timer-sec-live')?.addEventListener('change',e=>{ hostTimerSeconds=Math.max(0,parseInt(e.target.value)||0); });
+
+  // Host open session — re-authenticate if needed, then open
+  on('btn-open-session',()=>{
+    if(ws?.readyState===1){
+      // Re-send set_host first to ensure server has host role, then open_session
+      // This handles edge cases where WS reconnected but role wasn't confirmed
+      if(HOST_PASSWORD_INPUT) send({type:'set_host',password:HOST_PASSWORD_INPUT});
+      setTimeout(()=>send({type:'open_session'}), HOST_PASSWORD_INPUT?80:0);
+      const btn=document.getElementById('btn-open-session');
+      if(btn){ btn.textContent='Opening…'; btn.disabled=true; btn.style.opacity='.6'; }
+    } else {
+      showToast('Not connected to server.\nCheck your connection and try again.','bad');
+    }
+  });
+
+  // Sidebar toggles
+  on('sb-toggle-q',     ()=>{ sidebarQOpen=!sidebarQOpen; render(); });
+  on('sb-toggle-stud',  ()=>{ sidebarStudOpen=!sidebarStudOpen; render(); });
+  on('sb-toggle-sched', ()=>{ sidebarSchedOpen=!sidebarSchedOpen; render(); });
+  on('btn-sched-nav',   ()=>{ sidebarSchedOpen=!sidebarSchedOpen; render(); });
+  on('btn-sched-close', ()=>{ sidebarSchedOpen=false; render(); });
+  on('btn-standings-open',  ()=>{ showStandingsOverlay=true;  render(); });
+  on('btn-standings-close', ()=>{ showStandingsOverlay=false; render(); });
+
+  // Q selection
+  document.querySelectorAll('.q-row[data-qi]').forEach(el=>
+    el.addEventListener('click',()=>{ if(S.status==='question'||S.status==='revealed') return; selIdx=+el.dataset.qi; answerKey=questions[selIdx]?.correct??-1; render(); })
+  );
+
+  // Answer key
+  document.querySelectorAll('.key-card[data-key]').forEach(el=>{
+    el.addEventListener('click', ()=>{ answerKey=+el.dataset.key; render(); });
+    el.addEventListener('keydown', e=>{
+      if(e.key==='Enter'||e.key===' '){ e.preventDefault(); el.click(); return; }
+      const all=[...document.querySelectorAll('.key-card[data-key]')];
+      const idx=all.indexOf(el);
+      // Arrow keys navigate the 2×2 grid: Right/Down = next, Left/Up = prev
+      const delta={'ArrowRight':1,'ArrowDown':2,'ArrowLeft':-1,'ArrowUp':-2};
+      if(delta[e.key]!==undefined){
+        e.preventDefault();
+        const next=all[(idx+delta[e.key]+all.length)%all.length];
+        next?.focus();
+      }
+    });
+  });
+
+  // Push question (with debounce to prevent stuck)
+  on('btn-push',()=>{
+    if(pushing||selIdx<0||answerKey<0) return;
+    const t=Math.max(0,parseInt(document.getElementById('timer-sec-live')?.value)||hostTimerSeconds);
+    pushing=true;
+    send({type:'push_question',question:questions[selIdx],correct:answerKey,timerSeconds:t});
+    // Safety: reset push flag after 4s if no state update comes
+    pushTimeout=setTimeout(()=>{ pushing=false; pushTimeout=null; render(); },4000);
+    render();
+  });
+
+  on('btn-reveal',()=>send({type:'reveal'}));
+  on('btn-next',  ()=>{ send({type:'clear'}); selIdx=selIdx+1<questions.length?selIdx+1:-1; answerKey=selIdx>=0?(questions[selIdx]?.correct??-1):-1; });
+  on('btn-end',   ()=>{ if(confirm('End session and show results?')) send({type:'end_session'}); });
+  on('btn-reset', ()=>{ if(confirm('Reset everything?')){ send({type:'reset'}); questions=[]; selIdx=-1; answerKey=-1; inspectPid=null; subjects=[]; repoPath=null; stopMic(); render(); } });
+  on('btn-close-inspect',()=>{ inspectPid=null; render(); });
+
+  // Host ended — Continue
+  on('btn-continue-session',()=>{ send({type:'continue_session'}); });
+  // Halt: just show the local overlay — no server message yet
+  on('btn-halt',()=>{ showingHaltMenu=true; render(); });
+
+  // New Session: server banks current scores then resets to 0
+  on('btn-new-session',()=>{
+    showingHaltMenu=false;
+    send({type:'reset'});
+    selIdx=questions.length>0?0:-1; answerKey=selIdx>=0?(questions[0]?.correct??-1):-1; inspectPid=null;
+    render();
+  });
+
+  // Stop & Dismiss: server builds authoritative final leaderboard from its own gameScores
+  // and sends it to every student inside the kicked message
+  on('btn-stop-dismiss',()=>{
+    showingHaltMenu=false;
+    playMp3('stop.mp3');
+    send({type:'shutdown'});
+    render();
+  });
+
+  on('btn-halt-cancel',()=>{ showingHaltMenu=false; render(); });
+  on('btn-shutdown',()=>{ if(confirm('Shut down session?')) send({type:'shutdown'}); });
+
+  document.querySelectorAll('.itbl tbody tr[data-pid]').forEach(row=>
+    row.addEventListener('click',()=>{ inspectPid=row.dataset.pid; render(); })
+  );
+
+  // Mic
+  on('btn-mic-start',()=>startMic());
+  on('btn-mic-stop', ()=>stopMic());
+
+  // Answer options
+  document.querySelectorAll('.opt-card[data-opt]').forEach(el=>
+    el.addEventListener('click',()=>{
+      if(S.myAnswer!==null&&S.myAnswer!==undefined) return;
+      if(S.status==='revealed') return;
+      if(el.classList.contains('locked')) return;
+      // Record how many seconds since question was pushed
+      const secs = S.questionPushedAt ? Math.round((Date.now()-S.questionPushedAt)/1000) : null;
+      myLastAnswerTime = secs;
+      if(secs!==null && myPid) localAnswerTimes[myPid]=secs; // precise click-time for self
+      send({type:'answer',idx:+el.dataset.opt, ...(secs!==null?{timeTaken:secs}:{})});
+    })
+  );
+
+  updateMicDot();
+
+  // Global host keyboard shortcuts — re-attach fresh on every render
+  document.removeEventListener('keydown', hostKeyDown);
+  if(role==='host'&&hostAuthed) document.addEventListener('keydown', hostKeyDown);
+}
+
+function on(id,fn){ document.getElementById(id)?.addEventListener('click',fn); }
+// Submit cumulative scores to all-time leaderboard (POST /api/leaderboard)
+// Server uses $inc so these totals are ADDED to any existing all-time record.
+// All-time leaderboard is now written server-side in persistLeaderboard() on shutdown
+
+function doDismissHome(){
+  if(dismissedTimer){clearInterval(dismissedTimer);dismissedTimer=null;}
+  showingDismissed=false; showingHalted=false; haltedSnapshot=[]; haltedTotalQuestions=0;
+  role=null; myName=null; myPid=null; showingProfile=false; prevMyScore=0; scoreGain=0; myLastAnswerTime=null; localAnswerTimes={}; startTimerDisplay._lastStart=null;
+  allTimeLB=null;  // force refresh so updated all-time scores show immediately
+  sessionStorage.removeItem('qz_pid'); sessionStorage.removeItem(NAV_KEY);
+  render();
+  fetchLeaderboard();
+}
+function doLogout(){ clearAuth(); role=null; myPid=null; myName=null; hostAuthed=false; HOST_PASSWORD_INPUT=''; showingProfile=false; prevMyScore=0; scoreGain=0; myLastAnswerTime=null; localAnswerTimes={}; startTimerDisplay._lastStart=null; allTimeLB=null; serverSchedules=null; hostSchedules=[]; sessionStorage.removeItem(NAV_KEY); sessionStorage.removeItem('scc_hpw'); render(); }
+
+/* Shared back navigation */
+function doBack(){
+  if(showingDismissed){ doDismissHome(); return; }
+  if(showingProfile){
+    showingProfile=false;
+    navPush(); // push a new state so further back press goes home
+    render(); return;
+  }
+  if(role==='host'&&hostAuthed){
+    if(!confirm('Leave host panel and go home?')) return;
+    role=null; hostAuthed=false; HOST_PASSWORD_INPUT=''; sessionStorage.removeItem('scc_hpw'); stopMic();
+    navPush(); render(); return;
+  }
+  if(role==='host'&&!hostAuthed){
+    role=null; render(); return;
+  }
+  if(role==='participant'&&myName){
+    if(!confirm('Leave the session and go home?')) return;
+    send({type:'leave'}); return;
+  }
+  role=null; hostAuthed=false; myName=null; myPid=null; showingProfile=false; render();
+}
+function doHostLogin(){
+  const v=document.getElementById('pw-in')?.value?.trim();
+  if(!v)return;
+  HOST_PASSWORD_INPUT=v;
+  sessionStorage.setItem('scc_hpw', v);
+  send({type:'set_host',password:v});
+}
+function doLeave(){ role=null; myName=null; myPid=null; showingProfile=false; prevMyScore=0; scoreGain=0; myLastAnswerTime=null; localAnswerTimes={}; startTimerDisplay._lastStart=null; sessionStorage.removeItem('qz_pid'); sessionStorage.removeItem(NAV_KEY); render(); }
+function doJoin(){
+  const name=currentUser?.displayName||currentUser?.name||'';
+  if(!name)return;
+  myName=name;
+  myPid=sessionStorage.getItem('qz_pid');
+  send({type:'join',name:myName,pid:myPid,userId:currentUser?.id});
+  render();
+}
+
+async function doLogin(){
+  const email=document.getElementById('auth-email')?.value?.trim();
+  const pw=document.getElementById('auth-pw')?.value;
+  const err=document.getElementById('auth-err'); if(err)err.textContent='';
+  try{
+    const d=await apiPost('/api/login',{email,password:pw});
+    saveAuth(d.token,d.user); render(); connect();
+  }catch(e){ if(err)err.textContent=e.message; }
+}
+async function doRegister(){
+  const name=document.getElementById('auth-name')?.value?.trim();
+  const email=document.getElementById('auth-email')?.value?.trim();
+  const pw=document.getElementById('auth-pw')?.value;
+  const err=document.getElementById('auth-err'); if(err)err.textContent='';
+  try{
+    const d=await apiPost('/api/register',{name,email,password:pw});
+    saveAuth(d.token,d.user); render(); connect();
+  }catch(e){ if(err)err.textContent=e.message; }
+}
+
+function esc(s){ return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+// Render LaTeX within $...$ (inline) and $$...$$ (display-block) delimiters.
+// Non-math segments are HTML-escaped; math segments are rendered by KaTeX.
+function renderMath(str){
+  if(!str) return '';
+  const out=[];
+  // A single formula unit: starts with a letter, has ≥1 sub/superscript group.
+  // Each _/^ group can use bare chars OR {braces}, and may be followed by trailing letters
+  // (e.g. H_2O — the O after the subscript).
+  // Examples matched: Na_2O, H_2SO_4, O^{2-}, H^+, OH^-, CuSO_4, Fe^{3+}
+  const UNIT='[A-Za-z][A-Za-z0-9]*(?:[_^](?:\\{[^}]*\\}|[A-Za-z0-9+\\-]+)[A-Za-z0-9]*)+';
+  // A \cdot bridge (possibly with a leading coefficient like 5 or 1/2) connecting two units.
+  // Examples: \cdot 5H_2O  \cdot 1/2H_2O
+  const BRIDGE='(?:\\s*\\\\cdot\\s*[\\d./]*[A-Za-z][A-Za-z0-9]*(?:[_^](?:\\{[^}]*\\}|[A-Za-z0-9+\\-]+)[A-Za-z0-9]*)*)*';
+  const re=new RegExp('(\\$\\$[\\s\\S]+?\\$\\$|\\$[^$\\n]+?\\$|'+UNIT+BRIDGE+')','g');
+  let last=0, m;
+  while((m=re.exec(str))!==null){
+    if(m.index>last) out.push(esc(str.slice(last,m.index)));
+    const raw=m[0];
+    let inner=raw, display=false;
+    if(raw.startsWith('$$')){ display=true; inner=raw.slice(2,-2); }
+    else if(raw.startsWith('$')){ inner=raw.slice(1,-1); }
+    // bare chemistry/math token — pass directly to KaTeX
+    try{ out.push(katex.renderToString(inner,{displayMode:display,throwOnError:false,output:'html'})); }
+    catch(e){ out.push(esc(raw)); }
+    last=m.index+raw.length;
+  }
+  if(last<str.length) out.push(esc(str.slice(last)));
+  return out.join('');
+}
+
+/* ══════════════════════════════════════
+   BOOT
+══════════════════════════════════════ */
+
+/* Push a history entry whenever we navigate deeper, so the phone's
+   hardware/gesture back button can pop back to the previous screen. */
+function navPush(){
+  history.pushState({qz:true}, '', location.href);
+}
+
+// Intercept browser/phone back button
+window.addEventListener('popstate', ()=>{
+  // If we're somewhere deep, go back one level
+  if(showingDismissed||showingProfile||role||showingHalted){
+    doBack();
+    // Re-push so the next back press also works
+    history.pushState({qz:true}, '', location.href);
+  }
+});
+
+loadStoredAuth();
+loadNavState(); // restore navigation position from before reload
+// Seed the history stack so popstate always has a base entry
+history.replaceState({qz:true}, '', location.href);
+render();
+// Always connect WebSocket — needed for host-only sessions (no currentUser) and participant reconnects
+connect();
+if(currentUser){
+  fetchSchedules();
+  fetchLeaderboard();
+}
+</script>
+</body>
+</html>
