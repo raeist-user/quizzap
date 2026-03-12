@@ -740,8 +740,13 @@ function connect(){
           const fl = m.payload?.finalLeaderboard;
           if(fl && fl.length) haltedSnapshot = fl;
           else { const fp = m.payload?.participants||S.participants||[]; if(fp.length) haltedSnapshot=[...fp]; }
-          // Capture total questions asked (from live history or payload)
-          haltedTotalQuestions = (S.history||[]).length || m.payload?.totalQuestions || 0;
+          // Capture total questions — prefer payload, then own history count, then studentQCount
+          const payloadTotal = m.payload?.totalQuestions || 0;
+          const histTotal = (S.history||[]).length || (S.myHistory||[]).length;
+          haltedTotalQuestions = payloadTotal || histTotal || studentQCount || 0;
+          // If server didn't provide a label, build one from best available count
+          if(!haltedTotalLabel && haltedTotalQuestions>0) haltedTotalLabel=String(haltedTotalQuestions);
+          else if(!haltedTotalLabel && studentQCount>0) haltedTotalLabel=String(studentQCount);
         }
         showingHalted=false; showingDismissed=true; dismissedCountdown=120;
         if(dismissedTimer){clearInterval(dismissedTimer);dismissedTimer=null;}
@@ -756,11 +761,14 @@ function connect(){
         render(); break;
       case 'halted':
         // Host halted — students see a "please wait" screen with snapshot LB.
-        // When host continues, new state updates will override.
-        // When host fully ends, a 'kicked' or 'ended' status arrives.
         { const haltedParts=m.payload?.participants||S.participants||[];
           haltedSnapshot=haltedParts;
-          haltedTotalQuestions = (S.history||[]).length || m.payload?.totalQuestions || 0; }
+          const payloadTotal2 = m.payload?.totalQuestions || 0;
+          const histTotal2 = (S.history||[]).length || (S.myHistory||[]).length;
+          haltedTotalQuestions = payloadTotal2 || histTotal2 || studentQCount || 0;
+          if(!haltedTotalLabel && haltedTotalQuestions>0) haltedTotalLabel=String(haltedTotalQuestions);
+          else if(!haltedTotalLabel && studentQCount>0) haltedTotalLabel=String(studentQCount);
+        }
         showingHalted=true; haltedCountdown=0; // no auto-dismiss — wait for host
         render();
         break;
@@ -2294,7 +2302,7 @@ function hostEndedHTML(){
   const sorted=[...parts].sort((a,b)=>(b.score||0)-(a.score||0));
   const partMap={}; parts.forEach(p=>partMap[p.id]=p);
   const totalQs=history.length;
-  const totalLabel=haltedTotalLabel||(totalQs>0?String(totalQs):'?');
+  const totalLabel=haltedTotalLabel||(questions.length>0?String(questions.length):totalQs>0?String(totalQs):'?');
   const table=parts.length&&history.length?`<div class="itbl-wrap"><table class="itbl">
     <thead><tr><th>Student</th>${history.map((_,i)=>`<th>Q${i+1}</th>`).join('')}<th>Score</th></tr></thead>
     <tbody>${sorted.map(p=>`<tr data-pid="${p.id}"><td><strong>${esc(p.name)}</strong></td>
@@ -2310,7 +2318,7 @@ function hostEndedHTML(){
           return`<span class="ans-chip ${cls}" style="${oi===ans||oi===h.correct?'font-weight:600':''}">${'ABCD'[oi]}) ${renderMath(o)}${mark}</span>`;}).join('')}${ans===null?'<span class="ans-chip ac-none">No answer</span>':''}</div></div>`;}).join('')}
     </div>`;
   }
-  return `<div class="wide" style="padding:16px">
+  return `<div style="position:relative;padding:16px;width:100%;box-sizing:border-box">
     <div class="results-header">
       <h2>Results</h2>
       <div class="results-btns">
@@ -2322,7 +2330,9 @@ function hostEndedHTML(){
     <div class="notice n-neutral mb3" style="font-size:.79rem">
       <strong>Continue</strong> — return to waiting room &nbsp;·&nbsp; <strong>Halt</strong> — send students home
     </div>
-    <p class="muted small mb2">Tap any row to inspect answers.</p>${table}${detail}</div>`;
+    <p class="muted small mb2">Tap any row to inspect answers.</p>${table}${detail}
+    ${haltMenuOverlayHTML()}
+  </div>`;
 }
 
 /* ══════════════════════════════════════
@@ -2388,9 +2398,9 @@ function waitHTML(){
     <div class="lb-head"><span style="font-size:.82rem;font-weight:600">🏆 Leaderboard</span><span class="small muted">${parts.length} students</span></div>
     ${[...parts].sort((a,b)=>(b.score||0)-(a.score||0)).map((p,i)=>{
       const isMe=p.id===myPid;
-      // Server-broadcast answerTimes (if available) for all; else only own precise time
-      const ansTime = S.answerTimes?.[p.id] ?? (isMe ? localAnswerTimes[p.id] ?? null : null);
-      const ansTimeStr = ansTime!==null ? `${ansTime}s` : '—';
+      // Server-broadcast answerTimes wins for any student; own precise time is always available via localAnswerTimes
+      const ansTime = S.answerTimes?.[p.id] ?? localAnswerTimes[p.id] ?? null;
+      const ansTimeStr = ansTime!==null ? `${ansTime}s` : (isMe ? '—' : '');
       // Score colour: green = gained points, red = answered wrong
       const scoreColor=isMe?(scoreGain>0?'#16a34a':scoreGain===0&&myLastAnswerTime!==null?'var(--bad)':'inherit'):'inherit';
       // Gain badge for self only
@@ -2964,7 +2974,7 @@ function on(id,fn){ document.getElementById(id)?.addEventListener('click',fn); }
 function doDismissHome(){
   if(dismissedTimer){clearInterval(dismissedTimer);dismissedTimer=null;}
   showingDismissed=false; showingHalted=false; haltedSnapshot=[]; haltedTotalQuestions=0;
-  role=null; myName=null; myPid=null; showingProfile=false; prevMyScore=0; scoreGain=0; myLastAnswerTime=null; localAnswerTimes={}; startTimerDisplay._lastStart=null; studentQCount=0;
+  role=null; myName=null; myPid=null; showingProfile=false; prevMyScore=0; scoreGain=0; myLastAnswerTime=null; localAnswerTimes={}; startTimerDisplay._lastStart=null; studentQCount=0; haltedTotalLabel=''; haltedTotalQuestions=0;
   allTimeLB=null;  // force refresh so updated all-time scores show immediately
   sessionStorage.removeItem('qz_pid'); sessionStorage.removeItem(NAV_KEY);
   render();
@@ -3001,7 +3011,7 @@ function doHostLogin(){
   sessionStorage.setItem('scc_hpw', v);
   send({type:'set_host',password:v});
 }
-function doLeave(){ role=null; myName=null; myPid=null; showingProfile=false; prevMyScore=0; scoreGain=0; myLastAnswerTime=null; localAnswerTimes={}; startTimerDisplay._lastStart=null; studentQCount=0; sessionStorage.removeItem('qz_pid'); sessionStorage.removeItem(NAV_KEY); render(); }
+function doLeave(){ role=null; myName=null; myPid=null; showingProfile=false; prevMyScore=0; scoreGain=0; myLastAnswerTime=null; localAnswerTimes={}; startTimerDisplay._lastStart=null; studentQCount=0; haltedTotalLabel=''; haltedTotalQuestions=0; sessionStorage.removeItem('qz_pid'); sessionStorage.removeItem(NAV_KEY); render(); }
 function doJoin(){
   const name=currentUser?.displayName||currentUser?.name||'';
   if(!name)return;
