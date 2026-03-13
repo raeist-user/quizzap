@@ -24,7 +24,6 @@ const userSchema = new mongoose.Schema({
   name:        { type: String, required: true, trim: true, maxlength: 50 },
   displayName: { type: String, trim: true, maxlength: 32, default: '' },
   username:    { type: String, required: true, unique: true, lowercase: true, trim: true, match: /^[a-zA-Z0-9_]{3,30}$/ },
-  email:       { type: String, unique: true, sparse: true, lowercase: true, trim: true, default: null },
   password:    { type: String, required: true },
   role:        { type: String, enum: ['student','host'], default: 'student' },
   createdAt:   { type: Date, default: Date.now },
@@ -94,7 +93,6 @@ app.post('/api/register', async (req, res) => {
     const user = await User.create({ name: name.trim(), username: username.trim().toLowerCase(), password: hashed });
     const token = jwt.sign({ id: user._id, name: user.name, username: user.username, role: user.role }, JWT_SECRET, { expiresIn: '7d' });
     res.json({ token, user: { id: user._id, name: user.name, displayName: user.displayName || '', username: user.username, role: user.role } });
-  } catch (e) { res.status(500).json({ error: 'Registration failed' }); }
 });
 
 // Login
