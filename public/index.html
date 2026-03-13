@@ -3068,6 +3068,8 @@ function liveCheckUsername(val){
     _unLastChecked=val;
     try{
       const r=await fetch('/api/check-username?username='+encodeURIComponent(val));
+      // If endpoint doesn't exist yet (404 or non-JSON), just reset to neutral — don't show an error
+      if(!r.ok){ status.textContent=''; hint.textContent='Letters, numbers, underscores only'; hint.style.color='var(--mid)'; return; }
       const d=await r.json();
       // Only update if input still matches (user may have kept typing)
       const cur=document.getElementById('auth-username')?.value?.trim();
@@ -3080,7 +3082,8 @@ function liveCheckUsername(val){
         hint.textContent='Username is already taken'; hint.style.color='var(--bad)';
       }
     }catch(e){
-      status.textContent=''; hint.textContent='Could not check availability'; hint.style.color='var(--mid)';
+      // Network error or endpoint missing — silently reset, don't alarm the user
+      status.textContent=''; hint.textContent='Letters, numbers, underscores only'; hint.style.color='var(--mid)';
     }
   }, 450); // 450ms debounce
 }
@@ -3091,7 +3094,7 @@ async function doLogin(){
   const err=document.getElementById('auth-err'); if(err)err.textContent='';
   if(!username){if(err)err.textContent='Username is required';return;}
   try{
-    const d=await apiPost('/api/login',{username,password:pw});
+    const d=await apiPost('/api/login',{username,email:'',password:pw});
     saveAuth(d.token,d.user); render(); connect();
   }catch(e){ if(err)err.textContent=e.message; }
 }
@@ -3108,7 +3111,7 @@ async function doRegister(){
   const unHint=document.getElementById('un-hint');
   if(unHint&&unHint.textContent==='Username is already taken'){if(err)err.textContent='That username is already taken — please choose another';return;}
   try{
-    const d=await apiPost('/api/register',{name,username,password:pw});
+    const d=await apiPost('/api/register',{name,username,email:'',password:pw});
     saveAuth(d.token,d.user); render(); connect();
   }catch(e){ if(err)err.textContent=e.message; }
 }
