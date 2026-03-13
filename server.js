@@ -30,6 +30,17 @@ const userSchema = new mongoose.Schema({
 });
 const User = mongoose.model('User', userSchema);
 
+// Drop any stale indexes left over from old schema (e.g. the old email unique index)
+// This runs once on startup and is safe to call repeatedly — it's a no-op if indexes don't exist
+mongoose.connection.once('open', async () => {
+  try {
+    await User.collection.dropIndex('email_1');
+    console.log('Dropped stale email index');
+  } catch (_) {
+    // Index didn't exist — that's fine
+  }
+});
+
 // FIX #6-9: Schedule and Leaderboard models were missing entirely
 const scheduleSchema = new mongoose.Schema({
   title:     { type: String, required: true, trim: true, maxlength: 60 },
@@ -94,7 +105,13 @@ app.post('/api/register', async (req, res) => {
     const token = jwt.sign({ id: user._id, name: user.name, username: user.username, role: user.role }, JWT_SECRET, { expiresIn: '7d' });
     res.json({ token, user: { id: user._id, name: user.name, displayName: user.displayName || '', username: user.username, role: user.role } });
   } catch (e) {
-    if (e.code === 11000) return res.status(400).json({ error: 'Username already taken' });
+    if (e.code === 11000) {
+      const field = Object.keys(e.keyPattern || {})[0] || '';
+      if (field === 'username') return res.status(400).json({ error: 'Username already taken' });
+      // Any other duplicate key (e.g. stale index) — treat as server error, not user error
+      console.error('Register duplicate key on field:', field, e.message);
+      return res.status(500).json({ error: 'Registration failed — please try again' });
+    }
     console.error('Register error:', e.message);
     res.status(500).json({ error: 'Registration failed' });
   }
