@@ -736,17 +736,12 @@ function connect(){
     switch(m.type){
       case 'hello':     myCid=m.cid; break;
       case 'kicked':
-        { // Use cumulative finalLeaderboard sent by host if present, otherwise fall back
-          const fl = m.payload?.finalLeaderboard;
+        { const fl = m.payload?.finalLeaderboard;
           if(fl && fl.length) haltedSnapshot = fl;
           else { const fp = m.payload?.participants||S.participants||[]; if(fp.length) haltedSnapshot=[...fp]; }
-          // Capture total questions — prefer payload, then own history count, then studentQCount
-          const payloadTotal = m.payload?.totalQuestions || 0;
-          const histTotal = (S.history||[]).length || (S.myHistory||[]).length;
-          haltedTotalQuestions = payloadTotal || histTotal || studentQCount || 0;
-          // If server didn't provide a label, build one from best available count
-          if(!haltedTotalLabel && haltedTotalQuestions>0) haltedTotalLabel=String(haltedTotalQuestions);
-          else if(!haltedTotalLabel && studentQCount>0) haltedTotalLabel=String(studentQCount);
+          // totalQuestions comes from server (host's loaded question count) — authoritative
+          haltedTotalQuestions = m.payload?.totalQuestions || S.totalQuestions || 0;
+          haltedTotalLabel = haltedTotalQuestions > 0 ? String(haltedTotalQuestions) : '?';
         }
         showingHalted=false; showingDismissed=true; dismissedCountdown=120;
         if(dismissedTimer){clearInterval(dismissedTimer);dismissedTimer=null;}
@@ -760,14 +755,10 @@ function connect(){
         },1000);
         render(); break;
       case 'halted':
-        // Host halted — students see a "please wait" screen with snapshot LB.
         { const haltedParts=m.payload?.participants||S.participants||[];
           haltedSnapshot=haltedParts;
-          const payloadTotal2 = m.payload?.totalQuestions || 0;
-          const histTotal2 = (S.history||[]).length || (S.myHistory||[]).length;
-          haltedTotalQuestions = payloadTotal2 || histTotal2 || studentQCount || 0;
-          if(!haltedTotalLabel && haltedTotalQuestions>0) haltedTotalLabel=String(haltedTotalQuestions);
-          else if(!haltedTotalLabel && studentQCount>0) haltedTotalLabel=String(studentQCount);
+          haltedTotalQuestions = m.payload?.totalQuestions || S.totalQuestions || 0;
+          haltedTotalLabel = haltedTotalQuestions > 0 ? String(haltedTotalQuestions) : '?';
         }
         showingHalted=true; haltedCountdown=0; // no auto-dismiss — wait for host
         render();
@@ -793,19 +784,6 @@ function connect(){
           pushing=false;
           if(pushTimeout){ clearTimeout(pushTimeout); pushTimeout=null; }
         }
-        // Track per-student answer times client-side as answers arrive.
-        // When a new pid appears in answers (wasn't there before), record elapsed secs with ms precision.
-        if(m.payload.questionPushedAt && m.payload.answers){
-          const prevAnswers=S.answers||{};
-          Object.entries(m.payload.answers).forEach(([pid,ans])=>{
-            if(ans!=null && !(pid in localAnswerTimes) && !(pid in prevAnswers)){
-              const ms=Date.now()-m.payload.questionPushedAt;
-              localAnswerTimes[pid]=parseFloat(Math.max(0,ms/1000).toFixed(2));
-            }
-          });
-        }
-        // For current user, prefer the precise client-side click time (already set in localAnswerTimes on click)
-        if(myPid && myLastAnswerTime!==null) localAnswerTimes[myPid]=myLastAnswerTime;
         if(ns==='idle'&&prevStatus==='idle'){ prevMyScore=inc; }
         // Save session on end
         if(ns==='ended'&&prevStatus!=='ended'&&role==='participant'&&myPid){
@@ -2082,7 +2060,7 @@ function hostHTML(){
     ?sorted.map((p,i)=>{
         const ans=S.answers?.[p.id];
         const ansStr=ans!==undefined&&ans!==null?'ABCD'[ans]:'—';
-        const ansTime = S.answerTimes?.[p.id] ?? localAnswerTimes[p.id];
+        const ansTime = S.answerTimes?.[p.id] ?? null;
         const isCorrect=ans!==undefined&&ans!==null&&ans===S.correct;
         const isWrong=ans!==undefined&&ans!==null&&ans!==S.correct;
         return `<div style="display:flex;align-items:center;gap:8px;padding:7px 10px;border-bottom:1px solid var(--line);font-size:.83rem">
@@ -2413,15 +2391,14 @@ function waitHTML(){
     <div class="lb-head"><span style="font-size:.82rem;font-weight:600">🏆 Leaderboard</span><span class="small muted">${parts.length} students</span></div>
     ${[...parts].sort((a,b)=>(b.score||0)-(a.score||0)).map((p,i)=>{
       const isMe=p.id===myPid;
-      // Server-broadcast answerTimes wins for any student; own precise time is always available via localAnswerTimes
-      const ansTime = S.answerTimes?.[p.id] ?? localAnswerTimes[p.id] ?? null;
+      const ansTime = S.answerTimes?.[p.id] ?? null;
       const ansTimeStr = ansTime!==null ? `${parseFloat(ansTime).toFixed(2)}s` : (isMe ? '—' : '');
-      // Score colour: green = gained points, red = answered wrong
-      // Green = answered correctly, default black = answered wrong, inherit = not yet answered
-      const scoreColor=isMe
-        ?(myLastAnswerTime!==null?(scoreGain>0?'#16a34a':'var(--ink)'):'inherit')
-        :'inherit';
-      const scoreFontWeight=isMe&&myLastAnswerTime!==null?'700':'600';
+      // Determine correct/wrong from last history entry for self
+      const lastH = isMe && (S.myHistory||[]).length ? S.myHistory[S.myHistory.length-1] : null;
+      const answeredLastQ = lastH && lastH.myAnswer!==null && lastH.myAnswer!==undefined;
+      const gotItRight = answeredLastQ && lastH.myAnswer===lastH.correct;
+      const scoreColor = isMe && answeredLastQ ? (gotItRight?'#16a34a':'var(--ink)') : 'inherit';
+      const scoreFontWeight = isMe && answeredLastQ ? '700' : '600';
       return `<div class="lb-row${isMe?' me':''}">
         <div class="score-rank">${['🥇','🥈','🥉'][i]||i+1}</div>
         <div style="flex:1">${esc(p.name)}${isMe?' <span style="font-size:.7rem;color:var(--mid)">← you</span>':''}</div>
@@ -2919,7 +2896,7 @@ function attach(){
     if(pushing||selIdx<0||answerKey<0) return;
     const t=Math.max(0,parseInt(document.getElementById('timer-sec-live')?.value)||hostTimerSeconds);
     pushing=true;
-    send({type:'push_question',question:questions[selIdx],correct:answerKey,timerSeconds:t});
+    send({type:'push_question',question:questions[selIdx],correct:answerKey,timerSeconds:t,totalQuestions:questions.length});
     // Safety: reset push flag after 4s if no state update comes
     pushTimeout=setTimeout(()=>{ pushing=false; pushTimeout=null; render(); },4000);
     render();
