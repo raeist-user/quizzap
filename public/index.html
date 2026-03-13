@@ -614,6 +614,37 @@ function loadStoredAuth(){
 function saveAuth(token,user){ authToken=token; currentUser=user; localStorage.setItem('scc_token',token); localStorage.setItem('scc_user',JSON.stringify(user)); }
 function clearAuth(){ authToken=null; currentUser=null; localStorage.removeItem('scc_token'); localStorage.removeItem('scc_user'); }
 
+/* ── Server-side session sync ───────────────────────────────────────────────
+   Called once on boot: verifies the stored token against the DB.
+   - If the account was deleted  → clears auth and shows login screen
+   - If the account data changed (e.g. username was manually added) → refreshes local session
+   This ensures deleted accounts never persist in localStorage.
+──────────────────────────────────────────────────────────────────────────── */
+async function syncAuthWithServer(){
+  if(!authToken) return; // not logged in — nothing to sync
+  try{
+    const r=await fetch('/api/me',{headers:{Authorization:'Bearer '+authToken}});
+    if(r.status===401||r.status===403){
+      // Account deleted or token invalid — force logout
+      clearAuth();
+      // Also clear nav state so we don't restore a stale screen
+      try{ sessionStorage.removeItem('scc_nav'); sessionStorage.removeItem('qz_pid'); }catch(_){}
+      render();
+      return;
+    }
+    if(!r.ok) return; // server error — fail silently, don't log out on transient errors
+    const d=await r.json();
+    if(d.token&&d.user){
+      // Refresh token + user data in case anything changed (e.g. username updated in DB)
+      saveAuth(d.token,d.user);
+      currentUser=d.user;
+    }
+  }catch(e){
+    // Network error (offline, server starting up) — don't log out, just continue
+    console.warn('Session sync skipped (network):', e.message);
+  }
+}
+
 /* ── Navigation-state persistence (survives reload) ─────────────────────── */
 const NAV_KEY='scc_nav';
 function saveNavState(){
@@ -3156,6 +3187,10 @@ if(currentUser){
   fetchSchedules();
   fetchLeaderboard();
 }
+// Sync session with DB on every page load:
+// - Clears session if account was deleted
+// - Refreshes user data if anything was manually updated (e.g. username added)
+syncAuthWithServer().then(()=>{ render(); if(currentUser){ fetchSchedules(); fetchLeaderboard(); } });
 </script>
 </body>
 </html>
