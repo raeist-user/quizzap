@@ -23,22 +23,23 @@ mongoose.connect(MONGODB_URI)
 const userSchema = new mongoose.Schema({
   name:        { type: String, required: true, trim: true, maxlength: 50 },
   displayName: { type: String, trim: true, maxlength: 32, default: '' },
-  username:    { type: String, required: true, unique: true, lowercase: true, trim: true, match: /^[a-zA-Z0-9_]{3,30}$/ },
+  // email is now the primary identity — required for new registrations, sparse so existing docs without it don't conflict
+  email:       { type: String, trim: true, lowercase: true, sparse: true, unique: true, default: null },
+  // username is optional — users can set it for login/display; sparse unique so null docs don't conflict
+  username:    { type: String, lowercase: true, trim: true, sparse: true, unique: true, match: /^[a-zA-Z0-9_]{3,30}$/, default: null },
   password:    { type: String, required: true },
   role:        { type: String, enum: ['student','host'], default: 'student' },
   createdAt:   { type: Date, default: Date.now },
 });
 const User = mongoose.model('User', userSchema);
 
-// Drop any stale indexes left over from old schema (e.g. the old email unique index)
-// This runs once on startup and is safe to call repeatedly — it's a no-op if indexes don't exist
+// Clean up stale indexes from old schema on startup
 mongoose.connection.once('open', async () => {
-  try {
-    await User.collection.dropIndex('email_1');
-    console.log('Dropped stale email index');
-  } catch (_) {
-    // Index didn't exist — that's fine
-  }
+  const drop = async (name) => {
+    try { await User.collection.dropIndex(name); console.log('Dropped index:', name); } catch (_) {}
+  };
+  await drop('email_1');       // old non-sparse email index
+  await drop('username_1');    // old required username index — replaced by sparse version
 });
 
 // FIX #6-9: Schedule and Leaderboard models were missing entirely
@@ -91,24 +92,43 @@ function requireAuth(req, res, next) {
 // Register
 app.post('/api/register', async (req, res) => {
   try {
-    const { name, username, password } = req.body;
-    if (!name?.trim())     return res.status(400).json({ error: 'Full name is required' });
-    if (!username?.trim()) return res.status(400).json({ error: 'Username is required' });
-    if (!password)         return res.status(400).json({ error: 'Password is required' });
-    if (!/^[a-zA-Z0-9_]{3,30}$/.test(username.trim()))
-      return res.status(400).json({ error: 'Username must be 3–30 characters: letters, numbers, underscores only' });
+    const { name, email, username, password } = req.body;
+    if (!name?.trim())  return res.status(400).json({ error: 'Full name is required' });
+    if (!email?.trim()) return res.status(400).json({ error: 'Email is required' });
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()))
+      return res.status(400).json({ error: 'Enter a valid email address' });
+    if (!password)      return res.status(400).json({ error: 'Password is required' });
     if (password.length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters' });
-    if (await User.findOne({ username: username.trim().toLowerCase() }))
-      return res.status(400).json({ error: 'Username already taken' });
+
+    // Username is optional — validate only if provided
+    const uname = username?.trim() || null;
+    if (uname) {
+      if (!/^[a-zA-Z0-9_]{3,30}$/.test(uname))
+        return res.status(400).json({ error: 'Username must be 3–30 characters: letters, numbers, underscores only' });
+      if (await User.findOne({ username: uname.toLowerCase() }))
+        return res.status(400).json({ error: 'Username already taken' });
+    }
+
+    if (await User.findOne({ email: email.trim().toLowerCase() }))
+      return res.status(400).json({ error: 'An account with this email already exists' });
+
     const hashed = await bcrypt.hash(password, 10);
-    const user = await User.create({ name: name.trim(), username: username.trim().toLowerCase(), password: hashed });
-    const token = jwt.sign({ id: user._id, name: user.name, username: user.username, role: user.role }, JWT_SECRET, { expiresIn: '7d' });
-    res.json({ token, user: { id: user._id, name: user.name, displayName: user.displayName || '', username: user.username, role: user.role } });
+    const user = await User.create({
+      name: name.trim(),
+      email: email.trim().toLowerCase(),
+      username: uname ? uname.toLowerCase() : null,
+      password: hashed,
+    });
+    const token = jwt.sign(
+      { id: user._id, name: user.name, displayName: user.displayName || '', email: user.email, username: user.username || '', role: user.role },
+      JWT_SECRET, { expiresIn: '7d' }
+    );
+    res.json({ token, user: { id: user._id, name: user.name, displayName: user.displayName || '', email: user.email, username: user.username || '', role: user.role } });
   } catch (e) {
     if (e.code === 11000) {
       const field = Object.keys(e.keyPattern || {})[0] || '';
+      if (field === 'email')    return res.status(400).json({ error: 'An account with this email already exists' });
       if (field === 'username') return res.status(400).json({ error: 'Username already taken' });
-      // Any other duplicate key (e.g. stale index) — treat as server error, not user error
       console.error('Register duplicate key on field:', field, e.message);
       return res.status(500).json({ error: 'Registration failed — please try again' });
     }
@@ -117,16 +137,34 @@ app.post('/api/register', async (req, res) => {
   }
 });
 
-// Login
+// Login — accepts email or username in a single "identifier" field
 app.post('/api/login', async (req, res) => {
   try {
-    const { username, password } = req.body;
-    if (!username?.trim() || !password) return res.status(400).json({ error: 'Username and password required' });
-    const user = await User.findOne({ username: username.trim().toLowerCase() });
+    const { identifier, password } = req.body;
+    if (!identifier?.trim() || !password)
+      return res.status(400).json({ error: 'Email/username and password required' });
+
+    const id = identifier.trim().toLowerCase();
+    let user = null;
+
+    if (id.includes('@')) {
+      // Looks like an email — check email field first, then fall back to username field
+      // (fallback handles old accounts that had their email stored in username)
+      user = await User.findOne({ email: id });
+      if (!user) user = await User.findOne({ username: id });
+    } else {
+      // Plain username
+      user = await User.findOne({ username: id });
+    }
+
     if (!user || !(await bcrypt.compare(password, user.password)))
-      return res.status(400).json({ error: 'Invalid username or password' });
-    const token = jwt.sign({ id: user._id, name: user.name, displayName: user.displayName || '', username: user.username, role: user.role }, JWT_SECRET, { expiresIn: '7d' });
-    res.json({ token, user: { id: user._id, name: user.name, displayName: user.displayName || '', username: user.username, role: user.role } });
+      return res.status(400).json({ error: 'Invalid email/username or password' });
+
+    const token = jwt.sign(
+      { id: user._id, name: user.name, displayName: user.displayName || '', email: user.email || '', username: user.username || '', role: user.role },
+      JWT_SECRET, { expiresIn: '7d' }
+    );
+    res.json({ token, user: { id: user._id, name: user.name, displayName: user.displayName || '', email: user.email || '', username: user.username || '', role: user.role } });
   } catch (e) { res.status(500).json({ error: 'Login failed' }); }
 });
 
@@ -149,13 +187,13 @@ app.get('/api/me', requireAuth, async (req, res) => {
     if (!user) return res.status(401).json({ error: 'Account not found' });
     // Issue a refreshed token so the client always has up-to-date claims
     const token = jwt.sign(
-      { id: user._id, name: user.name, displayName: user.displayName || '', username: user.username, role: user.role },
+      { id: user._id, name: user.name, displayName: user.displayName || '', email: user.email || '', username: user.username || '', role: user.role },
       JWT_SECRET,
       { expiresIn: '7d' }
     );
     res.json({
       token,
-      user: { id: user._id, name: user.name, displayName: user.displayName || '', username: user.username, role: user.role }
+      user: { id: user._id, name: user.name, displayName: user.displayName || '', email: user.email || '', username: user.username || '', role: user.role }
     });
   } catch (e) {
     console.error('/api/me error:', e.message);
@@ -185,8 +223,8 @@ app.post('/api/update-name', requireAuth, async (req, res) => {
     if (!displayName?.trim()) return res.status(400).json({ error: 'Display name required' });
     if (displayName.trim().length > 32) return res.status(400).json({ error: 'Max 32 characters' });
     const user = await User.findByIdAndUpdate(req.user.id, { displayName: displayName.trim() }, { new: true });
-    const token = jwt.sign({ id: user._id, name: user.name, displayName: user.displayName, username: user.username, role: user.role }, JWT_SECRET, { expiresIn: '7d' });
-    res.json({ ok: true, token, user: { id: user._id, name: user.name, displayName: user.displayName, username: user.username, role: user.role } });
+    const token = jwt.sign({ id: user._id, name: user.name, displayName: user.displayName, email: user.email || '', username: user.username || '', role: user.role }, JWT_SECRET, { expiresIn: '7d' });
+    res.json({ ok: true, token, user: { id: user._id, name: user.name, displayName: user.displayName, email: user.email || '', username: user.username || '', role: user.role } });
   } catch (e) { res.status(500).json({ error: 'Failed' }); }
 });
 
