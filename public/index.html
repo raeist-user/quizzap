@@ -740,12 +740,13 @@ function connect(){
           const fl = m.payload?.finalLeaderboard;
           if(fl && fl.length) haltedSnapshot = fl;
           else { const fp = m.payload?.participants||S.participants||[]; if(fp.length) haltedSnapshot=[...fp]; }
-          // Capture total questions — prefer payload, then own history count, then studentQCount
+          // totalQuestions from server is now the declared quiz size (sent by host in shutdown message)
           const payloadTotal = m.payload?.totalQuestions || 0;
           const histTotal = (S.history||[]).length || (S.myHistory||[]).length;
           haltedTotalQuestions = payloadTotal || histTotal || studentQCount || 0;
-          // If server didn't provide a label, build one from best available count
-          if(!haltedTotalLabel && haltedTotalQuestions>0) haltedTotalLabel=String(haltedTotalQuestions);
+          // Always overwrite with the server value if present (it now reflects the real quiz total)
+          if(payloadTotal>0) haltedTotalLabel=String(payloadTotal);
+          else if(!haltedTotalLabel && haltedTotalQuestions>0) haltedTotalLabel=String(haltedTotalQuestions);
           else if(!haltedTotalLabel && studentQCount>0) haltedTotalLabel=String(studentQCount);
         }
         showingHalted=false; showingDismissed=true; dismissedCountdown=120;
@@ -766,7 +767,8 @@ function connect(){
           const payloadTotal2 = m.payload?.totalQuestions || 0;
           const histTotal2 = (S.history||[]).length || (S.myHistory||[]).length;
           haltedTotalQuestions = payloadTotal2 || histTotal2 || studentQCount || 0;
-          if(!haltedTotalLabel && haltedTotalQuestions>0) haltedTotalLabel=String(haltedTotalQuestions);
+          if(payloadTotal2>0) haltedTotalLabel=String(payloadTotal2);
+          else if(!haltedTotalLabel && haltedTotalQuestions>0) haltedTotalLabel=String(haltedTotalQuestions);
           else if(!haltedTotalLabel && studentQCount>0) haltedTotalLabel=String(studentQCount);
         }
         showingHalted=true; haltedCountdown=0; // no auto-dismiss — wait for host
@@ -1302,9 +1304,6 @@ async function generateQuiz(){
     s.files.filter(f=>f.selected).forEach(f=>selections.push({file:f,subjName:s.name}));
   });
   if(!selections.length){msg.innerHTML='<div class="notice n-bad mt2">Select at least one chapter file above.</div>';return;}
-  // Determine denominator label for final leaderboard
-  const anyAll=selections.some(({file})=>!file.count||file.count===0);
-  haltedTotalLabel=anyAll?'all':String(selections.reduce((s,{file})=>s+(file.count||0),0));
   msg.innerHTML='<div class="notice n-neutral mt2">Fetching questions…</div>';
   let all=[];
   try{
@@ -1326,6 +1325,7 @@ async function generateQuiz(){
       all=[...all,...shuffled];
     }
     questions=all; selIdx=0; answerKey=all[0]?.correct??-1;
+    haltedTotalLabel=String(questions.length); // true total — set after parsing so it reflects actual count
     msg.innerHTML=''; render();
   }catch(e){ msg.innerHTML=`<div class="notice n-bad mt2">${esc(e.message)}</div>`; }
 }
@@ -2314,7 +2314,7 @@ function hostEndedHTML(){
   const sorted=[...parts].sort((a,b)=>(b.score||0)-(a.score||0));
   const partMap={}; parts.forEach(p=>partMap[p.id]=p);
   const totalQs=history.length;
-  const totalLabel=haltedTotalLabel||(questions.length>0?String(questions.length):totalQs>0?String(totalQs):'?');
+  const totalLabel=questions.length>0?String(questions.length):(haltedTotalLabel||(totalQs>0?String(totalQs):'?'));
   const table=parts.length&&history.length?`<div class="itbl-wrap"><table class="itbl">
     <thead><tr><th>Student</th>${history.map((_,i)=>`<th>Q${i+1}</th>`).join('')}<th>Score</th></tr></thead>
     <tbody>${sorted.map(p=>`<tr data-pid="${p.id}"><td><strong>${esc(p.name)}</strong></td>
@@ -2911,7 +2911,7 @@ function attach(){
     if(pushing||selIdx<0||answerKey<0) return;
     const t=Math.max(0,parseInt(document.getElementById('timer-sec-live')?.value)||hostTimerSeconds);
     pushing=true;
-    send({type:'push_question',question:questions[selIdx],correct:answerKey,timerSeconds:t});
+    send({type:'push_question',question:questions[selIdx],correct:answerKey,timerSeconds:t,totalQuestions:questions.length});
     // Safety: reset push flag after 4s if no state update comes
     pushTimeout=setTimeout(()=>{ pushing=false; pushTimeout=null; render(); },4000);
     render();
@@ -2941,7 +2941,7 @@ function attach(){
   on('btn-stop-dismiss',()=>{
     showingHaltMenu=false;
     playMp3('stop.mp3');
-    send({type:'shutdown'});
+    send({type:'shutdown', totalQuestions:questions.length||0});
     render();
   });
 
