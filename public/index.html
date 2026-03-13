@@ -1592,13 +1592,27 @@ function profilePageHTML(){
   }
 
   if(profileTab==='settings'){
+    const hasUsername=!!(u.username);
     body=`
     <div class="psec">
       <h3>🎭 Session Display Name</h3>
       <p class="muted small mb2" style="font-size:.77rem">Shown during quizzes instead of your full name.</p>
-      <div class="form-row"><label>Display name</label><input class="form-input" id="p-disp-in" maxlength="32" value="${esc(u.displayName||u.name)}" placeholder="Your quiz nickname"/></div>
+      <div class="form-row"><label>Display name</label><input class="form-input" id="p-disp-in" maxlength="32" value="${esc(u.name)}" placeholder="Your quiz nickname"/></div>
       <button class="btn btn-dark btn-sm" id="btn-save-disp">Save</button>
       <div class="form-msg" id="p-disp-msg"></div>
+    </div>
+    <div class="psec">
+      <h3>🪪 Username</h3>
+      ${hasUsername
+        ? `<p class="muted small mb2" style="font-size:.77rem">Your username is used for login. Once set it cannot be removed, only changed.</p>
+           <div class="form-row"><label>Username</label><div style="position:relative"><input class="form-input" id="p-uname-in" maxlength="30" value="${esc(u.username)}" placeholder="your_username" autocapitalize="none" spellcheck="false" style="padding-right:36px"/><span id="p-un-status" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);font-size:.85rem;line-height:1;pointer-events:none"></span></div></div>
+           <small id="p-un-hint" style="font-size:.72rem;margin-top:3px;display:block;color:var(--mid)">Letters, numbers, underscores · 3–30 characters</small>`
+        : `<p class="muted small mb2" style="font-size:.77rem">You didn't set a username when registering. Add one now to log in without email. Once set it cannot be removed.</p>
+           <div class="form-row"><label>Username</label><div style="position:relative"><input class="form-input" id="p-uname-in" maxlength="30" placeholder="your_username" autocapitalize="none" spellcheck="false" style="padding-right:36px"/><span id="p-un-status" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);font-size:.85rem;line-height:1;pointer-events:none"></span></div></div>
+           <small id="p-un-hint" style="font-size:.72rem;margin-top:3px;display:block;color:var(--mid)">Letters, numbers, underscores · 3–30 characters</small>`
+      }
+      <button class="btn btn-dark btn-sm mt1" id="btn-save-uname">${hasUsername?'Update username':'Set username'}</button>
+      <div class="form-msg" id="p-uname-msg"></div>
     </div>
     <div class="psec">
       <h3>🔑 Change Password</h3>
@@ -1610,7 +1624,7 @@ function profilePageHTML(){
     </div>`;
   }
 
-  const disp=u.displayName||u.name;
+  const disp=u.name;
   return `<div class="profile-page">
     <div class="row gap2 mb3">
       <span style="font-size:.95rem;font-weight:600">My Profile</span>
@@ -1618,7 +1632,7 @@ function profilePageHTML(){
     <div class="profile-hero">
       <div class="ph-avatar">${initials}</div>
       <div class="ph-info">
-        <div class="ph-name">${esc(disp)}${u.displayName&&u.displayName!==u.name?`<span style="font-size:.72rem;color:var(--mid);font-weight:400;margin-left:6px">(${esc(u.name)})</span>`:''}</div>
+        <div class="ph-name">${esc(disp)}</div>
         <div class="ph-email">${u.email ? esc(u.email) : ''}${u.username ? `<span style="color:var(--mid);margin-left:6px">· @${esc(u.username)}</span>` : ''}</div>
       </div>
     </div>
@@ -2392,7 +2406,7 @@ function noSessionHTML(){
 }
 
 function joinHTML(){
-  const name=currentUser?.displayName||currentUser?.name||'';
+  const name=currentUser?.name||'';
   const initials=name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase()||'?';
   return `<div class="center"><div class="box">
     <h2 class="mb1">Join session</h2>
@@ -2578,6 +2592,36 @@ function attach(){
       const d=await apiPost('/api/update-name',{displayName:v},true);
       saveAuth(d.token,d.user); msg.className='form-msg ok'; msg.textContent='✓ Saved!';
       setTimeout(()=>render(),700);
+    }catch(e){msg.className='form-msg err';msg.textContent=e.message;}
+  });
+  // Username live availability check in profile settings
+  document.getElementById('p-uname-in')?.addEventListener('input', async (e)=>{
+    const val=e.target.value.trim();
+    const status=document.getElementById('p-un-status');
+    const hint=document.getElementById('p-un-hint');
+    if(!status)return;
+    if(!val||val.length<3){status.textContent='';return;}
+    if(!/^[a-zA-Z0-9_]+$/.test(val)){status.textContent='🚫';if(hint)hint.textContent='Letters, numbers, underscores only';return;}
+    // If same as current username, no need to check
+    if(currentUser?.username&&val.toLowerCase()===currentUser.username.toLowerCase()){status.textContent='✅';if(hint)hint.textContent='This is your current username';return;}
+    try{
+      const r=await fetch('/api/check-username?username='+encodeURIComponent(val));
+      const j=await r.json();
+      status.textContent=j.available?'✅':'🚫';
+      if(hint)hint.textContent=j.available?'Username is available':'Username is already taken';
+    }catch(_){status.textContent='';}
+  });
+  on('btn-save-uname', async ()=>{
+    const v=document.getElementById('p-uname-in')?.value?.trim();
+    const msg=document.getElementById('p-uname-msg'); if(!msg)return;
+    if(!v){msg.className='form-msg err';msg.textContent='Username required';return;}
+    if(!/^[a-zA-Z0-9_]{3,30}$/.test(v)){msg.className='form-msg err';msg.textContent='3–30 chars, letters/numbers/underscores only';return;}
+    const status=document.getElementById('p-un-status');
+    if(status?.textContent==='🚫'){msg.className='form-msg err';msg.textContent='That username is already taken';return;}
+    try{
+      const d=await apiPost('/api/update-username',{username:v},true);
+      saveAuth(d.token,d.user); msg.className='form-msg ok'; msg.textContent='✓ Username saved!';
+      setTimeout(()=>render(),800);
     }catch(e){msg.className='form-msg err';msg.textContent=e.message;}
   });
   on('btn-save-pw', async ()=>{
@@ -3040,7 +3084,7 @@ function doHostLogin(){
 }
 function doLeave(){ role=null; myName=null; myPid=null; showingProfile=false; prevMyScore=0; scoreGain=0; myLastAnswerTime=null; localAnswerTimes={}; startTimerDisplay._lastStart=null; studentQCount=0; haltedTotalLabel=''; haltedTotalQuestions=0; sessionStorage.removeItem('qz_pid'); sessionStorage.removeItem(NAV_KEY); render(); }
 function doJoin(){
-  const name=currentUser?.displayName||currentUser?.name||'';
+  const name=currentUser?.name||'';
   if(!name)return;
   myName=name;
   myPid=sessionStorage.getItem('qz_pid');
