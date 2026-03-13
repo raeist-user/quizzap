@@ -23,7 +23,8 @@ mongoose.connect(MONGODB_URI)
 const userSchema = new mongoose.Schema({
   name:        { type: String, required: true, trim: true, maxlength: 50 },
   displayName: { type: String, trim: true, maxlength: 32, default: '' },
-  email:       { type: String, required: true, unique: true, lowercase: true, trim: true },
+  username:    { type: String, required: true, unique: true, lowercase: true, trim: true, match: /^[a-zA-Z0-9_]{3,30}$/ },
+  email:       { type: String, unique: true, sparse: true, lowercase: true, trim: true, default: null },
   password:    { type: String, required: true },
   role:        { type: String, enum: ['student','host'], default: 'student' },
   createdAt:   { type: Date, default: Date.now },
@@ -80,30 +81,44 @@ function requireAuth(req, res, next) {
 // Register
 app.post('/api/register', async (req, res) => {
   try {
-    const { name, email, password } = req.body;
-    if (!name?.trim() || !email?.trim() || !password) return res.status(400).json({ error: 'All fields required' });
+    const { name, username, password } = req.body;
+    if (!name?.trim())     return res.status(400).json({ error: 'Full name is required' });
+    if (!username?.trim()) return res.status(400).json({ error: 'Username is required' });
+    if (!password)         return res.status(400).json({ error: 'Password is required' });
+    if (!/^[a-zA-Z0-9_]{3,30}$/.test(username.trim()))
+      return res.status(400).json({ error: 'Username must be 3–30 characters: letters, numbers, underscores only' });
     if (password.length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters' });
-    if (await User.findOne({ email: email.toLowerCase() })) return res.status(400).json({ error: 'Email already registered' });
+    if (await User.findOne({ username: username.trim().toLowerCase() }))
+      return res.status(400).json({ error: 'Username already taken' });
     const hashed = await bcrypt.hash(password, 10);
-    const user = await User.create({ name: name.trim(), email: email.toLowerCase(), password: hashed });
-    const token = jwt.sign({ id: user._id, name: user.name, email: user.email, role: user.role }, JWT_SECRET, { expiresIn: '7d' });
-    // FIX #11: include displayName in response so join screen shows correct name immediately
-    res.json({ token, user: { id: user._id, name: user.name, displayName: user.displayName || '', email: user.email, role: user.role } });
+    const user = await User.create({ name: name.trim(), username: username.trim().toLowerCase(), password: hashed });
+    const token = jwt.sign({ id: user._id, name: user.name, username: user.username, role: user.role }, JWT_SECRET, { expiresIn: '7d' });
+    res.json({ token, user: { id: user._id, name: user.name, displayName: user.displayName || '', username: user.username, role: user.role } });
   } catch (e) { res.status(500).json({ error: 'Registration failed' }); }
 });
 
 // Login
 app.post('/api/login', async (req, res) => {
   try {
-    const { email, password } = req.body;
-    if (!email || !password) return res.status(400).json({ error: 'Email and password required' });
-    const user = await User.findOne({ email: email.toLowerCase() });
+    const { username, password } = req.body;
+    if (!username?.trim() || !password) return res.status(400).json({ error: 'Username and password required' });
+    const user = await User.findOne({ username: username.trim().toLowerCase() });
     if (!user || !(await bcrypt.compare(password, user.password)))
-      return res.status(400).json({ error: 'Invalid email or password' });
-    const token = jwt.sign({ id: user._id, name: user.name, displayName: user.displayName || '', email: user.email, role: user.role }, JWT_SECRET, { expiresIn: '7d' });
-    // FIX #11: include displayName in login response so quiz name is correct
-    res.json({ token, user: { id: user._id, name: user.name, displayName: user.displayName || '', email: user.email, role: user.role } });
+      return res.status(400).json({ error: 'Invalid username or password' });
+    const token = jwt.sign({ id: user._id, name: user.name, displayName: user.displayName || '', username: user.username, role: user.role }, JWT_SECRET, { expiresIn: '7d' });
+    res.json({ token, user: { id: user._id, name: user.name, displayName: user.displayName || '', username: user.username, role: user.role } });
   } catch (e) { res.status(500).json({ error: 'Login failed' }); }
+});
+
+// Check username availability (public — called live from register form)
+app.get('/api/check-username', async (req, res) => {
+  try {
+    const { username } = req.query;
+    if (!username || !/^[a-zA-Z0-9_]{3,30}$/.test(username.trim()))
+      return res.json({ available: false });
+    const exists = await User.findOne({ username: username.trim().toLowerCase() }).lean();
+    res.json({ available: !exists });
+  } catch (e) { res.status(500).json({ available: false }); }
 });
 
 // Change password
@@ -128,8 +143,8 @@ app.post('/api/update-name', requireAuth, async (req, res) => {
     if (!displayName?.trim()) return res.status(400).json({ error: 'Display name required' });
     if (displayName.trim().length > 32) return res.status(400).json({ error: 'Max 32 characters' });
     const user = await User.findByIdAndUpdate(req.user.id, { displayName: displayName.trim() }, { new: true });
-    const token = jwt.sign({ id: user._id, name: user.name, displayName: user.displayName, email: user.email, role: user.role }, JWT_SECRET, { expiresIn: '7d' });
-    res.json({ ok: true, token, user: { id: user._id, name: user.name, displayName: user.displayName, email: user.email, role: user.role } });
+    const token = jwt.sign({ id: user._id, name: user.name, displayName: user.displayName, username: user.username, role: user.role }, JWT_SECRET, { expiresIn: '7d' });
+    res.json({ ok: true, token, user: { id: user._id, name: user.name, displayName: user.displayName, username: user.username, role: user.role } });
   } catch (e) { res.status(500).json({ error: 'Failed' }); }
 });
 
