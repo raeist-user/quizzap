@@ -781,10 +781,14 @@ function connect(){
         if(ns==='idle'&&prevStatus==='revealed'){ scoreGain=inc-prevMyScore; if(scoreGain<0)scoreGain=0; }
         if(ns==='question'){
           scoreGain=0; prevMyScore=inc;
-          myLastAnswerTime=null;  // reset timing for new question
-          localAnswerTimes={};    // clear per-student times for new question
-          studentQCount++;        // track total questions seen (for student denominator)
-          startTimerDisplay._lastStart=null; // force timer restart for new question
+          // Only reset per-question timing on a BRAND NEW question push (questionPushedAt changes),
+          // NOT on every state update for the same question (which would wipe the student's stored time).
+          if(m.payload.questionPushedAt !== S.questionPushedAt){
+            myLastAnswerTime=null;
+            localAnswerTimes={};
+            studentQCount++;
+            startTimerDisplay._lastStart=null; // force timer restart for new question
+          }
           // Clear push-stuck state
           pushing=false;
           if(pushTimeout){ clearTimeout(pushTimeout); pushTimeout=null; }
@@ -1521,6 +1525,14 @@ function studentDismissedHTML(){
   const myRank=sorted.findIndex(p=>p.id===myPid)+1;
   const total=haltedTotalQuestions||0;
   const totalStr=haltedTotalLabel||(studentQCount>0?String(studentQCount):total>0?String(total):'?');
+  const rows=sorted.length
+    ?sorted.map((p,i)=>`
+      <div class="lb-row${p.id===myPid?' me':''}">
+        <div class="score-rank">${medals[i]||('#'+(i+1))}</div>
+        <div style="flex:1;font-weight:${i<3?'600':'400'}">${esc(p.name)}${p.id===myPid?' <span style="font-size:.68rem;color:var(--mid)">(you)</span>':''}</div>
+        <div class="score-pts"><span style="font-weight:700">${p.score||0}</span><span style="font-size:.7rem;color:var(--mid);font-weight:400">/${totalStr}</span></div>
+      </div>`).join('')
+    :`<div style="padding:20px;text-align:center;color:var(--mid)">No scores yet.</div>`;
   const circ=125.7;
   const offset=(circ*(dismissedCountdown/120)).toFixed(1);
   return `<div style="display:flex;flex-direction:column;height:calc(100vh - 54px);overflow:hidden;padding:16px 20px;max-width:520px;margin:0 auto">
