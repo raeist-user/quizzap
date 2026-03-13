@@ -93,6 +93,11 @@ app.post('/api/register', async (req, res) => {
     const user = await User.create({ name: name.trim(), username: username.trim().toLowerCase(), password: hashed });
     const token = jwt.sign({ id: user._id, name: user.name, username: user.username, role: user.role }, JWT_SECRET, { expiresIn: '7d' });
     res.json({ token, user: { id: user._id, name: user.name, displayName: user.displayName || '', username: user.username, role: user.role } });
+  } catch (e) {
+    if (e.code === 11000) return res.status(400).json({ error: 'Username already taken' });
+    console.error('Register error:', e.message);
+    res.status(500).json({ error: 'Registration failed' });
+  }
 });
 
 // Login
