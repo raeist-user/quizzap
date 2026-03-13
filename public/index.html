@@ -1381,7 +1381,7 @@ function render(){
   document.getElementById('p-avatar').textContent=u.name[0].toUpperCase();
   document.getElementById('p-name-lbl').textContent=u.name.split(' ')[0];
   document.getElementById('pd-full-name').textContent=u.name;
-  document.getElementById('pd-email').textContent = u.username ? '@'+u.username : '';
+  document.getElementById('pd-email').textContent = u.email || (u.username ? '@'+u.username : '');
   const v=document.getElementById('view');
 
   if(showingDismissed){ v.innerHTML=studentDismissedHTML(); attach(); return; }
@@ -1414,7 +1414,7 @@ function authHTML(){
 }
 function loginFormHTML(){
   return `<div>
-    <div class="form-group"><label class="form-label">Username</label><input class="form-input" type="text" id="auth-username" placeholder="your_username" autocomplete="username" autocapitalize="none" spellcheck="false"/></div>
+    <div class="form-group"><label class="form-label">Email or username</label><input class="form-input" type="text" id="auth-identifier" placeholder="you@gmail.com or your_username" autocomplete="username" autocapitalize="none" spellcheck="false"/></div>
     <div class="form-group"><label class="form-label">Password</label><input class="form-input" type="password" id="auth-pw" placeholder="••••••••" autocomplete="current-password"/></div>
     <div id="auth-err" class="form-error"></div>
     <button class="btn btn-dark btn-full mt2" id="btn-login">Sign in →</button>
@@ -1423,7 +1423,8 @@ function loginFormHTML(){
 function registerFormHTML(){
   return `<div>
     <div class="form-group"><label class="form-label">Full name</label><input class="form-input" type="text" id="auth-name" placeholder="Your name" autocomplete="name"/></div>
-    <div class="form-group"><label class="form-label">Username</label><div style="position:relative"><input class="form-input" type="text" id="auth-username" placeholder="your_username" autocomplete="username" autocapitalize="none" spellcheck="false" style="padding-right:36px"/><span id="un-status" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);font-size:.85rem;line-height:1;pointer-events:none"></span></div><small id="un-hint" style="font-size:.72rem;margin-top:3px;display:block;color:var(--mid)">Letters, numbers, underscores only</small></div>
+    <div class="form-group"><label class="form-label">Email</label><input class="form-input" type="email" id="auth-email" placeholder="you@gmail.com" autocomplete="email" autocapitalize="none" spellcheck="false"/></div>
+    <div class="form-group"><label class="form-label">Username <span style="font-weight:400;font-size:.75rem;color:var(--mid)">(optional)</span></label><div style="position:relative"><input class="form-input" type="text" id="auth-username" placeholder="your_username" autocomplete="off" autocapitalize="none" spellcheck="false" style="padding-right:36px"/><span id="un-status" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);font-size:.85rem;line-height:1;pointer-events:none"></span></div><small id="un-hint" style="font-size:.72rem;margin-top:3px;display:block;color:var(--mid)">Letters, numbers, underscores only · used for login &amp; profile</small></div>
     <div class="form-group"><label class="form-label">Password <span style="font-weight:400;text-transform:none;letter-spacing:0">(min 6 chars)</span></label><input class="form-input" type="password" id="auth-pw" placeholder="••••••••" autocomplete="new-password"/></div>
     <div id="auth-err" class="form-error"></div>
     <button class="btn btn-dark btn-full mt2" id="btn-register">Create account →</button>
@@ -1449,7 +1450,6 @@ function landingHTML(){
           <div class="lb-row${e.userId===currentUser?.id?' me':''}">
             <div class="score-rank">${['🥇','🥈','🥉'][i]||('#'+(i+1))}</div>
             <div style="flex:1;font-weight:${e.userId===currentUser?.id?'700':'400'}">${esc(e.userName||'—')}</div>
-            <div class="lb-sessions">${e.sessionsPlayed||0} session${(e.sessionsPlayed||0)!==1?'s':''}</div>
             <div class="score-pts">${e.totalScore||0} pts</div>
           </div>`).join('')
         :'<div style="padding:32px;text-align:center;color:var(--mid)"><div style="font-size:2rem;margin-bottom:10px">🏆</div>No scores yet — be the first!</div>';
@@ -1457,7 +1457,6 @@ function landingHTML(){
       ?`<div style="border-top:2px solid var(--line)"><div class="lb-row me">
           <div class="score-rank">#${myRankAll}</div>
           <div style="flex:1;font-weight:700">${esc(myEntry.userName||'—')} <span style="font-size:.7rem;color:var(--mid)">← you</span></div>
-          <div class="lb-sessions">${myEntry.sessionsPlayed||0} session${(myEntry.sessionsPlayed||0)!==1?'s':''}</div>
           <div class="score-pts">${myEntry.totalScore||0} pts</div>
         </div></div>`
       :'';
@@ -1620,7 +1619,7 @@ function profilePageHTML(){
       <div class="ph-avatar">${initials}</div>
       <div class="ph-info">
         <div class="ph-name">${esc(disp)}${u.displayName&&u.displayName!==u.name?`<span style="font-size:.72rem;color:var(--mid);font-weight:400;margin-left:6px">(${esc(u.name)})</span>`:''}</div>
-        <div class="ph-email">${u.username ? '@'+esc(u.username) : ''}</div>
+        <div class="ph-email">${u.email ? esc(u.email) : ''}${u.username ? `<span style="color:var(--mid);margin-left:6px">· @${esc(u.username)}</span>` : ''}</div>
       </div>
     </div>
     <div class="ptabs">${tabsHTML}</div>
@@ -3097,29 +3096,33 @@ function liveCheckUsername(val){
 }
 
 async function doLogin(){
-  const username=document.getElementById('auth-username')?.value?.trim();
+  const identifier=document.getElementById('auth-identifier')?.value?.trim();
   const pw=document.getElementById('auth-pw')?.value;
   const err=document.getElementById('auth-err'); if(err)err.textContent='';
-  if(!username){if(err)err.textContent='Username is required';return;}
+  if(!identifier){if(err)err.textContent='Email or username is required';return;}
   try{
-    const d=await apiPost('/api/login',{username,password:pw});
+    const d=await apiPost('/api/login',{identifier,password:pw});
     saveAuth(d.token,d.user); render(); connect();
   }catch(e){ if(err)err.textContent=e.message; }
 }
 async function doRegister(){
   const name=document.getElementById('auth-name')?.value?.trim();
-  const username=document.getElementById('auth-username')?.value?.trim();
+  const email=document.getElementById('auth-email')?.value?.trim();
+  const username=document.getElementById('auth-username')?.value?.trim()||'';
   const pw=document.getElementById('auth-pw')?.value;
   const err=document.getElementById('auth-err'); if(err)err.textContent='';
   if(!name){if(err)err.textContent='Full name is required';return;}
-  if(!username){if(err)err.textContent='Username is required';return;}
-  if(!/^[a-zA-Z0-9_]+$/.test(username)){if(err)err.textContent='Username may only contain letters, numbers and underscores';return;}
-  if(username.length<3){if(err)err.textContent='Username must be at least 3 characters';return;}
-  // Block if live-check already confirmed the username is taken
-  const unHint=document.getElementById('un-hint');
-  if(unHint&&unHint.textContent==='Username is already taken'){if(err)err.textContent='That username is already taken — please choose another';return;}
+  if(!email){if(err)err.textContent='Email is required';return;}
+  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){if(err)err.textContent='Enter a valid email address';return;}
+  // Username optional — validate only if filled
+  if(username){
+    if(!/^[a-zA-Z0-9_]+$/.test(username)){if(err)err.textContent='Username may only contain letters, numbers and underscores';return;}
+    if(username.length<3){if(err)err.textContent='Username must be at least 3 characters';return;}
+    const unHint=document.getElementById('un-hint');
+    if(unHint&&unHint.textContent==='Username is already taken'){if(err)err.textContent='That username is already taken — please choose another';return;}
+  }
   try{
-    const d=await apiPost('/api/register',{name,username,password:pw});
+    const d=await apiPost('/api/register',{name,email,username:username||undefined,password:pw});
     saveAuth(d.token,d.user); render(); connect();
   }catch(e){ if(err)err.textContent=e.message; }
 }
