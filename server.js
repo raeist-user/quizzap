@@ -216,16 +216,37 @@ app.post('/api/change-password', requireAuth, async (req, res) => {
   } catch (e) { res.status(500).json({ error: 'Failed' }); }
 });
 
-// Update display name
+// Update display name — writes directly to the name field (no separate displayName var)
 app.post('/api/update-name', requireAuth, async (req, res) => {
   try {
     const { displayName } = req.body;
     if (!displayName?.trim()) return res.status(400).json({ error: 'Display name required' });
     if (displayName.trim().length > 32) return res.status(400).json({ error: 'Max 32 characters' });
-    const user = await User.findByIdAndUpdate(req.user.id, { displayName: displayName.trim() }, { new: true });
-    const token = jwt.sign({ id: user._id, name: user.name, displayName: user.displayName, email: user.email || '', username: user.username || '', role: user.role }, JWT_SECRET, { expiresIn: '7d' });
-    res.json({ ok: true, token, user: { id: user._id, name: user.name, displayName: user.displayName, email: user.email || '', username: user.username || '', role: user.role } });
+    const user = await User.findByIdAndUpdate(req.user.id, { name: displayName.trim() }, { new: true });
+    const token = jwt.sign({ id: user._id, name: user.name, displayName: user.displayName || '', email: user.email || '', username: user.username || '', role: user.role }, JWT_SECRET, { expiresIn: '7d' });
+    res.json({ ok: true, token, user: { id: user._id, name: user.name, displayName: user.displayName || '', email: user.email || '', username: user.username || '', role: user.role } });
   } catch (e) { res.status(500).json({ error: 'Failed' }); }
+});
+
+// Set or change username — once set, cannot be cleared (only replaced with another valid username)
+app.post('/api/update-username', requireAuth, async (req, res) => {
+  try {
+    const { username } = req.body;
+    if (!username?.trim()) return res.status(400).json({ error: 'Username required' });
+    const uname = username.trim().toLowerCase();
+    if (!/^[a-zA-Z0-9_]{3,30}$/.test(uname))
+      return res.status(400).json({ error: 'Username must be 3–30 characters: letters, numbers, underscores only' });
+    // Check availability — allow if it's already this user's own username
+    const existing = await User.findOne({ username: uname }).lean();
+    if (existing && existing._id.toString() !== req.user.id)
+      return res.status(400).json({ error: 'Username already taken' });
+    const user = await User.findByIdAndUpdate(req.user.id, { username: uname }, { new: true });
+    const token = jwt.sign({ id: user._id, name: user.name, displayName: user.displayName || '', email: user.email || '', username: user.username || '', role: user.role }, JWT_SECRET, { expiresIn: '7d' });
+    res.json({ ok: true, token, user: { id: user._id, name: user.name, displayName: user.displayName || '', email: user.email || '', username: user.username || '', role: user.role } });
+  } catch (e) {
+    if (e.code === 11000) return res.status(400).json({ error: 'Username already taken' });
+    res.status(500).json({ error: 'Failed' });
+  }
 });
 
 // ── SCHEDULE ROUTES (FIX #6, #7, #8) ─────────────────────────────────────────
