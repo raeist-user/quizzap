@@ -937,7 +937,10 @@ function startTimerDisplay(){
   if(timerInterval){clearInterval(timerInterval);timerInterval=null;}
   startTimerDisplay._lastStart=start;
   function tick(){
-    const remaining=Math.max(0, total-(Date.now()-start)/1000);
+    const elapsed=Math.max(0,(Date.now()-start)/1000);
+    const remaining=Math.max(0, total-elapsed);
+    // Cap display value at total so we never show more than the set timer (avoids clock skew showing +1)
+    const displaySecs=Math.min(total, Math.ceil(remaining));
     const pct=(remaining/total)*100;
     const urgent=remaining<total*0.25;
     // Student timer bar
@@ -946,7 +949,7 @@ function startTimerDisplay(){
     if(bar&&dig){
       bar.style.width=pct+'%';
       bar.className='timer-bar-fill'+(urgent?' urgent':'');
-      dig.textContent=Math.ceil(remaining)+'s';
+      dig.textContent=displaySecs+'s';
       dig.className='timer-digits'+(urgent?' urgent':'');
     }
     // Host timer bar (in host controller)
@@ -955,7 +958,7 @@ function startTimerDisplay(){
     if(hBar&&hDig){
       hBar.style.width=pct+'%';
       hBar.style.background=urgent?'var(--bad)':'var(--accent)';
-      hDig.textContent=Math.ceil(remaining)+'s';
+      hDig.textContent=displaySecs+'s';
       hDig.style.color=urgent?'var(--bad)':'var(--ink)';
     }
     if(remaining<=0){
@@ -1369,7 +1372,7 @@ function render(){
   document.getElementById('p-avatar').textContent=u.name[0].toUpperCase();
   document.getElementById('p-name-lbl').textContent=u.name.split(' ')[0];
   document.getElementById('pd-full-name').textContent=u.name;
-  document.getElementById('pd-email').textContent=u.email;
+  document.getElementById('pd-email').textContent=u.username ? '@'+u.username : (u.email||'');
   const v=document.getElementById('view');
 
   if(showingDismissed){ v.innerHTML=studentDismissedHTML(); attach(); return; }
@@ -1402,7 +1405,7 @@ function authHTML(){
 }
 function loginFormHTML(){
   return `<div>
-    <div class="form-group"><label class="form-label">Email</label><input class="form-input" type="text" id="auth-email" placeholder="you@example.com" autocomplete="email"/></div>
+    <div class="form-group"><label class="form-label">Username</label><input class="form-input" type="text" id="auth-username" placeholder="your_username" autocomplete="username" autocapitalize="none" spellcheck="false"/></div>
     <div class="form-group"><label class="form-label">Password</label><input class="form-input" type="password" id="auth-pw" placeholder="••••••••" autocomplete="current-password"/></div>
     <div id="auth-err" class="form-error"></div>
     <button class="btn btn-dark btn-full mt2" id="btn-login">Sign in →</button>
@@ -1411,7 +1414,7 @@ function loginFormHTML(){
 function registerFormHTML(){
   return `<div>
     <div class="form-group"><label class="form-label">Full name</label><input class="form-input" type="text" id="auth-name" placeholder="Your name" autocomplete="name"/></div>
-    <div class="form-group"><label class="form-label">Email</label><input class="form-input" type="text" id="auth-email" placeholder="you@example.com" autocomplete="email"/></div>
+    <div class="form-group"><label class="form-label">Username</label><div style="position:relative"><input class="form-input" type="text" id="auth-username" placeholder="your_username" autocomplete="username" autocapitalize="none" spellcheck="false" style="padding-right:36px"/><span id="un-status" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);font-size:.85rem;line-height:1;pointer-events:none"></span></div><small id="un-hint" style="font-size:.72rem;margin-top:3px;display:block;color:var(--mid)">Letters, numbers, underscores only</small></div>
     <div class="form-group"><label class="form-label">Password <span style="font-weight:400;text-transform:none;letter-spacing:0">(min 6 chars)</span></label><input class="form-input" type="password" id="auth-pw" placeholder="••••••••" autocomplete="new-password"/></div>
     <div id="auth-err" class="form-error"></div>
     <button class="btn btn-dark btn-full mt2" id="btn-register">Create account →</button>
@@ -1608,7 +1611,7 @@ function profilePageHTML(){
       <div class="ph-avatar">${initials}</div>
       <div class="ph-info">
         <div class="ph-name">${esc(disp)}${u.displayName&&u.displayName!==u.name?`<span style="font-size:.72rem;color:var(--mid);font-weight:400;margin-left:6px">(${esc(u.name)})</span>`:''}</div>
-        <div class="ph-email">${esc(u.email)}</div>
+        <div class="ph-email">${u.username?'@'+esc(u.username):(u.email?esc(u.email):'')}</div>
       </div>
     </div>
     <div class="ptabs">${tabsHTML}</div>
@@ -2086,8 +2089,8 @@ function hostHTML(){
           <div style="min-width:22px;text-align:center;font-size:.72rem;color:var(--mid)">${medals[i]||('#'+(i+1))}</div>
           <div class="j-av" style="flex-shrink:0">${initials(p.name)}</div>
           <div style="flex:1;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">${esc(p.name)}</div>
-          <div style="font-size:.75rem;font-weight:600;min-width:18px;text-align:center;color:${isCorrect?'#16a34a':isWrong?'var(--bad)':'var(--mid)'}">${ansStr}</div>
-          ${ansTime!=null?`<div style="font-size:.7rem;color:var(--mid);min-width:28px;text-align:right">${ansTime}s</div>`:'<div style="min-width:28px"></div>'}
+          <div style="font-size:.72rem;font-weight:700;min-width:26px;text-align:center;padding:2px 5px;border-radius:4px;${isCorrect?'background:#dcfce7;color:#16a34a':isWrong?'background:#fee2e2;color:#be123c':ans!==undefined&&ans!==null?'background:var(--faint);color:var(--mid)':'color:var(--mid)'}">${ansStr}</div>
+          ${ansTime!=null?`<div style="font-size:.7rem;color:var(--mid);min-width:40px;text-align:right">${parseFloat(ansTime).toFixed(2)}s</div>`:'<div style="min-width:40px"></div>'}
           <div style="font-weight:600;min-width:44px;text-align:right">${p.score||0} <span style="font-size:.68rem;color:var(--mid)">pts</span></div>
         </div>`;
       }).join('')
@@ -2228,7 +2231,7 @@ function hostHTML(){
             <div style="width:80px;height:6px;background:var(--line);border-radius:3px;overflow:hidden">
               <div id="host-timer-bar" style="height:100%;background:${timerLeft<timerTotal*0.25?'var(--bad)':'var(--accent)'};border-radius:3px;width:${timerTotal?((timerLeft/timerTotal)*100).toFixed(1):0}%;transition:width .5s linear"></div>
             </div>
-            <span id="host-timer-digits" style="font-size:.85rem;font-weight:700;color:${timerLeft<timerTotal*0.25?'var(--bad)':'var(--ink)'};min-width:28px;text-align:right">${Math.ceil(timerLeft)}s</span>
+            <span id="host-timer-digits" style="font-size:.85rem;font-weight:700;color:${timerLeft<timerTotal*0.25?'var(--bad)':'var(--ink)'};min-width:28px;text-align:right">${Math.min(timerTotal,Math.ceil(timerLeft))}s</span>
           </div>`
         :`<input type="number" min="0" max="300" value="${hostTimerSeconds}" id="timer-sec-live" class="q-count-input" style="width:60px"/>
            <span class="muted small">sec</span>`}
@@ -2390,7 +2393,7 @@ function joinHTML(){
       <div style="width:38px;height:38px;border-radius:50%;background:var(--ink);color:#fff;display:flex;align-items:center;justify-content:center;font-size:.9rem;font-weight:600;flex-shrink:0">${initials}</div>
       <div style="min-width:0">
         <div style="font-weight:600;font-size:.95rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(name)}</div>
-        <div class="muted small">${esc(currentUser?.email||'')}</div>
+        <div class="muted small">${currentUser?.username?'@'+esc(currentUser.username):(currentUser?.email?esc(currentUser.email):'')}</div>
       </div>
     </div>
     <button class="btn btn-dark btn-full" id="btn-enter">Join →</button>
@@ -2412,20 +2415,18 @@ function waitHTML(){
       const isMe=p.id===myPid;
       // Server-broadcast answerTimes wins for any student; own precise time is always available via localAnswerTimes
       const ansTime = S.answerTimes?.[p.id] ?? localAnswerTimes[p.id] ?? null;
-      const ansTimeStr = ansTime!==null ? `${ansTime}s` : (isMe ? '—' : '');
+      const ansTimeStr = ansTime!==null ? `${parseFloat(ansTime).toFixed(2)}s` : (isMe ? '—' : '');
       // Score colour: green = gained points, red = answered wrong
-      const scoreColor=isMe?(scoreGain>0?'#16a34a':scoreGain===0&&myLastAnswerTime!==null?'var(--bad)':'inherit'):'inherit';
-      // Gain badge for self only
-      const gainBadge=isMe&&myLastAnswerTime!==null
-        ?(scoreGain>0
-          ?`<span style="font-size:.68rem;font-weight:700;color:#16a34a;background:#dcfce7;padding:1px 5px;border-radius:8px;margin-right:3px">+${scoreGain}</span>`
-          :`<span style="font-size:.68rem;font-weight:700;color:#be123c;background:#fee2e2;padding:1px 5px;border-radius:8px;margin-right:3px">✗</span>`)
-        :'';
+      // Green = answered correctly, default black = answered wrong, inherit = not yet answered
+      const scoreColor=isMe
+        ?(myLastAnswerTime!==null?(scoreGain>0?'#16a34a':'var(--ink)'):'inherit')
+        :'inherit';
+      const scoreFontWeight=isMe&&myLastAnswerTime!==null?'700':'600';
       return `<div class="lb-row${isMe?' me':''}">
         <div class="score-rank">${['🥇','🥈','🥉'][i]||i+1}</div>
         <div style="flex:1">${esc(p.name)}${isMe?' <span style="font-size:.7rem;color:var(--mid)">← you</span>':''}</div>
         <span style="font-size:.72rem;color:var(--mid);min-width:42px;text-align:right;margin-right:5px">${ansTimeStr}</span>
-        ${gainBadge}<div class="score-pts" style="color:${scoreColor}">${p.score||0}</div>
+        <div class="score-pts" style="color:${scoreColor};font-weight:${scoreFontWeight}">${p.score||0}</div>
       </div>`;
     }).join('')}
   </div>`:'';
@@ -2532,7 +2533,14 @@ function attach(){
   on('btn-login',   doLogin);
   on('btn-register',doRegister);
   document.getElementById('auth-pw')?.addEventListener('keydown',e=>{ if(e.key==='Enter'){ if(authTab==='login') doLogin(); else doRegister(); }});
-  document.getElementById('auth-email')?.addEventListener('keydown',e=>{ if(e.key==='Enter'){ document.getElementById('auth-pw')?.focus(); }});
+  document.getElementById('auth-username')?.addEventListener('keydown',e=>{ if(e.key==='Enter'){ document.getElementById('auth-pw')?.focus(); }});
+  // Live username availability check (register tab only)
+  if(authTab==='register'){
+    _unLastChecked=''; // reset cache on each render
+    document.getElementById('auth-username')?.addEventListener('input',e=>{
+      liveCheckUsername(e.target.value.trim());
+    });
+  }
 
   // Profile dropdown — one-time setup handled in setupOutsideClick() above
   setupOutsideClick();
@@ -3033,22 +3041,74 @@ function doJoin(){
   render();
 }
 
+/* ── Live username availability check ──────────────────────────────────── */
+let _unCheckTimer=null;
+let _unLastChecked='';
+function liveCheckUsername(val){
+  const status=document.getElementById('un-status');
+  const hint=document.getElementById('un-hint');
+  if(!status||!hint) return;
+  // Clear previous debounce
+  if(_unCheckTimer){ clearTimeout(_unCheckTimer); _unCheckTimer=null; }
+  if(!val){ status.textContent=''; hint.textContent='Letters, numbers, underscores only'; hint.style.color='var(--mid)'; return; }
+  // Validate format first
+  if(!/^[a-zA-Z0-9_]+$/.test(val)){
+    status.textContent='✗'; status.style.color='var(--bad)';
+    hint.textContent='Only letters, numbers and underscores allowed'; hint.style.color='var(--bad)';
+    return;
+  }
+  if(val.length<3){
+    status.textContent=''; hint.textContent='At least 3 characters required'; hint.style.color='var(--bad)'; return;
+  }
+  if(val===_unLastChecked) return; // already checked this exact value
+  // Show spinner while waiting
+  status.textContent='⏳'; status.style.color='var(--mid)';
+  hint.textContent='Checking availability…'; hint.style.color='var(--mid)';
+  _unCheckTimer=setTimeout(async()=>{
+    _unLastChecked=val;
+    try{
+      const r=await fetch('/api/check-username?username='+encodeURIComponent(val));
+      const d=await r.json();
+      // Only update if input still matches (user may have kept typing)
+      const cur=document.getElementById('auth-username')?.value?.trim();
+      if(cur!==val) return;
+      if(d.available){
+        status.textContent='✓'; status.style.color='var(--good)';
+        hint.textContent='Username is available!'; hint.style.color='var(--good)';
+      } else {
+        status.textContent='✗'; status.style.color='var(--bad)';
+        hint.textContent='Username is already taken'; hint.style.color='var(--bad)';
+      }
+    }catch(e){
+      status.textContent=''; hint.textContent='Could not check availability'; hint.style.color='var(--mid)';
+    }
+  }, 450); // 450ms debounce
+}
+
 async function doLogin(){
-  const email=document.getElementById('auth-email')?.value?.trim();
+  const username=document.getElementById('auth-username')?.value?.trim();
   const pw=document.getElementById('auth-pw')?.value;
   const err=document.getElementById('auth-err'); if(err)err.textContent='';
+  if(!username){if(err)err.textContent='Username is required';return;}
   try{
-    const d=await apiPost('/api/login',{email,password:pw});
+    const d=await apiPost('/api/login',{username,password:pw});
     saveAuth(d.token,d.user); render(); connect();
   }catch(e){ if(err)err.textContent=e.message; }
 }
 async function doRegister(){
   const name=document.getElementById('auth-name')?.value?.trim();
-  const email=document.getElementById('auth-email')?.value?.trim();
+  const username=document.getElementById('auth-username')?.value?.trim();
   const pw=document.getElementById('auth-pw')?.value;
   const err=document.getElementById('auth-err'); if(err)err.textContent='';
+  if(!name){if(err)err.textContent='Full name is required';return;}
+  if(!username){if(err)err.textContent='Username is required';return;}
+  if(!/^[a-zA-Z0-9_]+$/.test(username)){if(err)err.textContent='Username may only contain letters, numbers and underscores';return;}
+  if(username.length<3){if(err)err.textContent='Username must be at least 3 characters';return;}
+  // Block if live-check already confirmed the username is taken
+  const unHint=document.getElementById('un-hint');
+  if(unHint&&unHint.textContent==='Username is already taken'){if(err)err.textContent='That username is already taken — please choose another';return;}
   try{
-    const d=await apiPost('/api/register',{name,email,password:pw});
+    const d=await apiPost('/api/register',{name,username,password:pw});
     saveAuth(d.token,d.user); render(); connect();
   }catch(e){ if(err)err.textContent=e.message; }
 }
