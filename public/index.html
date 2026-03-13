@@ -364,59 +364,6 @@
 
     @media(max-width:480px){.stat-grid{grid-template-columns:repeat(2,1fr)}}
 
-    /* FOLDER GRID — generate tab */
-    .folder-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:5px;margin-bottom:8px}
-    @media(max-width:320px){.folder-grid{grid-template-columns:repeat(3,1fr)}}
-    .folder-card{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;aspect-ratio:1/1;border:1.5px solid var(--line);border-radius:10px;background:var(--white);cursor:pointer;padding:8px 4px;transition:border-color .15s,background .15s,transform .1s;user-select:none;position:relative}
-    .folder-card:hover{border-color:#999;background:var(--faint);transform:translateY(-1px)}
-    .folder-card:active{transform:scale(.96)}
-    .folder-card.has-sel{border-color:var(--accent);background:#f0f7ff}
-    .folder-card .fc-icon{font-size:1.25rem;line-height:1}
-    .folder-card .fc-name{font-size:.62rem;font-weight:600;text-align:center;line-height:1.2;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;word-break:break-word;color:var(--ink)}
-    .folder-card .fc-badge{position:absolute;top:5px;right:6px;background:var(--accent);color:#fff;font-size:.58rem;font-weight:700;padding:1px 5px;border-radius:10px;line-height:1.5}
-    /* FOLDER CARD EDIT BUTTON */
-    .folder-card-add{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;aspect-ratio:1/1;border:1.5px dashed var(--line);border-radius:10px;background:var(--faint);cursor:pointer;padding:6px;transition:border-color .15s,background .15s}
-    .folder-card-add:hover{border-color:#999;background:#eeede9}
-    .folder-card-add.active{border-color:var(--accent);background:#eff6ff;border-style:solid}
-    /* MANAGE OVERLAY */
-    .manage-overlay-backdrop{position:fixed;inset:0;z-index:860;background:rgba(15,15,15,.45);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);display:flex;align-items:flex-end;justify-content:center;animation:fadeIn .08s ease}
-    .manage-overlay-panel{background:var(--white);border-radius:18px 18px 0 0;width:100%;max-width:480px;max-height:88vh;display:flex;flex-direction:column;animation:slideUp .1s ease;overflow:hidden}
-    .manage-overlay-head{display:flex;align-items:center;padding:13px 16px 10px;flex-shrink:0;border-bottom:1px solid var(--line);gap:8px}
-    .manage-overlay-body{overflow-y:auto;flex:1;padding:10px 14px;display:flex;flex-direction:column;gap:6px}
-    .mfile-row{display:flex;align-items:center;gap:7px;padding:8px 10px;border:1px solid var(--line);border-radius:7px;background:var(--white)}
-    .mfile-row.editing{border-color:var(--accent);background:#eff6ff}
-    /* CHAPTER OVERLAY */
-    .chapter-overlay-backdrop{position:fixed;inset:0;z-index:850;background:rgba(15,15,15,.45);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);display:flex;align-items:flex-end;justify-content:center;animation:fadeIn .08s ease}
-    .chapter-overlay-panel{background:var(--white);border-radius:18px 18px 0 0;width:100%;max-width:480px;max-height:82vh;display:flex;flex-direction:column;animation:slideUp .1s ease;overflow:hidden}
-    .chapter-overlay-head{display:flex;align-items:center;padding:14px 16px 10px;flex-shrink:0;border-bottom:1px solid var(--line)}
-    .chapter-overlay-title{font-size:.95rem;font-weight:700;flex:1;display:flex;align-items:center;gap:8px}
-    .chapter-overlay-body{overflow-y:auto;flex:1;padding:10px 14px;display:flex;flex-direction:column;gap:5px}
-    .chapter-row{display:flex;align-items:center;gap:10px;padding:9px 12px;border:1.5px solid var(--line);border-radius:8px;cursor:pointer;background:var(--white);transition:border-color .12s,background .12s}
-    .chapter-row.sel{border-color:var(--accent);background:#eff6ff}
-    .chapter-row:active{background:var(--faint)}
-    .ch-check{width:16px;height:16px;border-radius:4px;border:2px solid var(--line);display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:border-color .12s,background .12s}
-    .chapter-row.sel .ch-check{border-color:var(--accent);background:var(--accent)}
-    .ch-name{flex:1;font-size:.82rem;line-height:1.3}
-    .chapter-row.sel .ch-name{font-weight:600;color:var(--accent)}
-    .ch-count{width:44px;font-size:.75rem;padding:3px 5px;border:1px solid var(--line);border-radius:5px;text-align:center;outline:none;background:var(--white)}
-    .chapter-row.sel .ch-count{border-color:var(--accent)}
-    .chapter-overlay-foot{padding:10px 14px 20px;flex-shrink:0;border-top:1px solid var(--line);display:flex;gap:8px}
-    /* KEYBOARD ACCESSIBILITY — focus rings */
-    :focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:3px}
-    .key-card:focus-visible{outline:2px solid var(--accent);outline-offset:1px;border-radius:var(--r)}
-    [data-subj-expand]:focus-visible{outline:2px solid var(--accent);outline-offset:1px;border-radius:var(--r)}
-    .opt-card:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
-
-    /* HOST SETTINGS OVERLAY */
-    .host-settings-overlay{position:fixed;inset:0;z-index:950;background:rgba(0,0,0,.42);display:flex;align-items:flex-end;justify-content:center;animation:fadeIn .08s ease}
-    .host-settings-panel{background:var(--white);border-radius:14px 14px 0 0;width:100%;max-width:500px;padding:22px 22px 32px;max-height:80vh;overflow-y:auto;animation:slideUp .1s ease}
-    .kbd{display:inline-flex;align-items:center;justify-content:center;min-width:26px;height:22px;padding:0 6px;background:var(--faint);border:1.5px solid #d1d0cb;border-radius:4px;font-family:monospace;font-size:.7rem;font-weight:700;color:var(--ink);flex-shrink:0;box-shadow:0 1px 0 #bbb}
-    .shortcut-row{display:flex;align-items:center;gap:12px;padding:9px 0;border-bottom:1px solid var(--faint)}
-    .shortcut-row:last-child{border-bottom:none}
-    .shortcut-keys{display:flex;align-items:center;gap:4px;flex-shrink:0;min-width:110px;flex-wrap:wrap}
-    .shortcut-desc{font-size:.82rem;color:var(--ink)}
-    .shortcut-section{font-size:.66rem;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--mid);margin:16px 0 6px;padding-bottom:4px;border-bottom:1px solid var(--line)}
-
     /* HOST FULL-SCREEN LAYOUT */
     .host-full{display:flex;flex-direction:column;height:100vh;overflow:hidden}
     .host-live-nav{background:var(--white);border-bottom:1px solid var(--line);padding:0 12px;height:48px;display:flex;align-items:center;gap:8px;overflow:hidden;flex-shrink:0}
@@ -425,7 +372,7 @@
     .host-students-panel{margin:8px 12px;border:1px solid var(--line);border-radius:var(--r);overflow:hidden;flex-shrink:0;height:230px;display:flex;flex-direction:column}
     .host-students-head{padding:6px 10px;border-bottom:1px solid var(--line);background:var(--faint);display:flex;justify-content:space-between;align-items:center;flex-shrink:0}
     .host-students-inner{overflow-y:auto;flex:1}
-    .host-bottom{flex:1;padding:6px 10px 10px;display:flex;flex-direction:column;gap:5px;overflow:hidden;min-height:0}
+    .host-bottom{flex:1;padding:8px 12px 14px;display:flex;flex-direction:column;gap:6px;overflow:hidden;min-height:0}
     .host-bottom-scroll{overflow-y:auto;flex:1;display:flex;flex-direction:column;gap:6px}
 
     /* HOME / LB FULLSCREEN */
@@ -490,17 +437,10 @@ let hostTimerSeconds=0;
 let repoPath=null;
 let subjects=[];          // [{name, path, files:[], filesLoaded:false}]
 let expandedSubject=null; // which subject accordion is open in generate tab
-let folderOverlaySubject=null;   // subject name whose chapter overlay is open
-let folderOverlayDraft={};       // {fileName: {selected, count}} — pending selections inside overlay
-let folderManageSubject=null;    // subject name whose manage overlay is open
-let showNewFolderCard=false;     // whether the + new folder card input is shown
 let repoLoading=false;
 
 // Host halt confirmation menu state
 let showingHaltMenu=false;
-
-// Host settings/shortcuts overlay
-let hostSettingsOpen=false;
 
 // Upload manage state
 let manageEditMode=null;      // null | 'existing' | 'new'
@@ -524,16 +464,9 @@ let pushing=false, pushTimeout=null;
 
 // Halt flow
 let showingHalted=false, haltedCountdown=0, haltedTimer=null, haltedSnapshot=[];
-let haltedTotalQuestions=0;   // total questions asked in the session (for score/total display)
-let haltedTotalLabel='';      // denominator label for final leaderboard: 'all' or specific count string
 
 // Dismissed flow
-let showingDismissed=false, dismissedCountdown=120, dismissedTimer=null;
-
-// Answer timing (client-side — seconds taken to answer current question)
-let myLastAnswerTime=null;
-let localAnswerTimes={};   // {pid: secs} built client-side from S.answers appearance time
-let studentQCount=0;       // how many questions this client has seen pushed (for student denominator)
+let showingDismissed=false, dismissedCountdown=30, dismissedTimer=null;
 
 // Cumulative scoring is now handled server-side via gameScores in server.js
 
@@ -740,37 +673,24 @@ function connect(){
           const fl = m.payload?.finalLeaderboard;
           if(fl && fl.length) haltedSnapshot = fl;
           else { const fp = m.payload?.participants||S.participants||[]; if(fp.length) haltedSnapshot=[...fp]; }
-          // totalQuestions from server is now the declared quiz size (sent by host in shutdown message)
-          const payloadTotal = m.payload?.totalQuestions || 0;
-          const histTotal = (S.history||[]).length || (S.myHistory||[]).length;
-          haltedTotalQuestions = payloadTotal || histTotal || studentQCount || 0;
-          // Always overwrite with the server value if present (it now reflects the real quiz total)
-          if(payloadTotal>0) haltedTotalLabel=String(payloadTotal);
-          else if(!haltedTotalLabel && haltedTotalQuestions>0) haltedTotalLabel=String(haltedTotalQuestions);
-          else if(!haltedTotalLabel && studentQCount>0) haltedTotalLabel=String(studentQCount);
         }
-        showingHalted=false; showingDismissed=true; dismissedCountdown=120;
+        showingHalted=false; showingDismissed=true; dismissedCountdown=30;
         if(dismissedTimer){clearInterval(dismissedTimer);dismissedTimer=null;}
         dismissedTimer=setInterval(()=>{
           dismissedCountdown=Math.max(0,dismissedCountdown-1);
           const cd=document.getElementById('dismissed-cd-num');
-          if(cd) cd.textContent=`${Math.floor(dismissedCountdown/60)}:${String(dismissedCountdown%60).padStart(2,'0')}`;
+          if(cd) cd.textContent=dismissedCountdown;
           const ring=document.getElementById('dismissed-ring');
-          if(ring) ring.style.strokeDashoffset=(125.7*(dismissedCountdown/120)).toFixed(2);
+          if(ring) ring.style.strokeDashoffset=(125.7*(dismissedCountdown/30)).toFixed(2);
           if(dismissedCountdown<=0){clearInterval(dismissedTimer);dismissedTimer=null;doDismissHome();}
         },1000);
         render(); break;
       case 'halted':
         // Host halted — students see a "please wait" screen with snapshot LB.
+        // When host continues, new state updates will override.
+        // When host fully ends, a 'kicked' or 'ended' status arrives.
         { const haltedParts=m.payload?.participants||S.participants||[];
-          haltedSnapshot=haltedParts;
-          const payloadTotal2 = m.payload?.totalQuestions || 0;
-          const histTotal2 = (S.history||[]).length || (S.myHistory||[]).length;
-          haltedTotalQuestions = payloadTotal2 || histTotal2 || studentQCount || 0;
-          if(payloadTotal2>0) haltedTotalLabel=String(payloadTotal2);
-          else if(!haltedTotalLabel && haltedTotalQuestions>0) haltedTotalLabel=String(haltedTotalQuestions);
-          else if(!haltedTotalLabel && studentQCount>0) haltedTotalLabel=String(studentQCount);
-        }
+          haltedSnapshot=haltedParts; }
         showingHalted=true; haltedCountdown=0; // no auto-dismiss — wait for host
         render();
         break;
@@ -783,31 +703,10 @@ function connect(){
         if(ns==='idle'&&prevStatus==='revealed'){ scoreGain=inc-prevMyScore; if(scoreGain<0)scoreGain=0; }
         if(ns==='question'){
           scoreGain=0; prevMyScore=inc;
-          // Only reset per-question timing on a BRAND NEW question push (questionPushedAt changes),
-          // NOT on every state update for the same question (which would wipe the student's stored time).
-          if(m.payload.questionPushedAt !== S.questionPushedAt){
-            myLastAnswerTime=null;
-            localAnswerTimes={};
-            studentQCount++;
-            startTimerDisplay._lastStart=null; // force timer restart for new question
-          }
           // Clear push-stuck state
           pushing=false;
           if(pushTimeout){ clearTimeout(pushTimeout); pushTimeout=null; }
         }
-        // Track per-student answer times client-side as answers arrive.
-        // When a new pid appears in answers (wasn't there before), record elapsed secs with ms precision.
-        if(m.payload.questionPushedAt && m.payload.answers){
-          const prevAnswers=S.answers||{};
-          Object.entries(m.payload.answers).forEach(([pid,ans])=>{
-            if(ans!=null && !(pid in localAnswerTimes) && !(pid in prevAnswers)){
-              const ms=Date.now()-m.payload.questionPushedAt;
-              localAnswerTimes[pid]=parseFloat(Math.max(0,ms/1000).toFixed(2));
-            }
-          });
-        }
-        // For current user, prefer the precise client-side click time (already set in localAnswerTimes on click)
-        if(myPid && myLastAnswerTime!==null) localAnswerTimes[myPid]=myLastAnswerTime;
         if(ns==='idle'&&prevStatus==='idle'){ prevMyScore=inc; }
         // Save session on end
         if(ns==='ended'&&prevStatus!=='ended'&&role==='participant'&&myPid){
@@ -929,15 +828,9 @@ function updateMicDot(){ const d=document.getElementById('mic-dot'); if(!d)retur
    TIMER
 ══════════════════════════════════════ */
 function startTimerDisplay(){
-  const total=S.timerSeconds, start=S.questionPushedAt;
-  if(!total||!start||S.status!=='question'){
-    if(timerInterval){clearInterval(timerInterval);timerInterval=null;}
-    return;
-  }
-  // Don't restart interval if already running for the same question push time
-  if(timerInterval && startTimerDisplay._lastStart===start) return;
   if(timerInterval){clearInterval(timerInterval);timerInterval=null;}
-  startTimerDisplay._lastStart=start;
+  const total=S.timerSeconds, start=S.questionPushedAt;
+  if(!total||!start||S.status!=='question') return;
   function tick(){
     const remaining=Math.max(0, total-(Date.now()-start)/1000);
     const pct=(remaining/total)*100;
@@ -1060,52 +953,6 @@ async function loadSubjectFiles(subjName){
       .filter(i=>i.type==='file'&&i.name.endsWith('.txt')&&i.name!=='.gitkeep')
       .map(i=>({name:i.name,path:i.path,sha:i.sha,selected:false,count:0}));
     subj.filesLoaded=true;
-    // If folder overlay is open for this subject, seed draft with newly loaded files
-    if(folderOverlaySubject===subjName){
-      subj.files.forEach(f=>{ if(!folderOverlayDraft[f.name]) folderOverlayDraft[f.name]={selected:f.selected,count:f.count||0}; });
-      // Patch only the overlay body to avoid full-page re-render flicker
-      const body=document.querySelector('.chapter-overlay-body');
-      if(body){
-        body.innerHTML=subj.files.length
-          ?subj.files.map(f=>{
-              const d=folderOverlayDraft[f.name]||{selected:false,count:0};
-              return `<div class="chapter-row${d.selected?' sel':''}" data-ch-toggle="${esc(f.name)}">
-                <div class="ch-check">${d.selected?'<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20,6 9,17 4,12"/></svg>':''}</div>
-                <span class="ch-name">${esc(f.name.replace(/\.txt$/i,''))}</span>
-                ${d.selected?`<input class="ch-count" type="number" min="0" max="999" value="${d.count||''}" placeholder="all" data-ch-cnt="${esc(f.name)}" title="0 or blank = all questions" onclick="event.stopPropagation()"/>`:'<span style="width:44px"></span>'}
-              </div>`;
-            }).join('')
-          :'<p class="muted" style="padding:20px;text-align:center;font-size:.84rem">No .txt files in this folder.</p>';
-        // Re-attach event listeners for the newly injected rows
-        body.querySelectorAll('[data-ch-toggle]').forEach(el=>{
-          el.addEventListener('click',e=>{
-            if(e.target.tagName==='INPUT') return;
-            const fn=el.dataset.chToggle;
-            if(!folderOverlayDraft[fn]) folderOverlayDraft[fn]={selected:false,count:0};
-            const nowSel=!folderOverlayDraft[fn].selected;
-            folderOverlayDraft[fn].selected=nowSel;
-            el.classList.toggle('sel',nowSel);
-            const chk=el.querySelector('.ch-check');
-            if(chk) chk.innerHTML=nowSel?'<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20,6 9,17 4,12"/></svg>':'';
-            const existingInput=el.querySelector('.ch-count');
-            const existingSpacer=el.querySelector('span[style*="width:44px"]');
-            if(nowSel&&!existingInput){
-              if(existingSpacer) existingSpacer.remove();
-              const inp=document.createElement('input');
-              inp.className='ch-count'; inp.type='number'; inp.min='0'; inp.max='999';
-              inp.value=folderOverlayDraft[fn].count||''; inp.placeholder='all';
-              inp.dataset.chCnt=fn; inp.title='0 or blank = all questions';
-              inp.onclick=ev=>ev.stopPropagation();
-              inp.addEventListener('change',()=>{ folderOverlayDraft[fn].count=Math.max(0,parseInt(inp.value)||0); });
-              el.appendChild(inp);
-            } else if(!nowSel&&existingInput){
-              existingInput.remove();
-              const sp=document.createElement('span'); sp.style.width='44px'; el.appendChild(sp);
-            }
-          });
-        });
-      }
-    }
     render();
   }catch(e){ console.warn('Could not load files for',subjName,e.message); subj.filesLoaded=true; render(); }
 }
@@ -1325,7 +1172,6 @@ async function generateQuiz(){
       all=[...all,...shuffled];
     }
     questions=all; selIdx=0; answerKey=all[0]?.correct??-1;
-    haltedTotalLabel=String(questions.length); // true total — set after parsing so it reflects actual count
     msg.innerHTML=''; render();
   }catch(e){ msg.innerHTML=`<div class="notice n-bad mt2">${esc(e.message)}</div>`; }
 }
@@ -1491,14 +1337,12 @@ function haltedHTML(){
   const medals=['🥇','🥈','🥉'];
   const myP=sorted.find(p=>p.id===myPid);
   const myRank=sorted.findIndex(p=>p.id===myPid)+1;
-  const total=haltedTotalQuestions||0;
-  const totalStr=haltedTotalLabel||(studentQCount>0?String(studentQCount):total>0?String(total):'?');
   const rows=sorted.length
     ?sorted.map((p,i)=>`
       <div class="lb-row${p.id===myPid?' me':''}">
         <div class="score-rank">${medals[i]||('#'+(i+1))}</div>
         <div style="flex:1;font-weight:${i<3?'600':'400'}">${esc(p.name)}${p.id===myPid?' <span style="font-size:.68rem;color:var(--mid)">(you)</span>':''}</div>
-        <div class="score-pts"><span style="font-weight:700">${p.score||0}</span><span style="font-size:.7rem;color:var(--mid);font-weight:400">/${totalStr}</span></div>
+        <div class="score-pts">${p.score||0} pts</div>
       </div>`).join('')
     :`<div style="padding:20px;text-align:center;color:var(--mid)">No scores yet.</div>`;
   return `<div style="display:flex;flex-direction:column;height:calc(100vh - 54px);overflow:hidden;padding:16px 20px;max-width:520px;margin:0 auto">
@@ -1506,7 +1350,7 @@ function haltedHTML(){
       <div style="font-size:2.4rem;margin-bottom:10px;animation:blink 1.4s ease-in-out infinite">⏸</div>
       <h2 style="margin-bottom:6px">Session paused</h2>
       <p class="muted small">The host has paused the quiz.<br>Please wait patiently — they may continue<br>or start a new session shortly.</p>
-      ${myP?`<div style="margin-top:10px;display:inline-flex;align-items:center;gap:7px;padding:5px 13px;background:#e8f5ee;border:1px solid #b7dfc7;border-radius:20px;font-size:.77rem;font-weight:600;color:#166534">Score: ${myP.score||0}/${totalStr} &nbsp;·&nbsp; Rank #${myRank}</div>`:''}
+      ${myP?'<div style="margin-top:10px;display:inline-flex;align-items:center;gap:7px;padding:5px 13px;background:#e8f5ee;border:1px solid #b7dfc7;border-radius:20px;font-size:.77rem;font-weight:600;color:#166534">Score: '+myP.score+' pts &nbsp;·&nbsp; Rank #'+myRank+'</div>':''}
     </div>
     <div class="lb-panel" style="flex:1;overflow:hidden;display:flex;flex-direction:column">
       <div class="lb-head"><span style="font-size:.82rem;font-weight:600">🏆 Current Standings</span><span class="small muted">${sorted.length} student${sorted.length!==1?'s':''}</span></div>
@@ -1523,18 +1367,16 @@ function studentDismissedHTML(){
   const medals=['🥇','🥈','🥉'];
   const myP=sorted.find(p=>p.id===myPid);
   const myRank=sorted.findIndex(p=>p.id===myPid)+1;
-  const total=haltedTotalQuestions||0;
-  const totalStr=haltedTotalLabel||(studentQCount>0?String(studentQCount):total>0?String(total):'?');
   const rows=sorted.length
     ?sorted.map((p,i)=>`
       <div class="lb-row${p.id===myPid?' me':''}">
         <div class="score-rank">${medals[i]||('#'+(i+1))}</div>
         <div style="flex:1;font-weight:${i<3?'600':'400'}">${esc(p.name)}${p.id===myPid?' <span style="font-size:.68rem;color:var(--mid)">(you)</span>':''}</div>
-        <div class="score-pts"><span style="font-weight:700">${p.score||0}</span><span style="font-size:.7rem;color:var(--mid);font-weight:400">/${totalStr}</span></div>
+        <div class="score-pts">${p.score||0} pts</div>
       </div>`).join('')
-    :`<div style="padding:20px;text-align:center;color:var(--mid)">No scores yet.</div>`;
+    :`<div style="padding:20px;text-align:center;color:var(--mid)">No scores recorded.</div>`;
   const circ=125.7;
-  const offset=(circ*(dismissedCountdown/120)).toFixed(1);
+  const offset=(circ*(dismissedCountdown/30)).toFixed(1);
   return `<div style="display:flex;flex-direction:column;height:calc(100vh - 54px);overflow:hidden;padding:16px 20px;max-width:520px;margin:0 auto">
     <div style="text-align:center;padding:18px 0 12px;flex-shrink:0">
       <div style="position:relative;width:72px;height:72px;margin:0 auto 14px">
@@ -1543,17 +1385,17 @@ function studentDismissedHTML(){
           <circle id="dismissed-ring" cx="36" cy="36" r="20" fill="none" stroke="var(--bad)" stroke-width="4"
             stroke-dasharray="${circ}" stroke-dashoffset="${offset}" style="transition:stroke-dashoffset 1s linear"/>
         </svg>
-        <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:.85rem;font-weight:700;color:var(--bad);line-height:1" id="dismissed-cd-num">${Math.floor(dismissedCountdown/60)}:${String(dismissedCountdown%60).padStart(2,'0')}</div>
+        <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:1.3rem;font-weight:700;color:var(--bad)" id="dismissed-cd-num">${dismissedCountdown}</div>
       </div>
       <div style="font-size:2rem;margin-bottom:8px">🎓</div>
       <h2 style="margin-bottom:5px">Session has ended</h2>
-      <p class="muted small">The host has closed this session.<br>Going home in ${Math.floor(dismissedCountdown/60)}m ${dismissedCountdown%60}s.</p>
-      ${myP?`<div style="margin-top:10px;display:inline-flex;align-items:center;gap:7px;padding:5px 13px;background:#e8f5ee;border:1px solid #b7dfc7;border-radius:20px;font-size:.77rem;font-weight:600;color:#166534">Final: ${myP.score||0}/${totalStr} &nbsp;·&nbsp; #${myRank} of ${sorted.length}</div>`:''}
+      <p class="muted small">The host has closed this session.<br>Going home in ${dismissedCountdown} seconds.</p>
+      ${myP?'<div style="margin-top:10px;display:inline-flex;align-items:center;gap:7px;padding:5px 13px;background:#e8f5ee;border:1px solid #b7dfc7;border-radius:20px;font-size:.77rem;font-weight:600;color:#166534">Final: '+myP.score+' pts &nbsp;·&nbsp; #'+myRank+' of '+sorted.length+'</div>':''}
       <div style="margin-top:14px">
         <button class="btn btn-dark" id="btn-dismissed-home" style="gap:7px;padding:9px 22px">🏠 Go Home Now</button>
       </div>
     </div>
-    <div style="font-size:.67rem;text-align:center;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--mid);margin-bottom:6px;flex-shrink:0">🏆 Final Leaderboard</div>
+    <div style="font-size:.67rem;text-align:center;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--mid);margin-bottom:6px;flex-shrink:0">🏆 Final Leaderboard (Cumulative)</div>
     <div class="lb-panel" style="flex:1;overflow:hidden;display:flex;flex-direction:column;margin-top:0">
       <div class="lb-head"><span style="font-size:.82rem;font-weight:600">Final Standings</span><span class="small muted">${sorted.length} student${sorted.length!==1?'s':''}</span></div>
       <div style="overflow-y:auto;flex:1">${rows}</div>
@@ -1783,232 +1625,6 @@ function standingsOverlayHTML(){
 }
 
 
-function manageOverlayHTML(){
-  if(!folderManageSubject) return '';
-  // Set manageFolder to match overlay subject so existing editor logic works
-  const fName=folderManageSubject;
-
-  // File list
-  const fileRows=manageFolderFiles.length
-    ?manageFolderFiles.map(f=>`
-      <div class="mfile-row${manageFile===f.name?' editing':''}">
-        <span style="flex:1;font-size:.8rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:${manageFile===f.name?'var(--accent)':'var(--ink)'};font-weight:${manageFile===f.name?'600':'400'}">${esc(f.name)}</span>
-        <button class="btn btn-ghost btn-sm" style="padding:2px 9px;font-size:.7rem;flex-shrink:0;${manageFile===f.name?'background:#e0edff;border-color:var(--accent);color:var(--accent)':''}" data-file-edit="${esc(f.name)}">${manageFile===f.name?'✎ Editing':'Edit'}</button>
-        <button class="btn btn-sm" style="padding:2px 7px;flex-shrink:0;background:#fff1f2;border-color:#fecdd3;color:#be123c;font-size:.68rem" data-file-del="${esc(f.name)}" title="Delete">✕</button>
-      </div>`).join('')
-    :(manageFolderFiles.length===0&&manageFile===null
-      ?`<div style="padding:12px;text-align:center;color:var(--mid);font-size:.78rem;background:var(--faint);border-radius:7px">No .txt files yet — create one below</div>`
-      :'');
-
-  // Inline editor (when a file is open)
-  const editorBlock=manageEditMode?`
-    <div style="border:1.5px solid var(--ink);border-radius:9px;overflow:hidden;box-shadow:0 2px 10px rgba(0,0,0,.07);display:flex;flex-direction:column;">
-      <div style="display:flex;align-items:center;gap:6px;padding:7px 10px;background:var(--ink);color:#fff;flex-shrink:0">
-        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-        <span style="font-size:.75rem;font-weight:600;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
-          ${esc(fName)} / ${manageEditMode==='new'
-            ?`<input id="new-file-name-editor" placeholder="chapter1.txt" maxlength="60"
-                style="background:rgba(255,255,255,.18);border:none;border-bottom:1px solid rgba(255,255,255,.5);color:#fff;font-size:.75rem;font-weight:600;padding:1px 5px;outline:none;width:120px;border-radius:3px"
-                value="${esc(manageNewFileName)}"/>`
-            :`<span style="opacity:.85">${esc(manageFile||'')}</span>`}
-        </span>
-        <button id="btn-editor-fullscreen" style="background:none;border:1px solid rgba(255,255,255,.3);color:#fff;padding:2px 7px;border-radius:4px;cursor:pointer;font-size:.68rem" title="${editorFullscreen?'Exit fullscreen':'Fullscreen'}">
-          ${editorFullscreen
-            ?`<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3"/></svg>`
-            :`<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>`}
-        </button>
-        <button id="btn-close-editor" style="background:none;border:1px solid rgba(255,255,255,.3);color:#fff;padding:2px 7px;border-radius:4px;cursor:pointer;font-size:.68rem">✕</button>
-      </div>
-      <div style="padding:3px 10px;background:#fafaf9;border-bottom:1px solid var(--line);font-size:.63rem;color:var(--mid);flex-shrink:0">
-        <strong style="color:var(--ink)">Format:</strong> Question · <code style="background:#eee;padding:0 3px;border-radius:2px">(A)opt, (B)opt, (C)opt, (D)opt</code>
-      </div>
-      <textarea id="q-editor" style="width:100%;font-family:monospace;font-size:.76rem;resize:none;padding:10px 12px;border:none;outline:none;display:block;min-height:160px;box-sizing:border-box"
-        placeholder="What is photosynthesis?&#10;(A)Making food from sunlight, (B)Breathing, (C)Digestion, (D)Transpiration">${esc(editingContent)}</textarea>
-      <div style="display:flex;gap:6px;padding:6px 10px;background:#fafaf9;border-top:1px solid var(--line);align-items:center;flex-shrink:0">
-        <button class="btn btn-good btn-sm" style="gap:4px;font-size:.75rem" id="btn-save-editor">
-          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17,21 17,13 7,13 7,21"/></svg>Save to GitHub
-        </button>
-        <label class="btn btn-white btn-sm" style="cursor:pointer;gap:4px;font-size:.75rem">
-          ↑ Upload .txt<input type="file" id="file-upload-inp" accept=".txt" style="display:none"/>
-        </label>
-      </div>
-    </div>`:
-    // Fullscreen editor (separate overlay)
-    (editorFullscreen?`<div id="editor-fs-overlay" style="position:fixed;inset:0;z-index:900;background:#fff;display:flex;flex-direction:column;">
-      <div style="display:flex;align-items:center;gap:6px;padding:7px 10px;background:var(--ink);color:#fff;flex-shrink:0">
-        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-        <span style="font-size:.75rem;font-weight:600;flex:1">${esc(fName)} / ${esc(manageFile||'')}</span>
-        <button id="btn-editor-fullscreen" style="background:none;border:1px solid rgba(255,255,255,.3);color:#fff;padding:2px 7px;border-radius:4px;cursor:pointer;font-size:.68rem">⤡ Exit</button>
-        <button id="btn-close-editor" style="background:none;border:1px solid rgba(255,255,255,.3);color:#fff;padding:2px 7px;border-radius:4px;cursor:pointer;font-size:.68rem">✕</button>
-      </div>
-      <textarea id="q-editor" style="flex:1;width:100%;font-family:monospace;font-size:.8rem;resize:none;padding:12px 14px;border:none;outline:none;display:block;box-sizing:border-box">${esc(editingContent)}</textarea>
-      <div style="display:flex;gap:6px;padding:8px 10px;background:#fafaf9;border-top:1px solid var(--line);align-items:center;flex-shrink:0">
-        <button class="btn btn-good btn-sm" id="btn-save-editor">Save to GitHub</button>
-      </div>
-    </div>`:'');
-
-  return `<div class="manage-overlay-backdrop" id="manage-overlay-backdrop">
-    <div class="manage-overlay-panel">
-      <div class="manage-overlay-head">
-        <span style="font-size:1.2rem">📁</span>
-        <div style="flex:1;min-width:0">
-          <div style="font-size:.9rem;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(fName)}</div>
-          <div style="font-size:.68rem;color:var(--mid)">${manageFolderFiles.length} file${manageFolderFiles.length!==1?'s':''}</div>
-        </div>
-        <button class="btn btn-ghost btn-sm" id="btn-manage-close" style="font-size:.75rem;flex-shrink:0">✕ Close</button>
-      </div>
-      <div class="manage-overlay-body">
-        ${fileRows}
-        ${editorBlock}
-        ${!manageEditMode?`
-        <div style="display:flex;gap:5px;margin-top:2px">
-          <input class="form-input" id="new-file-name" placeholder="chapter.txt" maxlength="60" style="flex:1;font-size:.76rem;padding:5px 8px"/>
-          <button class="btn btn-dark btn-sm" id="btn-create-file" style="font-size:.73rem;white-space:nowrap">+ New</button>
-          <label class="btn btn-white btn-sm" style="cursor:pointer;font-size:.73rem;white-space:nowrap">
-            ↑ Upload<input type="file" id="file-upload-inp" accept=".txt" style="display:none"/>
-          </label>
-        </div>`:''}
-        <div id="upload-msg" style="font-size:.75rem">${uploadMsg}</div>
-      </div>
-      <div style="padding:8px 14px 22px;border-top:1px solid var(--line);flex-shrink:0">
-        <button class="btn btn-sm btn-full" style="background:#fff1f2;color:#be123c;border-color:#fecdd3;font-size:.73rem;justify-content:center" id="btn-delete-folder">✕ Delete folder &amp; all files</button>
-      </div>
-    </div>
-    ${editorFullscreen?editorBlock:''}
-  </div>`;
-}
-
-function hostSettingsOverlayHTML(){
-  if(!hostSettingsOpen) return '';
-  return `<div class="host-settings-overlay" id="host-settings-overlay" role="dialog" aria-modal="true" aria-label="Keyboard shortcuts and settings">
-    <div class="host-settings-panel">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">
-        <div>
-          <div style="font-weight:700;font-size:1rem">⌨️ Keyboard Shortcuts</div>
-          <div class="muted small mt1">Navigate the host panel without a mouse</div>
-        </div>
-        <button class="btn btn-ghost btn-sm" id="btn-settings-close" style="flex-shrink:0">✕ Close</button>
-      </div>
-
-      <div class="shortcut-section">Quiz Controls</div>
-      <div class="shortcut-row">
-        <div class="shortcut-keys"><kbd class="kbd">←</kbd><kbd class="kbd">→</kbd></div>
-        <div class="shortcut-desc">Previous / next question</div>
-      </div>
-      <div class="shortcut-row">
-        <div class="shortcut-keys"><kbd class="kbd">P</kbd></div>
-        <div class="shortcut-desc">Push current question to students</div>
-      </div>
-      <div class="shortcut-row">
-        <div class="shortcut-keys"><kbd class="kbd">R</kbd></div>
-        <div class="shortcut-desc">Reveal the correct answer</div>
-      </div>
-      <div class="shortcut-row">
-        <div class="shortcut-keys"><kbd class="kbd">N</kbd></div>
-        <div class="shortcut-desc">Advance to next question (after reveal)</div>
-      </div>
-      <div class="shortcut-row">
-        <div class="shortcut-keys"><kbd class="kbd">1</kbd>–<kbd class="kbd">4</kbd></div>
-        <div class="shortcut-desc">Set answer key to option A – D</div>
-      </div>
-
-      <div class="shortcut-section">Tab Navigation</div>
-      <div class="shortcut-row">
-        <div class="shortcut-keys"><kbd class="kbd">Tab</kbd></div>
-        <div class="shortcut-desc">Move focus to next control</div>
-      </div>
-      <div class="shortcut-row">
-        <div class="shortcut-keys"><kbd class="kbd">⇧ Shift</kbd><kbd class="kbd">Tab</kbd></div>
-        <div class="shortcut-desc">Move focus to previous control</div>
-      </div>
-      <div class="shortcut-row">
-        <div class="shortcut-keys"><kbd class="kbd">Enter</kbd></div>
-        <div class="shortcut-desc">Activate focused button or item</div>
-      </div>
-      <div class="shortcut-row">
-        <div class="shortcut-keys"><kbd class="kbd">Space</kbd></div>
-        <div class="shortcut-desc">Toggle checkbox or activate button</div>
-      </div>
-      <div class="shortcut-row">
-        <div class="shortcut-keys"><kbd class="kbd">Esc</kbd></div>
-        <div class="shortcut-desc">Close overlays and panels</div>
-      </div>
-
-      <div class="shortcut-section">Generate Tab — Subject Picker</div>
-      <div class="shortcut-row">
-        <div class="shortcut-keys"><kbd class="kbd">Tab</kbd></div>
-        <div class="shortcut-desc">Focus each subject folder</div>
-      </div>
-      <div class="shortcut-row">
-        <div class="shortcut-keys"><kbd class="kbd">Enter</kbd> / <kbd class="kbd">Space</kbd></div>
-        <div class="shortcut-desc">Expand or collapse subject folder</div>
-      </div>
-      <div class="shortcut-row">
-        <div class="shortcut-keys"><kbd class="kbd">↑</kbd> / <kbd class="kbd">↓</kbd></div>
-        <div class="shortcut-desc">Move between subject folders</div>
-      </div>
-
-      <div class="shortcut-section">Answer Key Grid</div>
-      <div class="shortcut-row">
-        <div class="shortcut-keys"><kbd class="kbd">Tab</kbd></div>
-        <div class="shortcut-desc">Focus each answer option</div>
-      </div>
-      <div class="shortcut-row">
-        <div class="shortcut-keys"><kbd class="kbd">←</kbd><kbd class="kbd">→</kbd><kbd class="kbd">↑</kbd><kbd class="kbd">↓</kbd></div>
-        <div class="shortcut-desc">Move between options A–D</div>
-      </div>
-      <div class="shortcut-row">
-        <div class="shortcut-keys"><kbd class="kbd">Enter</kbd> / <kbd class="kbd">Space</kbd></div>
-        <div class="shortcut-desc">Select this option as the answer key</div>
-      </div>
-    </div>
-  </div>`;
-}
-
-/* ══════════════════════════════════════
-   HOST KEYBOARD SHORTCUTS (global handler — added/removed by attach)
-══════════════════════════════════════ */
-function hostKeyDown(e){
-  if(!hostAuthed||role!=='host') return;
-  // Close settings with Escape
-  if(hostSettingsOpen&&e.key==='Escape'){ hostSettingsOpen=false; render(); return; }
-  if(folderManageSubject&&e.key==='Escape'){ folderManageSubject=null; manageFolder=null; manageEditMode=null; manageFile=null; manageFolderFiles=[]; editingContent=''; editingSha=null; uploadMsg=''; editorFullscreen=false; render(); return; }
-  if(folderOverlaySubject&&e.key==='Escape'){ folderOverlaySubject=null; folderOverlayDraft={}; render(); return; }
-  // Close halt/sched overlays with Escape
-  if((showingHaltMenu||sidebarSchedOpen)&&e.key==='Escape'){
-    showingHaltMenu=false; sidebarSchedOpen=false; render(); return;
-  }
-  // Don't fire shortcuts when typing in an input/textarea/select
-  const tag=document.activeElement?.tagName;
-  if(tag==='INPUT'||tag==='TEXTAREA'||tag==='SELECT') return;
-  // Don't fire when inside an overlay other than the main panel
-  if(hostSettingsOpen||showingHaltMenu||sidebarSchedOpen) return;
-  switch(e.key){
-    case 'ArrowLeft':
-      e.preventDefault();
-      document.getElementById('btn-q-prev')?.click(); break;
-    case 'ArrowRight':
-      e.preventDefault();
-      document.getElementById('btn-q-next')?.click(); break;
-    case 'p': case 'P':
-      e.preventDefault();
-      document.getElementById('btn-push')?.click(); break;
-    case 'r': case 'R':
-      e.preventDefault();
-      document.getElementById('btn-reveal')?.click(); break;
-    case 'n': case 'N':
-      e.preventDefault();
-      document.getElementById('btn-next')?.click(); break;
-    case '1': case '2': case '3': case '4':{
-      e.preventDefault();
-      const idx=parseInt(e.key)-1;
-      const cards=[...document.querySelectorAll('.key-card[data-key]')];
-      if(cards[idx]) cards[idx].click();
-      break;
-    }
-  }
-}
-
 function hostHTML(){
   if(S.status==='ended') return hostEndedHTML();
 
@@ -2037,9 +1653,6 @@ function hostHTML(){
       </div>
       <button class="btn btn-ghost btn-sm" id="btn-sched-nav" style="flex-shrink:0;padding:4px 8px;gap:4px;font-size:.75rem">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>Sched
-      </button>
-      <button class="btn btn-ghost btn-sm" id="btn-host-settings" title="Keyboard shortcuts &amp; settings" aria-label="Open keyboard shortcuts" style="flex-shrink:0;padding:4px 9px;font-size:.75rem">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
       </button>
     </div>`;
 
@@ -2079,15 +1692,11 @@ function hostHTML(){
     ?sorted.map((p,i)=>{
         const ans=S.answers?.[p.id];
         const ansStr=ans!==undefined&&ans!==null?'ABCD'[ans]:'—';
-        const ansTime = S.answerTimes?.[p.id] ?? localAnswerTimes[p.id];
-        const isCorrect=ans!==undefined&&ans!==null&&ans===S.correct;
-        const isWrong=ans!==undefined&&ans!==null&&ans!==S.correct;
         return `<div style="display:flex;align-items:center;gap:8px;padding:7px 10px;border-bottom:1px solid var(--line);font-size:.83rem">
           <div style="min-width:22px;text-align:center;font-size:.72rem;color:var(--mid)">${medals[i]||('#'+(i+1))}</div>
           <div class="j-av" style="flex-shrink:0">${initials(p.name)}</div>
           <div style="flex:1;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">${esc(p.name)}</div>
-          <div style="font-size:.75rem;font-weight:600;min-width:18px;text-align:center;color:${isCorrect?'#16a34a':isWrong?'var(--bad)':'var(--mid)'}">${ansStr}</div>
-          ${ansTime!=null?`<div style="font-size:.7rem;color:var(--mid);min-width:28px;text-align:right">${ansTime}s</div>`:'<div style="min-width:28px"></div>'}
+          <div style="font-size:.75rem;color:var(--mid);min-width:18px;text-align:center">${ansStr}</div>
           <div style="font-weight:600;min-width:44px;text-align:right">${p.score||0} <span style="font-size:.68rem;color:var(--mid)">pts</span></div>
         </div>`;
       }).join('')
@@ -2111,97 +1720,173 @@ function hostHTML(){
   // No questions loaded → show upload/generate panel
   if(!questions.length){
     const totalSelectedFiles=subjects.reduce((n,s)=>n+s.files.filter(f=>f.selected).length,0);
-    // Chapter overlay HTML (rendered on top of everything when a folder is tapped)
-    const chapterOverlayHTML=(()=>{
-      if(!folderOverlaySubject) return '';
-      const subj=subjects.find(s=>s.name===folderOverlaySubject);
-      if(!subj) return '';
-      const draft=folderOverlayDraft;
-      const selCount=Object.values(draft).filter(d=>d.selected).length;
-      const rows=subj.filesLoaded
-        ?(subj.files.length
-          ?subj.files.map(f=>{
-              const d=draft[f.name]||{selected:false,count:0};
-              return `<div class="chapter-row${d.selected?' sel':''}" data-ch-toggle="${esc(f.name)}">
-                <div class="ch-check">${d.selected?'<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20,6 9,17 4,12"/></svg>':''}</div>
-                <span class="ch-name">${esc(f.name.replace(/\.txt$/i,''))}</span>
-                ${d.selected?`<input class="ch-count" type="number" min="0" max="999" value="${d.count||''}" placeholder="all" data-ch-cnt="${esc(f.name)}" title="0 or blank = all questions" onclick="event.stopPropagation()"/>`:
-                  '<span style="width:44px"></span>'}
-              </div>`;
-            }).join('')
-          :'<p class="muted" style="padding:20px;text-align:center;font-size:.84rem">No .txt files in this folder.</p>')
-        :'<div style="padding:32px;text-align:center"><div class="spinner" style="margin:0 auto 10px"></div><p class="muted small">Loading chapters…</p></div>';
-      return `<div class="chapter-overlay-backdrop" id="ch-overlay-backdrop">
-        <div class="chapter-overlay-panel">
-          <div class="chapter-overlay-head">
-            <div class="chapter-overlay-title">
-              <span style="font-size:1.3rem">📁</span>
-              <span>${esc(folderOverlaySubject)}</span>
-
-            </div>
-            <div style="display:flex;gap:6px;flex-shrink:0">
-              <button class="btn btn-ghost btn-sm" id="btn-ch-clear" style="font-size:.72rem;color:var(--mid)">✕ Clear</button>
-              <button class="btn btn-ghost btn-sm" id="btn-ch-cancel" style="font-size:.76rem">Cancel</button>
-              <button class="btn btn-accent btn-sm" id="btn-ch-save" style="font-size:.76rem;font-weight:600">Save ✓</button>
-            </div>
-          </div>
-          <div class="chapter-overlay-body">${rows}</div>
-        </div>
-      </div>`;
-    })();
-
     const generatePanel=`
-      ${chapterOverlayHTML}
+      <p class="muted small mb2">Tap a subject to expand it, select chapters, then generate.</p>
       ${subjects.length?`
-        <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">
-          <button class="btn btn-ghost btn-sm" id="btn-browse" style="padding:4px 9px;font-size:.72rem">${repoLoading?'⏳ Loading':'↻ Refresh'}</button>
-          <div style="display:flex;align-items:center;gap:5px;margin-left:auto">
-            <span style="font-size:.72rem;color:var(--mid)">⏱</span>
-            <input type="number" min="0" max="300" value="${hostTimerSeconds}" id="timer-sec-input" class="q-count-input" style="width:46px;font-size:.75rem;padding:3px 6px"/>
-            <span style="font-size:.72rem;color:var(--mid)">s</span>
-          </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+          <button class="btn btn-white btn-sm" id="btn-browse">${repoLoading?'⏳ Loading…':'↻ Refresh'}</button>
+          <span class="muted small">${totalSelectedFiles?totalSelectedFiles+' file'+(totalSelectedFiles>1?'s':'')+' selected':'tap subjects below'}</span>
         </div>
-        <button class="btn btn-accent btn-sm btn-full" id="btn-gen" style="font-size:.8rem;margin-bottom:7px" ${subjects.some(s=>s.files.some(f=>f.selected))?'':'disabled'}>Generate quiz →</button>
-        <div class="folder-grid">
+        <div class="timer-input-row" style="margin-bottom:8px">
+          <span class="muted small" style="flex:1">⏱ Timer per question</span>
+          <input type="number" min="0" max="300" value="${hostTimerSeconds}" id="timer-sec-input" class="q-count-input" style="width:70px"/>
+          <span class="muted small">sec</span>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:5px;margin-bottom:8px">
           ${subjects.map(s=>{
+            const isExp=(expandedSubject===s.name);
             const selCount=s.files.filter(f=>f.selected).length;
-            return `<div class="folder-card${selCount?' has-sel':''}" data-folder-name="${esc(s.name)}" style="position:relative" tabindex="0" role="button" aria-label="${esc(s.name)}">
-              ${selCount?`<div class="fc-badge">${selCount}</div>`:''}
-              <div class="fc-icon">${selCount?'📂':'📁'}</div>
-              <div class="fc-name">${esc(s.name)}</div>
+            return `<div style="border:1.5px solid ${selCount>0?'var(--ink)':'var(--line)'};border-radius:var(--r);overflow:hidden;background:var(--white)">
+              <div data-subj-expand="${esc(s.name)}" style="display:flex;align-items:center;gap:8px;padding:9px 12px;cursor:pointer;user-select:none;-webkit-user-select:none;${selCount>0?'background:#f0fdf4':''}">
+                <span style="flex:1;font-size:.84rem;font-weight:600">${esc(s.name)}</span>
+                ${selCount>0?`<span class="tag tag-green">${selCount} file${selCount>1?'s':''}</span>`:''}
+                ${isExp&&!s.filesLoaded?`<span class="muted small" style="font-size:.7rem">loading…</span>`:''}
+                <span style="font-size:.68rem;color:var(--mid);transition:transform .15s;display:inline-block;${isExp?'transform:rotate(180deg)':''}">▼</span>
+              </div>
+              ${isExp?`<div style="border-top:1px solid var(--line);background:var(--faint);padding:7px 10px;display:flex;flex-direction:column;gap:4px">
+                ${s.filesLoaded&&s.files.length?s.files.map(f=>`
+                  <div style="display:flex;align-items:center;gap:8px;padding:6px 8px;background:var(--white);border:1.5px solid ${f.selected?'var(--accent)':'var(--line)'};border-radius:6px;${f.selected?'background:#eff6ff':''}">
+                    <input type="checkbox" ${f.selected?'checked':''} data-file-check="${esc(s.name)}||${esc(f.name)}" style="flex-shrink:0;cursor:pointer;width:15px;height:15px;accent-color:var(--accent)"/>
+                    <span style="flex:1;font-size:.79rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;${f.selected?'font-weight:600':''}" title="${esc(f.name)}">${esc(f.name.replace(/\.txt$/i,''))}</span>
+                    <input type="number" min="0" max="999" value="${f.count||''}" placeholder="all"
+                      data-file-cnt="${esc(s.name)}||${esc(f.name)}"
+                      class="q-count-input" style="width:52px;font-size:.74rem;${f.selected?'':'opacity:.35'}"
+                      title="Leave 0 / blank for all questions"/>
+                    <span class="muted" style="font-size:.68rem">q's</span>
+                  </div>`).join('')
+                  :s.filesLoaded?`<p class="muted small" style="padding:4px 0;text-align:center">No .txt files in this folder.</p>`
+                  :`<p class="muted small" style="padding:4px 0;text-align:center">Loading…</p>`}
+              </div>`:''}
             </div>`;
           }).join('')}
-          <div class="folder-card-add${showNewFolderCard?' active':''}" id="btn-new-folder-card" tabindex="0" role="button" aria-label="Create new folder">
-            ${showNewFolderCard
-              ?`<input id="new-folder-name" placeholder="Folder name" maxlength="40" autofocus
-                  style="width:100%;font-size:.68rem;padding:3px 5px;border:1px solid var(--accent);border-radius:5px;outline:none;text-align:center"
-                  onclick="event.stopPropagation()"/>`
-              :`<div style="font-size:1.1rem;color:var(--mid)">＋</div>
-                <div style="font-size:.62rem;font-weight:600;color:var(--mid)">New folder</div>`}
-          </div>
         </div>
-        ${showNewFolderCard?`<div style="display:flex;gap:5px;margin-top:-4px;margin-bottom:6px">
-          <button class="btn btn-accent btn-sm" id="btn-create-folder" style="flex:1;font-size:.74rem">Create</button>
-          <button class="btn btn-ghost btn-sm" id="btn-cancel-new-folder" style="font-size:.74rem">Cancel</button>
-        </div>`:''}
         <div id="gen-msg"></div>
+        <button class="btn btn-accent btn-full" id="btn-gen" ${totalSelectedFiles?'':'disabled'}>Generate quiz →</button>
       `:`
         <div id="repo-msg"></div>
-        <button class="btn btn-dark btn-sm" id="btn-browse" style="margin-top:6px;width:100%">${repoLoading?'⏳ Loading…':'Load subjects from GitHub →'}</button>
+        <button class="btn btn-dark btn-sm" id="btn-browse" style="margin-top:8px">${repoLoading?'⏳ Loading…':'Load subjects from GitHub →'}</button>
       `}`;
+
+    const folderOptions=uploadSubjects.map(f=>`<option value="${esc(f.name)}"${manageFolder===f.name?' selected':''}>${esc(f.name)}</option>`).join('');
+
+    // File list for current folder
+    const fileListHTML=manageFolder?(
+      manageFolderFiles.length
+        ?`<div style="margin-bottom:10px">
+            <div style="font-size:.7rem;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--mid);margin-bottom:5px">Files in ${esc(manageFolder)}</div>
+            <div style="display:flex;flex-direction:column;gap:3px">
+              ${manageFolderFiles.map(f=>`
+                <div style="display:flex;align-items:center;gap:7px;padding:7px 10px;background:${manageFile===f.name?'#f0f7ff':'var(--white)'};border:1.5px solid ${manageFile===f.name?'var(--accent)':'var(--line)'};border-radius:8px">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="${manageFile===f.name?'var(--accent)':'var(--mid)'}" stroke-width="2" style="flex-shrink:0"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/></svg>
+                  <span style="flex:1;font-size:.82rem;font-weight:${manageFile===f.name?'600':'400'};overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:${manageFile===f.name?'var(--accent)':'var(--ink)'}">${esc(f.name)}</span>
+                  <button class="btn btn-ghost btn-sm" style="padding:3px 10px;font-size:.72rem;flex-shrink:0;${manageFile===f.name?'background:#e0edff;border-color:var(--accent);color:var(--accent)':''}" data-file-edit="${esc(f.name)}">${manageFile===f.name?'Editing':'Edit'}</button>
+                  <button class="btn btn-sm" style="padding:3px 7px;flex-shrink:0;background:#fff1f2;border-color:#fecdd3;color:#be123c" data-file-del="${esc(f.name)}" title="Delete this file">
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" style="pointer-events:none"><polyline points="3,6 5,6 21,6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>
+                  </button>
+                </div>`).join('')}
+            </div>
+          </div>`
+        :`<div style="padding:10px 0;text-align:center;color:var(--mid);font-size:.82rem;background:var(--faint);border-radius:8px;margin-bottom:10px">No .txt files yet in this folder</div>`
+    ):'';
+
+    // Full-screen editor overlay or inline editor
+    const editorInner=`
+      <div style="display:flex;align-items:center;gap:8px;padding:10px 12px;background:var(--ink);color:#fff;flex-shrink:0">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+        <span style="font-size:.78rem;font-weight:600;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+          ${esc(manageFolder)} /
+          ${manageEditMode==='new'
+            ?`<input id="new-file-name-editor" placeholder="chapter1.txt" maxlength="60"
+                style="background:rgba(255,255,255,.18);border:none;border-bottom:1px solid rgba(255,255,255,.5);color:#fff;font-size:.78rem;font-weight:600;padding:1px 6px;outline:none;width:130px;border-radius:3px;margin-left:2px"
+                value="${esc(manageNewFileName)}"/>`
+            :`<span style="opacity:.85">${esc(manageFile||'')}</span>`}
+        </span>
+        <button id="btn-editor-fullscreen" style="background:none;border:1px solid rgba(255,255,255,.3);color:#fff;padding:2px 8px;border-radius:5px;cursor:pointer;font-size:.72rem" title="${editorFullscreen?'Exit fullscreen':'Fullscreen'}">
+          ${editorFullscreen
+            ?`<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3"/></svg>`
+            :`<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>`}
+        </button>
+        <button id="btn-close-editor" style="background:none;border:1px solid rgba(255,255,255,.3);color:#fff;padding:2px 8px;border-radius:5px;cursor:pointer;font-size:.72rem">✕</button>
+      </div>
+      <div style="padding:5px 10px;background:#fafaf9;border-bottom:1px solid var(--line);font-size:.69rem;color:var(--mid);flex-shrink:0">
+        <strong style="color:var(--ink)">Format:</strong>
+        Question text on one line, options on next:
+        <code style="background:#eee;padding:1px 4px;border-radius:3px">(A)opt, (B)opt, (C)opt, (D)opt</code>
+      </div>
+      <textarea id="q-editor" style="flex:1;width:100%;font-family:monospace;font-size:.78rem;resize:none;padding:12px 14px;border:none;outline:none;display:block;box-sizing:border-box;background:#fff;min-height:${editorFullscreen?'0':'260px'}"
+        placeholder="What is photosynthesis?&#10;(A)Making food from sunlight, (B)Breathing, (C)Digestion, (D)Transpiration&#10;&#10;Capital of India?&#10;(A)Mumbai, (B)Delhi, (C)Kolkata, (D)Chennai">${esc(editingContent)}</textarea>
+      <div style="display:flex;gap:8px;padding:9px 10px;background:#fafaf9;border-top:1px solid var(--line);align-items:center;flex-wrap:wrap;flex-shrink:0">
+        <button class="btn btn-good btn-sm" style="gap:5px" id="btn-save-editor">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17,21 17,13 7,13 7,21"/><polyline points="7,3 7,8 15,8"/></svg>
+          Save to GitHub
+        </button>
+        <label class="btn btn-white btn-sm" style="cursor:pointer;gap:5px">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17,8 12,3 7,8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          Upload .txt
+          <input type="file" id="file-upload-inp" accept=".txt" style="display:none"/>
+        </label>
+      </div>`;
+
+    const editorHTML=manageEditMode?(editorFullscreen
+      // Fullscreen overlay
+      ?`<div id="editor-fs-overlay" style="position:fixed;inset:0;z-index:800;background:#fff;display:flex;flex-direction:column;">${editorInner}</div>`
+      // Inline with min-height
+      :`<div style="border:1.5px solid var(--ink);border-radius:10px;overflow:hidden;margin-bottom:10px;box-shadow:0 2px 10px rgba(0,0,0,.08);display:flex;flex-direction:column;">${editorInner}</div>`
+    ):'';
+
+    const managePanel=`
+      <div style="display:flex;gap:6px;align-items:center;margin-bottom:10px">
+        <select class="form-input" id="manage-folder-sel" style="flex:1;font-size:.82rem;padding:7px 8px">
+          <option value="">— select subject folder —</option>${folderOptions}
+        </select>
+        <button class="btn btn-ghost btn-sm" id="btn-folder-refresh" title="Refresh">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><polyline points="1,4 1,10 7,10"/><path d="M3.51 15a9 9 0 1 0 .49-4.95"/></svg>
+        </button>
+      </div>
+      ${manageFolder?`
+        ${fileListHTML}
+        ${editorHTML}
+        ${!manageEditMode?`
+          <div style="border-top:1px solid var(--line);padding-top:9px;display:flex;flex-direction:column;gap:6px">
+            <div style="font-size:.7rem;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--mid);margin-bottom:2px">Add chapter file</div>
+            <div style="display:flex;gap:6px">
+              <input class="form-input" id="new-file-name" placeholder="chapter2.txt" maxlength="60" style="flex:1;font-size:.82rem;padding:7px 8px"/>
+              <button class="btn btn-dark btn-sm" id="btn-create-file" style="gap:4px;white-space:nowrap">+ New file</button>
+            </div>
+            <label class="btn btn-white btn-sm btn-full" style="cursor:pointer;justify-content:center;gap:6px">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17,8 12,3 7,8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+              Upload .txt file from device
+              <input type="file" id="file-upload-inp" accept=".txt" style="display:none"/>
+            </label>
+            <button class="btn btn-sm btn-full" style="background:#fff1f2;color:#be123c;border-color:#fecdd3;justify-content:center;gap:5px;margin-top:2px" id="btn-delete-folder">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3,6 5,6 21,6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+              Delete folder &amp; all files
+            </button>
+          </div>`:''}`
+        :`<p class="muted small">Select a subject folder above to manage its chapter files.</p>`}
+      <div style="border-top:1px solid var(--line);padding-top:10px;margin-top:10px">
+        <div style="font-size:.7rem;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--mid);margin-bottom:6px">New subject folder</div>
+        <div style="display:flex;gap:6px">
+          <input class="form-input" id="new-folder-name" placeholder="e.g. Science" maxlength="40" style="flex:1;font-size:.82rem;padding:7px 8px"/>
+          <button class="btn btn-accent btn-sm" id="btn-create-folder" style="white-space:nowrap">+ Create</button>
+        </div>
+      </div>
+      <div id="upload-msg">${uploadMsg}</div>`;
 
     return `<div class="host-full" style="position:relative">
       ${liveNav}
       ${ctrlBar}
       ${studentsPanel}
       <div class="host-bottom">
-        <div class="host-bottom-scroll" style="padding-top:5px">${generatePanel}</div>
+        <div style="display:flex;gap:0;border:1px solid var(--line);border-radius:var(--r);overflow:hidden;flex-shrink:0">
+          <button class="btn${uploadTab==='generate'?' btn-dark':' btn-ghost'}" style="flex:1;border-radius:0;border:none" id="tab-generate">📋 Generate</button>
+          <button class="btn${uploadTab==='manage'?' btn-dark':' btn-ghost'}" style="flex:1;border-radius:0;border:none;border-left:1px solid var(--line)" id="tab-manage">📂 Upload</button>
+        </div>
+        <div class="host-bottom-scroll">${uploadTab==='generate'?generatePanel:managePanel}</div>
       </div>
-      ${manageOverlayHTML()}
       ${schedOverlayHTML()}
       ${haltMenuOverlayHTML()}
       ${standingsOverlayHTML()}
-      ${hostSettingsOverlayHTML()}
     </div>`;
   }
 
@@ -2255,7 +1940,7 @@ function hostHTML(){
   const keyGrid=(!isLive&&q)?`
     <div class="key-grid" style="flex-shrink:0">
       ${q.options.map((o,i)=>`
-        <div class="key-card${answerKey===i?' selected':''}" data-key="${i}" tabindex="0" role="button" aria-pressed="${answerKey===i}" aria-label="Option ${'ABCD'[i]}">
+        <div class="key-card${answerKey===i?' selected':''}" data-key="${i}">
           <div class="kl">${'ABCD'[i]}</div><div class="kt${urduCls(q)}">${renderMath(o)}</div>
         </div>`).join('')}
     </div>`:'';
@@ -2301,7 +1986,6 @@ function hostHTML(){
     ${schedOverlayHTML()}
     ${haltMenuOverlayHTML()}
     ${standingsOverlayHTML()}
-    ${hostSettingsOverlayHTML()}
   </div>`;
 }
 
@@ -2313,24 +1997,22 @@ function hostEndedHTML(){
   const history=S.history||[], parts=S.participants||[];
   const sorted=[...parts].sort((a,b)=>(b.score||0)-(a.score||0));
   const partMap={}; parts.forEach(p=>partMap[p.id]=p);
-  const totalQs=history.length;
-  const totalLabel=questions.length>0?String(questions.length):(haltedTotalLabel||(totalQs>0?String(totalQs):'?'));
   const table=parts.length&&history.length?`<div class="itbl-wrap"><table class="itbl">
     <thead><tr><th>Student</th>${history.map((_,i)=>`<th>Q${i+1}</th>`).join('')}<th>Score</th></tr></thead>
     <tbody>${sorted.map(p=>`<tr data-pid="${p.id}"><td><strong>${esc(p.name)}</strong></td>
       ${history.map(h=>{const ans=h.answers[p.id]??null;if(ans===null)return'<td class="c-nil">—</td>';return`<td class="${ans===h.correct?'c-ok':'c-bad'}">${'ABCD'[ans]}${ans===h.correct?' ✓':' ✗'}</td>`;}).join('')}
-      <td><strong>${p.score||0}</strong><span style="font-size:.7rem;color:var(--mid)">/${totalLabel}</span></td></tr>`).join('')}</tbody>
+      <td><strong>${p.score||0}</strong></td></tr>`).join('')}</tbody>
   </table></div>`:'<div class="notice n-neutral">No data recorded.</div>';
   let detail='';
   if(inspectPid&&partMap[inspectPid]){
     const p=partMap[inspectPid];
-    detail=`<div class="detail-wrap"><div class="detail-head"><span><strong>${esc(p.name)}</strong> — ${p.score||0}/${totalLabel}</span><button class="btn btn-ghost btn-sm" id="btn-close-inspect">Close</button></div>
+    detail=`<div class="detail-wrap"><div class="detail-head"><span><strong>${esc(p.name)}</strong> — ${p.score||0} pts</span><button class="btn btn-ghost btn-sm" id="btn-close-inspect">Close</button></div>
       ${history.map((h,i)=>{const ans=h.answers[p.id]??null;return`<div class="detail-row"><div class="detail-q">Q${i+1}: ${renderMath(h.question.text)}</div>
         <div class="ans-chips">${h.question.options.map((o,oi)=>{let cls='ac-none';if(oi===h.correct)cls='ac-good';if(ans===oi&&oi!==h.correct)cls='ac-bad';const mark=oi===ans?(oi===h.correct?' ✓':' ✗'):'';
           return`<span class="ans-chip ${cls}" style="${oi===ans||oi===h.correct?'font-weight:600':''}">${'ABCD'[oi]}) ${renderMath(o)}${mark}</span>`;}).join('')}${ans===null?'<span class="ans-chip ac-none">No answer</span>':''}</div></div>`;}).join('')}
     </div>`;
   }
-  return `<div style="position:relative;padding:16px;width:100%;box-sizing:border-box">
+  return `<div class="wide" style="padding:16px">
     <div class="results-header">
       <h2>Results</h2>
       <div class="results-btns">
@@ -2342,9 +2024,7 @@ function hostEndedHTML(){
     <div class="notice n-neutral mb3" style="font-size:.79rem">
       <strong>Continue</strong> — return to waiting room &nbsp;·&nbsp; <strong>Halt</strong> — send students home
     </div>
-    <p class="muted small mb2">Tap any row to inspect answers.</p>${table}${detail}
-    ${haltMenuOverlayHTML()}
-  </div>`;
+    <p class="muted small mb2">Tap any row to inspect answers.</p>${table}${detail}</div>`;
 }
 
 /* ══════════════════════════════════════
@@ -2408,26 +2088,12 @@ function waitHTML(){
   const waitMsg=history.length?'Wait for next question…':'Waiting for host to start…';
   const lbHTML=history.length?`<div class="lb-panel">
     <div class="lb-head"><span style="font-size:.82rem;font-weight:600">🏆 Leaderboard</span><span class="small muted">${parts.length} students</span></div>
-    ${[...parts].sort((a,b)=>(b.score||0)-(a.score||0)).map((p,i)=>{
-      const isMe=p.id===myPid;
-      // Server-broadcast answerTimes wins for any student; own precise time is always available via localAnswerTimes
-      const ansTime = S.answerTimes?.[p.id] ?? localAnswerTimes[p.id] ?? null;
-      const ansTimeStr = ansTime!==null ? `${ansTime}s` : (isMe ? '—' : '');
-      // Score colour: green = gained points, red = answered wrong
-      const scoreColor=isMe?(scoreGain>0?'#16a34a':scoreGain===0&&myLastAnswerTime!==null?'var(--bad)':'inherit'):'inherit';
-      // Gain badge for self only
-      const gainBadge=isMe&&myLastAnswerTime!==null
-        ?(scoreGain>0
-          ?`<span style="font-size:.68rem;font-weight:700;color:#16a34a;background:#dcfce7;padding:1px 5px;border-radius:8px;margin-right:3px">+${scoreGain}</span>`
-          :`<span style="font-size:.68rem;font-weight:700;color:#be123c;background:#fee2e2;padding:1px 5px;border-radius:8px;margin-right:3px">✗</span>`)
-        :'';
-      return `<div class="lb-row${isMe?' me':''}">
+    ${[...parts].sort((a,b)=>(b.score||0)-(a.score||0)).map((p,i)=>`
+      <div class="lb-row${p.id===myPid?' me':''}">
         <div class="score-rank">${['🥇','🥈','🥉'][i]||i+1}</div>
-        <div style="flex:1">${esc(p.name)}${isMe?' <span style="font-size:.7rem;color:var(--mid)">← you</span>':''}</div>
-        <span style="font-size:.72rem;color:var(--mid);min-width:42px;text-align:right;margin-right:5px">${ansTimeStr}</span>
-        ${gainBadge}<div class="score-pts" style="color:${scoreColor}">${p.score||0}</div>
-      </div>`;
-    }).join('')}
+        <div style="flex:1">${esc(p.name)}${p.id===myPid?' <span style="font-size:.7rem;color:var(--mid)">← you</span>':''}</div>
+        <div class="score-pts">${p.score||0}${p.id===myPid&&scoreGain>0?'<span style="color:#22c55e;font-size:.74rem;font-weight:700;margin-left:5px">+'+scoreGain+'</span>':''}</div>
+      </div>`).join('')}
   </div>`:'';
   return `<div class="wait-shell">
     <div class="wait-header">
@@ -2626,77 +2292,20 @@ function attach(){
 
   // Resource browser / upload panel
   on('btn-browse', browseRepo);
+  on('tab-generate', ()=>{ uploadTab='generate'; render(); });
+  on('tab-manage', ()=>{ uploadTab='manage'; uploadMsg=''; loadUploadFolders(); render(); });
 
-  // Folder cards — single tap = chapter overlay, long press (400ms) = manage overlay
-  document.querySelectorAll('.folder-card[data-folder-name]').forEach(el=>{
-    const name=el.dataset.folderName;
-    let pressTimer=null, didLongPress=false;
-
-    // Single tap: natural click opens chapter overlay
-    el.addEventListener('click', ()=>{ if(!didLongPress) openFolderOverlay(name); });
-
-    // 1.2s hold opens manage overlay — does NOT interfere with click
-    let pressStartX=0, pressStartY=0;
-    el.addEventListener('pointerdown', e=>{
-      didLongPress=false;
-      pressStartX=e.clientX; pressStartY=e.clientY;
-      pressTimer=setTimeout(()=>{
-        didLongPress=true;
-        navigator.vibrate&&navigator.vibrate(40);
-        el.style.transform='scale(.93)';
-        setTimeout(()=>{ el.style.transform=''; },150);
-        folderManageSubject=name; manageFolder=name;
-        manageEditMode=null; manageFile=null; manageFolderFiles=[]; editingContent=''; editingSha=null; uploadMsg='';
-        loadFolderFiles(name);
-        render();
-      }, 1200);
-    });
-    el.addEventListener('pointerup',     ()=>{ clearTimeout(pressTimer); pressTimer=null; setTimeout(()=>{ didLongPress=false; },50); });
-    el.addEventListener('pointercancel', ()=>{ clearTimeout(pressTimer); pressTimer=null; didLongPress=false; });
-    el.addEventListener('pointermove', e=>{
-      const dx=e.clientX-pressStartX, dy=e.clientY-pressStartY;
-      if(dx*dx+dy*dy>100){ clearTimeout(pressTimer); pressTimer=null; }
-    });
-
-    // Keyboard: Enter/Space = open selection, Shift+Enter = manage
-    el.addEventListener('keydown', e=>{
-      if(e.key==='Enter'||e.key===' '){
-        e.preventDefault();
-        if(e.shiftKey){
-          folderManageSubject=name; manageFolder=name;
-          manageEditMode=null; manageFile=null; manageFolderFiles=[]; editingContent=''; editingSha=null; uploadMsg='';
-          loadFolderFiles(name); render();
-        } else {
-          openFolderOverlay(name);
-        }
-        return;
-      }
-      const all=[...document.querySelectorAll('.folder-card[data-folder-name]')];
-      const i=all.indexOf(el);
-      if(e.key==='ArrowRight'||e.key==='ArrowDown'){ e.preventDefault(); all[(i+1)%all.length]?.focus(); }
-      if(e.key==='ArrowLeft'||e.key==='ArrowUp')  { e.preventDefault(); all[(i-1+all.length)%all.length]?.focus(); }
-    });
+  // Manage tab — folder selection changes inline
+  const manageSel=document.getElementById('manage-folder-sel');
+  if(manageSel) manageSel.addEventListener('change', e=>{
+    manageFolder=e.target.value||null;
+    manageEditMode=null; manageFile=null; manageFolderFiles=[]; editingContent=''; editingSha=null; uploadMsg='';
+    if(manageFolder){ loadFolderFiles(manageFolder); }
+    render();
   });
+  on('btn-folder-refresh', ()=>{ if(manageFolder) loadFolderFiles(manageFolder); loadUploadFolders(); });
 
-  // + New folder card
-  on('btn-new-folder-card', ()=>{
-    if(!showNewFolderCard){ showNewFolderCard=true; render(); setTimeout(()=>document.getElementById('new-folder-name')?.focus(),40); }
-  });
-  on('btn-cancel-new-folder', ()=>{ showNewFolderCard=false; render(); });
-  on('btn-create-folder', async ()=>{
-    await createFolder();
-    showNewFolderCard=false;
-    // also refresh subjects list
-    browseRepo();
-  });
-
-  // Manage overlay — close
-  on('btn-manage-close', ()=>{ folderManageSubject=null; manageFolder=null; manageEditMode=null; manageFile=null; manageFolderFiles=[]; editingContent=''; editingSha=null; uploadMsg=''; editorFullscreen=false; render(); });
-  document.getElementById('manage-overlay-backdrop')?.addEventListener('click', e=>{
-    if(e.target.id==='manage-overlay-backdrop'){ folderManageSubject=null; manageFolder=null; manageEditMode=null; manageFile=null; manageFolderFiles=[]; editingContent=''; editingSha=null; uploadMsg=''; editorFullscreen=false; render(); }
-  });
-
-  // Manage overlay — file edit button
+  // Manage tab — click a file row to edit it
   document.querySelectorAll('[data-file-edit]').forEach(el=>{
     el.addEventListener('click', ()=>{
       const fn=el.dataset.fileEdit;
@@ -2705,7 +2314,29 @@ function attach(){
     });
   });
 
-  // Manage overlay — file delete button
+  // Manage tab — create new file button
+  on('btn-create-file', ()=>{
+    const inp=document.getElementById('new-file-name');
+    let n=inp?inp.value.trim():'';
+    if(!n){setUploadMsg('Enter a file name first','bad');return;}
+    if(!n.endsWith('.txt')) n+='.txt';
+    manageEditMode='new'; manageFile=n; manageNewFileName=n; editingContent=''; editingSha=null;
+    setUploadMsg('','');
+    render();
+    setTimeout(()=>document.getElementById('q-editor')?.focus(),50);
+  });
+
+  // Editor fullscreen toggle
+  on('btn-editor-fullscreen', ()=>{
+    // Save textarea content before toggling so it isn't lost
+    const ta=document.getElementById('q-editor');
+    if(ta) editingContent=ta.value;
+    editorFullscreen=!editorFullscreen;
+    render();
+    setTimeout(()=>{ const t=document.getElementById('q-editor'); if(t){ t.value=editingContent; t.focus(); t.setSelectionRange(t.value.length,t.value.length); } },30);
+  });
+
+  // Manage tab — per-file delete buttons
   document.querySelectorAll('[data-file-del]').forEach(el=>{
     el.addEventListener('click', ()=>{
       const fn=el.dataset.fileDel;
@@ -2714,149 +2345,73 @@ function attach(){
     });
   });
 
-  // Manage overlay — create new file
-  on('btn-create-file', ()=>{
-    const inp=document.getElementById('new-file-name');
-    let n=inp?inp.value.trim():'';
-    if(!n){setUploadMsg('Enter a file name first','bad');return;}
-    if(!n.endsWith('.txt')) n+='.txt';
-    manageEditMode='new'; manageFile=n; manageNewFileName=n; editingContent=''; editingSha=null;
-    setUploadMsg('',''); render();
-    setTimeout(()=>document.getElementById('q-editor')?.focus(),50);
-  });
-
-  // Editor fullscreen toggle
-  on('btn-editor-fullscreen', ()=>{
-    const ta=document.getElementById('q-editor');
-    if(ta) editingContent=ta.value;
-    editorFullscreen=!editorFullscreen;
-    render();
-    setTimeout(()=>{ const t=document.getElementById('q-editor'); if(t){ t.value=editingContent; t.focus(); t.setSelectionRange(t.value.length,t.value.length); } },30);
-  });
-
   on('btn-delete-folder', async ()=>{
     if(!manageFolder) return;
     if(!confirm(`Delete folder "${manageFolder}" and all its contents?`)) return;
     await deleteFolder(manageFolder);
-    folderManageSubject=null; render();
   });
+  on('btn-create-folder', createFolder);
   on('btn-save-editor', saveEditorContent);
   on('btn-close-editor', ()=>{ manageEditMode=null; manageFile=null; manageNewFileName=''; editingContent=''; editingSha=null; uploadMsg=''; editorFullscreen=false; render(); });
   document.getElementById('file-upload-inp')?.addEventListener('change', uploadQuestionsFile);
 
-  // Host settings overlay
-  on('btn-host-settings', ()=>{ hostSettingsOpen=true; render(); setTimeout(()=>document.getElementById('btn-settings-close')?.focus(),50); });
-  on('btn-settings-close', ()=>{ hostSettingsOpen=false; render(); });
-  document.getElementById('host-settings-overlay')?.addEventListener('click', e=>{
-    if(e.target.id==='host-settings-overlay'){ hostSettingsOpen=false; render(); }
-  });
-
-  // Generate tab — folder card: open chapter overlay
-  function openFolderOverlay(name){
-    folderOverlaySubject=name;
-    const subj=subjects.find(s=>s.name===name);
-    folderOverlayDraft={};
-    if(subj){ subj.files.forEach(f=>{ folderOverlayDraft[f.name]={selected:f.selected,count:f.count||0}; }); }
-    if(subj&&!subj.filesLoaded) loadSubjectFiles(name);
-    render();
-  }
-  document.querySelectorAll('[data-folder-open]').forEach(el=>{
-    el.addEventListener('click', ()=> openFolderOverlay(el.dataset.folderOpen));
-    el.addEventListener('keydown', e=>{
-      if(e.key==='Enter'||e.key===' '){ e.preventDefault(); openFolderOverlay(el.dataset.folderOpen); return; }
-      const all=[...document.querySelectorAll('[data-folder-open]')];
-      const i=all.indexOf(el);
-      if(e.key==='ArrowRight'||e.key==='ArrowDown'){ e.preventDefault(); all[(i+1)%all.length]?.focus(); }
-      if(e.key==='ArrowLeft'||e.key==='ArrowUp'){ e.preventDefault(); all[(i-1+all.length)%all.length]?.focus(); }
-    });
-  });
-
-  // Chapter overlay — cancel
-  on('btn-ch-cancel', ()=>{ folderOverlaySubject=null; folderOverlayDraft={}; render(); });
-
-  // Chapter overlay — save (commit draft back to subjects)
-  on('btn-ch-save', ()=>{
-    const subj=subjects.find(s=>s.name===folderOverlaySubject);
-    if(subj){
-      document.querySelectorAll('[data-ch-cnt]').forEach(inp=>{
-        const fn=inp.dataset.chCnt;
-        if(folderOverlayDraft[fn]) folderOverlayDraft[fn].count=Math.max(0,parseInt(inp.value)||0);
-      });
-      subj.files.forEach(f=>{
-        const d=folderOverlayDraft[f.name];
-        if(d){ f.selected=d.selected; f.count=d.count; }
-      });
-    }
-    folderOverlaySubject=null; folderOverlayDraft={};
-    render();
-  });
-
-  // Chapter overlay — clear all (patch in place, no full re-render)
-  on('btn-ch-clear', ()=>{
-    Object.keys(folderOverlayDraft).forEach(k=>{ folderOverlayDraft[k].selected=false; });
-    document.querySelectorAll('[data-ch-toggle]').forEach(el=>{
-      el.classList.remove('sel');
-      const chk=el.querySelector('.ch-check'); if(chk) chk.innerHTML='';
-      const inp=el.querySelector('.ch-count');
-      if(inp){ inp.remove(); const sp=document.createElement('span'); sp.style.width='44px'; el.appendChild(sp); }
-    });
-  });
-
-  // Chapter overlay — backdrop click to cancel
-  document.getElementById('ch-overlay-backdrop')?.addEventListener('click', e=>{
-    if(e.target.id==='ch-overlay-backdrop'){ folderOverlaySubject=null; folderOverlayDraft={}; render(); }
-  });
-
-  // Chapter overlay — toggle chapter row (no full re-render — patch in place to prevent flicker)
-  document.querySelectorAll('[data-ch-toggle]').forEach(el=>{
-    el.addEventListener('click', e=>{
-      if(e.target.tagName==='INPUT') return;
-      const fn=el.dataset.chToggle;
-      if(!folderOverlayDraft[fn]) folderOverlayDraft[fn]={selected:false,count:0};
-      const nowSel=!folderOverlayDraft[fn].selected;
-      folderOverlayDraft[fn].selected=nowSel;
-
-      // Patch the row class
-      el.classList.toggle('sel', nowSel);
-
-      // Patch the checkbox
-      const chk=el.querySelector('.ch-check');
-      if(chk) chk.innerHTML=nowSel?'<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20,6 9,17 4,12"/></svg>':'';
-
-      // Patch the count input / spacer
-      const existingInput=el.querySelector('.ch-count');
-      const existingSpacer=el.querySelector('span[style*="width:44px"]');
-      if(nowSel && !existingInput){
-        if(existingSpacer) existingSpacer.remove();
-        const inp=document.createElement('input');
-        inp.className='ch-count'; inp.type='number'; inp.min='0'; inp.max='999';
-        inp.value=folderOverlayDraft[fn].count||''; inp.placeholder='all';
-        inp.dataset.chCnt=fn; inp.title='0 or blank = all questions';
-        inp.onclick=ev=>ev.stopPropagation();
-        inp.addEventListener('change',()=>{ folderOverlayDraft[fn].count=Math.max(0,parseInt(inp.value)||0); });
-        el.appendChild(inp);
-      } else if(!nowSel && existingInput){
-        existingInput.remove();
-        const sp=document.createElement('span');
-        sp.style.width='44px'; el.appendChild(sp);
+  // Generate tab — subject accordion expand/collapse
+  document.querySelectorAll('[data-subj-expand]').forEach(el=>{
+    el.addEventListener('click', ()=>{
+      const name=el.dataset.subjExpand;
+      if(expandedSubject===name){ expandedSubject=null; }
+      else{
+        expandedSubject=name;
+        const s=subjects.find(x=>x.name===name);
+        if(s&&!s.filesLoaded) loadSubjectFiles(name);
       }
+      render();
     });
   });
 
-  // Chapter overlay — count inputs (update draft without re-render)
-  document.querySelectorAll('[data-ch-cnt]').forEach(inp=>{
-    inp.addEventListener('change', ()=>{
-      const fn=inp.dataset.chCnt;
-      if(!folderOverlayDraft[fn]) folderOverlayDraft[fn]={selected:true,count:0};
-      folderOverlayDraft[fn].count=Math.max(0,parseInt(inp.value)||0);
+  // Generate tab — file checkboxes
+  document.querySelectorAll('[data-file-check]').forEach(inp=>{
+    inp.addEventListener('change', e=>{
+      e.stopPropagation();
+      const parts=inp.dataset.fileCheck.split('||');
+      const subjName=parts[0], fileName=parts[1];
+      const subj=subjects.find(s=>s.name===subjName);
+      if(!subj) return;
+      const file=subj.files.find(f=>f.name===fileName);
+      if(!file) return;
+      file.selected=inp.checked;
+      render();
     });
+    inp.addEventListener('click', e=>e.stopPropagation());
+  });
+
+  // Generate tab — file count inputs (save on change, don't re-render to keep focus)
+  document.querySelectorAll('[data-file-cnt]').forEach(inp=>{
+    inp.addEventListener('change', e=>{
+      e.stopPropagation();
+      const parts=inp.dataset.fileCnt.split('||');
+      const subjName=parts[0], fileName=parts[1];
+      const subj=subjects.find(s=>s.name===subjName);
+      if(!subj) return;
+      const file=subj.files.find(f=>f.name===fileName);
+      if(file) file.count=Math.max(0,parseInt(inp.value)||0);
+    });
+    inp.addEventListener('click', e=>e.stopPropagation());
   });
 
   on('btn-gen', ()=>{
+    // Save timer and any unsaved count inputs before generating
     hostTimerSeconds=Math.max(0,parseInt(document.getElementById('timer-sec-input')?.value)||0);
+    document.querySelectorAll('[data-file-cnt]').forEach(inp=>{
+      const parts=inp.dataset.fileCnt.split('||');
+      const subj=subjects.find(s=>s.name===parts[0]);
+      if(!subj) return;
+      const file=subj.files.find(f=>f.name===parts[1]);
+      if(file) file.count=Math.max(0,parseInt(inp.value)||0);
+    });
     generateQuiz();
   });
-  on('btn-reload',()=>{ questions=[]; selIdx=-1; answerKey=-1; subjects=[]; expandedSubject=null; repoPath=null; folderOverlaySubject=null; folderOverlayDraft={}; folderManageSubject=null; showNewFolderCard=false; manageFolder=null; manageFile=null; manageFolderFiles=[]; manageEditMode=null; manageNewFileName=''; editingContent=''; editingSha=null; uploadMsg=''; editorFullscreen=false; haltedTotalLabel=''; render(); });
+  on('btn-reload',()=>{ questions=[]; selIdx=-1; answerKey=-1; subjects=[]; expandedSubject=null; repoPath=null; uploadTab='generate'; manageFolder=null; manageFile=null; manageFolderFiles=[]; manageEditMode=null; manageNewFileName=''; editingContent=''; editingSha=null; uploadMsg=''; editorFullscreen=false; render(); });
 
   // Timer input (live)
   document.getElementById('timer-sec-live')?.addEventListener('change',e=>{ hostTimerSeconds=Math.max(0,parseInt(e.target.value)||0); });
@@ -2890,28 +2445,16 @@ function attach(){
   );
 
   // Answer key
-  document.querySelectorAll('.key-card[data-key]').forEach(el=>{
-    el.addEventListener('click', ()=>{ answerKey=+el.dataset.key; render(); });
-    el.addEventListener('keydown', e=>{
-      if(e.key==='Enter'||e.key===' '){ e.preventDefault(); el.click(); return; }
-      const all=[...document.querySelectorAll('.key-card[data-key]')];
-      const idx=all.indexOf(el);
-      // Arrow keys navigate the 2×2 grid: Right/Down = next, Left/Up = prev
-      const delta={'ArrowRight':1,'ArrowDown':2,'ArrowLeft':-1,'ArrowUp':-2};
-      if(delta[e.key]!==undefined){
-        e.preventDefault();
-        const next=all[(idx+delta[e.key]+all.length)%all.length];
-        next?.focus();
-      }
-    });
-  });
+  document.querySelectorAll('.key-card[data-key]').forEach(el=>
+    el.addEventListener('click',()=>{ answerKey=+el.dataset.key; render(); })
+  );
 
   // Push question (with debounce to prevent stuck)
   on('btn-push',()=>{
     if(pushing||selIdx<0||answerKey<0) return;
     const t=Math.max(0,parseInt(document.getElementById('timer-sec-live')?.value)||hostTimerSeconds);
     pushing=true;
-    send({type:'push_question',question:questions[selIdx],correct:answerKey,timerSeconds:t,totalQuestions:questions.length});
+    send({type:'push_question',question:questions[selIdx],correct:answerKey,timerSeconds:t});
     // Safety: reset push flag after 4s if no state update comes
     pushTimeout=setTimeout(()=>{ pushing=false; pushTimeout=null; render(); },4000);
     render();
@@ -2941,7 +2484,7 @@ function attach(){
   on('btn-stop-dismiss',()=>{
     showingHaltMenu=false;
     playMp3('stop.mp3');
-    send({type:'shutdown', totalQuestions:questions.length||0});
+    send({type:'shutdown'});
     render();
   });
 
@@ -2962,20 +2505,11 @@ function attach(){
       if(S.myAnswer!==null&&S.myAnswer!==undefined) return;
       if(S.status==='revealed') return;
       if(el.classList.contains('locked')) return;
-      // Record how many seconds since question was pushed — with sub-second precision
-      const ms = S.questionPushedAt ? Date.now()-S.questionPushedAt : null;
-      const secs = ms!==null ? parseFloat(Math.max(0,ms/1000).toFixed(2)) : null;
-      myLastAnswerTime = secs;
-      if(secs!==null && myPid) localAnswerTimes[myPid]=secs; // precise click-time for self
-      send({type:'answer',idx:+el.dataset.opt, ...(secs!==null?{timeTaken:secs}:{})});
+      send({type:'answer',idx:+el.dataset.opt});
     })
   );
 
   updateMicDot();
-
-  // Global host keyboard shortcuts — re-attach fresh on every render
-  document.removeEventListener('keydown', hostKeyDown);
-  if(role==='host'&&hostAuthed) document.addEventListener('keydown', hostKeyDown);
 }
 
 function on(id,fn){ document.getElementById(id)?.addEventListener('click',fn); }
@@ -2985,14 +2519,14 @@ function on(id,fn){ document.getElementById(id)?.addEventListener('click',fn); }
 
 function doDismissHome(){
   if(dismissedTimer){clearInterval(dismissedTimer);dismissedTimer=null;}
-  showingDismissed=false; showingHalted=false; haltedSnapshot=[]; haltedTotalQuestions=0;
-  role=null; myName=null; myPid=null; showingProfile=false; prevMyScore=0; scoreGain=0; myLastAnswerTime=null; localAnswerTimes={}; startTimerDisplay._lastStart=null; studentQCount=0; haltedTotalLabel=''; haltedTotalQuestions=0;
+  showingDismissed=false; showingHalted=false; haltedSnapshot=[];
+  role=null; myName=null; myPid=null; showingProfile=false; prevMyScore=0; scoreGain=0;
   allTimeLB=null;  // force refresh so updated all-time scores show immediately
   sessionStorage.removeItem('qz_pid'); sessionStorage.removeItem(NAV_KEY);
   render();
   fetchLeaderboard();
 }
-function doLogout(){ clearAuth(); role=null; myPid=null; myName=null; hostAuthed=false; HOST_PASSWORD_INPUT=''; showingProfile=false; prevMyScore=0; scoreGain=0; myLastAnswerTime=null; localAnswerTimes={}; startTimerDisplay._lastStart=null; studentQCount=0; allTimeLB=null; serverSchedules=null; hostSchedules=[]; sessionStorage.removeItem(NAV_KEY); sessionStorage.removeItem('scc_hpw'); render(); }
+function doLogout(){ clearAuth(); role=null; myPid=null; myName=null; hostAuthed=false; HOST_PASSWORD_INPUT=''; showingProfile=false; prevMyScore=0; scoreGain=0; allTimeLB=null; serverSchedules=null; hostSchedules=[]; sessionStorage.removeItem(NAV_KEY); sessionStorage.removeItem('scc_hpw'); render(); }
 
 /* Shared back navigation */
 function doBack(){
@@ -3023,7 +2557,7 @@ function doHostLogin(){
   sessionStorage.setItem('scc_hpw', v);
   send({type:'set_host',password:v});
 }
-function doLeave(){ role=null; myName=null; myPid=null; showingProfile=false; prevMyScore=0; scoreGain=0; myLastAnswerTime=null; localAnswerTimes={}; startTimerDisplay._lastStart=null; studentQCount=0; haltedTotalLabel=''; haltedTotalQuestions=0; sessionStorage.removeItem('qz_pid'); sessionStorage.removeItem(NAV_KEY); render(); }
+function doLeave(){ role=null; myName=null; myPid=null; showingProfile=false; prevMyScore=0; scoreGain=0; sessionStorage.removeItem('qz_pid'); sessionStorage.removeItem(NAV_KEY); render(); }
 function doJoin(){
   const name=currentUser?.displayName||currentUser?.name||'';
   if(!name)return;
