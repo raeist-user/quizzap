@@ -335,6 +335,43 @@
     .form-msg{font-size:.77rem;margin-top:5px;min-height:16px}
     .form-msg.ok{color:var(--good)}.form-msg.err{color:var(--bad)}
 
+    /* PROFILE CHARTS */
+    .pov-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px}
+    @media(max-width:520px){.pov-stats{grid-template-columns:repeat(2,1fr)}}
+    .pov-stat{background:var(--white);border:1px solid var(--line);border-radius:10px;padding:13px 10px;text-align:center}
+    .pov-stat-num{font-size:1.45rem;font-weight:700;line-height:1;margin-bottom:2px;font-family:var(--serif)}
+    .pov-stat-lbl{font-size:.63rem;color:var(--mid);text-transform:uppercase;letter-spacing:.06em;font-weight:500}
+    .pov-stat-sub{font-size:.66rem;color:var(--mid);margin-top:2px}
+    .pchart-card{background:var(--white);border:1px solid var(--line);border-radius:10px;padding:14px;margin-bottom:10px;position:relative}
+    .pchart-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:6px}
+    .pchart-title{font-size:.68rem;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--mid)}
+    .pchart-legend{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+    .pchart-leg-item{display:flex;align-items:center;gap:5px;font-size:.68rem;color:var(--mid)}
+    .pchart-leg-dash{width:18px;height:2px;flex-shrink:0}
+    .chart-wrap{position:relative;width:100%;overflow:visible}
+    .chart-tooltip{position:absolute;top:-36px;background:var(--ink);color:#fff;font-size:.71rem;font-weight:500;padding:4px 8px;border-radius:5px;white-space:nowrap;pointer-events:none;opacity:0;transition:opacity .13s;transform:translateX(-50%);z-index:20}
+    .chart-tooltip::after{content:'';position:absolute;top:100%;left:50%;transform:translateX(-50%);border:4px solid transparent;border-top-color:var(--ink)}
+    .heatmap-grid{display:grid;grid-template-columns:repeat(15,1fr);gap:3px;margin-top:6px}
+    @media(max-width:420px){.heatmap-grid{gap:2px}}
+    .hm-col{display:flex;flex-direction:column;gap:3px}
+    @media(max-width:420px){.hm-col{gap:2px}}
+    .hm-cell{border-radius:2px;aspect-ratio:1;min-height:0;background:var(--faint)}
+    .hm-cell[data-v="0"]{background:#edecea}
+    .hm-cell[data-v="1"]{background:#b7dfc7}
+    .hm-cell[data-v="2"]{background:#74c69d}
+    .hm-cell[data-v="3"]{background:#40916c}
+    .hm-cell[data-v="4"]{background:#1b4332}
+    .hm-legend{display:flex;align-items:center;gap:5px;justify-content:flex-end;margin-top:6px;font-size:.66rem;color:var(--mid)}
+    .hm-swatch{width:11px;height:11px;border-radius:2px;flex-shrink:0}
+    .hist-pb-badge{display:inline-flex;align-items:center;gap:3px;background:#d8f3dc;color:#2d6a4f;font-size:.62rem;font-weight:600;padding:1px 6px;border-radius:9px;margin-left:5px;vertical-align:middle}
+    .prank-card{background:var(--white);border:1px solid var(--line);border-radius:10px;padding:14px;margin-bottom:10px;display:flex;align-items:center;gap:14px}
+    .prank-num{font-family:var(--serif);font-size:2rem;font-weight:400;line-height:1;flex-shrink:0;min-width:50px;text-align:center}
+    .prank-info{flex:1;min-width:0}
+    .prank-label{font-size:.7rem;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--mid);margin-bottom:3px}
+    .prank-sub{font-size:.78rem;color:var(--mid)}
+    .no-data-notice{text-align:center;padding:32px 16px;color:var(--mid);font-size:.83rem}
+    .no-data-notice span{font-size:1.6rem;display:block;margin-bottom:8px}
+
     /* SESSION CONTROL BOX */
     .session-ctrl{padding:12px 14px;border-radius:var(--r);margin-bottom:14px;display:flex;flex-direction:column;gap:8px}
     .session-ctrl-open{background:#e8f5ee;border:1px solid #b7dfc7}
@@ -533,6 +570,7 @@ let showingDismissed=false, dismissedCountdown=120, dismissedTimer=null;
 // Answer timing (client-side — seconds taken to answer current question)
 let myLastAnswerTime=null;
 let localAnswerTimes={};   // {pid: secs} built client-side from S.answers appearance time
+let sessionCorrectTimes=[]; // secs for each correctly answered question this session
 let studentQCount=0;       // how many questions this client has seen pushed (for student denominator)
 
 // Cumulative scoring is now handled server-side via gameScores in server.js
@@ -823,15 +861,18 @@ function connect(){
           const myRank2=sorted2.findIndex(p=>p.id===myPid)+1;
           const hist2=m.payload.myHistory||[];
           const correct2=hist2.filter(h=>h.myAnswer!==null&&h.myAnswer===h.correct).length;
-          saveSession({date:new Date().toISOString(),score:inc,total:hist2.length,rank:myRank2||0,participants:pts.length,correct:correct2});
+          const fastestMs=sessionCorrectTimes.length?Math.round(Math.min(...sessionCorrectTimes)*1000):null;
+          saveSession({date:new Date().toISOString(),score:inc,total:hist2.length,rank:myRank2||0,participants:pts.length,correct:correct2,fastestMs});
+          sessionCorrectTimes=[];
         }
-        // Detect answer reveal sounds
+        // Detect answer reveal sounds + capture correct answer timing
         if(role==='participant'){
           if(ns==='revealed'&&prevStatus==='question'){
             const myAns=m.payload.myAnswer;
             const correct=m.payload.correct;
             if(myAns!==null&&myAns!==undefined){
               setTimeout(()=>{ myAns===correct?playCorrect():playWrong(); },200);
+              if(myAns===correct&&myLastAnswerTime!==null) sessionCorrectTimes.push(myLastAnswerTime);
             }
           }
         }
@@ -1586,9 +1627,276 @@ function profilePageHTML(){
 
   let body='';
 
-  if(profileTab==='overview'||profileTab==='history'){
-    const icon=profileTab==='overview'?'📈':'📋';
-    body='<div style="text-align:center;padding:48px 20px;color:var(--mid)"><div style="font-size:2.4rem;margin-bottom:12px">'+icon+'</div><div style="font-size:.95rem;font-weight:600;color:var(--ink);margin-bottom:6px">Coming soon</div><p class="muted small">This section is being built.</p></div>';
+  if(profileTab==='overview'){
+    const history=loadHistory();
+    if(!history.length){
+      body=`<div class="no-data-notice"><span>📊</span>No sessions yet. Complete a quiz to see your stats here!</div>`;
+    } else {
+      // ── 4-stat header ──────────────────────────────────────────────────────
+      const totalCorrect=history.reduce((s,e)=>s+(e.correct||0),0);
+      const totalQs=history.reduce((s,e)=>s+(e.total||0),0);
+      const accuracy=totalQs?Math.round(totalCorrect/totalQs*100):0;
+      const bestScore=Math.max(...history.map(e=>e.score||0));
+      // Fastest correct answer across all sessions
+      const allFastMs=history.map(e=>e.fastestMs).filter(v=>v!=null&&v>0);
+      const fastestMs=allFastMs.length?Math.min(...allFastMs):null;
+      const fastLabel=fastestMs!=null?(fastestMs<1000?(fastestMs+'ms'):(fastestMs/1000).toFixed(1)+'s'):'—';
+
+      const statsHTML=`<div class="pov-stats">
+        <div class="pov-stat"><div class="pov-stat-num">${history.length}</div><div class="pov-stat-lbl">Sessions</div></div>
+        <div class="pov-stat"><div class="pov-stat-num">${accuracy}%</div><div class="pov-stat-lbl">Accuracy</div></div>
+        <div class="pov-stat"><div class="pov-stat-num">${bestScore}</div><div class="pov-stat-lbl">Best Score</div></div>
+        <div class="pov-stat"><div class="pov-stat-num" style="font-size:${fastestMs&&fastestMs<10000?'1.25rem':'1rem'}">${fastLabel}</div><div class="pov-stat-lbl">Fastest Correct ⚡</div></div>
+      </div>`;
+
+      // ── Score bar chart ────────────────────────────────────────────────────
+      const last15=[...history].reverse().slice(-15);
+      const scores=last15.map(e=>e.score||0);
+      const maxScore=Math.max(...scores,1);
+      // Nice gridlines: step = ceil(max/5) rounded to nice number
+      function niceStep(max){
+        const raw=max/5;
+        const mag=Math.pow(10,Math.floor(Math.log10(raw||1)));
+        const norm=raw/mag;
+        const nice=norm<=1?1:norm<=2?2:norm<=5?5:10;
+        return Math.max(1,nice*mag);
+      }
+      const step=niceStep(maxScore);
+      const gridMax=Math.ceil(maxScore/step)*step;
+      const gridLines=[];
+      for(let v=0;v<=gridMax;v+=step) gridLines.push(v);
+
+      // SVG dimensions
+      const W=520, H=140, PAD_L=36, PAD_B=24, PAD_T=10, PAD_R=6;
+      const chartW=W-PAD_L-PAD_R, chartH=H-PAD_T-PAD_B;
+      const barCount=last15.length;
+      const barW=Math.floor(chartW/barCount*0.6);
+      const barGap=chartW/barCount;
+      const maxScoreIdx=scores.indexOf(Math.max(...scores));
+
+      let svgBars='', svgGridX='', svgLabels='', tooltipDivs='';
+      // Grid lines + labels
+      gridLines.forEach(v=>{
+        const y=PAD_T+chartH-(v/gridMax)*chartH;
+        svgGridX+=`<line x1="${PAD_L}" x2="${W-PAD_R}" y1="${y}" y2="${y}" stroke="#e4e3df" stroke-width="1"/>`;
+        svgLabels+=`<text x="${PAD_L-4}" y="${y+4}" text-anchor="end" font-size="10" fill="#9a9990">${v}</text>`;
+      });
+      // X axis
+      svgGridX+=`<line x1="${PAD_L}" x2="${W-PAD_R}" y1="${PAD_T+chartH}" y2="${PAD_T+chartH}" stroke="#e4e3df" stroke-width="1"/>`;
+
+      last15.forEach((e,i)=>{
+        const x=PAD_L+i*barGap+barGap/2;
+        const barH=scores[i]>0?(scores[i]/gridMax)*chartH:2;
+        const y=PAD_T+chartH-barH;
+        const isTop=i===maxScoreIdx;
+        const fill=isTop?'#111110':'#c8c7c3';
+        const d=new Date(e.date);
+        const label=d.toLocaleDateString('en',{weekday:'short',month:'short',day:'numeric'});
+        svgBars+=`<rect class="bar-rect" x="${x-barW/2}" y="${y}" width="${barW}" height="${barH}" rx="2" fill="${fill}" data-score="${scores[i]}" data-label="${label}" data-idx="${i}" style="cursor:pointer"/>`;
+      });
+
+      const barChartHTML=`<div class="pchart-card">
+        <div class="pchart-head"><span class="pchart-title">Score History</span><span style="font-size:.7rem;color:var(--mid)">Last ${last15.length} sessions</span></div>
+        <div class="chart-wrap" id="score-chart-wrap">
+          <div class="chart-tooltip" id="score-tooltip"></div>
+          <svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block;overflow:visible">
+            <g>${svgGridX}${svgLabels}${svgBars}</g>
+          </svg>
+        </div>
+      </div>`;
+
+      // ── Accuracy trend chart ───────────────────────────────────────────────
+      const accs=last15.map(e=>e.total?(Math.round(e.correct/e.total*100)):null);
+      const validAccs=accs.filter(v=>v!==null);
+      const avgAcc=validAccs.length?Math.round(validAccs.reduce((a,b)=>a+b,0)/validAccs.length):0;
+      const pbAcc=Math.max(...validAccs,0);
+      const pbAccIdx=accs.indexOf(pbAcc);
+
+      const AW=520, AH=150, AL=36, AB=24, AT=18, AR=6;
+      const achW=AW-AL-AR, achH=AH-AT-AB;
+      const pts2=accs.map((v,i)=>v!==null?{x:AL+i*(achW/(last15.length-1||1))+0,y:AT+achH-(v/100)*achH}:null);
+      // Filter out nulls for curve drawing
+      const validPts=pts2.filter(p=>p!==null);
+
+      // Bezier path using catmull-rom → cubic bezier
+      function catmullToCubic(pts){
+        if(pts.length<2) return '';
+        let d=`M${pts[0].x},${pts[0].y}`;
+        for(let i=0;i<pts.length-1;i++){
+          const p0=pts[Math.max(i-1,0)], p1=pts[i], p2=pts[i+1], p3=pts[Math.min(i+2,pts.length-1)];
+          const cp1x=p1.x+(p2.x-p0.x)/6;
+          const cp1y=p1.y+(p2.y-p0.y)/6;
+          const cp2x=p2.x-(p3.x-p1.x)/6;
+          const cp2y=p2.y-(p3.y-p1.y)/6;
+          d+=` C${cp1x},${cp1y} ${cp2x},${cp2y} ${p2.x},${p2.y}`;
+        }
+        return d;
+      }
+
+      const curvePath=catmullToCubic(validPts);
+      const fillPath=validPts.length>1?`${curvePath} L${validPts[validPts.length-1].x},${AT+achH} L${validPts[0].x},${AT+achH} Z`:'';
+
+      // Y gridlines at 0,25,50,75,100
+      let accGridX='', accLabels='';
+      [0,25,50,75,100].forEach(v=>{
+        const y=AT+achH-(v/100)*achH;
+        accGridX+=`<line x1="${AL}" x2="${AW-AR}" y1="${y}" y2="${y}" stroke="#e4e3df" stroke-width="1" stroke-dasharray="${v===0?'none':'3,3'}"/>`;
+        accLabels+=`<text x="${AL-4}" y="${y+4}" text-anchor="end" font-size="10" fill="#9a9990">${v}</text>`;
+      });
+
+      // PB line and avg line
+      const pbY=AT+achH-(pbAcc/100)*achH;
+      const avgY=AT+achH-(avgAcc/100)*achH;
+      const pbLine=`<line x1="${AL}" x2="${AW-AR}" y1="${pbY}" y2="${pbY}" stroke="#2d6a4f" stroke-width="1.5" stroke-dasharray="5,3" opacity=".8"/>`;
+      const avgLine=`<line x1="${AL}" x2="${AW-AR}" y1="${avgY}" y2="${avgY}" stroke="#9a9990" stroke-width="1.5" stroke-dasharray="5,3" opacity=".7"/>`;
+
+      // Dots
+      let dots='', accTooltipData='';
+      accs.forEach((v,i)=>{
+        if(v===null) return;
+        const p=pts2[i];
+        const isPB=i===pbAccIdx;
+        const isLast=i===last15.length-1;
+        const isBig=isPB||isLast;
+        const r=isBig?5:3.5;
+        let fill=v>=avgAcc?'#2d9e6b':'#c1121f';
+        if(isPB) fill='#2d6a4f';
+        const stroke=isBig?'white':'none';
+        const sw=isBig?1.5:0;
+        const d=new Date(last15[i].date);
+        const lbl=`${v}% · ${d.toLocaleDateString('en',{weekday:'short',month:'short',day:'numeric'})}`;
+        dots+=`<circle class="acc-dot" cx="${p.x}" cy="${p.y}" r="${r}" fill="${fill}" stroke="${stroke}" stroke-width="${sw}" data-acc="${v}" data-label="${lbl}" data-idx="${i}" style="cursor:pointer"/>`;
+      });
+
+      const gradId='accGrad'+Math.random().toString(36).slice(2,6);
+      const accChartHTML=`<div class="pchart-card">
+        <div class="pchart-head">
+          <span class="pchart-title">Accuracy Trend</span>
+          <div class="pchart-legend">
+            <div class="pchart-leg-item"><div class="pchart-leg-dash" style="background:#2d6a4f;height:2px;border-top:2px dashed #2d6a4f;"></div><span>PB ${pbAcc}%</span></div>
+            <div class="pchart-leg-item"><div class="pchart-leg-dash" style="border-top:2px dashed #9a9990;"></div><span>Avg ${avgAcc}%</span></div>
+          </div>
+        </div>
+        <div class="chart-wrap" id="acc-chart-wrap">
+          <div class="chart-tooltip" id="acc-tooltip"></div>
+          <svg viewBox="0 0 ${AW} ${AH}" style="width:100%;height:auto;display:block;overflow:visible">
+            <defs>
+              <linearGradient id="${gradId}" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#2d9e6b" stop-opacity=".22"/>
+                <stop offset="100%" stop-color="#2d9e6b" stop-opacity="0"/>
+              </linearGradient>
+            </defs>
+            ${accGridX}${accLabels}
+            ${fillPath?`<path d="${fillPath}" fill="url(#${gradId})"/>`:''}
+            ${validPts.length>1?`<path d="${curvePath}" fill="none" stroke="#2d9e6b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>`:''}
+            ${avgLine}${pbLine}${dots}
+          </svg>
+        </div>
+      </div>`;
+
+      // ── Activity heatmap ────────────────────────────────────────────────────
+      const now=new Date(); now.setHours(23,59,59,999);
+      const hmStart=new Date(now); hmStart.setDate(hmStart.getDate()-104); hmStart.setHours(0,0,0,0);
+      // Map date string → count
+      const dayCounts={};
+      history.forEach(e=>{ const k=new Date(e.date).toDateString(); dayCounts[k]=(dayCounts[k]||0)+1; });
+      // Build 15 weeks
+      let cols='';
+      for(let w=0;w<15;w++){
+        let cells='';
+        for(let d=0;d<7;d++){
+          const dt=new Date(hmStart); dt.setDate(dt.getDate()+w*7+d);
+          if(dt>now){ cells+=`<div class="hm-cell" data-v="0" style="opacity:.2"></div>`; continue; }
+          const cnt=dayCounts[dt.toDateString()]||0;
+          const v=cnt===0?0:cnt===1?1:cnt===2?2:cnt<=4?3:4;
+          const label=cnt?`${dt.toLocaleDateString('en',{month:'short',day:'numeric'})}: ${cnt} session${cnt>1?'s':''}`:dt.toLocaleDateString('en',{month:'short',day:'numeric'});
+          cells+=`<div class="hm-cell" data-v="${v}" title="${label}"></div>`;
+        }
+        cols+=`<div class="hm-col">${cells}</div>`;
+      }
+      const hmHTML=`<div class="pchart-card">
+        <div class="pchart-head"><span class="pchart-title">Activity</span></div>
+        <div class="heatmap-grid">${cols}</div>
+        <div class="hm-legend">
+          <span>Less</span>
+          <div class="hm-swatch" style="background:#edecea"></div>
+          <div class="hm-swatch" style="background:#b7dfc7"></div>
+          <div class="hm-swatch" style="background:#74c69d"></div>
+          <div class="hm-swatch" style="background:#40916c"></div>
+          <div class="hm-swatch" style="background:#1b4332"></div>
+          <span>More</span>
+        </div>
+      </div>`;
+
+      // ── Breakdown card ──────────────────────────────────────────────────────
+      const avgScore=history.length?Math.round(history.reduce((s,e)=>s+(e.score||0),0)/history.length):0;
+      const bestRanks=history.map(e=>e.rank||999).filter(r=>r>0);
+      const bestRank=bestRanks.length?Math.min(...bestRanks):null;
+      const since=new Date(history[history.length-1].date).toLocaleDateString('en',{month:'short',day:'numeric',year:'numeric'});
+      const breakdownHTML=`<div class="pchart-card">
+        <div class="pchart-head"><span class="pchart-title">Breakdown</span></div>
+        <div class="prow"><span>Avg score per session</span><span class="prow-val">${avgScore} pts</span></div>
+        <div class="prow"><span>Personal best accuracy</span><span class="prow-val" style="color:var(--good)">${pbAcc}%</span></div>
+        ${bestRank?`<div class="prow"><span>Best rank achieved</span><span class="prow-val">#${bestRank}</span></div>`:''}
+        <div class="prow"><span>Total questions seen</span><span class="prow-val">${totalQs}</span></div>
+        <div class="prow"><span>Total correct answers</span><span class="prow-val">${totalCorrect}</span></div>
+        <div class="prow"><span>Playing since</span><span class="prow-val">${since}</span></div>
+      </div>`;
+
+      // ── Leaderboard rank card ────────────────────────────────────────────────
+      let rankCardHTML='';
+      if(currentUser){
+        const myEntry=allTimeLB?allTimeLB.find(e=>e.userId===currentUser.id):null;
+        const myRankAll=allTimeLB?allTimeLB.findIndex(e=>e.userId===currentUser.id)+1:0;
+        const totalPlayers=allTimeLB?allTimeLB.length:0;
+        const totalPts=myEntry?myEntry.total||myEntry.score||0:0;
+        if(allTimeLB===null){
+          rankCardHTML=`<div class="prank-card"><div class="prank-num" style="font-size:1.2rem;color:var(--mid)">…</div><div class="prank-info"><div class="prank-label">All-Time Rank</div><div class="prank-sub">Loading leaderboard…</div></div></div>`;
+        } else if(myEntry){
+          rankCardHTML=`<div class="prank-card">
+            <div class="prank-num">#${myRankAll}</div>
+            <div class="prank-info">
+              <div class="prank-label">All-Time Rank</div>
+              <div class="prank-sub">of ${totalPlayers} players · ${totalPts} total pts</div>
+            </div>
+            <div style="font-size:1.4rem">🏅</div>
+          </div>`;
+        } else {
+          rankCardHTML=`<div class="prank-card"><div class="prank-num" style="font-size:1rem;color:var(--mid)">—</div><div class="prank-info"><div class="prank-label">All-Time Rank</div><div class="prank-sub">Not yet ranked on the leaderboard</div></div></div>`;
+        }
+      }
+
+      body=statsHTML+barChartHTML+accChartHTML+hmHTML+breakdownHTML+rankCardHTML;
+    }
+  }
+
+  if(profileTab==='history'){
+    const history=loadHistory();
+    if(!history.length){
+      body=`<div class="no-data-notice"><span>📋</span>No sessions recorded yet.</div>`;
+    } else {
+      const maxScore=Math.max(...history.map(e=>e.score||0));
+      const rows=history.map((e,i)=>{
+        const d=new Date(e.date);
+        const dateStr=d.toLocaleDateString('en',{month:'short',day:'numeric',year:'numeric'});
+        const timeStr=d.toLocaleTimeString('en',{hour:'2-digit',minute:'2-digit'});
+        const acc=e.total?Math.round(e.correct/e.total*100):null;
+        const accCls=acc===null?'ok':acc>=70?'good':acc>=45?'ok':'bad';
+        const accLbl=acc!==null?acc+'%':'—';
+        const isPB=e.score===maxScore;
+        const rankStr=e.rank&&e.participants?`#${e.rank} of ${e.participants}`:e.rank?`#${e.rank}`:'';
+        return `<div class="hist-row">
+          <div class="col" style="min-width:80px;flex-shrink:0">
+            <span class="hist-date">${dateStr}</span>
+            <span class="hist-date" style="margin-top:1px">${timeStr}</span>
+          </div>
+          <div class="hist-score">${e.score||0} pts${isPB?'<span class="hist-pb-badge">PB</span>':''}</div>
+          <div class="hist-rank">${rankStr}</div>
+          <div class="hist-acc ${accCls}">${accLbl}</div>
+        </div>`;
+      }).join('');
+      body=`<div style="margin-bottom:6px;font-size:.75rem;color:var(--mid)">${history.length} session${history.length>1?'s':''} recorded</div>${rows}`;
+    }
   }
 
   if(profileTab==='settings'){
@@ -2542,6 +2850,50 @@ function setupOutsideClick(){
   },{passive:true});
 }
 
+/* ══════════════════════════════════════
+   PROFILE CHART INTERACTIONS
+══════════════════════════════════════ */
+function setupProfileCharts(){
+  // Generic tooltip setup for SVG elements
+  function attachTooltip(wrapId, tooltipId, selector, getContent){
+    const wrap=document.getElementById(wrapId);
+    const tip=document.getElementById(tooltipId);
+    if(!wrap||!tip) return;
+    let dismissTimer=null;
+    const show=(el,e)=>{
+      clearTimeout(dismissTimer);
+      const content=getContent(el);
+      if(!content) return;
+      tip.textContent=content;
+      // Position tooltip: use SVG element's bounding rect relative to wrap
+      const wrapRect=wrap.getBoundingClientRect();
+      const elRect=el.getBoundingClientRect();
+      const cx=elRect.left+elRect.width/2-wrapRect.left;
+      const pct=(cx/wrapRect.width)*100;
+      tip.style.left=Math.max(5,Math.min(95,pct))+'%';
+      tip.style.opacity='1';
+    };
+    const hide=()=>{ tip.style.opacity='0'; };
+    wrap.querySelectorAll(selector).forEach(el=>{
+      el.addEventListener('mouseenter',e=>show(el,e));
+      el.addEventListener('mouseleave',()=>hide());
+      el.addEventListener('touchstart',e=>{ e.preventDefault(); show(el,e); clearTimeout(dismissTimer); dismissTimer=setTimeout(hide,1400); },{passive:false});
+    });
+  }
+
+  // Score bar chart
+  attachTooltip('score-chart-wrap','score-tooltip','.bar-rect',el=>{
+    const score=el.getAttribute('data-score');
+    const label=el.getAttribute('data-label');
+    return `${score} pts · ${label}`;
+  });
+
+  // Accuracy trend chart
+  attachTooltip('acc-chart-wrap','acc-tooltip','.acc-dot',el=>{
+    return el.getAttribute('data-label');
+  });
+}
+
 function attach(){
   // Click sounds
   document.querySelectorAll('.btn,.key-card,.auth-tab,.home-tab').forEach(el=>
@@ -2569,6 +2921,7 @@ function attach(){
   on('btn-profile',()=>{ showingProfile=true; profileTab='overview'; document.getElementById('p-dropdown')?.classList.add('hidden'); navPush(); render(); });
   on('btn-profile-back',()=>{ showingProfile=false; render(); });
   document.querySelectorAll('.ptab[data-ptab]').forEach(el=>el.addEventListener('click',()=>{ profileTab=el.dataset.ptab; render(); }));
+  if(showingProfile) setupProfileCharts();
 
   on('btn-dismissed-home', doDismissHome);
   on('btn-lb-refresh',()=>{ allTimeLB=null; render(); fetchLeaderboard(); });
@@ -3045,13 +3398,13 @@ function on(id,fn){ document.getElementById(id)?.addEventListener('click',fn); }
 function doDismissHome(){
   if(dismissedTimer){clearInterval(dismissedTimer);dismissedTimer=null;}
   showingDismissed=false; showingHalted=false; haltedSnapshot=[]; haltedTotalQuestions=0;
-  role=null; myName=null; myPid=null; showingProfile=false; prevMyScore=0; scoreGain=0; myLastAnswerTime=null; localAnswerTimes={}; startTimerDisplay._lastStart=null; studentQCount=0; haltedTotalLabel=''; haltedTotalQuestions=0;
+  role=null; myName=null; myPid=null; showingProfile=false; prevMyScore=0; scoreGain=0; myLastAnswerTime=null; localAnswerTimes={}; sessionCorrectTimes=[]; startTimerDisplay._lastStart=null; studentQCount=0; haltedTotalLabel=''; haltedTotalQuestions=0;
   allTimeLB=null;  // force refresh so updated all-time scores show immediately
   sessionStorage.removeItem('qz_pid'); sessionStorage.removeItem(NAV_KEY);
   render();
   fetchLeaderboard();
 }
-function doLogout(){ clearAuth(); role=null; myPid=null; myName=null; hostAuthed=false; HOST_PASSWORD_INPUT=''; showingProfile=false; prevMyScore=0; scoreGain=0; myLastAnswerTime=null; localAnswerTimes={}; startTimerDisplay._lastStart=null; studentQCount=0; allTimeLB=null; serverSchedules=null; hostSchedules=[]; sessionStorage.removeItem(NAV_KEY); sessionStorage.removeItem('scc_hpw'); render(); }
+function doLogout(){ clearAuth(); role=null; myPid=null; myName=null; hostAuthed=false; HOST_PASSWORD_INPUT=''; showingProfile=false; prevMyScore=0; scoreGain=0; myLastAnswerTime=null; localAnswerTimes={}; sessionCorrectTimes=[]; startTimerDisplay._lastStart=null; studentQCount=0; allTimeLB=null; serverSchedules=null; hostSchedules=[]; sessionStorage.removeItem(NAV_KEY); sessionStorage.removeItem('scc_hpw'); render(); }
 
 /* Shared back navigation */
 function doBack(){
@@ -3082,7 +3435,7 @@ function doHostLogin(){
   sessionStorage.setItem('scc_hpw', v);
   send({type:'set_host',password:v});
 }
-function doLeave(){ role=null; myName=null; myPid=null; showingProfile=false; prevMyScore=0; scoreGain=0; myLastAnswerTime=null; localAnswerTimes={}; startTimerDisplay._lastStart=null; studentQCount=0; haltedTotalLabel=''; haltedTotalQuestions=0; sessionStorage.removeItem('qz_pid'); sessionStorage.removeItem(NAV_KEY); render(); }
+function doLeave(){ role=null; myName=null; myPid=null; showingProfile=false; prevMyScore=0; scoreGain=0; myLastAnswerTime=null; localAnswerTimes={}; sessionCorrectTimes=[]; startTimerDisplay._lastStart=null; studentQCount=0; haltedTotalLabel=''; haltedTotalQuestions=0; sessionStorage.removeItem('qz_pid'); sessionStorage.removeItem(NAV_KEY); render(); }
 function doJoin(){
   const name=currentUser?.name||'';
   if(!name)return;
