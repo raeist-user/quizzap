@@ -242,14 +242,16 @@ function bankGameScores() {
 function fresh() {
   return {
     status:           'idle',
-    sessionOpen:      false,  // FIX #1: was missing — students always saw "No session active"
+    sessionOpen:      false,
     question:         null,
     correct:          null,
-    answers:          {},     // pid → optIdx
-    participants:     {},     // pid → { id, name, score, userId }
+    answers:          {},       // pid → optIdx
+    answerTimes:      {},       // pid → seconds (server-recorded, sourced from student timeTaken)
+    participants:     {},       // pid → { id, name, score, userId }
     history:          [],
     timerSeconds:     0,
     questionPushedAt: null,
+    totalQuestions:   0,        // total questions loaded by host — used as denominator
   };
 }
 
@@ -269,7 +271,7 @@ function broadcast()    {
 function project(role, pid) {
   const base = {
     status:           state.status,
-    sessionOpen:      state.sessionOpen,  // FIX #2: was missing — client never knew when joining was allowed
+    sessionOpen:      state.sessionOpen,
     question:         state.question,
     participants:     Object.values(state.participants),
     totalAnswered:    Object.keys(state.answers).length,
@@ -279,6 +281,8 @@ function project(role, pid) {
       : [],
     timerSeconds:     state.timerSeconds,
     questionPushedAt: state.questionPushedAt,
+    answerTimes:      state.answerTimes,       // server-recorded per-student times
+    totalQuestions:   state.totalQuestions,    // denominator — total questions loaded by host
   };
   if (role === 'host') return { ...base, correct: state.correct, answers: state.answers, history: state.history, sessionSnapshots, gameScores: Object.entries(gameScores).map(([pid,g])=>({id:pid,name:g.name,total:g.total})) };
   if (role === 'participant') {
@@ -367,8 +371,10 @@ wss.on('connection', ws => {
         state.question         = msg.question;
         state.correct          = msg.correct;
         state.answers          = {};
+        state.answerTimes      = {};
         state.timerSeconds     = Math.max(0, parseInt(msg.timerSeconds) || 0);
         state.questionPushedAt = Date.now();
+        if (msg.totalQuestions > 0) state.totalQuestions = parseInt(msg.totalQuestions);
         broadcast();
         break;
 
@@ -442,7 +448,7 @@ wss.on('connection', ws => {
         if (client.role !== 'host') break;
         clients.forEach((c) => {
           if (c.role === 'participant')
-            tx(c.ws, { type: 'halted', payload: { participants: Object.values(state.participants) } });
+            tx(c.ws, { type: 'halted', payload: { participants: Object.values(state.participants), totalQuestions: state.totalQuestions } });
         });
         broadcast();
         break;
@@ -458,7 +464,7 @@ wss.on('connection', ws => {
           persistLeaderboard(finalLeaderboard);
           clients.forEach((c) => {
             if (c.role === 'participant') {
-              tx(c.ws, { type: 'kicked', payload: { finalLeaderboard } });
+              tx(c.ws, { type: 'kicked', payload: { finalLeaderboard, totalQuestions: state.totalQuestions } });
               c.role = null; c.pid = null;
             }
           });
@@ -485,6 +491,9 @@ wss.on('connection', ws => {
         if (state.answers[client.pid] !== undefined) break;
         if (typeof msg.idx !== 'number' || msg.idx < 0 || msg.idx > 3) break;
         state.answers[client.pid] = msg.idx;
+        // Record timeTaken sent by the student — this is the authoritative source
+        if (typeof msg.timeTaken === 'number' && msg.timeTaken >= 0)
+          state.answerTimes[client.pid] = parseFloat(msg.timeTaken.toFixed(2));
         broadcast();
         break;
 
