@@ -141,6 +141,28 @@ app.get('/api/check-username', async (req, res) => {
   } catch (e) { res.status(500).json({ available: false }); }
 });
 
+// Verify session — called on every page load to confirm the account still exists
+// Returns fresh user data so any manual DB edits (e.g. username added) are picked up immediately
+app.get('/api/me', requireAuth, async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id).select('-password').lean();
+    if (!user) return res.status(401).json({ error: 'Account not found' });
+    // Issue a refreshed token so the client always has up-to-date claims
+    const token = jwt.sign(
+      { id: user._id, name: user.name, displayName: user.displayName || '', username: user.username, role: user.role },
+      JWT_SECRET,
+      { expiresIn: '7d' }
+    );
+    res.json({
+      token,
+      user: { id: user._id, name: user.name, displayName: user.displayName || '', username: user.username, role: user.role }
+    });
+  } catch (e) {
+    console.error('/api/me error:', e.message);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 // Change password
 app.post('/api/change-password', requireAuth, async (req, res) => {
   try {
