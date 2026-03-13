@@ -22,9 +22,8 @@ mongoose.connect(MONGODB_URI)
 
 const userSchema = new mongoose.Schema({
   name:        { type: String, required: true, trim: true, maxlength: 50 },
-  displayName: { type: String, trim: true, maxlength: 32, default: '' },
-  // email is now the primary identity — required for new registrations, sparse so existing docs without it don't conflict
-  email:       { type: String, trim: true, lowercase: true, sparse: true, unique: true, default: null },
+  // email is the primary identity — required at both schema and route level
+  email:       { type: String, required: true, trim: true, lowercase: true, unique: true },
   // username is optional — users can set it for login/display; sparse unique so null docs don't conflict
   username:    { type: String, lowercase: true, trim: true, sparse: true, unique: true, match: /^[a-zA-Z0-9_]{3,30}$/, default: null },
   password:    { type: String, required: true },
@@ -120,10 +119,10 @@ app.post('/api/register', async (req, res) => {
       password: hashed,
     });
     const token = jwt.sign(
-      { id: user._id, name: user.name, displayName: user.displayName || '', email: user.email, username: user.username || '', role: user.role },
+      { id: user._id, name: user.name, email: user.email, username: user.username || '', role: user.role },
       JWT_SECRET, { expiresIn: '7d' }
     );
-    res.json({ token, user: { id: user._id, name: user.name, displayName: user.displayName || '', email: user.email, username: user.username || '', role: user.role } });
+    res.json({ token, user: { id: user._id, name: user.name, email: user.email, username: user.username || '', role: user.role } });
   } catch (e) {
     if (e.code === 11000) {
       const field = Object.keys(e.keyPattern || {})[0] || '';
@@ -161,10 +160,10 @@ app.post('/api/login', async (req, res) => {
       return res.status(400).json({ error: 'Invalid email/username or password' });
 
     const token = jwt.sign(
-      { id: user._id, name: user.name, displayName: user.displayName || '', email: user.email || '', username: user.username || '', role: user.role },
+      { id: user._id, name: user.name, email: user.email || '', username: user.username || '', role: user.role },
       JWT_SECRET, { expiresIn: '7d' }
     );
-    res.json({ token, user: { id: user._id, name: user.name, displayName: user.displayName || '', email: user.email || '', username: user.username || '', role: user.role } });
+    res.json({ token, user: { id: user._id, name: user.name, email: user.email || '', username: user.username || '', role: user.role } });
   } catch (e) { res.status(500).json({ error: 'Login failed' }); }
 });
 
@@ -187,13 +186,13 @@ app.get('/api/me', requireAuth, async (req, res) => {
     if (!user) return res.status(401).json({ error: 'Account not found' });
     // Issue a refreshed token so the client always has up-to-date claims
     const token = jwt.sign(
-      { id: user._id, name: user.name, displayName: user.displayName || '', email: user.email || '', username: user.username || '', role: user.role },
+      { id: user._id, name: user.name, email: user.email || '', username: user.username || '', role: user.role },
       JWT_SECRET,
       { expiresIn: '7d' }
     );
     res.json({
       token,
-      user: { id: user._id, name: user.name, displayName: user.displayName || '', email: user.email || '', username: user.username || '', role: user.role }
+      user: { id: user._id, name: user.name, email: user.email || '', username: user.username || '', role: user.role }
     });
   } catch (e) {
     console.error('/api/me error:', e.message);
@@ -216,15 +215,15 @@ app.post('/api/change-password', requireAuth, async (req, res) => {
   } catch (e) { res.status(500).json({ error: 'Failed' }); }
 });
 
-// Update display name — writes directly to the name field (no separate displayName var)
+// Update display name
 app.post('/api/update-name', requireAuth, async (req, res) => {
   try {
     const { displayName } = req.body;
     if (!displayName?.trim()) return res.status(400).json({ error: 'Display name required' });
     if (displayName.trim().length > 32) return res.status(400).json({ error: 'Max 32 characters' });
     const user = await User.findByIdAndUpdate(req.user.id, { name: displayName.trim() }, { new: true });
-    const token = jwt.sign({ id: user._id, name: user.name, displayName: user.displayName || '', email: user.email || '', username: user.username || '', role: user.role }, JWT_SECRET, { expiresIn: '7d' });
-    res.json({ ok: true, token, user: { id: user._id, name: user.name, displayName: user.displayName || '', email: user.email || '', username: user.username || '', role: user.role } });
+    const token = jwt.sign({ id: user._id, name: user.name, email: user.email || '', username: user.username || '', role: user.role }, JWT_SECRET, { expiresIn: '7d' });
+    res.json({ ok: true, token, user: { id: user._id, name: user.name, email: user.email || '', username: user.username || '', role: user.role } });
   } catch (e) { res.status(500).json({ error: 'Failed' }); }
 });
 
@@ -241,8 +240,8 @@ app.post('/api/update-username', requireAuth, async (req, res) => {
     if (existing && existing._id.toString() !== req.user.id)
       return res.status(400).json({ error: 'Username already taken' });
     const user = await User.findByIdAndUpdate(req.user.id, { username: uname }, { new: true });
-    const token = jwt.sign({ id: user._id, name: user.name, displayName: user.displayName || '', email: user.email || '', username: user.username || '', role: user.role }, JWT_SECRET, { expiresIn: '7d' });
-    res.json({ ok: true, token, user: { id: user._id, name: user.name, displayName: user.displayName || '', email: user.email || '', username: user.username || '', role: user.role } });
+    const token = jwt.sign({ id: user._id, name: user.name, email: user.email || '', username: user.username || '', role: user.role }, JWT_SECRET, { expiresIn: '7d' });
+    res.json({ ok: true, token, user: { id: user._id, name: user.name, email: user.email || '', username: user.username || '', role: user.role } });
   } catch (e) {
     if (e.code === 11000) return res.status(400).json({ error: 'Username already taken' });
     res.status(500).json({ error: 'Failed' });
