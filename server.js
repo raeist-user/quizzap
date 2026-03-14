@@ -383,6 +383,10 @@ let gameScores = {};
 // sessionSnapshots: array of { sessionNum, scores: [{id,name,score}] } — one entry per completed session
 let sessionSnapshots = [];
 let sessionCounter = 0;
+// ── QUESTION REPORTS ──────────────────────────────────────────────────────────
+// Students can flag questions they believe have a wrong answer
+let questionReports = []; // { rid, question, correct, reportedAnswer, reporterName, reporterPids, ts, count }
+let reportCounter = 0;
 
 function bankGameScores() {
   const snap = [];
@@ -482,6 +486,8 @@ wss.on('connection', ws => {
         client.role = 'host'; hostCid = cid;
         tx(ws, { type: 'auth_ok' });
         tx(ws, { type: 'state', payload: project('host', null) });
+        // Send any existing reports accumulated before host connected
+        if (questionReports.length) tx(ws, { type: 'report_received', reports: questionReports });
         break;
 
       case 'join': {
@@ -598,6 +604,7 @@ wss.on('connection', ws => {
         // Bank current session scores before wiping
         bankGameScores();
         state = fresh();
+        questionReports = []; reportCounter = 0;
         clients.forEach((c) => {
           if (c.role === 'participant' && c.pid && c.name)
             state.participants[c.pid] = { id: c.pid, name: c.name, score: 0, userId: c.userId || null };
@@ -634,6 +641,7 @@ wss.on('connection', ws => {
         gameScores = {};
         sessionSnapshots = [];
         sessionCounter = 0;
+        questionReports = []; reportCounter = 0;
         state = fresh();
         broadcast();
         break;
@@ -658,6 +666,46 @@ wss.on('connection', ws => {
           state.answerTimes[client.pid] = parseFloat(msg.timeTaken.toFixed(2));
         broadcast();
         break;
+
+      // ── QUESTION REPORT ─────────────────────────────────────────────────────
+      // Student flags a question they believe has an incorrect answer key
+      case 'report_question': {
+        if (client.role !== 'participant' || !client.pid) break;
+        if (!msg.question?.text) break;
+        // De-duplicate: one report per student per question text
+        const existingRep = questionReports.find(r =>
+          r.question.text === msg.question.text && r.reporterPids.includes(client.pid)
+        );
+        if (existingRep) break;
+        const dupRep = questionReports.find(r => r.question.text === msg.question.text);
+        if (dupRep) {
+          // Already reported — just add this student to it
+          dupRep.count += 1;
+          dupRep.reporterPids.push(client.pid);
+        } else {
+          questionReports.push({
+            rid:           ++reportCounter,
+            question:      msg.question,
+            correct:       msg.correct ?? null,
+            reportedAnswer: msg.reportedAnswer ?? null,
+            reporterName:  client.name || 'Unknown',
+            reporterPids:  [client.pid],
+            ts:            Date.now(),
+            count:         1,
+          });
+        }
+        // Notify host immediately
+        txHost({ type: 'report_received', reports: questionReports });
+        break;
+      }
+
+      // ── DISMISS REPORT (host only) ───────────────────────────────────────────
+      case 'dismiss_report': {
+        if (client.role !== 'host') break;
+        questionReports = questionReports.filter(r => r.rid !== msg.rid);
+        txHost({ type: 'report_received', reports: questionReports });
+        break;
+      }
 
       // WebRTC relay
       case 'rtc_offer':
