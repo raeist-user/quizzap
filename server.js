@@ -418,6 +418,7 @@ function fresh() {
     timerSeconds:     0,
     questionPushedAt: null,
     totalQuestions:   0,        // total questions loaded by host — used as denominator
+    pushedCount:      0,        // how many questions have actually been pushed this session
   };
 }
 
@@ -449,6 +450,7 @@ function project(role, pid) {
     questionPushedAt: state.questionPushedAt,
     answerTimes:      state.answerTimes,       // server-recorded per-student times
     totalQuestions:   state.totalQuestions,    // denominator — total questions loaded by host
+    pushedCount:      state.pushedCount,       // questions actually pushed this session
   };
   if (role === 'host') return { ...base, correct: state.correct, answers: state.answers, history: state.history, sessionSnapshots, gameScores: Object.entries(gameScores).map(([pid,g])=>({id:pid,name:g.name,total:g.total})) };
   if (role === 'participant') {
@@ -542,6 +544,7 @@ wss.on('connection', ws => {
         state.answerTimes      = {};
         state.timerSeconds     = Math.max(0, parseInt(msg.timerSeconds) || 0);
         state.questionPushedAt = Date.now();
+        state.pushedCount      += 1;
         if (msg.totalQuestions > 0) state.totalQuestions = parseInt(msg.totalQuestions);
         broadcast();
         break;
@@ -617,7 +620,7 @@ wss.on('connection', ws => {
         if (client.role !== 'host') break;
         clients.forEach((c) => {
           if (c.role === 'participant')
-            tx(c.ws, { type: 'halted', payload: { participants: Object.values(state.participants), totalQuestions: state.totalQuestions } });
+            tx(c.ws, { type: 'halted', payload: { participants: Object.values(state.participants), totalQuestions: state.pushedCount } });
         });
         broadcast();
         break;
@@ -633,7 +636,7 @@ wss.on('connection', ws => {
           persistLeaderboard(finalLeaderboard);
           clients.forEach((c) => {
             if (c.role === 'participant') {
-              tx(c.ws, { type: 'kicked', payload: { finalLeaderboard, totalQuestions: state.totalQuestions } });
+              tx(c.ws, { type: 'kicked', payload: { finalLeaderboard, totalQuestions: state.pushedCount } });
               c.role = null; c.pid = null;
             }
           });
