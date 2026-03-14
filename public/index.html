@@ -863,8 +863,8 @@ function connect(){
         { const fl = m.payload?.finalLeaderboard;
           if(fl && fl.length) haltedSnapshot = fl;
           else { const fp = m.payload?.participants||S.participants||[]; if(fp.length) haltedSnapshot=[...fp]; }
-          // totalQuestions comes from server (host's loaded question count) — authoritative
-          haltedTotalQuestions = m.payload?.totalQuestions || S.totalQuestions || 0;
+          // totalQuestions comes from server (host's pushed question count) — authoritative
+          haltedTotalQuestions = m.payload?.totalQuestions || S.pushedCount || 0;
           haltedTotalLabel = haltedTotalQuestions > 0 ? String(haltedTotalQuestions) : '?';
           // ── Save session to history ──────────────────────────────────────
           if(role==='participant'&&myPid){
@@ -873,7 +873,7 @@ function connect(){
             const kickMe=kickParts.find(p=>p.id===myPid);
             const kickScore=kickMe?.score||S.myScore||0;
             const kickRank=kickSorted.findIndex(p=>p.id===myPid)+1;
-            const kickTotal=m.payload?.totalQuestions||S.totalQuestions||studentQCount||0;
+            const kickTotal=m.payload?.totalQuestions||S.pushedCount||studentQCount||0;
             const kickHistory=m.payload?.myHistory||S.myHistory||[];
             const kickCorrect=kickHistory.length
               ? kickHistory.filter(h=>h.myAnswer!==null&&h.myAnswer===h.correct).length
@@ -897,7 +897,7 @@ function connect(){
       case 'halted':
         { const haltedParts=m.payload?.participants||S.participants||[];
           haltedSnapshot=haltedParts;
-          haltedTotalQuestions = m.payload?.totalQuestions || S.totalQuestions || 0;
+          haltedTotalQuestions = m.payload?.totalQuestions || S.pushedCount || 0;
           haltedTotalLabel = haltedTotalQuestions > 0 ? String(haltedTotalQuestions) : '?';
         }
         showingHalted=true; haltedCountdown=0; // no auto-dismiss — wait for host
@@ -1482,9 +1482,7 @@ async function generateQuiz(){
     s.files.filter(f=>f.selected).forEach(f=>selections.push({file:f,subjName:s.name}));
   });
   if(!selections.length){msg.innerHTML='<div class="notice n-bad mt2">Select at least one chapter file above.</div>';return;}
-  // Determine denominator label for final leaderboard
-  const anyAll=selections.some(({file})=>!file.count||file.count===0);
-  haltedTotalLabel=anyAll?'all':String(selections.reduce((s,{file})=>s+(file.count||0),0));
+  // Denominator is now based on questions actually pushed, not questions loaded
   msg.innerHTML='<div class="notice n-neutral mt2">Fetching questions…</div>';
   let all=[];
   try{
@@ -1678,7 +1676,7 @@ function haltedHTML(){
   const myP=sorted.find(p=>p.id===myPid);
   const myRank=sorted.findIndex(p=>p.id===myPid)+1;
   const total=haltedTotalQuestions||0;
-  const totalStr=haltedTotalLabel||(studentQCount>0?String(studentQCount):total>0?String(total):'?');
+  const totalStr=total>0?String(total):'?';
   const rows=sorted.length
     ?sorted.map((p,i)=>`
       <div class="lb-row${p.id===myPid?' me':''}">
@@ -1710,7 +1708,7 @@ function studentDismissedHTML(){
   const myP=sorted.find(p=>p.id===myPid);
   const myRank=sorted.findIndex(p=>p.id===myPid)+1;
   const total=haltedTotalQuestions||0;
-  const totalStr=haltedTotalLabel||(studentQCount>0?String(studentQCount):total>0?String(total):'?');
+  const totalStr=total>0?String(total):'?';
   const rows=sorted.length
     ?sorted.map((p,i)=>`
       <div class="lb-row${p.id===myPid?' me':''}">
@@ -2575,14 +2573,20 @@ function hostHTML(){
   // ── 1. LIVE SCORE NAV ──────────────────────────────────────────────────
   const snaps = S.sessionSnapshots || [];
   const currentSessionLabel = snaps.length > 0 ? `S${snaps.length + 1}` : 'S1';
+  const pushedSoFar = S.pushedCount || 0;
+  const totalLoaded = questions.length || 0;
   const standingsLabel = parts.length
     ? `📊 ${currentSessionLabel} · ${parts.length} joined`
     : `📊 Standings`;
+  const pushedLabel = totalLoaded > 0
+    ? `Q${pushedSoFar}/${totalLoaded}`
+    : pushedSoFar > 0 ? `Q${pushedSoFar}` : '';
   const liveNav=`
     <div class="host-live-nav">
       <button class="btn btn-ghost btn-sm" id="btn-host-home" style="flex-shrink:0;padding:4px 8px;font-size:.75rem">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:3px"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9,22 9,12 15,12 15,22"/></svg>Home
       </button>
+      ${pushedLabel?`<span style="font-size:.72rem;font-weight:700;color:var(--accent);background:#eff6ff;border:1px solid #bfdbfe;padding:2px 8px;border-radius:20px;flex-shrink:0">${pushedLabel}</span>`:''}
       <div style="flex:1;min-width:0;display:flex;align-items:center;justify-content:center">
         <button class="btn btn-ghost btn-sm" id="btn-standings-open" style="padding:5px 14px;font-size:.8rem;font-weight:600;border-color:var(--line)">
           ${standingsLabel}
@@ -2597,9 +2601,6 @@ function hostHTML(){
         </button>
         <span id="reports-badge" class="reports-badge" style="display:${receivedReports.length?'flex':'none'};align-items:center;justify-content:center">${receivedReports.length||0}</span>
       </div>
-      <button class="btn btn-ghost btn-sm" id="btn-host-settings" title="Keyboard shortcuts &amp; settings" aria-label="Open keyboard shortcuts" style="flex-shrink:0;padding:4px 9px;font-size:.75rem">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-      </button>
     </div>`;
 
   // SVG icons — refined set
@@ -2880,7 +2881,7 @@ function hostEndedHTML(){
   const sorted=[...parts].sort((a,b)=>(b.score||0)-(a.score||0));
   const partMap={}; parts.forEach(p=>partMap[p.id]=p);
   const totalQs=history.length;
-  const totalLabel=haltedTotalLabel||(questions.length>0?String(questions.length):totalQs>0?String(totalQs):'?');
+  const totalLabel=String(totalQs||S.pushedCount||0);
   const table=parts.length&&history.length?`<div class="itbl-wrap"><table class="itbl">
     <thead><tr><th>Student</th>${history.map((_,i)=>`<th>Q${i+1}</th>`).join('')}<th>Score</th></tr></thead>
     <tbody>${sorted.map(p=>`<tr data-pid="${p.id}"><td><strong>${esc(p.name)}</strong></td>
