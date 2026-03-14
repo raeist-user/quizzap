@@ -811,6 +811,22 @@ function connect(){
           // totalQuestions comes from server (host's loaded question count) — authoritative
           haltedTotalQuestions = m.payload?.totalQuestions || S.totalQuestions || 0;
           haltedTotalLabel = haltedTotalQuestions > 0 ? String(haltedTotalQuestions) : '?';
+          // ── Save session to history ──────────────────────────────────────
+          if(role==='participant'&&myPid){
+            const kickParts=m.payload?.participants||S.participants||[];
+            const kickSorted=[...kickParts].sort((a,b)=>(b.score||0)-(a.score||0));
+            const kickMe=kickParts.find(p=>p.id===myPid);
+            const kickScore=kickMe?.score||S.myScore||0;
+            const kickRank=kickSorted.findIndex(p=>p.id===myPid)+1;
+            const kickTotal=m.payload?.totalQuestions||S.totalQuestions||studentQCount||0;
+            const kickHistory=m.payload?.myHistory||S.myHistory||[];
+            const kickCorrect=kickHistory.length
+              ? kickHistory.filter(h=>h.myAnswer!==null&&h.myAnswer===h.correct).length
+              : sessionCorrectTimes.length; // fallback: count of timed correct answers
+            const kickFastest=sessionCorrectTimes.length?Math.round(Math.min(...sessionCorrectTimes)*1000):null;
+            saveSession({date:new Date().toISOString(),score:kickScore,total:kickTotal,rank:kickRank||0,participants:kickParts.length,correct:kickCorrect,fastestMs:kickFastest});
+            sessionCorrectTimes=[];
+          }
         }
         showingHalted=false; showingDismissed=true; dismissedCountdown=120;
         if(dismissedTimer){clearInterval(dismissedTimer);dismissedTimer=null;}
@@ -854,8 +870,8 @@ function connect(){
           if(pushTimeout){ clearTimeout(pushTimeout); pushTimeout=null; }
         }
         if(ns==='idle'&&prevStatus==='idle'){ prevMyScore=inc; }
-        // Save session on end
-        if(ns==='ended'&&prevStatus!=='ended'&&role==='participant'&&myPid){
+        // Save session on end (natural end — all questions done)
+        if(ns==='ended'&&prevStatus!=='ended'&&role==='participant'&&myPid&&!showingDismissed){
           const pts=m.payload.participants||[];
           const sorted2=[...pts].sort((a,b)=>(b.score||0)-(a.score||0));
           const myRank2=sorted2.findIndex(p=>p.id===myPid)+1;
