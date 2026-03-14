@@ -667,7 +667,26 @@ wss.on('connection', ws => {
         broadcast();
         break;
 
-      // ── QUESTION REPORT ─────────────────────────────────────────────────────
+      // ── RAISE HAND ──────────────────────────────────────────────────────────
+      case 'raise_hand': {
+        if (client.role !== 'participant' || !client.pid) break;
+        const raiseName = (msg.name || client.name || 'A student').slice(0, 40);
+        txHost({ type: 'hand_raised', name: raiseName, pid: client.pid });
+        break;
+      }
+
+      // ── UPDATE QUESTION (host fix via report) ────────────────────────────────
+      case 'update_question': {
+        if (client.role !== 'host') break;
+        if (!msg.question?.text || !Array.isArray(msg.question.options)) break;
+        // Only update if this question is currently live/revealed
+        if (state.question && state.question.text === msg.question.text) {
+          state.question = msg.question;
+          if (typeof msg.correct === 'number') state.correct = msg.correct;
+          broadcast();
+        }
+        break;
+      }
       // Student flags a question they believe has an incorrect answer key
       case 'report_question': {
         if (client.role !== 'participant' || !client.pid) break;
