@@ -1616,6 +1616,24 @@ function studentDismissedHTML(){
 /* ══════════════════════════════════════
    PROFILE PAGE
 ══════════════════════════════════════ */
+function profileNiceStep(max){
+  const raw=max/5;
+  const mag=Math.pow(10,Math.floor(Math.log10(raw||1)));
+  const norm=raw/mag;
+  const nice=norm<=1?1:norm<=2?2:norm<=5?5:10;
+  return Math.max(1,nice*mag);
+}
+function profileCatmullToCubic(pts){
+  if(pts.length<2) return '';
+  let d=`M${pts[0].x},${pts[0].y}`;
+  for(let i=0;i<pts.length-1;i++){
+    const p0=pts[Math.max(i-1,0)], p1=pts[i], p2=pts[i+1], p3=pts[Math.min(i+2,pts.length-1)];
+    const cp1x=p1.x+(p2.x-p0.x)/6, cp1y=p1.y+(p2.y-p0.y)/6;
+    const cp2x=p2.x-(p3.x-p1.x)/6, cp2y=p2.y-(p3.y-p1.y)/6;
+    d+=` C${cp1x},${cp1y} ${cp2x},${cp2y} ${p2.x},${p2.y}`;
+  }
+  return d;
+}
 function profilePageHTML(){
   const u=currentUser;
   const initials=u.name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
@@ -1628,6 +1646,7 @@ function profilePageHTML(){
   let body='';
 
   if(profileTab==='overview'){
+    try{
     const history=loadHistory();
     if(!history.length){
       body=`<div class="no-data-notice"><span>📊</span>No sessions yet. Complete a quiz to see your stats here!</div>`;
@@ -1653,15 +1672,7 @@ function profilePageHTML(){
       const last15=[...history].reverse().slice(-15);
       const scores=last15.map(e=>e.score||0);
       const maxScore=Math.max(...scores,1);
-      // Nice gridlines: step = ceil(max/5) rounded to nice number
-      function niceStep(max){
-        const raw=max/5;
-        const mag=Math.pow(10,Math.floor(Math.log10(raw||1)));
-        const norm=raw/mag;
-        const nice=norm<=1?1:norm<=2?2:norm<=5?5:10;
-        return Math.max(1,nice*mag);
-      }
-      const step=niceStep(maxScore);
+      const step=profileNiceStep(maxScore);
       const gridMax=Math.ceil(maxScore/step)*step;
       const gridLines=[];
       for(let v=0;v<=gridMax;v+=step) gridLines.push(v);
@@ -1674,7 +1685,7 @@ function profilePageHTML(){
       const barGap=chartW/barCount;
       const maxScoreIdx=scores.indexOf(Math.max(...scores));
 
-      let svgBars='', svgGridX='', svgLabels='', tooltipDivs='';
+      let svgBars='', svgGridX='', svgLabels='';
       // Grid lines + labels
       gridLines.forEach(v=>{
         const y=PAD_T+chartH-(v/gridMax)*chartH;
@@ -1718,22 +1729,7 @@ function profilePageHTML(){
       // Filter out nulls for curve drawing
       const validPts=pts2.filter(p=>p!==null);
 
-      // Bezier path using catmull-rom → cubic bezier
-      function catmullToCubic(pts){
-        if(pts.length<2) return '';
-        let d=`M${pts[0].x},${pts[0].y}`;
-        for(let i=0;i<pts.length-1;i++){
-          const p0=pts[Math.max(i-1,0)], p1=pts[i], p2=pts[i+1], p3=pts[Math.min(i+2,pts.length-1)];
-          const cp1x=p1.x+(p2.x-p0.x)/6;
-          const cp1y=p1.y+(p2.y-p0.y)/6;
-          const cp2x=p2.x-(p3.x-p1.x)/6;
-          const cp2y=p2.y-(p3.y-p1.y)/6;
-          d+=` C${cp1x},${cp1y} ${cp2x},${cp2y} ${p2.x},${p2.y}`;
-        }
-        return d;
-      }
-
-      const curvePath=catmullToCubic(validPts);
+      const curvePath=profileCatmullToCubic(validPts);
       const fillPath=validPts.length>1?`${curvePath} L${validPts[validPts.length-1].x},${AT+achH} L${validPts[0].x},${AT+achH} Z`:'';
 
       // Y gridlines at 0,25,50,75,100
@@ -1867,6 +1863,10 @@ function profilePageHTML(){
       }
 
       body=statsHTML+barChartHTML+accChartHTML+hmHTML+breakdownHTML+rankCardHTML;
+    }
+    }catch(err){
+      console.error('Profile overview render error:', err);
+      body=`<div class="no-data-notice"><span>⚠️</span><b style="color:var(--ink)">Overview failed to load</b><br><span style="font-size:.75rem;font-family:monospace;word-break:break-all">${err.message}</span></div>`;
     }
   }
 
@@ -2918,9 +2918,13 @@ function attach(){
   // Profile dropdown — one-time setup handled in setupOutsideClick() above
   setupOutsideClick();
   on('btn-logout', doLogout);
-  on('btn-profile',()=>{ showingProfile=true; profileTab='overview'; document.getElementById('p-dropdown')?.classList.add('hidden'); navPush(); render(); });
+  on('btn-profile',()=>{ showingProfile=true; profileTab='overview'; document.getElementById('p-dropdown')?.classList.add('hidden'); navPush(); render(); fetchLeaderboard(); });
   on('btn-profile-back',()=>{ showingProfile=false; render(); });
-  document.querySelectorAll('.ptab[data-ptab]').forEach(el=>el.addEventListener('click',()=>{ profileTab=el.dataset.ptab; render(); }));
+  document.querySelectorAll('.ptab[data-ptab]').forEach(el=>el.addEventListener('click',()=>{
+    profileTab=el.dataset.ptab;
+    if(profileTab==='overview') fetchLeaderboard();
+    render();
+  }));
   if(showingProfile) setupProfileCharts();
 
   on('btn-dismissed-home', doDismissHome);
