@@ -469,6 +469,18 @@
     .home-full{height:calc(100vh - 54px);display:flex;align-items:center;justify-content:center;padding:20px;overflow:hidden}
     .lb-full-screen{height:calc(100vh - 54px);display:flex;flex-direction:column;overflow:hidden;padding:16px 20px}
     .lb-full-inner{max-width:520px;width:100%;margin:0 auto;display:flex;flex-direction:column;flex:1;overflow:hidden}
+
+    /* REPORT CARDS */
+    .report-card{background:var(--white);border:1px solid var(--line);border-radius:var(--r);margin-bottom:8px;overflow:hidden;transition:box-shadow .15s}
+    .report-card:hover{box-shadow:0 2px 10px rgba(0,0,0,.07)}
+    .report-card-head{display:flex;align-items:flex-start;gap:10px;padding:10px 12px;cursor:pointer;transition:background .1s;user-select:none}
+    .report-card-head:hover{background:var(--faint)}
+    .report-expand-body{border-top:1px solid var(--line);animation:fadeIn .15s ease}
+    .r-opt-row{display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:6px;margin-bottom:5px;font-size:.83rem;border:1px solid transparent}
+    .r-opt-correct{background:#dcfce7;border-color:#86efac}
+    .r-opt-reported{background:#fffbeb;border-color:#fcd34d}
+    .r-opt-normal{background:var(--white);border-color:var(--line)}
+    .reports-badge{position:absolute;top:-4px;right:-4px;background:var(--bad);color:#fff;font-size:.58rem;font-weight:700;padding:1px 5px;border-radius:10px;min-width:16px;text-align:center;line-height:1.6;pointer-events:none}
   </style>
 </head>
 <body>
@@ -563,6 +575,14 @@ let pushing=false, pushTimeout=null;
 let showingHalted=false, haltedCountdown=0, haltedTimer=null, haltedSnapshot=[];
 let haltedTotalQuestions=0;   // total questions asked in the session (for score/total display)
 let haltedTotalLabel='';      // denominator label for final leaderboard: 'all' or specific count string
+
+// ── QUESTION REPORT STATE ────────────────────────────────────────────────────
+let receivedReports=[];          // [{rid,question,correct,reportedAnswer,reporterName,ts,count}]
+let reportsOverlayOpen=false;    // whether the host reports overlay is visible
+let expandedReportRid=null;      // which report card is expanded (shows options)
+let editingReportRid=null;       // which report is in edit mode
+let editReportDraft={};          // {text, options:[], correct}
+let myReportedQuestions=new Set(); // track question texts reported by this student (prevent duplicates)
 
 // Dismissed flow
 let showingDismissed=false, dismissedCountdown=120, dismissedTimer=null;
@@ -935,6 +955,18 @@ function connect(){
       case 'auth_ok':   hostAuthed=true; fetchHostSchedules(); browseRepo(); navPush(); render(); break;
       case 'auth_fail': { const el=document.getElementById('pw-err'); if(el)el.textContent='Incorrect password.'; break; }
       case 'left':      doLeave(); break;
+      case 'report_received': {
+        receivedReports = m.reports || [];
+        // Update badge in-place without full re-render (avoids flicker during live quiz)
+        const rb = document.getElementById('reports-badge');
+        if (rb) {
+          rb.textContent = receivedReports.length;
+          rb.style.display = receivedReports.length ? 'flex' : 'none';
+        }
+        // If overlay is open, re-render to show updated list
+        if (reportsOverlayOpen) render();
+        break;
+      }
       case 'open_session_result':
         if(m.ok){
           playMp3('start.mp3');
@@ -2278,6 +2310,161 @@ function hostSettingsOverlayHTML(){
   </div>`;
 }
 
+
+/* ══════════════════════════════════════
+   REPORTS OVERLAY (host)
+══════════════════════════════════════ */
+function reportsOverlayHTML(){
+  if(!reportsOverlayOpen) return '';
+  const reports=receivedReports;
+  const hd=`<div class="standings-overlay-head">
+    <div style="display:flex;align-items:center;gap:10px">
+      <span style="font-weight:700;font-size:.95rem">&#128297; Reported Questions</span>
+      <span style="font-size:.75rem;color:var(--mid)">${reports.length} report${reports.length!==1?'s':''}</span>
+    </div>
+    <button class="btn btn-ghost btn-sm" id="btn-reports-close">&#x2715; Close</button>
+  </div>`;
+  if(!reports.length){
+    return `<div class="standings-overlay" id="reports-overlay">${hd}
+      <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:48px 20px;text-align:center;color:var(--mid)">
+        <div style="font-size:2.4rem;margin-bottom:12px">&#128461;</div>
+        <div style="font-size:.88rem;font-weight:500;margin-bottom:6px">No reports yet</div>
+        <div style="font-size:.78rem">Students can flag questions using the &#128681; button after a reveal.</div>
+      </div></div>`;
+  }
+  const cards=reports.map(r=>{
+    const isX=expandedReportRid===r.rid, isEd=editingReportRid===r.rid;
+    const q=r.question, uc=q&&q.subject&&q.subject.toLowerCase()==='urdu';
+    const s=Math.floor((Date.now()-r.ts)/1000);
+    const ago=s<60?s+'s ago':s<3600?Math.floor(s/60)+'m ago':Math.floor(s/3600)+'h ago';
+    const headH=`<div class="report-card-head" data-r-expand="${r.rid}">
+      <div style="flex:1;min-width:0">
+        <div style="font-size:.82rem;font-weight:500;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;${uc?'direction:rtl;font-family:Noto Nastaliq Urdu,serif;font-size:.86rem':''}">
+          ${renderMath(q?q.text.length>90?q.text.slice(0,88)+'\u2026':q.text:'?')}
+        </div>
+        <div style="display:flex;align-items:center;gap:7px;margin-top:3px;flex-wrap:wrap">
+          <span style="font-size:.7rem;color:var(--mid)">&#128681; ${esc(r.reporterName)}</span>
+          <span style="font-size:.7rem;color:var(--mid)">&middot; ${ago}</span>
+          ${r.count>1?`<span style="background:#fee2e2;color:#be123c;font-size:.63rem;font-weight:700;padding:1px 6px;border-radius:10px">${r.count}&times; flagged</span>`:''}
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:5px;flex-shrink:0;padding-left:4px">
+        <span style="font-size:.75rem;color:var(--mid);display:inline-block;transition:transform .2s;${isX?'transform:rotate(180deg)':''}">&#9662;</span>
+        <button class="btn btn-ghost btn-sm" data-r-dismiss="${r.rid}" style="font-size:.66rem;padding:2px 7px">&#x2715;</button>
+      </div>
+    </div>`;
+    let bodyH='';
+    if(isX){
+      if(isEd){
+        const d=editReportDraft;
+        bodyH=`<div class="report-expand-body" style="padding:13px 14px">
+          <div style="margin-bottom:10px">
+            <div style="font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--mid);margin-bottom:5px">Question text</div>
+            <textarea id="r-edit-qtext" style="width:100%;padding:8px 10px;border:1.5px solid var(--ink);border-radius:var(--r);font-family:${uc?'Noto Nastaliq Urdu,serif':'var(--sans)'};font-size:.83rem;line-height:${uc?'2.2':'1.45'};resize:vertical;outline:none;min-height:54px;box-sizing:border-box;${uc?'direction:rtl;text-align:right;':''}">${esc(d.text||'')}</textarea>
+          </div>
+          <div style="margin-bottom:10px">
+            <div style="font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--mid);margin-bottom:6px">Options</div>
+            <div style="display:flex;flex-direction:column;gap:5px">
+              ${(d.options||[]).map((o,i)=>`<div style="display:flex;align-items:center;gap:7px">
+                <div style="width:24px;height:24px;border-radius:5px;background:${d.correct===i?'var(--ink)':'var(--faint)'};color:${d.correct===i?'#fff':'var(--mid)'};border:1.5px solid ${d.correct===i?'var(--ink)':'var(--line)'};display:flex;align-items:center;justify-content:center;font-size:.68rem;font-weight:700;flex-shrink:0">${'ABCD'[i]}</div>
+                <input class="form-input" data-r-opt="${i}" value="${esc(o)}" style="flex:1;padding:5px 9px;font-size:.82rem;${uc?'direction:rtl;text-align:right;font-family:Noto Nastaliq Urdu,serif;':''}"/></div>`).join('')}
+            </div>
+          </div>
+          <div style="margin-bottom:13px">
+            <div style="font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--mid);margin-bottom:6px">Correct answer <span style="font-weight:400;text-transform:none;letter-spacing:0">(click to select)</span></div>
+            <div class="key-grid" style="min-height:unset;gap:6px">
+              ${(d.options||[]).map((o,i)=>`<div class="key-card${d.correct===i?' selected':''}" data-r-key="${i}" tabindex="0" role="button" aria-label="Option ${'ABCD'[i]}"><div class="kl">${'ABCD'[i]}</div><div class="kt${uc?' urdu':''}" style="font-size:.76rem">${renderMath(o||'')}</div></div>`).join('')}
+            </div>
+          </div>
+          <div style="display:flex;gap:7px;align-items:center">
+            <button class="btn btn-dark" id="btn-save-report-edit" style="flex:1;font-size:.8rem;gap:5px;padding:9px 12px">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17,21 17,13 7,13 7,21"/></svg>Save &amp; Fix
+            </button>
+            <button class="btn btn-ghost" id="btn-cancel-report-edit" style="font-size:.8rem;padding:9px 14px">Cancel</button>
+          </div>
+          <div id="report-edit-msg" style="font-size:.75rem;margin-top:7px;min-height:1.1em"></div>
+        </div>`;
+      } else {
+        const optR=(q&&q.options||[]).map((o,i)=>{
+          const isCr=i===r.correct, isRp=r.reportedAnswer!==null&&i===r.reportedAnswer;
+          let cls='r-opt-normal'; let badge='';
+          if(isCr){cls='r-opt-correct';badge=`<span style="font-size:.62rem;font-weight:600;color:#16a34a;flex-shrink:0">&#10003; marked correct</span>`;}
+          if(isRp&&!isCr){cls='r-opt-reported';badge=`<span style="font-size:.62rem;font-weight:600;color:#d97706;flex-shrink:0">&#9888; student picked</span>`;}
+          if(isRp&&isCr){badge=`<span style="font-size:.62rem;font-weight:600;color:#16a34a;flex-shrink:0">&#10003; correct (student also chose)</span>`;}
+          return `<div class="r-opt-row ${cls}">
+            <div style="width:22px;height:22px;border-radius:4px;background:${isCr?'var(--good)':isRp?'#f59e0b':'var(--line)'};color:${isCr||isRp?'#fff':'var(--mid)'};display:flex;align-items:center;justify-content:center;font-size:.67rem;font-weight:700;flex-shrink:0">${'ABCD'[i]}</div>
+            <span class="${uc?'urdu':''}" style="flex:1;font-size:.82rem">${renderMath(o)}</span>
+            ${badge}
+          </div>`;
+        }).join('');
+        bodyH=`<div class="report-expand-body" style="padding:12px 14px">
+          <div style="margin-bottom:10px">
+            <div style="font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--mid);margin-bottom:5px">Question${q&&q.subject?' &middot; '+esc(q.subject):''}${q&&q.chapter?' / '+esc(q.chapter):''}</div>
+            <div class="${uc?'urdu':''}" style="font-size:.85rem;line-height:${uc?'2.2':'1.5'};padding:9px 11px;background:var(--faint);border:1px solid var(--line);border-radius:6px">${renderMath(q&&q.text||'')}</div>
+          </div>
+          <div style="margin-bottom:10px">${optR}</div>
+          <div style="display:flex;gap:7px">
+            <button class="btn btn-dark btn-sm" data-r-edit="${r.rid}" style="gap:5px;font-size:.78rem">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>Edit
+            </button>
+            <button class="btn btn-ghost btn-sm" data-r-dismiss="${r.rid}" style="font-size:.78rem">&#x2715; Dismiss</button>
+          </div>
+        </div>`;
+      }
+    }
+    return `<div class="report-card" data-rid="${r.rid}">${headH}${bodyH}</div>`;
+  }).join('');
+
+  return `<div class="standings-overlay" id="reports-overlay">
+    ${hd}
+    <div class="standings-overlay-body" style="padding:12px">${cards}</div>
+  </div>`;
+}
+
+/* ══════════════════════════════════════
+   GITHUB QUESTION UPDATER
+   Reads the source .txt file, finds the question, moves the @ marker
+   to the newly selected correct option, and writes back to GitHub.
+══════════════════════════════════════ */
+async function updateReportedQuestionInGitHub(q, newText, newOptions, newCorrect){
+  if(!q||!q.subject||!q.chapter) return {ok:false,error:'No subject/chapter info on question'};
+  if(!isValidToken())             return {ok:false,error:'No GitHub token configured'};
+  const fileName=q.chapter+'.txt';
+  const encS=q.subject.split('/').map(encodeURIComponent).join('/');
+  const encF=encodeURIComponent(fileName);
+  const apiUrl=`https://api.github.com/repos/${GITHUB_REPO}/contents/resources/${encS}/${encF}?ref=${GITHUB_BRANCH}`;
+  try{
+    const res=await fetch(apiUrl,{headers:ghHeaders()});
+    if(!res.ok) throw new Error(`Cannot read file (HTTP ${res.status})`);
+    const data=await res.json();
+    const bytes=Uint8Array.from(atob(data.content.replace(/\n/g,'')),c=>c.charCodeAt(0));
+    const fileText=new TextDecoder('utf-8').decode(bytes);
+    const lines=fileText.split('\n');
+    // Find question line — strip leading "1. " numbering before comparing
+    const origText=q.text.trim();
+    let qi=-1;
+    for(let i=0;i<lines.length;i++){
+      const stripped=lines[i].trim().replace(/^\d+[.)]\s*/,'');
+      if(stripped===origText&&i+1<lines.length&&/\(A\)/i.test(lines[i+1])){ qi=i; break; }
+    }
+    if(qi<0) return {ok:false,error:'Question not found in file — edit manually'};
+    // Preserve existing number prefix  e.g. "12. "
+    const pfx=(lines[qi].match(/^(\d+[.)]\s*)/))||[''];
+    lines[qi]=pfx[0]+newText.trim();
+    // Rebuild option line with @ on correct answer
+    lines[qi+1]=newOptions.map((o,i)=>`(${['A','B','C','D'][i]}) ${o.replace(/@/g,'').trim()}${i===newCorrect?' @':''}`).join(', ');
+    const newContent=lines.join('\n');
+    const writeUrl=`https://api.github.com/repos/${GITHUB_REPO}/contents/resources/${encS}/${encF}`;
+    const wr=await fetch(writeUrl,{method:'PUT',headers:ghWriteHeaders(),body:JSON.stringify({
+      message:`Fix answer: ${newText.trim().slice(0,55)}`,
+      content:btoa(unescape(encodeURIComponent(newContent))),
+      sha:data.sha, branch:GITHUB_BRANCH
+    })});
+    if(!wr.ok) throw new Error(`Write failed (HTTP ${wr.status})`);
+    return {ok:true};
+  }catch(e){ return {ok:false,error:e.message}; }
+}
+
 /* ══════════════════════════════════════
    HOST KEYBOARD SHORTCUTS (global handler — added/removed by attach)
 ══════════════════════════════════════ */
@@ -2285,6 +2472,7 @@ function hostKeyDown(e){
   if(!hostAuthed||role!=='host') return;
   // Close settings with Escape
   if(hostSettingsOpen&&e.key==='Escape'){ hostSettingsOpen=false; render(); return; }
+  if(reportsOverlayOpen&&e.key==='Escape'){ reportsOverlayOpen=false; editingReportRid=null; editReportDraft={}; render(); return; }
   if(folderManageSubject&&e.key==='Escape'){ folderManageSubject=null; manageFolder=null; manageEditMode=null; manageFile=null; manageFolderFiles=[]; editingContent=''; editingSha=null; uploadMsg=''; editorFullscreen=false; render(); return; }
   if(folderOverlaySubject&&e.key==='Escape'){ folderOverlaySubject=null; folderOverlayDraft={}; render(); return; }
   // Close halt/sched overlays with Escape
@@ -2351,6 +2539,12 @@ function hostHTML(){
       <button class="btn btn-ghost btn-sm" id="btn-sched-nav" style="flex-shrink:0;padding:4px 8px;gap:4px;font-size:.75rem">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>Sched
       </button>
+      <div style="position:relative;flex-shrink:0">
+        <button class="btn btn-ghost btn-sm" id="btn-reports-open" title="Received question reports" style="padding:4px 8px;font-size:.75rem;gap:4px">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>
+        </button>
+        <span id="reports-badge" class="reports-badge" style="display:${receivedReports.length?'flex':'none'};align-items:center;justify-content:center">${receivedReports.length||0}</span>
+      </div>
       <button class="btn btn-ghost btn-sm" id="btn-host-settings" title="Keyboard shortcuts &amp; settings" aria-label="Open keyboard shortcuts" style="flex-shrink:0;padding:4px 9px;font-size:.75rem">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
       </button>
@@ -2514,6 +2708,7 @@ function hostHTML(){
       ${schedOverlayHTML()}
       ${haltMenuOverlayHTML()}
       ${standingsOverlayHTML()}
+      ${reportsOverlayHTML()}
       ${hostSettingsOverlayHTML()}
     </div>`;
   }
@@ -2614,6 +2809,7 @@ function hostHTML(){
     ${schedOverlayHTML()}
     ${haltMenuOverlayHTML()}
     ${standingsOverlayHTML()}
+    ${reportsOverlayHTML()}
     ${hostSettingsOverlayHTML()}
   </div>`;
 }
@@ -2770,6 +2966,10 @@ function questionViewHTML(){
   if(revealed&&answered){ const ok=S.myAnswer===correct; notice=`<div class="notice ${ok?'n-good':'n-bad'} mt3">${ok?'✓ Correct — +1 point':`✗ Wrong. Correct: ${esc(q.options[correct])}`}</div>`; }
   else if(answered&&!revealed){ notice=`<div class="notice n-neutral mt3">Answer submitted — waiting for reveal.</div>`; }
   const hasTimer=S.timerSeconds&&S.status==='question';
+  // Report button: visible after reveal so student can flag wrong answer key
+  const canReport=revealed&&q&&!myReportedQuestions.has(q.text);
+  const alreadyReported=revealed&&q&&myReportedQuestions.has(q.text);
+  const reportRow=revealed?`<div style="text-align:center;margin-top:14px">${canReport?`<button class="btn btn-ghost btn-sm" id="btn-report-q" style="color:var(--mid);font-size:.73rem;gap:5px;padding:5px 13px;border-color:var(--line)"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>Report wrong answer</button>`:alreadyReported?`<span style="font-size:.72rem;color:var(--good)">✓ Reported — thanks for flagging</span>`:''}</div>`:'';
   return `${scoreBannerHTML()}<div class="page">
     <div class="row between mb2">
       <div class="row gap2"><div id="mic-dot" class="mic-dot"></div><span class="small muted">Score: <strong>${S.myScore||0}</strong> pts</span></div>
@@ -2779,6 +2979,7 @@ function questionViewHTML(){
     <h2 class="mb3${urduCls(q)}">${renderMath(q.text)}</h2>
     <div class="opt-grid">${opts}</div>
     ${notice}
+    ${reportRow}
   </div>`;
 }
 
@@ -3249,7 +3450,7 @@ function attach(){
     hostTimerSeconds=Math.max(0,parseInt(document.getElementById('timer-sec-input')?.value)||0);
     generateQuiz();
   });
-  on('btn-reload',()=>{ questions=[]; selIdx=-1; answerKey=-1; subjects=[]; expandedSubject=null; repoPath=null; folderOverlaySubject=null; folderOverlayDraft={}; folderManageSubject=null; showNewFolderCard=false; manageFolder=null; manageFile=null; manageFolderFiles=[]; manageEditMode=null; manageNewFileName=''; editingContent=''; editingSha=null; uploadMsg=''; editorFullscreen=false; haltedTotalLabel=''; render(); });
+  on('btn-reload',()=>{ questions=[]; selIdx=-1; answerKey=-1; subjects=[]; expandedSubject=null; repoPath=null; folderOverlaySubject=null; folderOverlayDraft={}; folderManageSubject=null; showNewFolderCard=false; manageFolder=null; manageFile=null; manageFolderFiles=[]; manageEditMode=null; manageNewFileName=''; editingContent=''; editingSha=null; uploadMsg=''; editorFullscreen=false; haltedTotalLabel=''; reportsOverlayOpen=false; expandedReportRid=null; editingReportRid=null; editReportDraft={}; render(); });
 
   // Timer input (live)
   document.getElementById('timer-sec-live')?.addEventListener('change',e=>{ hostTimerSeconds=Math.max(0,parseInt(e.target.value)||0); });
@@ -3364,11 +3565,113 @@ function attach(){
     })
   );
 
+  // ── STUDENT: Report wrong answer button ──────────────────────────────────
+  on('btn-report-q', ()=>{
+    const q=S.question; if(!q) return;
+    if(myReportedQuestions.has(q.text)) return;
+    myReportedQuestions.add(q.text);
+    send({
+      type:'report_question',
+      question:q,
+      correct:S.correct??null,
+      reportedAnswer:S.myAnswer??null,
+    });
+    // Show immediate feedback without full re-render
+    const btn=document.getElementById('btn-report-q');
+    if(btn){ btn.disabled=true; btn.innerHTML='&#10003; Reported — thanks!'; btn.style.color='var(--good)'; btn.style.borderColor='var(--good)'; }
+  });
+
   updateMicDot();
 
   // Global host keyboard shortcuts — re-attach fresh on every render
   document.removeEventListener('keydown', hostKeyDown);
   if(role==='host'&&hostAuthed) document.addEventListener('keydown', hostKeyDown);
+
+  // ── HOST: Reports overlay ─────────────────────────────────────────────────
+  on('btn-reports-open', ()=>{ reportsOverlayOpen=true; render(); });
+  on('btn-reports-close',()=>{ reportsOverlayOpen=false; editingReportRid=null; editReportDraft={}; render(); });
+
+  // Expand/collapse individual report card
+  document.querySelectorAll('[data-r-expand]').forEach(el=>{
+    el.addEventListener('click', e=>{
+      if(e.target.closest('[data-r-dismiss]')||e.target.closest('[data-r-edit]')) return;
+      const rid=+el.dataset.rExpand;
+      if(expandedReportRid===rid){ expandedReportRid=null; editingReportRid=null; editReportDraft={}; }
+      else { expandedReportRid=rid; editingReportRid=null; editReportDraft={}; }
+      render();
+    });
+  });
+
+  // Dismiss report
+  document.querySelectorAll('[data-r-dismiss]').forEach(el=>{
+    el.addEventListener('click', e=>{
+      e.stopPropagation();
+      const rid=+el.dataset.rDismiss;
+      send({type:'dismiss_report', rid});
+      if(expandedReportRid===rid){ expandedReportRid=null; editingReportRid=null; editReportDraft={}; }
+    });
+  });
+
+  // Enter edit mode for a report
+  document.querySelectorAll('[data-r-edit]').forEach(el=>{
+    el.addEventListener('click', e=>{
+      e.stopPropagation();
+      const rid=+el.dataset.rEdit;
+      const rep=receivedReports.find(r=>r.rid===rid);
+      if(!rep) return;
+      editingReportRid=rid;
+      editReportDraft={
+        text: rep.question?.text||'',
+        options: (rep.question?.options||[]).slice(),
+        correct: rep.correct??0,
+        rid,
+      };
+      render();
+      setTimeout(()=>document.getElementById('r-edit-qtext')?.focus(),40);
+    });
+  });
+
+  // Answer key selection inside report edit
+  document.querySelectorAll('[data-r-key]').forEach(el=>{
+    el.addEventListener('click', ()=>{
+      editReportDraft.correct=+el.dataset.rKey;
+      // Patch key cards in-place (no full re-render) for snappy response
+      document.querySelectorAll('[data-r-key]').forEach(k=>{
+        k.classList.toggle('selected', +k.dataset.rKey===editReportDraft.correct);
+      });
+    });
+  });
+
+  // Cancel edit mode
+  on('btn-cancel-report-edit',()=>{ editingReportRid=null; editReportDraft={}; render(); });
+
+  // Save & Fix — write to GitHub and dismiss the report
+  on('btn-save-report-edit', async ()=>{
+    const msg=document.getElementById('report-edit-msg');
+    if(msg){ msg.textContent='Saving…'; msg.style.color='var(--mid)'; }
+    // Read live textarea / input values into draft
+    const ta=document.getElementById('r-edit-qtext');
+    if(ta) editReportDraft.text=ta.value;
+    document.querySelectorAll('[data-r-opt]').forEach(inp=>{ editReportDraft.options[+inp.dataset.rOpt]=inp.value; });
+    if(!editReportDraft.text?.trim()){ if(msg){msg.textContent='Question text cannot be empty';msg.style.color='var(--bad)';}return; }
+    const rep=receivedReports.find(r=>r.rid===editReportDraft.rid);
+    if(!rep){ if(msg){msg.textContent='Report not found';msg.style.color='var(--bad)';}return; }
+    const result=await updateReportedQuestionInGitHub(
+      rep.question,
+      editReportDraft.text,
+      editReportDraft.options,
+      editReportDraft.correct
+    );
+    if(result.ok){
+      // Dismiss the report
+      send({type:'dismiss_report', rid:rep.rid});
+      editingReportRid=null; editReportDraft={}; expandedReportRid=null;
+      showToast('✅ Question fixed and saved to GitHub!','good');
+      render();
+    } else {
+      if(msg){ msg.textContent='Error: '+result.error; msg.style.color='var(--bad)'; }
+    }
+  });
 }
 
 function on(id,fn){ document.getElementById(id)?.addEventListener('click',fn); }
