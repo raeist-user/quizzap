@@ -60,6 +60,19 @@ const leaderboardSchema = new mongoose.Schema({
 });
 const LeaderboardEntry = mongoose.model('LeaderboardEntry', leaderboardSchema);
 
+// ── SESSION HISTORY MODEL ─────────────────────────────────────────────────────
+const sessionSchema = new mongoose.Schema({
+  userId:      { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
+  date:        { type: Date, default: Date.now },
+  score:       { type: Number, default: 0 },
+  total:       { type: Number, default: 0 },   // total questions in session
+  correct:     { type: Number, default: 0 },   // correct answers
+  rank:        { type: Number, default: 0 },   // rank in that session
+  participants:{ type: Number, default: 0 },   // how many players were in session
+  fastestMs:   { type: Number, default: null }, // fastest correct answer in ms
+});
+const SessionEntry = mongoose.model('SessionEntry', sessionSchema);
+
 // ── EXPRESS ───────────────────────────────────────────────────────────────────
 const app = express();
 app.use(express.json());
@@ -313,6 +326,53 @@ app.post('/api/leaderboard', requireAuth, async (req, res) => {
     }
     res.json({ ok: true });
   } catch (e) { res.status(500).json({ error: 'Failed to save leaderboard' }); }
+});
+
+// ── SESSION HISTORY ROUTES ────────────────────────────────────────────────────
+
+// GET /api/sessions — return logged-in user's history (newest first, max 100)
+app.get('/api/sessions', requireAuth, async (req, res) => {
+  try {
+    const sessions = await SessionEntry.find({ userId: req.user.id })
+      .sort({ date: -1 })
+      .limit(100)
+      .lean();
+    // Shape to match what the client expects
+    const history = sessions.map(s => ({
+      date:         s.date.toISOString(),
+      score:        s.score,
+      total:        s.total,
+      correct:      s.correct,
+      rank:         s.rank,
+      participants: s.participants,
+      fastestMs:    s.fastestMs ?? null,
+    }));
+    res.json({ history });
+  } catch (e) {
+    console.error('/api/sessions GET error:', e.message);
+    res.status(500).json({ error: 'Failed to fetch session history' });
+  }
+});
+
+// POST /api/sessions — save one session after a game ends
+app.post('/api/sessions', requireAuth, async (req, res) => {
+  try {
+    const { date, score, total, correct, rank, participants, fastestMs } = req.body;
+    await SessionEntry.create({
+      userId:       req.user.id,
+      date:         date ? new Date(date) : new Date(),
+      score:        Number(score)        || 0,
+      total:        Number(total)        || 0,
+      correct:      Number(correct)      || 0,
+      rank:         Number(rank)         || 0,
+      participants: Number(participants) || 0,
+      fastestMs:    fastestMs != null ? Number(fastestMs) : null,
+    });
+    res.json({ ok: true });
+  } catch (e) {
+    console.error('/api/sessions POST error:', e.message);
+    res.status(500).json({ error: 'Failed to save session' });
+  }
 });
 
 // ── QUIZ STATE ────────────────────────────────────────────────────────────────
