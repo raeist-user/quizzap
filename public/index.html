@@ -956,6 +956,10 @@ function connect(){
       case 'auth_ok':   hostAuthed=true; fetchHostSchedules(); browseRepo(); navPush(); render(); break;
       case 'auth_fail': { const el=document.getElementById('pw-err'); if(el)el.textContent='Incorrect password.'; break; }
       case 'left':      doLeave(); break;
+      case 'hand_raised': {
+        if(role==='host') showHandRaiseToast(m.name);
+        break;
+      }
       case 'report_received': {
         receivedReports = m.reports || [];
         // Update badge in-place without full re-render (avoids flicker during live quiz)
@@ -1008,6 +1012,46 @@ function showToast(msg, type='neutral'){
   container.appendChild(t);
   requestAnimationFrame(()=>{ t.style.opacity='1'; });
   setTimeout(()=>{ t.style.opacity='0'; setTimeout(()=>t.remove(),220); },4000);
+}
+
+// Hand-raise notification for host — rich card, auto-vanishes in 5s, swipeable
+function showHandRaiseToast(studentName){
+  let container=document.getElementById('hand-raise-container');
+  if(!container){
+    container=document.createElement('div');
+    container.id='hand-raise-container';
+    container.style.cssText='position:fixed;top:58px;right:12px;z-index:9998;display:flex;flex-direction:column;gap:8px;pointer-events:none;max-width:300px;min-width:240px';
+    document.body.appendChild(container);
+  }
+  const card=document.createElement('div');
+  card.style.cssText='background:#fff;border:1.5px solid #fbbf24;border-radius:12px;box-shadow:0 6px 24px rgba(0,0,0,.15);padding:11px 14px;display:flex;align-items:flex-start;gap:10px;pointer-events:auto;cursor:default;opacity:0;transform:translateX(30px);transition:opacity .22s,transform .22s;position:relative;overflow:hidden';
+  const bar=document.createElement('div');
+  bar.style.cssText='position:absolute;bottom:0;left:0;height:3px;background:#fbbf24;width:100%;border-radius:0 0 10px 10px;transition:width 5s linear';
+  const inner=document.createElement('div');
+  inner.style.cssText='display:flex;align-items:flex-start;gap:10px;width:100%';
+  inner.innerHTML='<div style="font-size:1.4rem;flex-shrink:0;line-height:1.1">\u270B</div>'
+    +'<div style="flex:1;min-width:0"><div style="font-size:.83rem;font-weight:700;color:#92400e;line-height:1.3">'+esc(studentName)+' raised their hand</div>'
+    +'<div style="font-size:.73rem;color:#b45309;margin-top:2px">Waiting on WhatsApp for queries</div></div>'
+    +'<div class="hr-x" style="font-size:.75rem;color:#d97706;font-weight:600;flex-shrink:0;padding:1px 7px;background:#fef3c7;border-radius:6px;cursor:pointer;line-height:1.6">&#x2715;</div>';
+  card.appendChild(bar);
+  card.appendChild(inner);
+  container.appendChild(card);
+  requestAnimationFrame(()=>{
+    card.style.opacity='1'; card.style.transform='translateX(0)';
+    setTimeout(()=>{ bar.style.width='0'; },30);
+  });
+  let startX=0, dragging=false;
+  card.addEventListener('pointerdown',e=>{ startX=e.clientX; dragging=true; });
+  card.addEventListener('pointermove',e=>{ if(!dragging) return; const dx=e.clientX-startX; if(dx>10) card.style.transform='translateX('+dx+'px)'; });
+  card.addEventListener('pointerup',e=>{ dragging=false; if(e.clientX-startX>60) dismiss(); else card.style.transform='translateX(0)'; });
+  card.addEventListener('pointercancel',()=>{ dragging=false; card.style.transform='translateX(0)'; });
+  inner.querySelector('.hr-x').addEventListener('click', dismiss);
+  const timer=setTimeout(dismiss, 5000);
+  function dismiss(){
+    clearTimeout(timer);
+    card.style.opacity='0'; card.style.transform='translateX(30px)';
+    setTimeout(()=>card.remove(), 230);
+  }
 }
 
 // Store host password input for reconnection — persisted in sessionStorage to survive refresh
@@ -1512,7 +1556,11 @@ function render(){
   if(showingDismissed){ v.innerHTML=studentDismissedHTML(); attach(); return; }
   if(showingHalted){ v.innerHTML=haltedHTML(); attach(); return; }
   if(showingProfile){ v.innerHTML=profilePageHTML(); attach();
-    if(profileTab==='overview'||profileTab==='history') loadProfileData();
+    // Load profile data immediately after inserting skeleton HTML
+    if(profileTab==='overview'||profileTab==='history'){
+      // Use setTimeout(0) so the DOM is painted before async fetch starts
+      setTimeout(loadProfileData, 0);
+    }
     return; }
   if(!role)                           v.innerHTML=landingHTML();
   else if(role==='host'&&!hostAuthed) v.innerHTML=hostPassHTML();
@@ -2924,21 +2972,6 @@ function waitHTML(){
     <span>${esc(p.name)}${p.id===myPid?' <span style="font-size:.7rem;color:var(--mid)">(you)</span>':''}</span></div>`).join('');
   const history=S.myHistory||[];
   const waitMsg=history.length?'Wait for next question…':'Waiting for host to start…';
-  // Allow reporting the last answered question from the waiting screen
-  const lastH=history.length?history[history.length-1]:null;
-  const lastQ=lastH?.question||null;
-  const canReportLast=lastQ&&!myReportedQuestions.has(lastQ.text);
-  const alreadyReportedLast=lastQ&&myReportedQuestions.has(lastQ.text);
-  const reportFromWaitHTML=lastQ?`<div style="text-align:center;margin-top:8px;margin-bottom:2px">
-    ${canReportLast
-      ?`<button class="btn btn-ghost btn-sm" id="btn-report-last" style="color:var(--mid);font-size:.72rem;gap:4px;padding:4px 12px;border-color:var(--line)">
-          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>
-          Report last question's answer
-        </button>`
-      :alreadyReportedLast
-        ?`<span style="font-size:.72rem;color:var(--good)">✓ Last question reported</span>`
-        :''}
-  </div>`:'';
   const lbHTML=history.length?`<div class="lb-panel">
     <div class="lb-head"><span style="font-size:.82rem;font-weight:600">🏆 Leaderboard</span><span class="small muted">${parts.length} students</span></div>
     ${[...parts].sort((a,b)=>(b.score||0)-(a.score||0)).map((p,i)=>{
@@ -2971,8 +3004,10 @@ function waitHTML(){
     </div>
     <div class="student-grid" style="max-width:560px;margin-bottom:8px">${chips}</div>
     ${lbHTML}
-    ${reportFromWaitHTML}
-    <button class="btn btn-ghost btn-sm mt3" id="btn-leave">Leave session</button>
+    <div style="display:flex;align-items:center;gap:8px;margin-top:20px">
+      <button class="btn btn-ghost btn-sm" id="btn-leave">Leave session</button>
+      <button class="btn btn-ghost btn-sm" id="btn-raise-hand" style="gap:5px;font-size:.8rem" title="Raise hand — notify host">✋ Raise Hand</button>
+    </div>
   </div>`;
 }
 
@@ -2998,7 +3033,10 @@ function questionViewHTML(){
   return `${scoreBannerHTML()}<div class="page">
     <div class="row between mb2">
       <div class="row gap2"><div id="mic-dot" class="mic-dot"></div><span class="small muted">Score: <strong>${S.myScore||0}</strong> pts</span></div>
-      <button class="btn btn-ghost btn-sm" id="btn-leave">Leave</button>
+      <div class="row gap2">
+        <button class="btn btn-ghost btn-sm" id="btn-raise-hand" style="gap:4px;font-size:.78rem" title="Raise hand — notify host">✋</button>
+        <button class="btn btn-ghost btn-sm" id="btn-leave">Leave</button>
+      </div>
     </div>
     ${hasTimer?`<div class="timer-wrap"><div class="timer-bar-track"><div id="timer-bar" class="timer-bar-fill" style="width:100%"></div></div><div id="timer-digits" class="timer-digits">${S.timerSeconds}s</div></div>`:''}
     <h2 class="mb3${urduCls(q)}">${renderMath(q.text)}</h2>
@@ -3600,33 +3638,16 @@ function attach(){
     const q=S.question; if(!q) return;
     if(myReportedQuestions.has(q.text)) return;
     myReportedQuestions.add(q.text);
-    send({
-      type:'report_question',
-      question:q,
-      correct:S.correct??null,
-      reportedAnswer:S.myAnswer??null,
-    });
-    // Show immediate feedback without full re-render
+    send({type:'report_question',question:q,correct:S.correct??null,reportedAnswer:S.myAnswer??null});
     const btn=document.getElementById('btn-report-q');
     if(btn){ btn.disabled=true; btn.innerHTML='&#10003; Reported — thanks!'; btn.style.color='var(--good)'; btn.style.borderColor='var(--good)'; }
   });
 
-  // ── STUDENT: Report from wait screen (last question) ─────────────────────
-  on('btn-report-last', ()=>{
-    const history=S.myHistory||[];
-    const lastH=history.length?history[history.length-1]:null;
-    if(!lastH||!lastH.question) return;
-    const q=lastH.question;
-    if(myReportedQuestions.has(q.text)) return;
-    myReportedQuestions.add(q.text);
-    send({
-      type:'report_question',
-      question:q,
-      correct:lastH.correct??null,
-      reportedAnswer:lastH.myAnswer??null,
-    });
-    const btn=document.getElementById('btn-report-last');
-    if(btn){ btn.disabled=true; btn.innerHTML='&#10003; Reported — thanks!'; btn.style.color='var(--good)'; btn.style.borderColor='var(--good)'; }
+  // ── STUDENT: Raise hand button ───────────────────────────────────────────
+  on('btn-raise-hand', ()=>{
+    send({type:'raise_hand', name:myName||currentUser?.name||'Student'});
+    const btn=document.getElementById('btn-raise-hand');
+    if(btn){ btn.disabled=true; btn.style.opacity='.5'; setTimeout(()=>{ btn.disabled=false; btn.style.opacity=''; },10000); }
   });
 
   updateMicDot();
@@ -3711,10 +3732,26 @@ function attach(){
       editReportDraft.correct
     );
     if(result.ok){
+      // ── Update the live questions array instantly ──────────────────────────
+      const fixedQ={
+        ...rep.question,
+        text: editReportDraft.text.trim(),
+        options: editReportDraft.options.slice(),
+        correct: editReportDraft.correct,
+      };
+      // Update in host's local questions array
+      const qi=questions.findIndex(q=>q.text===rep.question.text);
+      if(qi>=0){
+        questions[qi]=fixedQ;
+        // If this is the currently selected question, update answerKey too
+        if(selIdx===qi) answerKey=editReportDraft.correct;
+      }
+      // Tell server to update the live state question if it's currently pushed
+      send({type:'update_question', question:fixedQ, correct:editReportDraft.correct});
       // Dismiss the report
       send({type:'dismiss_report', rid:rep.rid});
       editingReportRid=null; editReportDraft={}; expandedReportRid=null;
-      showToast('✅ Question fixed and saved to GitHub!','good');
+      showToast('✅ Question fixed, saved to GitHub, and pushed live!','good');
       render();
     } else {
       if(msg){ msg.textContent='Error: '+result.error; msg.style.color='var(--bad)'; }
