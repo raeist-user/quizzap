@@ -780,6 +780,11 @@ async function fetchLeaderboard(){
     const r=await fetch('/api/leaderboard');
     const d=await r.json();
     allTimeLB=d.leaderboard||[];
+    // If we're on the profile overview, patch just the rank card — no full re-render
+    if(showingProfile&&profileTab==='overview'){
+      const rc=document.getElementById('profile-rank-card');
+      if(rc){ rc.outerHTML=buildRankCardHTML(); return; }
+    }
     render();
   }catch(e){ allTimeLB=[]; }
 }
@@ -1632,6 +1637,18 @@ function studentDismissedHTML(){
 /* ══════════════════════════════════════
    PROFILE PAGE
 ══════════════════════════════════════ */
+function buildRankCardHTML(){
+  if(!currentUser) return '';
+  const myEntry=allTimeLB?allTimeLB.find(e=>e.userId===currentUser.id):null;
+  const myRankAll=allTimeLB?allTimeLB.findIndex(e=>e.userId===currentUser.id)+1:0;
+  const totalPlayers=allTimeLB?allTimeLB.length:0;
+  const totalPts=myEntry?myEntry.total||myEntry.score||0:0;
+  if(allTimeLB===null)
+    return `<div class="prank-card" id="profile-rank-card"><div class="prank-num" style="font-size:1.2rem;color:var(--mid)">…</div><div class="prank-info"><div class="prank-label">All-Time Rank</div><div class="prank-sub">Loading leaderboard…</div></div></div>`;
+  if(myEntry)
+    return `<div class="prank-card" id="profile-rank-card"><div class="prank-num">#${myRankAll}</div><div class="prank-info"><div class="prank-label">All-Time Rank</div><div class="prank-sub">of ${totalPlayers} players · ${totalPts} total pts</div></div><div style="font-size:1.4rem">🏅</div></div>`;
+  return `<div class="prank-card" id="profile-rank-card"><div class="prank-num" style="font-size:1rem;color:var(--mid)">—</div><div class="prank-info"><div class="prank-label">All-Time Rank</div><div class="prank-sub">Not yet ranked on the leaderboard</div></div></div>`;
+}
 function profileNiceStep(max){
   const raw=max/5;
   const mag=Math.pow(10,Math.floor(Math.log10(raw||1)));
@@ -1856,27 +1873,7 @@ function profilePageHTML(){
       </div>`;
 
       // ── Leaderboard rank card ────────────────────────────────────────────────
-      let rankCardHTML='';
-      if(currentUser){
-        const myEntry=allTimeLB?allTimeLB.find(e=>e.userId===currentUser.id):null;
-        const myRankAll=allTimeLB?allTimeLB.findIndex(e=>e.userId===currentUser.id)+1:0;
-        const totalPlayers=allTimeLB?allTimeLB.length:0;
-        const totalPts=myEntry?myEntry.total||myEntry.score||0:0;
-        if(allTimeLB===null){
-          rankCardHTML=`<div class="prank-card"><div class="prank-num" style="font-size:1.2rem;color:var(--mid)">…</div><div class="prank-info"><div class="prank-label">All-Time Rank</div><div class="prank-sub">Loading leaderboard…</div></div></div>`;
-        } else if(myEntry){
-          rankCardHTML=`<div class="prank-card">
-            <div class="prank-num">#${myRankAll}</div>
-            <div class="prank-info">
-              <div class="prank-label">All-Time Rank</div>
-              <div class="prank-sub">of ${totalPlayers} players · ${totalPts} total pts</div>
-            </div>
-            <div style="font-size:1.4rem">🏅</div>
-          </div>`;
-        } else {
-          rankCardHTML=`<div class="prank-card"><div class="prank-num" style="font-size:1rem;color:var(--mid)">—</div><div class="prank-info"><div class="prank-label">All-Time Rank</div><div class="prank-sub">Not yet ranked on the leaderboard</div></div></div>`;
-        }
-      }
+      const rankCardHTML=buildRankCardHTML();
 
       body=statsHTML+barChartHTML+accChartHTML+hmHTML+breakdownHTML+rankCardHTML;
     }
@@ -2869,45 +2866,39 @@ function setupOutsideClick(){
 /* ══════════════════════════════════════
    PROFILE CHART INTERACTIONS
 ══════════════════════════════════════ */
+let _chartListenerAC = null;
 function setupProfileCharts(){
-  // Generic tooltip setup for SVG elements
+  // Kill any previous tooltip listeners before re-attaching
+  if(_chartListenerAC) _chartListenerAC.abort();
+  _chartListenerAC = new AbortController();
+  const sig = _chartListenerAC.signal;
+
   function attachTooltip(wrapId, tooltipId, selector, getContent){
     const wrap=document.getElementById(wrapId);
     const tip=document.getElementById(tooltipId);
     if(!wrap||!tip) return;
     let dismissTimer=null;
-    const show=(el,e)=>{
+    const show=(el)=>{
       clearTimeout(dismissTimer);
       const content=getContent(el);
       if(!content) return;
       tip.textContent=content;
-      // Position tooltip: use SVG element's bounding rect relative to wrap
       const wrapRect=wrap.getBoundingClientRect();
       const elRect=el.getBoundingClientRect();
       const cx=elRect.left+elRect.width/2-wrapRect.left;
-      const pct=(cx/wrapRect.width)*100;
-      tip.style.left=Math.max(5,Math.min(95,pct))+'%';
+      tip.style.left=Math.max(5,Math.min(95,(cx/wrapRect.width)*100))+'%';
       tip.style.opacity='1';
     };
     const hide=()=>{ tip.style.opacity='0'; };
     wrap.querySelectorAll(selector).forEach(el=>{
-      el.addEventListener('mouseenter',e=>show(el,e));
-      el.addEventListener('mouseleave',()=>hide());
-      el.addEventListener('touchstart',e=>{ e.preventDefault(); show(el,e); clearTimeout(dismissTimer); dismissTimer=setTimeout(hide,1400); },{passive:false});
+      el.addEventListener('mouseenter',()=>show(el),{signal:sig});
+      el.addEventListener('mouseleave',hide,{signal:sig});
+      el.addEventListener('touchstart',e=>{ e.preventDefault(); show(el); clearTimeout(dismissTimer); dismissTimer=setTimeout(hide,1400); },{passive:false,signal:sig});
     });
   }
 
-  // Score bar chart
-  attachTooltip('score-chart-wrap','score-tooltip','.bar-rect',el=>{
-    const score=el.getAttribute('data-score');
-    const label=el.getAttribute('data-label');
-    return `${score} pts · ${label}`;
-  });
-
-  // Accuracy trend chart
-  attachTooltip('acc-chart-wrap','acc-tooltip','.acc-dot',el=>{
-    return el.getAttribute('data-label');
-  });
+  attachTooltip('score-chart-wrap','score-tooltip','.bar-rect',el=>`${el.dataset.score} pts · ${el.dataset.label}`);
+  attachTooltip('acc-chart-wrap','acc-tooltip','.acc-dot',el=>el.dataset.label);
 }
 
 function attach(){
@@ -2934,14 +2925,14 @@ function attach(){
   // Profile dropdown — one-time setup handled in setupOutsideClick() above
   setupOutsideClick();
   on('btn-logout', doLogout);
-  on('btn-profile',()=>{ showingProfile=true; profileTab='overview'; document.getElementById('p-dropdown')?.classList.add('hidden'); navPush(); render(); fetchLeaderboard(); });
+  on('btn-profile',()=>{ showingProfile=true; profileTab='overview'; document.getElementById('p-dropdown')?.classList.add('hidden'); navPush(); render(); if(!allTimeLB) fetchLeaderboard(); });
   on('btn-profile-back',()=>{ showingProfile=false; render(); });
   document.querySelectorAll('.ptab[data-ptab]').forEach(el=>el.addEventListener('click',()=>{
     profileTab=el.dataset.ptab;
-    if(profileTab==='overview') fetchLeaderboard();
     render();
+    if(profileTab==='overview'&&!allTimeLB) fetchLeaderboard();
   }));
-  if(showingProfile) setupProfileCharts();
+  if(showingProfile) requestAnimationFrame(setupProfileCharts);
 
   on('btn-dismissed-home', doDismissHome);
   on('btn-lb-refresh',()=>{ allTimeLB=null; render(); fetchLeaderboard(); });
