@@ -650,7 +650,7 @@ function loadStoredAuth(){
   }catch(e){}
 }
 function saveAuth(token,user){ authToken=token; currentUser=user; localStorage.setItem('scc_token',token); localStorage.setItem('scc_user',JSON.stringify(user)); }
-function clearAuth(){ authToken=null; currentUser=null; localStorage.removeItem('scc_token'); localStorage.removeItem('scc_user'); }
+function clearAuth(){ authToken=null; currentUser=null; localStorage.removeItem('scc_token'); localStorage.removeItem('scc_user'); invalidateSessionCache(); }
 
 /* ── Server-side session sync ───────────────────────────────────────────────
    Called once on boot: verifies the stored token against the DB.
@@ -733,9 +733,38 @@ async function apiDel(path){
 }
 
 // ── SESSION HISTORY ──────────────────────────────────────────────────────
-function histKey(){ return 'scc_history_'+(currentUser?.id||'x'); }
-function loadHistory(){ try{ return JSON.parse(localStorage.getItem(histKey())||'[]'); }catch{ return []; } }
-function saveSession(e){ const h=loadHistory(); h.unshift(e); localStorage.setItem(histKey(),JSON.stringify(h.slice(0,100))); }
+// History is now stored server-side. We keep a short-lived in-memory cache
+// so the profile page doesn't re-fetch on every tab switch.
+let _sessionCache = null;       // null = not loaded yet, [] = loaded but empty
+let _sessionCacheTime = 0;
+const SESSION_CACHE_TTL = 30000; // 30 s
+
+async function loadHistory(){
+  if(_sessionCache !== null && (Date.now()-_sessionCacheTime) < SESSION_CACHE_TTL)
+    return _sessionCache;
+  if(!authToken) return [];
+  try{
+    const r = await fetch('/api/sessions',{headers:{Authorization:'Bearer '+authToken}});
+    const d = await r.json();
+    _sessionCache = d.history || [];
+    _sessionCacheTime = Date.now();
+    return _sessionCache;
+  }catch(e){ return _sessionCache || []; }
+}
+function invalidateSessionCache(){ _sessionCache=null; _sessionCacheTime=0; }
+
+async function saveSession(e){
+  // Persist to DB — fire and forget, no UI block
+  if(!authToken) return;
+  try{
+    await fetch('/api/sessions',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+authToken},
+      body:JSON.stringify(e)
+    });
+    invalidateSessionCache(); // force fresh load next time profile opens
+  }catch(err){ console.warn('saveSession failed:',err.message); }
+}
 function computeStats(){
   const h=loadHistory(); if(!h.length) return null;
   const totalCorrect=h.reduce((s,e)=>s+(e.correct||0),0);
@@ -1649,6 +1678,171 @@ function buildRankCardHTML(){
     return `<div class="prank-card" id="profile-rank-card"><div class="prank-num">#${myRankAll}</div><div class="prank-info"><div class="prank-label">All-Time Rank</div><div class="prank-sub">of ${totalPlayers} players · ${totalPts} total pts</div></div><div style="font-size:1.4rem">🏅</div></div>`;
   return `<div class="prank-card" id="profile-rank-card"><div class="prank-num" style="font-size:1rem;color:var(--mid)">—</div><div class="prank-info"><div class="prank-label">All-Time Rank</div><div class="prank-sub">Not yet ranked on the leaderboard</div></div></div>`;
 }
+/* ── async profile data loader ─────────────────────────────────────────── */
+async function loadProfileData(){
+  const el=document.getElementById('profile-data-body');
+  if(!el) return;
+  try{
+    const history=await loadHistory();
+    if(profileTab==='overview') el.innerHTML=buildOverviewHTML(history);
+    else if(profileTab==='history') el.innerHTML=buildHistoryHTML(history);
+    requestAnimationFrame(setupProfileCharts);
+  }catch(err){
+    if(el) el.innerHTML=`<div class="no-data-notice"><span>⚠️</span><b style="color:var(--ink)">Failed to load</b><br><span style="font-size:.75rem;font-family:monospace">${err.message}</span></div>`;
+  }
+}
+
+function buildOverviewHTML(history){
+  if(!history.length)
+    return '<div class="no-data-notice"><span>📊</span>No sessions yet. Complete a quiz to see your stats here!</div>';
+  const totalCorrect=history.reduce((s,e)=>s+(e.correct||0),0);
+  const totalQs=history.reduce((s,e)=>s+(e.total||0),0);
+  const accuracy=totalQs?Math.round(totalCorrect/totalQs*100):0;
+  const bestScore=Math.max(...history.map(e=>e.score||0));
+  const allFastMs=history.map(e=>e.fastestMs).filter(v=>v!=null&&v>0);
+  const fastestMs=allFastMs.length?Math.min(...allFastMs):null;
+  const fastLabel=fastestMs!=null?(fastestMs<1000?(fastestMs+'ms'):(fastestMs/1000).toFixed(1)+'s'):'—';
+  const statsHTML='<div class="pov-stats">'
+    +'<div class="pov-stat"><div class="pov-stat-num">'+history.length+'</div><div class="pov-stat-lbl">Sessions</div></div>'
+    +'<div class="pov-stat"><div class="pov-stat-num">'+accuracy+'%</div><div class="pov-stat-lbl">Accuracy</div></div>'
+    +'<div class="pov-stat"><div class="pov-stat-num">'+bestScore+'</div><div class="pov-stat-lbl">Best Score</div></div>'
+    +'<div class="pov-stat"><div class="pov-stat-num" style="font-size:'+(fastestMs&&fastestMs<10000?'1.25rem':'1rem')+'">'+fastLabel+'</div><div class="pov-stat-lbl">Fastest Correct ⚡</div></div>'
+    +'</div>';
+  // Score bar chart
+  const last15=[...history].reverse().slice(-15);
+  const scores=last15.map(e=>e.score||0);
+  const maxScore=Math.max(...scores,1);
+  const step=profileNiceStep(maxScore);
+  const gridMax=Math.ceil(maxScore/step)*step;
+  const gridLines=[];
+  for(let v=0;v<=gridMax;v+=step) gridLines.push(v);
+  const W=520,H=140,PL=36,PB=24,PT=10,PR=6;
+  const cW=W-PL-PR,cH=H-PT-PB;
+  const bc=last15.length,bW=Math.floor(cW/bc*0.6),bG=cW/bc;
+  const mIdx=scores.indexOf(Math.max(...scores));
+  let svgBars='',svgGrid='',svgLbls='';
+  gridLines.forEach(v=>{
+    const y=PT+cH-(v/gridMax)*cH;
+    svgGrid+='<line x1="'+PL+'" x2="'+(W-PR)+'" y1="'+y+'" y2="'+y+'" stroke="#e4e3df" stroke-width="1"/>';
+    svgLbls+='<text x="'+(PL-4)+'" y="'+(y+4)+'" text-anchor="end" font-size="10" fill="#9a9990">'+v+'</text>';
+  });
+  svgGrid+='<line x1="'+PL+'" x2="'+(W-PR)+'" y1="'+(PT+cH)+'" y2="'+(PT+cH)+'" stroke="#e4e3df" stroke-width="1"/>';
+  last15.forEach((e,i)=>{
+    const x=PL+i*bG+bG/2;
+    const bH=scores[i]>0?(scores[i]/gridMax)*cH:2;
+    const y=PT+cH-bH;
+    const fill=i===mIdx?'#111110':'#c8c7c3';
+    const d=new Date(e.date);
+    const lbl=d.toLocaleDateString('en',{weekday:'short',month:'short',day:'numeric'});
+    svgBars+='<rect class="bar-rect" x="'+(x-bW/2)+'" y="'+y+'" width="'+bW+'" height="'+bH+'" rx="2" fill="'+fill+'" data-score="'+scores[i]+'" data-label="'+lbl+'" style="cursor:pointer"/>';
+  });
+  const barChartHTML='<div class="pchart-card"><div class="pchart-head"><span class="pchart-title">Score History</span><span style="font-size:.7rem;color:var(--mid)">Last '+last15.length+' sessions</span></div>'
+    +'<div class="chart-wrap" id="score-chart-wrap"><div class="chart-tooltip" id="score-tooltip"></div>'
+    +'<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;height:auto;display:block;overflow:visible"><g>'+svgGrid+svgLbls+svgBars+'</g></svg></div></div>';
+  // Accuracy chart
+  const accs=last15.map(e=>e.total?Math.round(e.correct/e.total*100):null);
+  const validAccs=accs.filter(v=>v!==null);
+  const avgAcc=validAccs.length?Math.round(validAccs.reduce((a,b)=>a+b,0)/validAccs.length):0;
+  const pbAcc=Math.max(...validAccs,0);
+  const pbAccIdx=accs.indexOf(pbAcc);
+  const AW=520,AH=150,AL=36,AB=24,AT=18,AR=6;
+  const achW=AW-AL-AR,achH=AH-AT-AB;
+  const pts2=accs.map((v,i)=>v!==null?{x:AL+i*(achW/(last15.length-1||1)),y:AT+achH-(v/100)*achH}:null);
+  const validPts=pts2.filter(p=>p!==null);
+  const curvePath=profileCatmullToCubic(validPts);
+  const fillPath=validPts.length>1?(curvePath+' L'+validPts[validPts.length-1].x+','+( AT+achH)+' L'+validPts[0].x+','+(AT+achH)+' Z'):'';
+  let accGrid='',accLbls='';
+  [0,25,50,75,100].forEach(v=>{
+    const y=AT+achH-(v/100)*achH;
+    accGrid+='<line x1="'+AL+'" x2="'+(AW-AR)+'" y1="'+y+'" y2="'+y+'" stroke="#e4e3df" stroke-width="1" stroke-dasharray="'+(v===0?'none':'3,3')+'"/>';
+    accLbls+='<text x="'+(AL-4)+'" y="'+(y+4)+'" text-anchor="end" font-size="10" fill="#9a9990">'+v+'</text>';
+  });
+  const pbY=AT+achH-(pbAcc/100)*achH,avgY=AT+achH-(avgAcc/100)*achH;
+  const pbLine='<line x1="'+AL+'" x2="'+(AW-AR)+'" y1="'+pbY+'" y2="'+pbY+'" stroke="#2d6a4f" stroke-width="1.5" stroke-dasharray="5,3" opacity=".8"/>';
+  const avgLine='<line x1="'+AL+'" x2="'+(AW-AR)+'" y1="'+avgY+'" y2="'+avgY+'" stroke="#9a9990" stroke-width="1.5" stroke-dasharray="5,3" opacity=".7"/>';
+  let dots='';
+  accs.forEach((v,i)=>{
+    if(v===null) return;
+    const p=pts2[i];
+    const isPB=i===pbAccIdx,isLast=i===last15.length-1,isBig=isPB||isLast;
+    let fill=v>=avgAcc?'#2d9e6b':'#c1121f'; if(isPB) fill='#2d6a4f';
+    const d=new Date(last15[i].date);
+    const lbl=v+'% · '+d.toLocaleDateString('en',{weekday:'short',month:'short',day:'numeric'});
+    dots+='<circle class="acc-dot" cx="'+p.x+'" cy="'+p.y+'" r="'+(isBig?5:3.5)+'" fill="'+fill+'" stroke="'+(isBig?'white':'none')+'" stroke-width="'+(isBig?1.5:0)+'" data-label="'+lbl+'" style="cursor:pointer"/>';
+  });
+  const gId='accGrad';
+  const accChartHTML='<div class="pchart-card"><div class="pchart-head"><span class="pchart-title">Accuracy Trend</span>'
+    +'<div class="pchart-legend"><div class="pchart-leg-item"><div class="pchart-leg-dash" style="border-top:2px dashed #2d6a4f;height:0"></div><span>PB '+pbAcc+'%</span></div>'
+    +'<div class="pchart-leg-item"><div class="pchart-leg-dash" style="border-top:2px dashed #9a9990;height:0"></div><span>Avg '+avgAcc+'%</span></div></div></div>'
+    +'<div class="chart-wrap" id="acc-chart-wrap"><div class="chart-tooltip" id="acc-tooltip"></div>'
+    +'<svg viewBox="0 0 '+AW+' '+AH+'" style="width:100%;height:auto;display:block;overflow:visible">'
+    +'<defs><linearGradient id="'+gId+'" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#2d9e6b" stop-opacity=".22"/><stop offset="100%" stop-color="#2d9e6b" stop-opacity="0"/></linearGradient></defs>'
+    +accGrid+accLbls
+    +(fillPath?'<path d="'+fillPath+'" fill="url(#'+gId+')"/>' : '')
+    +(validPts.length>1?'<path d="'+curvePath+'" fill="none" stroke="#2d9e6b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>' : '')
+    +avgLine+pbLine+dots
+    +'</svg></div></div>';
+  // Heatmap
+  const now=new Date(); now.setHours(23,59,59,999);
+  const hmStart=new Date(now); hmStart.setDate(hmStart.getDate()-104); hmStart.setHours(0,0,0,0);
+  const dayCounts={};
+  history.forEach(e=>{ const k=new Date(e.date).toDateString(); dayCounts[k]=(dayCounts[k]||0)+1; });
+  let cols='';
+  for(let w=0;w<15;w++){
+    let cells='';
+    for(let day=0;day<7;day++){
+      const dt=new Date(hmStart); dt.setDate(dt.getDate()+w*7+day);
+      if(dt>now){ cells+='<div class="hm-cell" data-v="0" style="opacity:.2"></div>'; continue; }
+      const cnt=dayCounts[dt.toDateString()]||0;
+      const v=cnt===0?0:cnt===1?1:cnt===2?2:cnt<=4?3:4;
+      const lbl=cnt?(dt.toLocaleDateString('en',{month:'short',day:'numeric'})+': '+cnt+' session'+(cnt>1?'s':'')):dt.toLocaleDateString('en',{month:'short',day:'numeric'});
+      cells+='<div class="hm-cell" data-v="'+v+'" title="'+lbl+'"></div>';
+    }
+    cols+='<div class="hm-col">'+cells+'</div>';
+  }
+  const hmHTML='<div class="pchart-card"><div class="pchart-head"><span class="pchart-title">Activity</span></div>'
+    +'<div class="heatmap-grid">'+cols+'</div>'
+    +'<div class="hm-legend"><span>Less</span>'
+    +'<div class="hm-swatch" style="background:#edecea"></div><div class="hm-swatch" style="background:#b7dfc7"></div>'
+    +'<div class="hm-swatch" style="background:#74c69d"></div><div class="hm-swatch" style="background:#40916c"></div>'
+    +'<div class="hm-swatch" style="background:#1b4332"></div><span>More</span></div></div>';
+  // Breakdown
+  const avgScore=history.length?Math.round(history.reduce((s,e)=>s+(e.score||0),0)/history.length):0;
+  const bestRanks=history.map(e=>e.rank||999).filter(r=>r>0);
+  const bestRank=bestRanks.length?Math.min(...bestRanks):null;
+  const since=new Date(history[history.length-1].date).toLocaleDateString('en',{month:'short',day:'numeric',year:'numeric'});
+  const breakdownHTML='<div class="pchart-card"><div class="pchart-head"><span class="pchart-title">Breakdown</span></div>'
+    +'<div class="prow"><span>Avg score per session</span><span class="prow-val">'+avgScore+' pts</span></div>'
+    +'<div class="prow"><span>Personal best accuracy</span><span class="prow-val" style="color:var(--good)">'+pbAcc+'%</span></div>'
+    +(bestRank?'<div class="prow"><span>Best rank achieved</span><span class="prow-val">#'+bestRank+'</span></div>':'')
+    +'<div class="prow"><span>Total questions seen</span><span class="prow-val">'+totalQs+'</span></div>'
+    +'<div class="prow"><span>Total correct answers</span><span class="prow-val">'+totalCorrect+'</span></div>'
+    +'<div class="prow"><span>Playing since</span><span class="prow-val">'+since+'</span></div></div>';
+  return statsHTML+barChartHTML+accChartHTML+hmHTML+breakdownHTML+buildRankCardHTML();
+}
+
+function buildHistoryHTML(history){
+  if(!history.length)
+    return '<div class="no-data-notice"><span>📋</span>No sessions recorded yet.</div>';
+  const maxScore=Math.max(...history.map(e=>e.score||0));
+  const rows=history.map(e=>{
+    const d=new Date(e.date);
+    const acc=e.total?Math.round(e.correct/e.total*100):null;
+    const cls=acc===null?'ok':acc>=70?'good':acc>=45?'ok':'bad';
+    const isPB=e.score===maxScore;
+    const rankStr=e.rank&&e.participants?('#'+e.rank+' of '+e.participants):e.rank?('#'+e.rank):'';
+    return '<div class="hist-row">'
+      +'<div class="col" style="min-width:80px;flex-shrink:0">'
+      +'<span class="hist-date">'+d.toLocaleDateString('en',{month:'short',day:'numeric',year:'numeric'})+'</span>'
+      +'<span class="hist-date" style="margin-top:1px">'+d.toLocaleTimeString('en',{hour:'2-digit',minute:'2-digit'})+'</span></div>'
+      +'<div class="hist-score">'+(e.score||0)+' pts'+(isPB?'<span class="hist-pb-badge">PB</span>':'')+'</div>'
+      +'<div class="hist-rank">'+rankStr+'</div>'
+      +'<div class="hist-acc '+cls+'">'+(acc!==null?acc+'%':'—')+'</div>'
+      +'</div>';
+  }).join('');
+  return '<div style="margin-bottom:6px;font-size:.75rem;color:var(--mid)">'+history.length+' session'+(history.length>1?'s':'')+' recorded</div>'+rows;
+}
+
 function profileNiceStep(max){
   const raw=max/5;
   const mag=Math.pow(10,Math.floor(Math.log10(raw||1)));
@@ -1670,248 +1864,21 @@ function profileCatmullToCubic(pts){
 function profilePageHTML(){
   const u=currentUser;
   const initials=u.name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
-  const stats=computeStats();
-  const history=loadHistory();
   // Schedule tab removed — only in host panel
   const TABS=[['overview','📈 Overview'],['history','📋 History'],['settings','⚙️ Settings']];
   const tabsHTML=TABS.map(([t,l])=>`<div class="ptab${profileTab===t?' active':''}" data-ptab="${t}">${l}</div>`).join('');
 
   let body='';
 
-  if(profileTab==='overview'){
-    try{
-    const history=loadHistory();
-    if(!history.length){
-      body=`<div class="no-data-notice"><span>📊</span>No sessions yet. Complete a quiz to see your stats here!</div>`;
-    } else {
-      // ── 4-stat header ──────────────────────────────────────────────────────
-      const totalCorrect=history.reduce((s,e)=>s+(e.correct||0),0);
-      const totalQs=history.reduce((s,e)=>s+(e.total||0),0);
-      const accuracy=totalQs?Math.round(totalCorrect/totalQs*100):0;
-      const bestScore=Math.max(...history.map(e=>e.score||0));
-      // Fastest correct answer across all sessions
-      const allFastMs=history.map(e=>e.fastestMs).filter(v=>v!=null&&v>0);
-      const fastestMs=allFastMs.length?Math.min(...allFastMs):null;
-      const fastLabel=fastestMs!=null?(fastestMs<1000?(fastestMs+'ms'):(fastestMs/1000).toFixed(1)+'s'):'—';
-
-      const statsHTML=`<div class="pov-stats">
-        <div class="pov-stat"><div class="pov-stat-num">${history.length}</div><div class="pov-stat-lbl">Sessions</div></div>
-        <div class="pov-stat"><div class="pov-stat-num">${accuracy}%</div><div class="pov-stat-lbl">Accuracy</div></div>
-        <div class="pov-stat"><div class="pov-stat-num">${bestScore}</div><div class="pov-stat-lbl">Best Score</div></div>
-        <div class="pov-stat"><div class="pov-stat-num" style="font-size:${fastestMs&&fastestMs<10000?'1.25rem':'1rem'}">${fastLabel}</div><div class="pov-stat-lbl">Fastest Correct ⚡</div></div>
-      </div>`;
-
-      // ── Score bar chart ────────────────────────────────────────────────────
-      const last15=[...history].reverse().slice(-15);
-      const scores=last15.map(e=>e.score||0);
-      const maxScore=Math.max(...scores,1);
-      const step=profileNiceStep(maxScore);
-      const gridMax=Math.ceil(maxScore/step)*step;
-      const gridLines=[];
-      for(let v=0;v<=gridMax;v+=step) gridLines.push(v);
-
-      // SVG dimensions
-      const W=520, H=140, PAD_L=36, PAD_B=24, PAD_T=10, PAD_R=6;
-      const chartW=W-PAD_L-PAD_R, chartH=H-PAD_T-PAD_B;
-      const barCount=last15.length;
-      const barW=Math.floor(chartW/barCount*0.6);
-      const barGap=chartW/barCount;
-      const maxScoreIdx=scores.indexOf(Math.max(...scores));
-
-      let svgBars='', svgGridX='', svgLabels='';
-      // Grid lines + labels
-      gridLines.forEach(v=>{
-        const y=PAD_T+chartH-(v/gridMax)*chartH;
-        svgGridX+=`<line x1="${PAD_L}" x2="${W-PAD_R}" y1="${y}" y2="${y}" stroke="#e4e3df" stroke-width="1"/>`;
-        svgLabels+=`<text x="${PAD_L-4}" y="${y+4}" text-anchor="end" font-size="10" fill="#9a9990">${v}</text>`;
-      });
-      // X axis
-      svgGridX+=`<line x1="${PAD_L}" x2="${W-PAD_R}" y1="${PAD_T+chartH}" y2="${PAD_T+chartH}" stroke="#e4e3df" stroke-width="1"/>`;
-
-      last15.forEach((e,i)=>{
-        const x=PAD_L+i*barGap+barGap/2;
-        const barH=scores[i]>0?(scores[i]/gridMax)*chartH:2;
-        const y=PAD_T+chartH-barH;
-        const isTop=i===maxScoreIdx;
-        const fill=isTop?'#111110':'#c8c7c3';
-        const d=new Date(e.date);
-        const label=d.toLocaleDateString('en',{weekday:'short',month:'short',day:'numeric'});
-        svgBars+=`<rect class="bar-rect" x="${x-barW/2}" y="${y}" width="${barW}" height="${barH}" rx="2" fill="${fill}" data-score="${scores[i]}" data-label="${label}" data-idx="${i}" style="cursor:pointer"/>`;
-      });
-
-      const barChartHTML=`<div class="pchart-card">
-        <div class="pchart-head"><span class="pchart-title">Score History</span><span style="font-size:.7rem;color:var(--mid)">Last ${last15.length} sessions</span></div>
-        <div class="chart-wrap" id="score-chart-wrap">
-          <div class="chart-tooltip" id="score-tooltip"></div>
-          <svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block;overflow:visible">
-            <g>${svgGridX}${svgLabels}${svgBars}</g>
-          </svg>
-        </div>
-      </div>`;
-
-      // ── Accuracy trend chart ───────────────────────────────────────────────
-      const accs=last15.map(e=>e.total?(Math.round(e.correct/e.total*100)):null);
-      const validAccs=accs.filter(v=>v!==null);
-      const avgAcc=validAccs.length?Math.round(validAccs.reduce((a,b)=>a+b,0)/validAccs.length):0;
-      const pbAcc=Math.max(...validAccs,0);
-      const pbAccIdx=accs.indexOf(pbAcc);
-
-      const AW=520, AH=150, AL=36, AB=24, AT=18, AR=6;
-      const achW=AW-AL-AR, achH=AH-AT-AB;
-      const pts2=accs.map((v,i)=>v!==null?{x:AL+i*(achW/(last15.length-1||1))+0,y:AT+achH-(v/100)*achH}:null);
-      // Filter out nulls for curve drawing
-      const validPts=pts2.filter(p=>p!==null);
-
-      const curvePath=profileCatmullToCubic(validPts);
-      const fillPath=validPts.length>1?`${curvePath} L${validPts[validPts.length-1].x},${AT+achH} L${validPts[0].x},${AT+achH} Z`:'';
-
-      // Y gridlines at 0,25,50,75,100
-      let accGridX='', accLabels='';
-      [0,25,50,75,100].forEach(v=>{
-        const y=AT+achH-(v/100)*achH;
-        accGridX+=`<line x1="${AL}" x2="${AW-AR}" y1="${y}" y2="${y}" stroke="#e4e3df" stroke-width="1" stroke-dasharray="${v===0?'none':'3,3'}"/>`;
-        accLabels+=`<text x="${AL-4}" y="${y+4}" text-anchor="end" font-size="10" fill="#9a9990">${v}</text>`;
-      });
-
-      // PB line and avg line
-      const pbY=AT+achH-(pbAcc/100)*achH;
-      const avgY=AT+achH-(avgAcc/100)*achH;
-      const pbLine=`<line x1="${AL}" x2="${AW-AR}" y1="${pbY}" y2="${pbY}" stroke="#2d6a4f" stroke-width="1.5" stroke-dasharray="5,3" opacity=".8"/>`;
-      const avgLine=`<line x1="${AL}" x2="${AW-AR}" y1="${avgY}" y2="${avgY}" stroke="#9a9990" stroke-width="1.5" stroke-dasharray="5,3" opacity=".7"/>`;
-
-      // Dots
-      let dots='', accTooltipData='';
-      accs.forEach((v,i)=>{
-        if(v===null) return;
-        const p=pts2[i];
-        const isPB=i===pbAccIdx;
-        const isLast=i===last15.length-1;
-        const isBig=isPB||isLast;
-        const r=isBig?5:3.5;
-        let fill=v>=avgAcc?'#2d9e6b':'#c1121f';
-        if(isPB) fill='#2d6a4f';
-        const stroke=isBig?'white':'none';
-        const sw=isBig?1.5:0;
-        const d=new Date(last15[i].date);
-        const lbl=`${v}% · ${d.toLocaleDateString('en',{weekday:'short',month:'short',day:'numeric'})}`;
-        dots+=`<circle class="acc-dot" cx="${p.x}" cy="${p.y}" r="${r}" fill="${fill}" stroke="${stroke}" stroke-width="${sw}" data-acc="${v}" data-label="${lbl}" data-idx="${i}" style="cursor:pointer"/>`;
-      });
-
-      const gradId='accGrad'+Math.random().toString(36).slice(2,6);
-      const accChartHTML=`<div class="pchart-card">
-        <div class="pchart-head">
-          <span class="pchart-title">Accuracy Trend</span>
-          <div class="pchart-legend">
-            <div class="pchart-leg-item"><div class="pchart-leg-dash" style="background:#2d6a4f;height:2px;border-top:2px dashed #2d6a4f;"></div><span>PB ${pbAcc}%</span></div>
-            <div class="pchart-leg-item"><div class="pchart-leg-dash" style="border-top:2px dashed #9a9990;"></div><span>Avg ${avgAcc}%</span></div>
-          </div>
-        </div>
-        <div class="chart-wrap" id="acc-chart-wrap">
-          <div class="chart-tooltip" id="acc-tooltip"></div>
-          <svg viewBox="0 0 ${AW} ${AH}" style="width:100%;height:auto;display:block;overflow:visible">
-            <defs>
-              <linearGradient id="${gradId}" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stop-color="#2d9e6b" stop-opacity=".22"/>
-                <stop offset="100%" stop-color="#2d9e6b" stop-opacity="0"/>
-              </linearGradient>
-            </defs>
-            ${accGridX}${accLabels}
-            ${fillPath?`<path d="${fillPath}" fill="url(#${gradId})"/>`:''}
-            ${validPts.length>1?`<path d="${curvePath}" fill="none" stroke="#2d9e6b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>`:''}
-            ${avgLine}${pbLine}${dots}
-          </svg>
-        </div>
-      </div>`;
-
-      // ── Activity heatmap ────────────────────────────────────────────────────
-      const now=new Date(); now.setHours(23,59,59,999);
-      const hmStart=new Date(now); hmStart.setDate(hmStart.getDate()-104); hmStart.setHours(0,0,0,0);
-      // Map date string → count
-      const dayCounts={};
-      history.forEach(e=>{ const k=new Date(e.date).toDateString(); dayCounts[k]=(dayCounts[k]||0)+1; });
-      // Build 15 weeks
-      let cols='';
-      for(let w=0;w<15;w++){
-        let cells='';
-        for(let d=0;d<7;d++){
-          const dt=new Date(hmStart); dt.setDate(dt.getDate()+w*7+d);
-          if(dt>now){ cells+=`<div class="hm-cell" data-v="0" style="opacity:.2"></div>`; continue; }
-          const cnt=dayCounts[dt.toDateString()]||0;
-          const v=cnt===0?0:cnt===1?1:cnt===2?2:cnt<=4?3:4;
-          const label=cnt?`${dt.toLocaleDateString('en',{month:'short',day:'numeric'})}: ${cnt} session${cnt>1?'s':''}`:dt.toLocaleDateString('en',{month:'short',day:'numeric'});
-          cells+=`<div class="hm-cell" data-v="${v}" title="${label}"></div>`;
-        }
-        cols+=`<div class="hm-col">${cells}</div>`;
-      }
-      const hmHTML=`<div class="pchart-card">
-        <div class="pchart-head"><span class="pchart-title">Activity</span></div>
-        <div class="heatmap-grid">${cols}</div>
-        <div class="hm-legend">
-          <span>Less</span>
-          <div class="hm-swatch" style="background:#edecea"></div>
-          <div class="hm-swatch" style="background:#b7dfc7"></div>
-          <div class="hm-swatch" style="background:#74c69d"></div>
-          <div class="hm-swatch" style="background:#40916c"></div>
-          <div class="hm-swatch" style="background:#1b4332"></div>
-          <span>More</span>
-        </div>
-      </div>`;
-
-      // ── Breakdown card ──────────────────────────────────────────────────────
-      const avgScore=history.length?Math.round(history.reduce((s,e)=>s+(e.score||0),0)/history.length):0;
-      const bestRanks=history.map(e=>e.rank||999).filter(r=>r>0);
-      const bestRank=bestRanks.length?Math.min(...bestRanks):null;
-      const since=new Date(history[history.length-1].date).toLocaleDateString('en',{month:'short',day:'numeric',year:'numeric'});
-      const breakdownHTML=`<div class="pchart-card">
-        <div class="pchart-head"><span class="pchart-title">Breakdown</span></div>
-        <div class="prow"><span>Avg score per session</span><span class="prow-val">${avgScore} pts</span></div>
-        <div class="prow"><span>Personal best accuracy</span><span class="prow-val" style="color:var(--good)">${pbAcc}%</span></div>
-        ${bestRank?`<div class="prow"><span>Best rank achieved</span><span class="prow-val">#${bestRank}</span></div>`:''}
-        <div class="prow"><span>Total questions seen</span><span class="prow-val">${totalQs}</span></div>
-        <div class="prow"><span>Total correct answers</span><span class="prow-val">${totalCorrect}</span></div>
-        <div class="prow"><span>Playing since</span><span class="prow-val">${since}</span></div>
-      </div>`;
-
-      // ── Leaderboard rank card ────────────────────────────────────────────────
-      const rankCardHTML=buildRankCardHTML();
-
-      body=statsHTML+barChartHTML+accChartHTML+hmHTML+breakdownHTML+rankCardHTML;
-    }
-    }catch(err){
-      console.error('Profile overview render error:', err);
-      body=`<div class="no-data-notice"><span>⚠️</span><b style="color:var(--ink)">Overview failed to load</b><br><span style="font-size:.75rem;font-family:monospace;word-break:break-all">${err.message}</span></div>`;
-    }
+  if(profileTab==='overview'||profileTab==='history'){
+    // Render a skeleton — real data loaded async by loadProfileData()
+    body=`<div id="profile-data-body">
+      <div style="text-align:center;padding:48px 16px;color:var(--mid)">
+        <div style="font-size:1.5rem;margin-bottom:10px;opacity:.4">⏳</div>
+        <div style="font-size:.83rem">Loading…</div>
+      </div>
+    </div>`;
   }
-
-  if(profileTab==='history'){
-    const history=loadHistory();
-    if(!history.length){
-      body=`<div class="no-data-notice"><span>📋</span>No sessions recorded yet.</div>`;
-    } else {
-      const maxScore=Math.max(...history.map(e=>e.score||0));
-      const rows=history.map((e,i)=>{
-        const d=new Date(e.date);
-        const dateStr=d.toLocaleDateString('en',{month:'short',day:'numeric',year:'numeric'});
-        const timeStr=d.toLocaleTimeString('en',{hour:'2-digit',minute:'2-digit'});
-        const acc=e.total?Math.round(e.correct/e.total*100):null;
-        const accCls=acc===null?'ok':acc>=70?'good':acc>=45?'ok':'bad';
-        const accLbl=acc!==null?acc+'%':'—';
-        const isPB=e.score===maxScore;
-        const rankStr=e.rank&&e.participants?`#${e.rank} of ${e.participants}`:e.rank?`#${e.rank}`:'';
-        return `<div class="hist-row">
-          <div class="col" style="min-width:80px;flex-shrink:0">
-            <span class="hist-date">${dateStr}</span>
-            <span class="hist-date" style="margin-top:1px">${timeStr}</span>
-          </div>
-          <div class="hist-score">${e.score||0} pts${isPB?'<span class="hist-pb-badge">PB</span>':''}</div>
-          <div class="hist-rank">${rankStr}</div>
-          <div class="hist-acc ${accCls}">${accLbl}</div>
-        </div>`;
-      }).join('');
-      body=`<div style="margin-bottom:6px;font-size:.75rem;color:var(--mid)">${history.length} session${history.length>1?'s':''} recorded</div>${rows}`;
-    }
-  }
-
   if(profileTab==='settings'){
     const hasUsername=!!(u.username);
     body=`
@@ -2932,7 +2899,10 @@ function attach(){
     render();
     if(profileTab==='overview'&&!allTimeLB) fetchLeaderboard();
   }));
-  if(showingProfile) requestAnimationFrame(setupProfileCharts);
+  if(showingProfile){
+    requestAnimationFrame(setupProfileCharts);
+    if(profileTab==='overview'||profileTab==='history') loadProfileData();
+  }
 
   on('btn-dismissed-home', doDismissHome);
   on('btn-lb-refresh',()=>{ allTimeLB=null; render(); fetchLeaderboard(); });
