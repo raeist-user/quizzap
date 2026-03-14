@@ -534,6 +534,7 @@ let prevMyScore=0, scoreGain=0;
 let questions=[], selIdx=-1, answerKey=-1, inspectPid=null;
 let sidebarQOpen=false, sidebarStudOpen=false, sidebarScoreOpen=false, sidebarSchedOpen=false, showStandingsOverlay=false;
 let hostTimerSeconds=0;
+let hostRandomize=false; // OFF by default — questions load in file order
 
 // Resource browser
 let repoPath=null;
@@ -1456,9 +1457,10 @@ async function generateQuiz(){
       const parsed=parseQuestions(text);
       if(!parsed.length) throw new Error(`No valid questions found in ${file.name}`);
       const take=(file.count>0)?Math.min(file.count,parsed.length):parsed.length;
-      const shuffled=[...parsed].sort(()=>Math.random()-.5).slice(0,take);
-      shuffled.forEach(q=>{ q.subject=subjName; q.chapter=file.name.replace(/\.txt$/i,''); });
-      all=[...all,...shuffled];
+      const ordered=hostRandomize?[...parsed].sort(()=>Math.random()-.5):parsed;
+      const picked=ordered.slice(0,take);
+      picked.forEach(q=>{ q.subject=subjName; q.chapter=file.name.replace(/\.txt$/i,''); });
+      all=[...all,...picked];
     }
     questions=all; selIdx=0; answerKey=all[0]?.correct??-1;
     msg.innerHTML=''; render();
@@ -1509,7 +1511,9 @@ function render(){
 
   if(showingDismissed){ v.innerHTML=studentDismissedHTML(); attach(); return; }
   if(showingHalted){ v.innerHTML=haltedHTML(); attach(); return; }
-  if(showingProfile){ v.innerHTML=profilePageHTML(); attach(); return; }
+  if(showingProfile){ v.innerHTML=profilePageHTML(); attach();
+    if(profileTab==='overview'||profileTab==='history') loadProfileData();
+    return; }
   if(!role)                           v.innerHTML=landingHTML();
   else if(role==='host'&&!hostAuthed) v.innerHTML=hostPassHTML();
   else if(role==='host')              v.innerHTML=hostHTML();
@@ -2663,6 +2667,11 @@ function hostHTML(){
         <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">
           <button class="btn btn-ghost btn-sm" id="btn-browse" style="padding:4px 9px;font-size:.72rem">${repoLoading?'⏳ Loading':'↻ Refresh'}</button>
           <div style="display:flex;align-items:center;gap:5px;margin-left:auto">
+            <button id="btn-toggle-random" title="${hostRandomize?'Randomise ON — click to turn off':'Randomise OFF — click to turn on'}"
+              style="padding:3px 8px;font-size:.7rem;font-weight:600;border-radius:var(--r);border:1.5px solid ${hostRandomize?'var(--accent)':'var(--line)'};background:${hostRandomize?'#eff6ff':'var(--faint)'};color:${hostRandomize?'var(--accent)':'var(--mid)'};cursor:pointer;display:flex;align-items:center;gap:4px;white-space:nowrap;transition:all .15s">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 3 21 3 21 8"/><line x1="4" y1="20" x2="21" y2="3"/><polyline points="21 16 21 21 16 21"/><line x1="15" y1="15" x2="21" y2="21"/></svg>
+              ${hostRandomize?'Rand: ON':'Rand: OFF'}
+            </button>
             <span style="font-size:.72rem;color:var(--mid)">⏱</span>
             <input type="number" min="0" max="300" value="${hostTimerSeconds}" id="timer-sec-input" class="q-count-input" style="width:46px;font-size:.75rem;padding:3px 6px"/>
             <span style="font-size:.72rem;color:var(--mid)">s</span>
@@ -2915,6 +2924,21 @@ function waitHTML(){
     <span>${esc(p.name)}${p.id===myPid?' <span style="font-size:.7rem;color:var(--mid)">(you)</span>':''}</span></div>`).join('');
   const history=S.myHistory||[];
   const waitMsg=history.length?'Wait for next question…':'Waiting for host to start…';
+  // Allow reporting the last answered question from the waiting screen
+  const lastH=history.length?history[history.length-1]:null;
+  const lastQ=lastH?.question||null;
+  const canReportLast=lastQ&&!myReportedQuestions.has(lastQ.text);
+  const alreadyReportedLast=lastQ&&myReportedQuestions.has(lastQ.text);
+  const reportFromWaitHTML=lastQ?`<div style="text-align:center;margin-top:8px;margin-bottom:2px">
+    ${canReportLast
+      ?`<button class="btn btn-ghost btn-sm" id="btn-report-last" style="color:var(--mid);font-size:.72rem;gap:4px;padding:4px 12px;border-color:var(--line)">
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>
+          Report last question's answer
+        </button>`
+      :alreadyReportedLast
+        ?`<span style="font-size:.72rem;color:var(--good)">✓ Last question reported</span>`
+        :''}
+  </div>`:'';
   const lbHTML=history.length?`<div class="lb-panel">
     <div class="lb-head"><span style="font-size:.82rem;font-weight:600">🏆 Leaderboard</span><span class="small muted">${parts.length} students</span></div>
     ${[...parts].sort((a,b)=>(b.score||0)-(a.score||0)).map((p,i)=>{
@@ -2947,6 +2971,7 @@ function waitHTML(){
     </div>
     <div class="student-grid" style="max-width:560px;margin-bottom:8px">${chips}</div>
     ${lbHTML}
+    ${reportFromWaitHTML}
     <button class="btn btn-ghost btn-sm mt3" id="btn-leave">Leave session</button>
   </div>`;
 }
@@ -3099,10 +3124,10 @@ function attach(){
     profileTab=el.dataset.ptab;
     render();
     if(profileTab==='overview'&&!allTimeLB) fetchLeaderboard();
+    // loadProfileData is already called inside render() for profile pages
   }));
   if(showingProfile){
     requestAnimationFrame(setupProfileCharts);
-    if(profileTab==='overview'||profileTab==='history') loadProfileData();
   }
 
   on('btn-dismissed-home', doDismissHome);
@@ -3450,7 +3475,12 @@ function attach(){
     hostTimerSeconds=Math.max(0,parseInt(document.getElementById('timer-sec-input')?.value)||0);
     generateQuiz();
   });
-  on('btn-reload',()=>{ questions=[]; selIdx=-1; answerKey=-1; subjects=[]; expandedSubject=null; repoPath=null; folderOverlaySubject=null; folderOverlayDraft={}; folderManageSubject=null; showNewFolderCard=false; manageFolder=null; manageFile=null; manageFolderFiles=[]; manageEditMode=null; manageNewFileName=''; editingContent=''; editingSha=null; uploadMsg=''; editorFullscreen=false; haltedTotalLabel=''; reportsOverlayOpen=false; expandedReportRid=null; editingReportRid=null; editReportDraft={}; render(); });
+  on('btn-toggle-random', ()=>{
+    hostTimerSeconds=Math.max(0,parseInt(document.getElementById('timer-sec-input')?.value)||0);
+    hostRandomize=!hostRandomize;
+    render();
+  });
+  on('btn-reload',()=>{ questions=[]; selIdx=-1; answerKey=-1; subjects=[]; expandedSubject=null; repoPath=null; folderOverlaySubject=null; folderOverlayDraft={}; folderManageSubject=null; showNewFolderCard=false; manageFolder=null; manageFile=null; manageFolderFiles=[]; manageEditMode=null; manageNewFileName=''; editingContent=''; editingSha=null; uploadMsg=''; editorFullscreen=false; haltedTotalLabel=''; reportsOverlayOpen=false; expandedReportRid=null; editingReportRid=null; editReportDraft={}; hostRandomize=false; render(); });
 
   // Timer input (live)
   document.getElementById('timer-sec-live')?.addEventListener('change',e=>{ hostTimerSeconds=Math.max(0,parseInt(e.target.value)||0); });
@@ -3578,6 +3608,24 @@ function attach(){
     });
     // Show immediate feedback without full re-render
     const btn=document.getElementById('btn-report-q');
+    if(btn){ btn.disabled=true; btn.innerHTML='&#10003; Reported — thanks!'; btn.style.color='var(--good)'; btn.style.borderColor='var(--good)'; }
+  });
+
+  // ── STUDENT: Report from wait screen (last question) ─────────────────────
+  on('btn-report-last', ()=>{
+    const history=S.myHistory||[];
+    const lastH=history.length?history[history.length-1]:null;
+    if(!lastH||!lastH.question) return;
+    const q=lastH.question;
+    if(myReportedQuestions.has(q.text)) return;
+    myReportedQuestions.add(q.text);
+    send({
+      type:'report_question',
+      question:q,
+      correct:lastH.correct??null,
+      reportedAnswer:lastH.myAnswer??null,
+    });
+    const btn=document.getElementById('btn-report-last');
     if(btn){ btn.disabled=true; btn.innerHTML='&#10003; Reported — thanks!'; btn.style.color='var(--good)'; btn.style.borderColor='var(--good)'; }
   });
 
