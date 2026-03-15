@@ -827,25 +827,39 @@ async function fetchHostSchedules(){
   }catch(e){ hostSchedules=[]; }
 }
 
-// ── ALL-TIME LEADERBOARD ──────────────────────────────────────────────────
+// ── LEADERBOARD ───────────────────────────────────────────────────────────────
+// Three separate fetch calls so each tab loads independently.
+// All three use the same endpoint with a ?period= param.
 async function fetchLeaderboard(){
-  try{
-    const [r1,r2,r3]=await Promise.all([
-      fetch('/api/leaderboard'),
-      fetch('/api/leaderboard/today'),
-      fetch('/api/leaderboard/week'),
+  // Set all to null so the UI shows spinners immediately
+  allTimeLB = null; todayLB = null; weekLB = null;
+  render();
+  // Fetch all three in parallel
+  try {
+    const [rt, rw, ra] = await Promise.all([
+      fetch('/api/leaderboard?period=today'),
+      fetch('/api/leaderboard?period=week'),
+      fetch('/api/leaderboard?period=all'),
     ]);
-    const [d1,d2,d3]=await Promise.all([r1.json(),r2.json(),r3.json()]);
-    allTimeLB=d1.leaderboard||[];
-    todayLB=d2.leaderboard||[];
-    weekLB=d3.leaderboard||[];
-    // If we're on the profile overview, patch just the rank card — no full re-render
-    if(showingProfile&&profileTab==='overview'){
-      const rc=document.getElementById('profile-rank-card');
-      if(rc){ rc.outerHTML=buildRankCardHTML(); return; }
-    }
-    render();
-  }catch(e){ allTimeLB=allTimeLB||[]; todayLB=todayLB||[]; weekLB=weekLB||[]; }
+    const [dt, dw, da] = await Promise.all([rt.json(), rw.json(), ra.json()]);
+    if (!rt.ok) throw new Error(dt.error || 'today failed');
+    if (!rw.ok) throw new Error(dw.error || 'week failed');
+    if (!ra.ok) throw new Error(da.error || 'all failed');
+    todayLB   = dt.leaderboard || [];
+    weekLB    = dw.leaderboard || [];
+    allTimeLB = da.leaderboard || [];
+  } catch(e) {
+    console.error('fetchLeaderboard:', e.message);
+    todayLB   = todayLB   || [];
+    weekLB    = weekLB    || [];
+    allTimeLB = allTimeLB || [];
+  }
+  // If on profile overview, patch just the rank card
+  if(showingProfile && profileTab==='overview'){
+    const rc = document.getElementById('profile-rank-card');
+    if(rc){ rc.outerHTML = buildRankCardHTML(); return; }
+  }
+  render();
 }
 
 /* ══════════════════════════════════════
@@ -1629,19 +1643,28 @@ function landingHTML(){
       if(lb===null) return '<div style="padding:32px;text-align:center;color:var(--mid)"><div class="spinner" style="margin:0 auto 12px"></div>Loading…</div>';
       if(!lb.length) return '<div style="padding:32px;text-align:center;color:var(--mid)"><div style="font-size:2rem;margin-bottom:10px">🏆</div>No scores yet!</div>';
       const medals=['🥇','🥈','🥉'];
-      let rows=lb.map((e,i)=>`
-        <div class="lb-row${e.userId===currentUser?.id?' me':''}">
-          <div class="score-rank">${medals[i]||('#'+(i+1))}</div>
-          <div style="flex:1;font-weight:${e.userId===currentUser?.id?'700':'400'}">${esc(e.userName||'—')}</div>
-          <div class="score-pts">${e.totalScore||0} pts</div>
-        </div>`).join('');
-      const myRank=lb.findIndex(e=>e.userId===currentUser?.id)+1;
-      const myEntry=lb.find(e=>e.userId===currentUser?.id);
-      if(myRank>lb.length&&myEntry) rows+=`<div style="border-top:2px solid var(--line)"><div class="lb-row me">
-        <div class="score-rank">#${myRank}</div>
-        <div style="flex:1;font-weight:700">${esc(myEntry.userName||'—')} <span style="font-size:.7rem;color:var(--mid)">← you</span></div>
-        <div class="score-pts">${myEntry.totalScore||0} pts</div>
-      </div></div>`;
+      const myId = String(currentUser?.id || '');
+      // Find whether current user is in the list
+      const myIdx = lb.findIndex(e => String(e.userId) === myId);
+      const rows = lb.map((e, i) => {
+        const isMe = String(e.userId) === myId;
+        return `<div class="lb-row${isMe?' me':''}">
+          <div class="score-rank">${medals[i] || ('#'+(i+1))}</div>
+          <div style="flex:1;font-weight:${isMe?'700':'400'}">${esc(e.userName||'—')}${isMe?' <span style="font-size:.7rem;color:var(--mid)">← you</span>':''}</div>
+          <div style="text-align:right">
+            <div class="score-pts">${e.totalScore||0} pts</div>
+            ${e.sessions?`<div style="font-size:.67rem;color:var(--mid)">${e.sessions} session${e.sessions!==1?'s':''}</div>`:''}
+          </div>
+        </div>`;
+      }).join('');
+      // If current user is not in the visible list at all, append them at the bottom
+      if(myIdx === -1 && myId){
+        return rows + `<div style="border-top:2px dashed var(--line)"><div class="lb-row me" style="opacity:.7">
+          <div class="score-rank">—</div>
+          <div style="flex:1;font-weight:700">${esc(currentUser.name||'—')} <span style="font-size:.7rem;color:var(--mid)">← you · not ranked</span></div>
+          <div class="score-pts">0 pts</div>
+        </div></div>`;
+      }
       return rows;
     }
 
@@ -1769,10 +1792,11 @@ function studentDismissedHTML(){
 ══════════════════════════════════════ */
 function buildRankCardHTML(){
   if(!currentUser) return '';
-  const myEntry=allTimeLB?allTimeLB.find(e=>e.userId===currentUser.id):null;
-  const myRankAll=allTimeLB?allTimeLB.findIndex(e=>e.userId===currentUser.id)+1:0;
-  const totalPlayers=allTimeLB?allTimeLB.length:0;
-  const totalPts=myEntry?myEntry.total||myEntry.score||0:0;
+  const myId = String(currentUser.id || '');
+  const myEntry    = allTimeLB ? allTimeLB.find(e => String(e.userId) === myId) : null;
+  const myRankAll  = allTimeLB ? allTimeLB.findIndex(e => String(e.userId) === myId) + 1 : 0;
+  const totalPlayers = allTimeLB ? allTimeLB.length : 0;
+  const totalPts   = myEntry ? (myEntry.totalScore || 0) : 0;
   if(allTimeLB===null)
     return `<div class="prank-card" id="profile-rank-card"><div class="prank-num" style="font-size:1.2rem;color:var(--mid)">…</div><div class="prank-info"><div class="prank-label">All-Time Rank</div><div class="prank-sub">Loading leaderboard…</div></div></div>`;
   if(myEntry)
