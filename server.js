@@ -323,12 +323,21 @@ app.get('/api/leaderboard', async (req, res) => {
     }
 
     // ── TODAY / WEEK (aggregate from SessionEntry) ─────────────────────────────
-    // "today"  = from 00:00:00 UTC today
+    // "today"  = from 05:00 IST today  (IST = UTC+5:30, so 05:00 IST = 23:30 UTC previous day)
     // "week"   = rolling 7-day window from exactly 7*24h ago
     let since;
     if (period === 'today') {
-      since = new Date();
-      since.setUTCHours(0, 0, 0, 0);          // UTC midnight — consistent regardless of server TZ
+      // Find the most recent 23:30 UTC (= 05:00 IST next calendar day)
+      const now = new Date();
+      // Build candidate: 23:30 UTC on the current UTC date
+      const candidate = new Date(Date.UTC(
+        now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(),
+        23, 30, 0, 0
+      ));
+      // If we haven't reached 23:30 UTC today yet, roll back to yesterday's 23:30 UTC
+      since = candidate > now
+        ? new Date(candidate.getTime() - 24 * 60 * 60 * 1000)
+        : candidate;
     } else {
       since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
     }
