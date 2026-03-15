@@ -603,7 +603,7 @@ let homeSection='home'; // 'home' | 'leaderboard'
 let allTimeLB=null;
 let todayLB=null;
 let weekLB=null;
-let homeLbTab='all'; // 'today' | 'week' | 'all'
+let homeLbTab='today'; // 'today' | 'week' | 'all'
 
 // Server schedules (shared between students and host)
 let serverSchedules=null;
@@ -2994,15 +2994,17 @@ function waitHTML(){
   let lbRows='';
   sortedParts.forEach((p,i)=>{
     const isMe=p.id===myPid;
+    const online=p.online!==false;
     const ansTime=S.answerTimes?.[p.id]??null;
     const ansTimeStr=ansTime!==null?parseFloat(ansTime).toFixed(2)+'s':'';
     const lastH=isMe&&history.length?history[history.length-1]:null;
     const answeredLast=lastH&&lastH.myAnswer!==null&&lastH.myAnswer!==undefined;
     const gotRight=answeredLast&&lastH.myAnswer===lastH.correct;
     const scoreColor=isMe&&answeredLast?(gotRight?'#16a34a':'var(--ink)'):'inherit';
-    lbRows+='<div class="lb-row'+(isMe?' me':'')+'">'+
+    const onlineDot=online?'<span style="width:6px;height:6px;border-radius:50%;background:#16a34a;flex-shrink:0;display:inline-block;margin-left:4px;vertical-align:middle"></span>':'';
+    lbRows+='<div class="lb-row'+(isMe?' me':'')+(online?' style="border-left:2px solid #b7dfc7"':'')+'">'+
       '<div class="score-rank">'+(medals[i]||('#'+(i+1)))+'</div>'+
-      '<div style="flex:1">'+esc(p.name)+(isMe?' <span style="font-size:.7rem;color:var(--mid)">\u2190 you</span>':'')+'</div>'+
+      '<div style="flex:1">'+esc(p.name)+onlineDot+(isMe?' <span style="font-size:.7rem;color:var(--mid)">\u2190 you</span>':'')+'</div>'+
       (ansTimeStr?'<span style="font-size:.72rem;color:var(--mid);min-width:42px;text-align:right;margin-right:5px">'+ansTimeStr+'</span>':'')+
       '<div class="score-pts" style="color:'+scoreColor+';font-weight:600">'+(p.score||0)+'</div>'+
       '</div>';
@@ -3016,8 +3018,19 @@ function waitHTML(){
       (lbRows||'<div style="padding:16px;text-align:center;color:var(--mid);font-size:.82rem">No students yet.</div>')+
       '</div>';
   } else if(parts.length){
-    // Before any question: show who has joined as chips (no scores yet)
-    const chips=parts.map(p=>'<div class="student-chip"><div class="s-av">'+esc(p.name.slice(0,2).toUpperCase())+'</div>'+esc(p.name)+(p.id===myPid?' <span style="font-size:.68rem;color:var(--mid)">\u2190 you</span>':'')+'</div>').join('');
+    // Before any question: show who has joined as chips with online/offline indicator
+    const chips=parts.map(p=>{
+      const online=p.online!==false; // treat as online if flag missing (legacy)
+      const isMe=p.id===myPid;
+      const avatarBg=online?'#16a34a':'var(--line)';
+      const chipBorder=online?'1px solid #b7dfc7':'1px solid var(--line)';
+      const chipBg=online?'#f0fdf4':'var(--white)';
+      return '<div class="student-chip" style="background:'+chipBg+';border:'+chipBorder+'">'+
+        '<div class="s-av" style="background:'+avatarBg+';color:#fff;border:none">'+esc(p.name.slice(0,2).toUpperCase())+'</div>'+
+        '<span>'+esc(p.name)+(isMe?' <span style="font-size:.68rem;color:var(--mid)">\u2190 you</span>':'')+'</span>'+
+        (online?'<span style="width:6px;height:6px;border-radius:50%;background:#16a34a;flex-shrink:0;margin-left:auto"></span>':'')+
+        '</div>';
+    }).join('');
     lbHTML='<div style="width:100%;max-width:480px;margin-top:4px">'+
       '<div style="font-size:.7rem;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--mid);margin-bottom:8px;text-align:center">'+parts.length+' student'+(parts.length!==1?'s':'')+' joined</div>'+
       '<div class="student-grid">'+chips+'</div>'+
@@ -3294,13 +3307,13 @@ function attach(){
 
   // Landing tabs
   on('ht-home',()=>{ homeSection='home'; render(); });
-  on('ht-lb',()=>{ homeSection='leaderboard'; homeLbTab='all'; allTimeLB=null; render(); fetchLeaderboard(); });
+  on('ht-lb',()=>{ homeSection='leaderboard'; homeLbTab='today'; allTimeLB=null; todayLB=null; weekLB=null; render(); fetchLeaderboard(); });
 
   // Landing nav
   on('go-host', ()=>{ role='host'; hostAuthed=false; navPush(); render(); });
   on('go-join',  ()=>{
     role='participant';
-    if(!serverSchedules) fetchSchedules();
+    fetchSchedules();
     navPush(); render();
   });
   on('btn-back-home',()=>{ role=null; myName=null; myPid=null; render(); });
