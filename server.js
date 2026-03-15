@@ -298,7 +298,6 @@ app.get('/api/leaderboard', async (req, res) => {
   try {
     const leaderboard = await LeaderboardEntry.find()
       .sort({ totalScore: -1 })
-      .limit(50)
       .lean();
     res.json({ leaderboard });
   } catch (e) { res.status(500).json({ error: 'Failed to fetch leaderboard' }); }
