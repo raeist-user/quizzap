@@ -303,6 +303,45 @@ app.get('/api/leaderboard', async (req, res) => {
   } catch (e) { res.status(500).json({ error: 'Failed to fetch leaderboard' }); }
 });
 
+// GET /api/leaderboard/today — sum session scores earned since midnight today
+app.get('/api/leaderboard/today', async (req, res) => {
+  try {
+    const start = new Date();
+    start.setHours(0, 0, 0, 0);
+    const entries = await SessionEntry.aggregate([
+      { $match: { date: { $gte: start } } },
+      { $group: { _id: '$userId', totalScore: { $sum: '$score' }, sessions: { $sum: 1 } } },
+      { $sort: { totalScore: -1 } },
+      { $lookup: { from: 'users', localField: '_id', foreignField: '_id', as: 'user' } },
+      { $unwind: { path: '$user', preserveNullAndEmptyArrays: true } },
+      { $project: { userId: { $toString: '$_id' }, userName: '$user.name', totalScore: 1, sessions: 1 } }
+    ]);
+    res.json({ leaderboard: entries });
+  } catch (e) {
+    console.error('/api/leaderboard/today error:', e.message);
+    res.status(500).json({ error: 'Failed to fetch today leaderboard' });
+  }
+});
+
+// GET /api/leaderboard/week — sum session scores from the last 7 days
+app.get('/api/leaderboard/week', async (req, res) => {
+  try {
+    const start = new Date(Date.now() - 7 * 86400000);
+    const entries = await SessionEntry.aggregate([
+      { $match: { date: { $gte: start } } },
+      { $group: { _id: '$userId', totalScore: { $sum: '$score' }, sessions: { $sum: 1 } } },
+      { $sort: { totalScore: -1 } },
+      { $lookup: { from: 'users', localField: '_id', foreignField: '_id', as: 'user' } },
+      { $unwind: { path: '$user', preserveNullAndEmptyArrays: true } },
+      { $project: { userId: { $toString: '$_id' }, userName: '$user.name', totalScore: 1, sessions: 1 } }
+    ]);
+    res.json({ leaderboard: entries });
+  } catch (e) {
+    console.error('/api/leaderboard/week error:', e.message);
+    res.status(500).json({ error: 'Failed to fetch week leaderboard' });
+  }
+});
+
 // POST /api/leaderboard — called once per game day on Stop & Dismiss
 // snap.score is the cumulative total for THIS game day only.
 // We $inc onto the all-time record so scores accumulate across separate game days.
