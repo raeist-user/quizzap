@@ -601,6 +601,7 @@ let homeSection='home'; // 'home' | 'leaderboard'
 
 // All-time leaderboard cache
 let allTimeLB=null;
+let waitLbTab='session'; // active tab in wait-screen leaderboard
 
 // Server schedules (shared between students and host)
 let serverSchedules=null;
@@ -1619,7 +1620,7 @@ function landingHTML(){
     const rows=allTimeLB===null
       ?'<div style="padding:32px;text-align:center;color:var(--mid)"><div class="spinner" style="margin:0 auto 12px"></div>Loading…</div>'
       :allTimeLB.length
-        ?allTimeLB.slice(0,20).map((e,i)=>`
+        ?allTimeLB.map((e,i)=>`
           <div class="lb-row${e.userId===currentUser?.id?' me':''}">
             <div class="score-rank">${['🥇','🥈','🥉'][i]||('#'+(i+1))}</div>
             <div style="flex:1;font-weight:${e.userId===currentUser?.id?'700':'400'}">${esc(e.userName||'—')}</div>
@@ -2966,49 +2967,94 @@ function joinHTML(){
 function waitHTML(){
   const parts=S.participants||[];
   const myP=parts.find(p=>p.id===myPid);
-  function initials(n){return n.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();}
-  const chips=[...(myP?[myP]:[]),...parts.filter(p=>p.id!==myPid)].map(p=>`
-    <div class="student-chip"><div class="s-av" style="${p.id===myPid?'background:#d8f3dc;border-color:#b7dfc7':''}">${initials(p.name)}</div>
-    <span>${esc(p.name)}${p.id===myPid?' <span style="font-size:.7rem;color:var(--mid)">(you)</span>':''}</span></div>`).join('');
   const history=S.myHistory||[];
-  const waitMsg=history.length?'Wait for next question…':'Waiting for host to start…';
-  const lbHTML=history.length?`<div class="lb-panel">
-    <div class="lb-head"><span style="font-size:.82rem;font-weight:600">🏆 Leaderboard</span><span class="small muted">${parts.length} students</span></div>
-    ${[...parts].sort((a,b)=>(b.score||0)-(a.score||0)).map((p,i)=>{
+  const waitMsg=history.length?'Wait for next question\u2026':'Waiting for host to start\u2026';
+  const medals=['\U0001f947','\U0001f948','\U0001f949'];
+  const tab=waitLbTab||'session';
+
+  // ── Session rows (ALL students, even 0 score) ─────────────────────────────
+  const sortedParts=[...parts].sort((a,b)=>(b.score||0)-(a.score||0));
+  let sessionRows='';
+  if(!sortedParts.length){
+    sessionRows='<div style="padding:16px;text-align:center;color:var(--mid);font-size:.82rem">No students yet.</div>';
+  } else {
+    sortedParts.forEach((p,i)=>{
       const isMe=p.id===myPid;
-      const ansTime = S.answerTimes?.[p.id] ?? null;
-      const ansTimeStr = ansTime!==null ? `${parseFloat(ansTime).toFixed(2)}s` : (isMe ? '—' : '');
-      // Determine correct/wrong from last history entry for self
-      const lastH = isMe && (S.myHistory||[]).length ? S.myHistory[S.myHistory.length-1] : null;
-      const answeredLastQ = lastH && lastH.myAnswer!==null && lastH.myAnswer!==undefined;
-      const gotItRight = answeredLastQ && lastH.myAnswer===lastH.correct;
-      const scoreColor = isMe && answeredLastQ ? (gotItRight?'#16a34a':'var(--ink)') : 'inherit';
-      const scoreFontWeight = isMe && answeredLastQ ? '700' : '600';
-      return `<div class="lb-row${isMe?' me':''}">
-        <div class="score-rank">${['🥇','🥈','🥉'][i]||i+1}</div>
-        <div style="flex:1">${esc(p.name)}${isMe?' <span style="font-size:.7rem;color:var(--mid)">← you</span>':''}</div>
-        <span style="font-size:.72rem;color:var(--mid);min-width:42px;text-align:right;margin-right:5px">${ansTimeStr}</span>
-        <div class="score-pts" style="color:${scoreColor};font-weight:${scoreFontWeight}">${p.score||0}</div>
-      </div>`;
-    }).join('')}
-  </div>`:'';
-  return `<div class="wait-shell">
-    <div class="wait-header">
-      <div class="spinner"></div>
-      <h2>${waitMsg}</h2>
-      <p class="muted mt1">${parts.length} student${parts.length!==1?'s':''} in the room</p>
-    </div>
-    <div class="voice-bar" style="max-width:480px;width:100%;margin-bottom:16px">
-      <div id="mic-dot" class="mic-dot"></div>
-      <span style="flex:1;color:var(--mid);font-size:.8rem">Host voice</span>
-    </div>
-    <div class="student-grid" style="max-width:560px;margin-bottom:8px">${chips}</div>
-    ${lbHTML}
-    <div style="display:flex;align-items:center;gap:8px;margin-top:20px">
-      <button class="btn btn-ghost btn-sm" id="btn-leave">Leave session</button>
-      <button class="btn btn-ghost btn-sm" id="btn-raise-hand" style="gap:5px;font-size:.8rem" title="Raise hand — notify host">✋ Raise Hand</button>
-    </div>
-  </div>`;
+      const ansTime=S.answerTimes?.[p.id]??null;
+      const ansTimeStr=ansTime!==null?parseFloat(ansTime).toFixed(2)+'s':'';
+      const lastH=isMe&&history.length?history[history.length-1]:null;
+      const answeredLast=lastH&&lastH.myAnswer!==null&&lastH.myAnswer!==undefined;
+      const gotRight=answeredLast&&lastH.myAnswer===lastH.correct;
+      const scoreColor=isMe&&answeredLast?(gotRight?'#16a34a':'var(--ink)'):'inherit';
+      sessionRows+='<div class="lb-row'+(isMe?' me':'')+'">'+
+        '<div class="score-rank">'+(medals[i]||('#'+(i+1)))+'</div>'+
+        '<div style="flex:1">'+esc(p.name)+(isMe?' <span style="font-size:.7rem;color:var(--mid)">\u2190 you</span>':'')+'</div>'+
+        (ansTimeStr?'<span style="font-size:.72rem;color:var(--mid);min-width:38px;text-align:right;margin-right:4px">'+ansTimeStr+'</span>':'')+
+        '<div class="score-pts" style="color:'+scoreColor+';font-weight:600">'+(p.score||0)+'</div>'+
+        '</div>';
+    });
+  }
+
+  // ── All-time rows helper ───────────────────────────────────────────────────
+  function makeAtRows(entries){
+    if(!entries) return '<div style="padding:20px;text-align:center"><div class="spinner" style="margin:0 auto 8px"></div><p class="muted small">Loading\u2026</p></div>';
+    if(!entries.length) return '<div style="padding:20px;text-align:center;color:var(--mid);font-size:.82rem">No data yet.</div>';
+    let rows='';
+    entries.forEach((e,i)=>{
+      const isMe=e.userId===currentUser?.id;
+      rows+='<div class="lb-row'+(isMe?' me':'')+'">'+
+        '<div class="score-rank">'+(medals[i]||('#'+(i+1)))+'</div>'+
+        '<div style="flex:1;font-weight:'+(isMe?'700':'400')+'">'+esc(e.userName||'\u2014')+'</div>'+
+        '<div class="score-pts">'+(e.totalScore||0)+' pts</div>'+
+        '</div>';
+    });
+    const myRank=entries.findIndex(e=>e.userId===currentUser?.id)+1;
+    const myEntry=entries.find(e=>e.userId===currentUser?.id);
+    if(myRank>entries.length&&myEntry){
+      rows+='<div style="border-top:2px solid var(--line)"><div class="lb-row me">'+
+        '<div class="score-rank">#'+myRank+'</div>'+
+        '<div style="flex:1;font-weight:700">'+esc(myEntry.userName||'\u2014')+' <span style="font-size:.7rem;color:var(--mid)">\u2190 you</span></div>'+
+        '<div class="score-pts">'+(myEntry.totalScore||0)+' pts</div>'+
+        '</div></div>';
+    }
+    return rows;
+  }
+
+  const todayStart=new Date(); todayStart.setHours(0,0,0,0);
+  const weekStart=new Date(Date.now()-7*86400000);
+  const todayRows=makeAtRows(allTimeLB?allTimeLB.filter(e=>(e.updatedAt?new Date(e.updatedAt):new Date(0))>=todayStart):null);
+  const weekRows=makeAtRows(allTimeLB?allTimeLB.filter(e=>(e.updatedAt?new Date(e.updatedAt):new Date(0))>=weekStart):null);
+  const allRows=makeAtRows(allTimeLB);
+
+  const tabDefs=[['session','\U0001f3af Session'],['today','\U0001f4c5 Today'],['week','\U0001f4c6 Week'],['all','\U0001f3c6 All-time']];
+  let tabBar='<div style="display:flex;border-bottom:1px solid var(--line);overflow-x:auto;scrollbar-width:none">';
+  tabDefs.forEach(function(td){
+    const id=td[0], label=td[1], active=tab===id;
+    tabBar+='<div data-wlb="'+id+'" style="flex:1;text-align:center;padding:7px 4px;font-size:.72rem;font-weight:600;cursor:pointer;white-space:nowrap;border-bottom:2px solid '+(active?'var(--ink)':'transparent')+';color:'+(active?'var(--ink)':'var(--mid)')+'">'+label+'</div>';
+  });
+  tabBar+='</div>';
+
+  const activeRows=tab==='session'?sessionRows:tab==='today'?todayRows:tab==='week'?weekRows:allRows;
+
+  return '<div class="wait-shell">'+
+    '<div class="wait-header">'+
+    '<div class="spinner"></div>'+
+    '<h2>'+waitMsg+'</h2>'+
+    '<p class="muted mt1">'+parts.length+' student'+(parts.length!==1?'s':'')+' in the room</p>'+
+    '</div>'+
+    '<div class="voice-bar" style="max-width:480px;width:100%;margin-bottom:8px">'+
+    '<div id="mic-dot" class="mic-dot"></div>'+
+    '<span style="flex:1;color:var(--mid);font-size:.8rem">Host voice</span>'+
+    '</div>'+
+    '<div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">'+
+    '<button class="btn btn-ghost btn-sm" id="btn-leave">Leave session</button>'+
+    '<button class="btn btn-ghost btn-sm" id="btn-raise-hand" style="gap:5px;font-size:.8rem">\u270b Raise Hand</button>'+
+    '</div>'+
+    '<div class="lb-panel" style="width:100%;max-width:520px">'+
+    '<div class="lb-head" style="padding:0">'+tabBar+'</div>'+
+    '<div style="overflow-y:auto;max-height:340px">'+activeRows+'</div>'+
+    '</div>'+
+    '</div>';
 }
 
 function questionViewHTML(){
@@ -3633,6 +3679,15 @@ function attach(){
     })
   );
 
+  // ── STUDENT: Wait screen leaderboard tabs ────────────────────────────────
+  document.querySelectorAll('[data-wlb]').forEach(el=>{
+    el.addEventListener('click',()=>{
+      waitLbTab=el.dataset.wlb;
+      if((waitLbTab==='today'||waitLbTab==='week'||waitLbTab==='all')&&!allTimeLB) fetchLeaderboard();
+      render();
+    });
+  });
+
   // ── STUDENT: Report wrong answer button ──────────────────────────────────
   on('btn-report-q', ()=>{
     const q=S.question; if(!q) return;
@@ -3804,7 +3859,7 @@ function doHostLogin(){
   sessionStorage.setItem('scc_hpw', v);
   send({type:'set_host',password:v});
 }
-function doLeave(){ role=null; myName=null; myPid=null; showingProfile=false; prevMyScore=0; scoreGain=0; myLastAnswerTime=null; localAnswerTimes={}; sessionCorrectTimes=[]; startTimerDisplay._lastStart=null; studentQCount=0; haltedTotalLabel=''; haltedTotalQuestions=0; sessionStorage.removeItem('qz_pid'); sessionStorage.removeItem(NAV_KEY); render(); }
+function doLeave(){ role=null; myName=null; myPid=null; showingProfile=false; prevMyScore=0; scoreGain=0; myLastAnswerTime=null; localAnswerTimes={}; sessionCorrectTimes=[]; startTimerDisplay._lastStart=null; studentQCount=0; haltedTotalLabel=''; haltedTotalQuestions=0; waitLbTab='session'; sessionStorage.removeItem('qz_pid'); sessionStorage.removeItem(NAV_KEY); render(); }
 function doJoin(){
   const name=currentUser?.name||'';
   if(!name)return;
