@@ -1644,20 +1644,15 @@ function landingHTML(){
       if(!lb.length) return '<div style="padding:32px;text-align:center;color:var(--mid)"><div style="font-size:2rem;margin-bottom:10px">🏆</div>No scores yet!</div>';
       const medals=['🥇','🥈','🥉'];
       const myId = String(currentUser?.id || '');
-      // Find whether current user is in the list
       const myIdx = lb.findIndex(e => String(e.userId) === myId);
       const rows = lb.map((e, i) => {
         const isMe = String(e.userId) === myId;
         return `<div class="lb-row${isMe?' me':''}">
           <div class="score-rank">${medals[i] || ('#'+(i+1))}</div>
           <div style="flex:1;font-weight:${isMe?'700':'400'}">${esc(e.userName||'—')}${isMe?' <span style="font-size:.7rem;color:var(--mid)">← you</span>':''}</div>
-          <div style="text-align:right">
-            <div class="score-pts">${e.totalScore||0} pts</div>
-            ${e.sessions?`<div style="font-size:.67rem;color:var(--mid)">${e.sessions} session${e.sessions!==1?'s':''}</div>`:''}
-          </div>
+          <div class="score-pts">${e.totalScore||0} pts</div>
         </div>`;
       }).join('');
-      // If current user is not in the visible list at all, append them at the bottom
       if(myIdx === -1 && myId){
         return rows + `<div style="border-top:2px dashed var(--line)"><div class="lb-row me" style="opacity:.7">
           <div class="score-rank">—</div>
