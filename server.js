@@ -474,11 +474,15 @@ function broadcast()    {
 }
 
 function project(role, pid) {
+  // Build set of pids that currently have an active WebSocket connection
+  const onlinePids = new Set();
+  clients.forEach(c => { if (c.role === 'participant' && c.pid) onlinePids.add(c.pid); });
+
   const base = {
     status:           state.status,
     sessionOpen:      state.sessionOpen,
     question:         state.question,
-    participants:     Object.values(state.participants),
+    participants:     Object.values(state.participants).map(p => ({ ...p, online: onlinePids.has(p.id) })),
     totalAnswered:    Object.keys(state.answers).length,
     answerCounts:     state.question
       ? state.question.options.map((_, i) =>
