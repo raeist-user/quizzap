@@ -601,6 +601,8 @@ let homeSection='home'; // 'home' | 'leaderboard'
 
 // All-time leaderboard cache
 let allTimeLB=null;
+let todayLB=null;
+let weekLB=null;
 let homeLbTab='all'; // 'today' | 'week' | 'all'
 
 // Server schedules (shared between students and host)
@@ -828,16 +830,22 @@ async function fetchHostSchedules(){
 // ── ALL-TIME LEADERBOARD ──────────────────────────────────────────────────
 async function fetchLeaderboard(){
   try{
-    const r=await fetch('/api/leaderboard');
-    const d=await r.json();
-    allTimeLB=d.leaderboard||[];
+    const [r1,r2,r3]=await Promise.all([
+      fetch('/api/leaderboard'),
+      fetch('/api/leaderboard/today'),
+      fetch('/api/leaderboard/week'),
+    ]);
+    const [d1,d2,d3]=await Promise.all([r1.json(),r2.json(),r3.json()]);
+    allTimeLB=d1.leaderboard||[];
+    todayLB=d2.leaderboard||[];
+    weekLB=d3.leaderboard||[];
     // If we're on the profile overview, patch just the rank card — no full re-render
     if(showingProfile&&profileTab==='overview'){
       const rc=document.getElementById('profile-rank-card');
       if(rc){ rc.outerHTML=buildRankCardHTML(); return; }
     }
     render();
-  }catch(e){ allTimeLB=[]; }
+  }catch(e){ allTimeLB=allTimeLB||[]; todayLB=todayLB||[]; weekLB=weekLB||[]; }
 }
 
 /* ══════════════════════════════════════
@@ -1615,11 +1623,6 @@ function landingHTML(){
   </div>`;
 
   if(homeSection==='leaderboard'){
-    const todayStart=new Date(); todayStart.setHours(0,0,0,0);
-    const weekStart=new Date(Date.now()-7*86400000);
-    const filterLB=(lb,since)=>lb?lb.filter(e=>(e.updatedAt?new Date(e.updatedAt):new Date(0))>=since):null;
-    const todayLB=filterLB(allTimeLB,todayStart);
-    const weekLB=filterLB(allTimeLB,weekStart);
     const activeLB=homeLbTab==='today'?todayLB:homeLbTab==='week'?weekLB:allTimeLB;
 
     function makeLBRows(lb){
@@ -2984,7 +2987,7 @@ function waitHTML(){
   const myP=parts.find(p=>p.id===myPid);
   const history=S.myHistory||[];
   const waitMsg=history.length?'Wait for next question\u2026':'Waiting for host to start\u2026';
-  const medals=['\U0001f947','\U0001f948','\U0001f949'];
+  const medals=['🥇','🥈','🥉'];
 
   // ALL students always shown, even with 0 score
   const sortedParts=[...parts].sort((a,b)=>(b.score||0)-(a.score||0));
@@ -3005,12 +3008,21 @@ function waitHTML(){
       '</div>';
   });
 
-  const lbHTML=history.length
-    ?'<div class="lb-panel">'+
-      '<div class="lb-head"><span style="font-size:.82rem;font-weight:600">\U0001f3c6 Leaderboard</span><span class="small muted">'+parts.length+' students</span></div>'+
+  let lbHTML='';
+  if(history.length){
+    // After at least one question: show full leaderboard with scores
+    lbHTML='<div class="lb-panel">'+
+      '<div class="lb-head"><span style="font-size:.82rem;font-weight:600">🏆 Leaderboard</span><span class="small muted">'+parts.length+' students</span></div>'+
       (lbRows||'<div style="padding:16px;text-align:center;color:var(--mid);font-size:.82rem">No students yet.</div>')+
-      '</div>'
-    :'';
+      '</div>';
+  } else if(parts.length){
+    // Before any question: show who has joined as chips (no scores yet)
+    const chips=parts.map(p=>'<div class="student-chip"><div class="s-av">'+esc(p.name.slice(0,2).toUpperCase())+'</div>'+esc(p.name)+(p.id===myPid?' <span style="font-size:.68rem;color:var(--mid)">\u2190 you</span>':'')+'</div>').join('');
+    lbHTML='<div style="width:100%;max-width:480px;margin-top:4px">'+
+      '<div style="font-size:.7rem;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--mid);margin-bottom:8px;text-align:center">'+parts.length+' student'+(parts.length!==1?'s':'')+' joined</div>'+
+      '<div class="student-grid">'+chips+'</div>'+
+      '</div>';
+  }
 
   return '<div class="wait-shell">'+
     '<div class="wait-header">'+
@@ -3188,7 +3200,7 @@ function attach(){
   }
 
   on('btn-dismissed-home', doDismissHome);
-  on('btn-lb-refresh',()=>{ allTimeLB=null; render(); fetchLeaderboard(); });
+  on('btn-lb-refresh',()=>{ allTimeLB=null; todayLB=null; weekLB=null; render(); fetchLeaderboard(); });
 
   // Home leaderboard tabs
   document.querySelectorAll('[data-hlb]').forEach(el=>{
