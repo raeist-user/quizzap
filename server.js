@@ -606,12 +606,13 @@ wss.on('connection', ws => {
         // Bank current session scores before wiping
         bankGameScores();
         state = fresh();
-        questionReports = []; reportCounter = 0;
         clients.forEach((c) => {
           if (c.role === 'participant' && c.pid && c.name)
             state.participants[c.pid] = { id: c.pid, name: c.name, score: 0, userId: c.userId || null };
         });
         broadcast();
+        // Re-send any persisted reports so host sees them after new session starts
+        if (questionReports.length) txHost({ type: 'report_received', reports: questionReports });
         break;
 
       // halt: sends halted message to students, host sees the halt menu
@@ -643,7 +644,6 @@ wss.on('connection', ws => {
         gameScores = {};
         sessionSnapshots = [];
         sessionCounter = 0;
-        questionReports = []; reportCounter = 0;
         state = fresh();
         broadcast();
         break;
