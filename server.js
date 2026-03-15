@@ -293,52 +293,91 @@ app.delete('/api/schedules/:id', requireAuth, async (req, res) => {
   } catch (e) { res.status(500).json({ error: 'Failed to delete schedule' }); }
 });
 
-// ── LEADERBOARD ROUTE (FIX #9) ────────────────────────────────────────────────
+// ── LEADERBOARD ROUTES ────────────────────────────────────────────────────────
+// GET /api/leaderboard?period=today|week|all
+//
+// today  — sum of scores from SessionEntry since today's UTC midnight
+// week   — sum of scores from SessionEntry in the rolling last-7-days window
+// all    — cumulative totals from LeaderboardEntry (written on each shutdown)
+//
+// All three return: [{ userId:string, userName:string, totalScore:number, sessions:number }]
+// sorted highest-first. userId is always a plain string so the client can safely
+// compare it against currentUser.id (which is also a string from the JWT payload).
+
 app.get('/api/leaderboard', async (req, res) => {
   try {
-    const leaderboard = await LeaderboardEntry.find()
-      .sort({ totalScore: -1 })
-      .lean();
-    res.json({ leaderboard });
-  } catch (e) { res.status(500).json({ error: 'Failed to fetch leaderboard' }); }
-});
+    const period = req.query.period || 'all';
 
-// GET /api/leaderboard/today — sum session scores earned since midnight today
-app.get('/api/leaderboard/today', async (req, res) => {
-  try {
-    const start = new Date();
-    start.setHours(0, 0, 0, 0);
+    // ── ALL-TIME ───────────────────────────────────────────────────────────────
+    if (period === 'all') {
+      const raw = await LeaderboardEntry.find()
+        .sort({ totalScore: -1 })
+        .lean();
+      const leaderboard = raw.map(e => ({
+        userId:       String(e.userId),          // ObjectId → string
+        userName:     e.userName || 'Unknown',
+        totalScore:   e.totalScore   || 0,
+        sessions:     e.sessionsPlayed || 0,
+      }));
+      return res.json({ leaderboard });
+    }
+
+    // ── TODAY / WEEK (aggregate from SessionEntry) ─────────────────────────────
+    // "today"  = from 00:00:00 UTC today
+    // "week"   = rolling 7-day window from exactly 7*24h ago
+    let since;
+    if (period === 'today') {
+      since = new Date();
+      since.setUTCHours(0, 0, 0, 0);          // UTC midnight — consistent regardless of server TZ
+    } else {
+      since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    }
+
     const entries = await SessionEntry.aggregate([
-      { $match: { date: { $gte: start } } },
-      { $group: { _id: '$userId', totalScore: { $sum: '$score' }, sessions: { $sum: 1 } } },
+      // Step 1: only sessions within the requested window
+      { $match: { date: { $gte: since } } },
+
+      // Step 2: sum score per user
+      {
+        $group: {
+          _id:        '$userId',
+          totalScore: { $sum: '$score' },
+          sessions:   { $sum:  1      },
+        },
+      },
+
+      // Step 3: sort highest first
       { $sort: { totalScore: -1 } },
-      { $lookup: { from: 'users', localField: '_id', foreignField: '_id', as: 'user' } },
-      { $unwind: { path: '$user', preserveNullAndEmptyArrays: true } },
-      { $project: { userId: { $toString: '$_id' }, userName: '$user.name', totalScore: 1, sessions: 1 } }
+
+      // Step 4: pull display name from users collection
+      {
+        $lookup: {
+          from:         'users',
+          localField:   '_id',
+          foreignField: '_id',
+          as:           'userDoc',
+        },
+      },
+
+      // Step 5: flatten the joined array (preserveNull handles deleted accounts)
+      { $unwind: { path: '$userDoc', preserveNullAndEmptyArrays: true } },
+
+      // Step 6: project clean fields only — suppress _id, stringify userId
+      {
+        $project: {
+          _id:        0,
+          userId:     { $toString: '$_id' },
+          userName:   { $ifNull: ['$userDoc.name', 'Unknown'] },
+          totalScore: 1,
+          sessions:   1,
+        },
+      },
     ]);
+
     res.json({ leaderboard: entries });
   } catch (e) {
-    console.error('/api/leaderboard/today error:', e.message);
-    res.status(500).json({ error: 'Failed to fetch today leaderboard' });
-  }
-});
-
-// GET /api/leaderboard/week — sum session scores from the last 7 days
-app.get('/api/leaderboard/week', async (req, res) => {
-  try {
-    const start = new Date(Date.now() - 7 * 86400000);
-    const entries = await SessionEntry.aggregate([
-      { $match: { date: { $gte: start } } },
-      { $group: { _id: '$userId', totalScore: { $sum: '$score' }, sessions: { $sum: 1 } } },
-      { $sort: { totalScore: -1 } },
-      { $lookup: { from: 'users', localField: '_id', foreignField: '_id', as: 'user' } },
-      { $unwind: { path: '$user', preserveNullAndEmptyArrays: true } },
-      { $project: { userId: { $toString: '$_id' }, userName: '$user.name', totalScore: 1, sessions: 1 } }
-    ]);
-    res.json({ leaderboard: entries });
-  } catch (e) {
-    console.error('/api/leaderboard/week error:', e.message);
-    res.status(500).json({ error: 'Failed to fetch week leaderboard' });
+    console.error('/api/leaderboard error:', e.message);
+    res.status(500).json({ error: 'Failed to fetch leaderboard' });
   }
 });
 
@@ -623,8 +662,10 @@ wss.on('connection', ws => {
           state.history.push({ question: state.question, correct: state.correct, answers: { ...state.answers } });
         }
         state.status = 'ended';
-        // FIX #12: persist scores to leaderboard DB
-        persistLeaderboard(Object.values(state.participants));
+        // NOTE: we do NOT persist to LeaderboardEntry here.
+        // persistLeaderboard is only called from shutdown, which uses gameScores
+        // (the true cumulative total across all sessions in a game day).
+        // Calling it here would cause double-counting when the host later shuts down.
         broadcast();
         break;
 
