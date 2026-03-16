@@ -604,6 +604,10 @@ let allTimeLB=null;
 let todayLB=null;
 let weekLB=null;
 let homeLbTab='today'; // 'today' | 'week' | 'all'
+// Per-tab fetch tracking: null=not started, false=loading, true=done
+let lbFetched={today:null, week:null, all:null};
+// Per-tab error messages (null = no error)
+let lbErrors={today:null, week:null, all:null};
 
 // Server schedules (shared between students and host)
 let serverSchedules=null;
@@ -830,35 +834,58 @@ async function fetchHostSchedules(){
 // ── LEADERBOARD ───────────────────────────────────────────────────────────────
 // Three separate fetch calls so each tab loads independently.
 // All three use the same endpoint with a ?period= param.
-async function fetchLeaderboard(){
-  // Set all to null so the UI shows spinners immediately
-  allTimeLB = null; todayLB = null; weekLB = null;
-  render();
-  // Fetch all three in parallel
-  try {
-    const [rt, rw, ra] = await Promise.all([
-      fetch('/api/leaderboard?period=today'),
-      fetch('/api/leaderboard?period=week'),
-      fetch('/api/leaderboard?period=all'),
-    ]);
-    const [dt, dw, da] = await Promise.all([rt.json(), rw.json(), ra.json()]);
-    if (!rt.ok) throw new Error(dt.error || 'today failed');
-    if (!rw.ok) throw new Error(dw.error || 'week failed');
-    if (!ra.ok) throw new Error(da.error || 'all failed');
-    todayLB   = dt.leaderboard || [];
-    weekLB    = dw.leaderboard || [];
-    allTimeLB = da.leaderboard || [];
-  } catch(e) {
-    console.error('fetchLeaderboard:', e.message);
-    todayLB   = todayLB   || [];
-    weekLB    = weekLB    || [];
-    allTimeLB = allTimeLB || [];
-  }
-  // If on profile overview, patch just the rank card
+/* ── fetchLeaderboard ────────────────────────────────────────────────────────
+   Fetch one or all leaderboard periods from the server.
+
+   period: 'today' | 'week' | 'all' | undefined (= all three)
+
+   Each period is fetched independently so a failure in one tab does not
+   affect the others.  Loading state is tracked per-tab via lbFetched so
+   the spinner only appears while that tab is genuinely in-flight, and
+   cached results are never wiped unnecessarily.
+──────────────────────────────────────────────────────────────────────────── */
+async function fetchLeaderboard(period){
+  const periods = period ? [period] : ['today','week','all'];
+
+  // Map each period to its cache variable getter/setter
+  const cache = {
+    today: { get:()=>todayLB,   set:(v)=>{ todayLB=v;   }, key:'today' },
+    week:  { get:()=>weekLB,    set:(v)=>{ weekLB=v;     }, key:'week'  },
+    all:   { get:()=>allTimeLB, set:(v)=>{ allTimeLB=v;  }, key:'all'   },
+  };
+
+  // Mark each requested period as loading and clear its error
+  periods.forEach(p => {
+    cache[p].set(null);      // null = loading sentinel
+    lbFetched[p] = false;    // false = in-flight
+    lbErrors[p]  = null;
+  });
+
+  render(); // show spinners immediately
+
+  // Fire all fetches concurrently
+  await Promise.all(periods.map(async (p) => {
+    try {
+      const r = await fetch('/api/leaderboard?period=' + p);
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || ('Server error (' + r.status + ')'));
+      cache[p].set(Array.isArray(d.leaderboard) ? d.leaderboard : []);
+      lbErrors[p]  = null;
+    } catch(e) {
+      console.error('fetchLeaderboard [' + p + ']:', e.message);
+      cache[p].set([]);              // empty array so UI shows "no scores"
+      lbErrors[p]  = e.message || 'Failed to load';
+    } finally {
+      lbFetched[p] = true;           // true = settled (success or error)
+    }
+  }));
+
+  // If viewing profile overview, patch just the rank card without a full re-render
   if(showingProfile && profileTab==='overview'){
     const rc = document.getElementById('profile-rank-card');
     if(rc){ rc.outerHTML = buildRankCardHTML(); return; }
   }
+
   render();
 }
 
@@ -1637,47 +1664,104 @@ function landingHTML(){
   </div>`;
 
   if(homeSection==='leaderboard'){
-    const activeLB=homeLbTab==='today'?todayLB:homeLbTab==='week'?weekLB:allTimeLB;
+    /* ── Pick the active dataset ──────────────────────────────────────────── */
+    const lbData = homeLbTab==='today' ? todayLB
+                 : homeLbTab==='week'  ? weekLB
+                 : allTimeLB;
 
-    function makeLBRows(lb){
-      if(lb===null) return '<div style="padding:32px;text-align:center;color:var(--mid)"><div class="spinner" style="margin:0 auto 12px"></div>Loading…</div>';
-      if(!lb.length) return '<div style="padding:32px;text-align:center;color:var(--mid)"><div style="font-size:2rem;margin-bottom:10px">🏆</div>No scores yet!</div>';
-      const medals=['🥇','🥈','🥉'];
-      const myId = String(currentUser?.id || '');
-      const myIdx = lb.findIndex(e => String(e.userId) === myId);
-      const rows = lb.map((e, i) => {
-        const isMe = String(e.userId) === myId;
+    const isLoading = lbData === null;           // null sentinel = in-flight
+    const hasError  = lbErrors[homeLbTab];
+
+    /* ── Render the rows for the active tab ──────────────────────────────── */
+    function buildRows(){
+      if(isLoading){
+        return `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:48px 20px;gap:12px;color:var(--mid)">
+          <div class="spinner"></div>
+          <span style="font-size:.84rem">Loading…</span>
+        </div>`;
+      }
+      if(hasError){
+        return `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 20px;gap:10px;color:var(--mid);text-align:center">
+          <div style="font-size:1.8rem">⚠️</div>
+          <span style="font-size:.84rem">${esc(hasError)}</span>
+          <button class="btn btn-ghost btn-sm" id="btn-lb-refresh" style="margin-top:4px">Try again</button>
+        </div>`;
+      }
+      if(!lbData.length){
+        return `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:48px 20px;gap:10px;color:var(--mid)">
+          <div style="font-size:2.4rem">🏆</div>
+          <span style="font-size:.84rem">No scores yet for this period</span>
+        </div>`;
+      }
+
+      const medals = ['🥇','🥈','🥉'];
+      const myId   = String(currentUser?.id || '');
+      const myIdx  = lbData.findIndex(e => String(e.userId) === myId);
+
+      const rows = lbData.map((e, i) => {
+        const isMe   = String(e.userId) === myId;
+        const medal  = medals[i] || ('<span style="font-size:.75rem;color:var(--mid)">#' + (i+1) + '</span>');
+        const nameWt = isMe ? '700' : (i < 3 ? '600' : '400');
+        const youTag = isMe ? ' <span style="font-size:.68rem;font-weight:400;color:var(--mid)">← you</span>' : '';
+        const sessions = e.sessions > 0
+          ? `<span class="lb-sessions">${e.sessions} session${e.sessions!==1?'s':''}</span>`
+          : '';
         return `<div class="lb-row${isMe?' me':''}">
-          <div class="score-rank">${medals[i] || ('#'+(i+1))}</div>
-          <div style="flex:1;font-weight:${isMe?'700':'400'}">${esc(e.userName||'—')}${isMe?' <span style="font-size:.7rem;color:var(--mid)">← you</span>':''}</div>
-          <div class="score-pts">${e.totalScore||0} pts</div>
+          <div class="score-rank" style="min-width:28px;text-align:center">${medal}</div>
+          <div style="flex:1;font-weight:${nameWt};min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(e.userName||'—')}${youTag}</div>
+          <div style="display:flex;align-items:center;gap:4px;flex-shrink:0">${sessions}<span class="score-pts">${e.totalScore||0}<span style="font-size:.7rem;font-weight:400;color:var(--mid)"> pts</span></span></div>
         </div>`;
       }).join('');
+
+      // Current user is not ranked yet — append a ghost row at the bottom
       if(myIdx === -1 && myId){
-        return rows + `<div style="border-top:2px dashed var(--line)"><div class="lb-row me" style="opacity:.7">
-          <div class="score-rank">—</div>
-          <div style="flex:1;font-weight:700">${esc(currentUser.name||'—')} <span style="font-size:.7rem;color:var(--mid)">← you · not ranked</span></div>
-          <div class="score-pts">0 pts</div>
-        </div></div>`;
+        return rows + `<div style="border-top:2px dashed var(--line)">
+          <div class="lb-row me" style="opacity:.7">
+            <div class="score-rank" style="min-width:28px;text-align:center"><span style="font-size:.75rem;color:var(--mid)">—</span></div>
+            <div style="flex:1;font-weight:700;min-width:0">${esc(currentUser.name||'—')} <span style="font-size:.68rem;font-weight:400;color:var(--mid)">← you · not ranked yet</span></div>
+            <div class="score-pts">0<span style="font-size:.7rem;font-weight:400;color:var(--mid)"> pts</span></div>
+          </div>
+        </div>`;
       }
+
       return rows;
     }
 
-    const tabDefs=[['today','📅 Today'],['week','📆 Week'],['all','🏆 All-time']];
-    const lbTabBar=`<div style="display:flex;border:1px solid var(--line);border-radius:var(--r);overflow:hidden;margin-bottom:14px">
-      ${tabDefs.map(([id,label])=>`<button data-hlb="${id}" style="flex:1;padding:8px 4px;font-size:.8rem;font-weight:500;border:none;cursor:pointer;background:${homeLbTab===id?'var(--ink)':'var(--faint)'};color:${homeLbTab===id?'#fff':'var(--mid)'};transition:background .15s">${label}</button>`).join('')}
+    /* ── Tab definitions ──────────────────────────────────────────────────── */
+    const tabDefs = [
+      { id:'today', label:'📅 Today',   sub:'Scores earned today'                     },
+      { id:'week',  label:'📆 Week',    sub:'Scores from the last 7 days'             },
+      { id:'all',   label:'🏆 All-time',sub:'Cumulative scores across all sessions'   },
+    ];
+    const activeDef = tabDefs.find(t => t.id === homeLbTab);
+
+    const tabBar = `<div style="display:flex;border:1px solid var(--line);border-radius:var(--r);overflow:hidden;margin-bottom:14px">
+      ${tabDefs.map(t => `<button
+          data-hlb="${t.id}"
+          style="flex:1;padding:8px 4px;font-size:.8rem;font-weight:500;border:none;cursor:pointer;
+                 background:${homeLbTab===t.id?'var(--ink)':'var(--faint)'};
+                 color:${homeLbTab===t.id?'#fff':'var(--mid)'};
+                 transition:background .15s;border-right:1px solid var(--line)"
+        >${t.label}</button>`).join('')}
     </div>`;
 
-    const subtitles={'today':'Scores earned today','week':'Scores from the last 7 days','all':'Cumulative scores across all sessions'};
+    const count    = (!isLoading && !hasError && lbData?.length) ? lbData.length : null;
+    const countTag = count !== null
+      ? `<span style="font-size:.74rem;color:var(--mid)">${count} player${count!==1?'s':''}</span>`
+      : '';
+
     return `<div class="lb-full-screen">
       <div class="lb-full-inner">
         ${tabs}
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
-          <p class="muted small">${subtitles[homeLbTab]}</p>
-          <button class="btn btn-ghost btn-sm" id="btn-lb-refresh" style="flex-shrink:0">↻</button>
+        ${tabBar}
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;gap:6px">
+          <span style="font-size:.8rem;color:var(--mid)">${esc(activeDef?.sub||'')}</span>
+          <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
+            ${countTag}
+            <button class="btn btn-ghost btn-sm" id="btn-lb-refresh" title="Refresh">↻</button>
+          </div>
         </div>
-        ${lbTabBar}
-        <div class="score-list" style="overflow-y:auto;flex:1">${makeLBRows(activeLB)}</div>
+        <div class="score-list" style="overflow-y:auto;flex:1;border-radius:var(--r)">${buildRows()}</div>
       </div>
     </div>`;
   }
@@ -3219,12 +3303,12 @@ function attach(){
   // Profile dropdown — one-time setup handled in setupOutsideClick() above
   setupOutsideClick();
   on('btn-logout', doLogout);
-  on('btn-profile',()=>{ showingProfile=true; profileTab='overview'; document.getElementById('p-dropdown')?.classList.add('hidden'); navPush(); render(); if(!allTimeLB) fetchLeaderboard(); });
+  on('btn-profile',()=>{ showingProfile=true; profileTab='overview'; document.getElementById('p-dropdown')?.classList.add('hidden'); navPush(); render(); if(!allTimeLB) fetchLeaderboard('all'); });
   on('btn-profile-back',()=>{ showingProfile=false; render(); });
   document.querySelectorAll('.ptab[data-ptab]').forEach(el=>el.addEventListener('click',()=>{
     profileTab=el.dataset.ptab;
     render();
-    if(profileTab==='overview'&&!allTimeLB) fetchLeaderboard();
+    if(profileTab==='overview'&&!allTimeLB) fetchLeaderboard('all');
     // loadProfileData is already called inside render() for profile pages
   }));
   if(showingProfile){
@@ -3232,11 +3316,27 @@ function attach(){
   }
 
   on('btn-dismissed-home', doDismissHome);
-  on('btn-lb-refresh',()=>{ allTimeLB=null; todayLB=null; weekLB=null; render(); fetchLeaderboard(); });
+  on('btn-lb-refresh',()=>{
+    // Refresh only the currently visible tab; reset its cache and re-fetch
+    const p = homeLbTab;
+    if(p==='today')  todayLB=null;
+    else if(p==='week') weekLB=null;
+    else allTimeLB=null;
+    lbFetched[p]=null; lbErrors[p]=null;
+    render();
+    fetchLeaderboard(p);
+  });
 
-  // Home leaderboard tabs
+  // Home leaderboard tabs — switch tab; fetch lazily only if not yet cached
   document.querySelectorAll('[data-hlb]').forEach(el=>{
-    el.addEventListener('click',()=>{ homeLbTab=el.dataset.hlb; render(); });
+    el.addEventListener('click',()=>{
+      const p = el.dataset.hlb;
+      homeLbTab = p;
+      render(); // switch tab immediately (shows cached data or spinner)
+      // Fetch only if this tab has never been loaded
+      const cached = p==='today' ? todayLB : p==='week' ? weekLB : allTimeLB;
+      if(cached === null && lbFetched[p] !== false) fetchLeaderboard(p);
+    });
   });
 
   // Host home button (inside full-window host nav)
@@ -3326,7 +3426,16 @@ function attach(){
 
   // Landing tabs
   on('ht-home',()=>{ homeSection='home'; render(); });
-  on('ht-lb',()=>{ homeSection='leaderboard'; homeLbTab='today'; allTimeLB=null; todayLB=null; weekLB=null; render(); fetchLeaderboard(); });
+  on('ht-lb',()=>{
+    homeSection='leaderboard';
+    // Start on today tab; reset everything so data is always fresh when opening LB
+    homeLbTab='today';
+    todayLB=null; weekLB=null; allTimeLB=null;
+    lbFetched={today:null, week:null, all:null};
+    lbErrors={today:null, week:null, all:null};
+    render();
+    fetchLeaderboard(); // fetch all three in parallel on open
+  });
 
   // Landing nav
   on('go-host', ()=>{ role='host'; hostAuthed=false; navPush(); render(); });
@@ -3836,12 +3945,16 @@ function doDismissHome(){
   if(dismissedTimer){clearInterval(dismissedTimer);dismissedTimer=null;}
   showingDismissed=false; showingHalted=false; haltedSnapshot=[]; haltedTotalQuestions=0;
   role=null; myName=null; myPid=null; showingProfile=false; prevMyScore=0; scoreGain=0; myLastAnswerTime=null; localAnswerTimes={}; sessionCorrectTimes=[]; startTimerDisplay._lastStart=null; studentQCount=0; haltedTotalLabel=''; haltedTotalQuestions=0;
-  allTimeLB=null;  // force refresh so updated all-time scores show immediately
+  // Wipe all LB caches so scores are fresh the next time the user opens the leaderboard
+  todayLB=null; weekLB=null; allTimeLB=null;
+  lbFetched={today:null, week:null, all:null};
+  lbErrors={today:null, week:null, all:null};
   sessionStorage.removeItem('qz_pid'); sessionStorage.removeItem(NAV_KEY);
   render();
+  // Pre-fetch all three tabs in the background ready for when the user opens LB
   fetchLeaderboard();
 }
-function doLogout(){ clearAuth(); role=null; myPid=null; myName=null; hostAuthed=false; HOST_PASSWORD_INPUT=''; showingProfile=false; prevMyScore=0; scoreGain=0; myLastAnswerTime=null; localAnswerTimes={}; sessionCorrectTimes=[]; startTimerDisplay._lastStart=null; studentQCount=0; allTimeLB=null; serverSchedules=null; hostSchedules=[]; sessionStorage.removeItem(NAV_KEY); sessionStorage.removeItem('scc_hpw'); render(); }
+function doLogout(){ clearAuth(); role=null; myPid=null; myName=null; hostAuthed=false; HOST_PASSWORD_INPUT=''; showingProfile=false; prevMyScore=0; scoreGain=0; myLastAnswerTime=null; localAnswerTimes={}; sessionCorrectTimes=[]; startTimerDisplay._lastStart=null; studentQCount=0; todayLB=null; weekLB=null; allTimeLB=null; lbFetched={today:null,week:null,all:null}; lbErrors={today:null,week:null,all:null}; serverSchedules=null; hostSchedules=[]; sessionStorage.removeItem(NAV_KEY); sessionStorage.removeItem('scc_hpw'); render(); }
 
 /* Shared back navigation */
 function doBack(){
