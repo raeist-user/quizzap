@@ -903,17 +903,23 @@ async function postNotice(text){
 // ── ADMIN REQUESTS ────────────────────────────────────────────────────────────
 async function fetchAdminRequests(){
   if(!authToken||currentUser?.role!=='host') return;
-  try{
-    const [jr, ur, ru] = await Promise.all([
-      fetch('/api/admin/join-requests',{headers:{Authorization:'Bearer '+authToken}}).then(r=>r.json()),
-      fetch('/api/admin/update-requests',{headers:{Authorization:'Bearer '+authToken}}).then(r=>r.json()),
-      fetch('/api/admin/users',{headers:{Authorization:'Bearer '+authToken}}).then(r=>r.json()),
-    ]);
-    joinRequests    = jr.requests  || [];
-    updateRequests  = ur.requests  || [];
-    registeredUsers = ru.users     || [];
-    render();
-  }catch(e){ console.warn('Admin fetch failed:',e.message); }
+  const hdr={Authorization:'Bearer '+authToken};
+  const safeFetch = async (url) => {
+    try{
+      const r = await fetch(url,{headers:hdr});
+      if(!r.ok) return {};
+      return await r.json();
+    }catch(e){ console.warn('Fetch failed:',url,e.message); return {}; }
+  };
+  const [jr, ur, ru] = await Promise.all([
+    safeFetch('/api/admin/join-requests'),
+    safeFetch('/api/admin/update-requests'),
+    safeFetch('/api/admin/users'),
+  ]);
+  joinRequests    = jr.requests || [];
+  updateRequests  = ur.requests || [];
+  registeredUsers = ru.users    || [];
+  render();
 }
 
 async function approveJoinReq(id){
