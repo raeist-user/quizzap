@@ -12,13 +12,13 @@ const jwt      = require('jsonwebtoken');
 try { require('dotenv').config(); } catch(_){}
 
 const JWT_SECRET    = process.env.JWT_SECRET    || 'change-this-in-production';
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/test';
+const MONGODB_URI   = process.env.MONGODB_URI   || 'mongodb://localhost:27017/shadabcoaching';
 const HOST_PASSWORD = process.env.HOST_PASSWORD || '2325';
 
 // ── MONGODB ───────────────────────────────────────────────────────────────────
 mongoose.connect(MONGODB_URI)
-  .then(() => console.log('MongoDB connected'))
-  .catch(e  => console.warn('MongoDB not connected:', e.message));
+  .then(() => console.log('MongoDB connected — db:', mongoose.connection.db.databaseName))
+  .catch(e  => console.error('MongoDB connection FAILED:', e.message));
 
 const userSchema = new mongoose.Schema({
   name:        { type: String, required: true, trim: true, maxlength: 50 },
@@ -59,14 +59,8 @@ const noticeSchema = new mongoose.Schema({
 });
 const Notice = mongoose.model('Notice', noticeSchema);
 
-// Clean up stale indexes from old schema on startup
-mongoose.connection.once('open', async () => {
-  const drop = async (name) => {
-    try { await User.collection.dropIndex(name); console.log('Dropped index:', name); } catch (_) {}
-  };
-  await drop('email_1');       // old non-sparse email index
-  await drop('username_1');    // old required username index — replaced by sparse version
-});
+// Index cleanup removed — one-time migration already applied to cluster.
+// Mongoose 8 manages sparse/unique indexes from schema definitions automatically.
 
 // FIX #6-9: Schedule and Leaderboard models were missing entirely
 const scheduleSchema = new mongoose.Schema({
@@ -338,16 +332,19 @@ app.get('/api/admin/join-requests', requireHost, async (req, res) => {
 
 app.post('/api/admin/join-requests/:id/approve', requireHost, async (req, res) => {
   try {
+    console.log('[approve] DB:', mongoose.connection.db.databaseName);
     const pr = await PendingReg.findById(req.params.id);
     if (!pr) return res.status(404).json({ error: 'Request not found' });
     if (await User.findOne({ email: pr.email })) {
       await PendingReg.findByIdAndDelete(pr._id);
       return res.status(400).json({ error: 'Email already registered' });
     }
-    await User.create({ name: pr.name, email: pr.email, username: pr.username || null, password: pr.password, role: 'student', status: 'approved' });
+    const newUser = await User.create({ name: pr.name, email: pr.email, username: pr.username || null, password: pr.password, role: 'student', status: 'approved' });
+    console.log('[approve] User created:', newUser._id, newUser.email);
     await PendingReg.findByIdAndDelete(pr._id);
     res.json({ ok: true });
   } catch (e) {
+    console.error('[approve] Error:', e.message, e.code);
     if (e.code === 11000) return res.status(400).json({ error: 'Username or email conflict' });
     res.status(500).json({ error: 'Failed' });
   }
