@@ -22,15 +22,42 @@ mongoose.connect(MONGODB_URI)
 
 const userSchema = new mongoose.Schema({
   name:        { type: String, required: true, trim: true, maxlength: 50 },
-  // email is the primary identity — required at both schema and route level
   email:       { type: String, required: true, trim: true, lowercase: true, unique: true },
-  // username is optional — users can set it for login/display; sparse unique so null docs don't conflict
   username:    { type: String, lowercase: true, trim: true, sparse: true, unique: true, match: /^[a-zA-Z0-9_]{3,30}$/, default: null },
   password:    { type: String, required: true },
   role:        { type: String, enum: ['student','host'], default: 'student' },
+  status:      { type: String, enum: ['pending','approved'], default: 'approved' },
   createdAt:   { type: Date, default: Date.now },
 });
 const User = mongoose.model('User', userSchema);
+
+// Pending registrations — new users awaiting host approval
+const pendingRegSchema = new mongoose.Schema({
+  name:      { type: String, required: true, trim: true, maxlength: 50 },
+  email:     { type: String, required: true, trim: true, lowercase: true, unique: true },
+  username:  { type: String, lowercase: true, trim: true, sparse: true, unique: true, default: null },
+  password:  { type: String, required: true },
+  createdAt: { type: Date, default: Date.now },
+});
+const PendingReg = mongoose.model('PendingReg', pendingRegSchema);
+
+// Update requests — students requesting name/username changes
+const updateReqSchema = new mongoose.Schema({
+  userId:    { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  userName:  { type: String },
+  type:      { type: String, enum: ['name','username'], required: true },
+  newValue:  { type: String, required: true, trim: true },
+  status:    { type: String, enum: ['pending','approved','rejected'], default: 'pending' },
+  createdAt: { type: Date, default: Date.now },
+});
+const UpdateReq = mongoose.model('UpdateReq', updateReqSchema);
+
+// Global notice — host broadcasts a message to all students
+const noticeSchema = new mongoose.Schema({
+  text:      { type: String, default: '', maxlength: 500 },
+  updatedAt: { type: Date, default: Date.now },
+});
+const Notice = mongoose.model('Notice', noticeSchema);
 
 // Clean up stale indexes from old schema on startup
 mongoose.connection.once('open', async () => {
@@ -99,9 +126,19 @@ function requireAuth(req, res, next) {
   catch { res.status(401).json({ error: 'Invalid token' }); }
 }
 
+function requireHost(req, res, next) {
+  const auth = req.headers.authorization;
+  if (!auth?.startsWith('Bearer ')) return res.status(401).json({ error: 'Unauthorised' });
+  try {
+    req.user = jwt.verify(auth.slice(7), JWT_SECRET);
+    if (req.user.role !== 'host') return res.status(403).json({ error: 'Host access required' });
+    next();
+  } catch { res.status(401).json({ error: 'Invalid token' }); }
+}
+
 // ── USER ROUTES ───────────────────────────────────────────────────────────────
 
-// Register
+// Register — creates a PendingReg entry; host must approve before account is active
 app.post('/api/register', async (req, res) => {
   try {
     const { name, email, username, password } = req.body;
@@ -112,36 +149,34 @@ app.post('/api/register', async (req, res) => {
     if (!password)      return res.status(400).json({ error: 'Password is required' });
     if (password.length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters' });
 
-    // Username is optional — validate only if provided
     const uname = username?.trim() || null;
     if (uname) {
       if (!/^[a-zA-Z0-9_]{3,30}$/.test(uname))
         return res.status(400).json({ error: 'Username must be 3–30 characters: letters, numbers, underscores only' });
       if (await User.findOne({ username: uname.toLowerCase() }))
         return res.status(400).json({ error: 'Username already taken' });
+      if (await PendingReg.findOne({ username: uname.toLowerCase() }))
+        return res.status(400).json({ error: 'Username already taken' });
     }
 
     if (await User.findOne({ email: email.trim().toLowerCase() }))
       return res.status(400).json({ error: 'An account with this email already exists' });
+    if (await PendingReg.findOne({ email: email.trim().toLowerCase() }))
+      return res.status(400).json({ error: 'A registration request with this email is already pending' });
 
     const hashed = await bcrypt.hash(password, 10);
-    const user = await User.create({
+    await PendingReg.create({
       name: name.trim(),
       email: email.trim().toLowerCase(),
       username: uname ? uname.toLowerCase() : null,
       password: hashed,
     });
-    const token = jwt.sign(
-      { id: user._id, name: user.name, email: user.email, username: user.username || '', role: user.role },
-      JWT_SECRET, { expiresIn: '7d' }
-    );
-    res.json({ token, user: { id: user._id, name: user.name, email: user.email, username: user.username || '', role: user.role } });
+    res.json({ pending: true, message: 'Registration submitted! Your account is pending approval by the host.' });
   } catch (e) {
     if (e.code === 11000) {
       const field = Object.keys(e.keyPattern || {})[0] || '';
-      if (field === 'email')    return res.status(400).json({ error: 'An account with this email already exists' });
+      if (field === 'email') return res.status(400).json({ error: 'An account with this email already exists' });
       if (field === 'username') return res.status(400).json({ error: 'Username already taken' });
-      console.error('Register duplicate key on field:', field, e.message);
       return res.status(500).json({ error: 'Registration failed — please try again' });
     }
     console.error('Register error:', e.message);
@@ -160,17 +195,18 @@ app.post('/api/login', async (req, res) => {
     let user = null;
 
     if (id.includes('@')) {
-      // Looks like an email — check email field first, then fall back to username field
-      // (fallback handles old accounts that had their email stored in username)
       user = await User.findOne({ email: id });
       if (!user) user = await User.findOne({ username: id });
     } else {
-      // Plain username
       user = await User.findOne({ username: id });
     }
 
     if (!user || !(await bcrypt.compare(password, user.password)))
       return res.status(400).json({ error: 'Invalid email/username or password' });
+
+    // Check approval status — hosts bypass this check
+    if (user.role !== 'host' && user.status === 'pending')
+      return res.status(403).json({ error: 'Your account is pending approval by the host.' });
 
     const token = jwt.sign(
       { id: user._id, name: user.name, email: user.email || '', username: user.username || '', role: user.role },
@@ -228,19 +264,34 @@ app.post('/api/change-password', requireAuth, async (req, res) => {
   } catch (e) { res.status(500).json({ error: 'Failed' }); }
 });
 
-// Update display name
+// Update display name — students submit a request; hosts update directly
 app.post('/api/update-name', requireAuth, async (req, res) => {
   try {
     const { displayName } = req.body;
     if (!displayName?.trim()) return res.status(400).json({ error: 'Display name required' });
     if (displayName.trim().length > 32) return res.status(400).json({ error: 'Max 32 characters' });
-    const user = await User.findByIdAndUpdate(req.user.id, { name: displayName.trim() }, { new: true });
-    const token = jwt.sign({ id: user._id, name: user.name, email: user.email || '', username: user.username || '', role: user.role }, JWT_SECRET, { expiresIn: '7d' });
-    res.json({ ok: true, token, user: { id: user._id, name: user.name, email: user.email || '', username: user.username || '', role: user.role } });
+
+    if (req.user.role === 'host') {
+      // Hosts update directly
+      const user = await User.findByIdAndUpdate(req.user.id, { name: displayName.trim() }, { new: true });
+      const token = jwt.sign({ id: user._id, name: user.name, email: user.email || '', username: user.username || '', role: user.role }, JWT_SECRET, { expiresIn: '7d' });
+      return res.json({ ok: true, token, user: { id: user._id, name: user.name, email: user.email || '', username: user.username || '', role: user.role } });
+    }
+
+    // Students create a pending update request
+    const existing = await UpdateReq.findOne({ userId: req.user.id, type: 'name', status: 'pending' });
+    if (existing) {
+      existing.newValue = displayName.trim();
+      await existing.save();
+    } else {
+      const u = await User.findById(req.user.id).lean();
+      await UpdateReq.create({ userId: req.user.id, userName: u?.name || req.user.name, type: 'name', newValue: displayName.trim() });
+    }
+    res.json({ ok: true, pending: true, message: 'Name change request submitted — awaiting host approval.' });
   } catch (e) { res.status(500).json({ error: 'Failed' }); }
 });
 
-// Set or change username — once set, cannot be cleared (only replaced with another valid username)
+// Set or change username — students submit a request; hosts update directly
 app.post('/api/update-username', requireAuth, async (req, res) => {
   try {
     const { username } = req.body;
@@ -248,17 +299,111 @@ app.post('/api/update-username', requireAuth, async (req, res) => {
     const uname = username.trim().toLowerCase();
     if (!/^[a-zA-Z0-9_]{3,30}$/.test(uname))
       return res.status(400).json({ error: 'Username must be 3–30 characters: letters, numbers, underscores only' });
-    // Check availability — allow if it's already this user's own username
     const existing = await User.findOne({ username: uname }).lean();
     if (existing && existing._id.toString() !== req.user.id)
       return res.status(400).json({ error: 'Username already taken' });
-    const user = await User.findByIdAndUpdate(req.user.id, { username: uname }, { new: true });
-    const token = jwt.sign({ id: user._id, name: user.name, email: user.email || '', username: user.username || '', role: user.role }, JWT_SECRET, { expiresIn: '7d' });
-    res.json({ ok: true, token, user: { id: user._id, name: user.name, email: user.email || '', username: user.username || '', role: user.role } });
+
+    if (req.user.role === 'host') {
+      // Hosts update directly
+      const user = await User.findByIdAndUpdate(req.user.id, { username: uname }, { new: true });
+      const token = jwt.sign({ id: user._id, name: user.name, email: user.email || '', username: user.username || '', role: user.role }, JWT_SECRET, { expiresIn: '7d' });
+      return res.json({ ok: true, token, user: { id: user._id, name: user.name, email: user.email || '', username: user.username || '', role: user.role } });
+    }
+
+    // Students create a pending update request
+    const existingReq = await UpdateReq.findOne({ userId: req.user.id, type: 'username', status: 'pending' });
+    if (existingReq) {
+      existingReq.newValue = uname;
+      await existingReq.save();
+    } else {
+      const u = await User.findById(req.user.id).lean();
+      await UpdateReq.create({ userId: req.user.id, userName: u?.name || req.user.name, type: 'username', newValue: uname });
+    }
+    res.json({ ok: true, pending: true, message: 'Username change request submitted — awaiting host approval.' });
   } catch (e) {
     if (e.code === 11000) return res.status(400).json({ error: 'Username already taken' });
     res.status(500).json({ error: 'Failed' });
   }
+});
+
+// ── ADMIN ROUTES (host only) ──────────────────────────────────────────────────
+
+// GET /api/admin/join-requests
+app.get('/api/admin/join-requests', requireHost, async (req, res) => {
+  try {
+    const reqs = await PendingReg.find().sort({ createdAt: 1 }).lean();
+    res.json({ requests: reqs.map(r => ({ id: r._id, name: r.name, email: r.email, username: r.username || '', createdAt: r.createdAt })) });
+  } catch (e) { res.status(500).json({ error: 'Failed' }); }
+});
+
+app.post('/api/admin/join-requests/:id/approve', requireHost, async (req, res) => {
+  try {
+    const pr = await PendingReg.findById(req.params.id);
+    if (!pr) return res.status(404).json({ error: 'Request not found' });
+    if (await User.findOne({ email: pr.email })) {
+      await PendingReg.findByIdAndDelete(pr._id);
+      return res.status(400).json({ error: 'Email already registered' });
+    }
+    await User.create({ name: pr.name, email: pr.email, username: pr.username || null, password: pr.password, role: 'student', status: 'approved' });
+    await PendingReg.findByIdAndDelete(pr._id);
+    res.json({ ok: true });
+  } catch (e) {
+    if (e.code === 11000) return res.status(400).json({ error: 'Username or email conflict' });
+    res.status(500).json({ error: 'Failed' });
+  }
+});
+
+app.post('/api/admin/join-requests/:id/reject', requireHost, async (req, res) => {
+  try {
+    await PendingReg.findByIdAndDelete(req.params.id);
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: 'Failed' }); }
+});
+
+// GET /api/admin/update-requests
+app.get('/api/admin/update-requests', requireHost, async (req, res) => {
+  try {
+    const reqs = await UpdateReq.find({ status: 'pending' }).sort({ createdAt: 1 }).lean();
+    res.json({ requests: reqs.map(r => ({ id: r._id, userId: String(r.userId), userName: r.userName || '', type: r.type, newValue: r.newValue, createdAt: r.createdAt })) });
+  } catch (e) { res.status(500).json({ error: 'Failed' }); }
+});
+
+app.post('/api/admin/update-requests/:id/approve', requireHost, async (req, res) => {
+  try {
+    const ur = await UpdateReq.findById(req.params.id);
+    if (!ur) return res.status(404).json({ error: 'Request not found' });
+    const update = ur.type === 'name' ? { name: ur.newValue } : { username: ur.newValue };
+    await User.findByIdAndUpdate(ur.userId, update);
+    ur.status = 'approved'; await ur.save();
+    res.json({ ok: true });
+  } catch (e) {
+    if (e.code === 11000) return res.status(400).json({ error: 'Username already taken' });
+    res.status(500).json({ error: 'Failed' });
+  }
+});
+
+app.post('/api/admin/update-requests/:id/reject', requireHost, async (req, res) => {
+  try {
+    await UpdateReq.findByIdAndUpdate(req.params.id, { status: 'rejected' });
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: 'Failed' }); }
+});
+
+// GET /api/notice
+app.get('/api/notice', async (req, res) => {
+  try {
+    const n = await Notice.findOne().lean();
+    res.json({ text: n?.text || '' });
+  } catch (e) { res.status(500).json({ error: 'Failed' }); }
+});
+
+// POST /api/notice (host only)
+app.post('/api/notice', requireHost, async (req, res) => {
+  try {
+    const { text } = req.body;
+    await Notice.findOneAndUpdate({}, { text: (text || '').slice(0, 500), updatedAt: new Date() }, { upsert: true });
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: 'Failed' }); }
 });
 
 // ── SCHEDULE ROUTES (FIX #6, #7, #8) ─────────────────────────────────────────
