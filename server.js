@@ -12,7 +12,7 @@ const jwt      = require('jsonwebtoken');
 try { require('dotenv').config(); } catch(_){}
 
 const JWT_SECRET    = process.env.JWT_SECRET    || 'change-this-in-production';
-const MONGODB_URI   = process.env.MONGODB_URI   || 'mongodb://localhost:27017/shadabcoaching';
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/test';
 const HOST_PASSWORD = process.env.HOST_PASSWORD || '2325';
 
 // ── MONGODB ───────────────────────────────────────────────────────────────────
