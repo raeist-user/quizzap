@@ -488,7 +488,7 @@
     .ctrl-panel-title{font-size:.75rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--mid)}
 
     /* Box-button row */
-    .cp-btn-row{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:10px}
+    .cp-btn-row{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:10px}
     .cp-btn{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;padding:11px 6px;background:var(--faint);color:var(--ink);border:1px solid var(--line);border-radius:10px;cursor:pointer;font-family:var(--sans);transition:background .18s,border-color .18s,color .18s;position:relative;min-height:60px;width:100%}
     .cp-btn:hover{background:#e8e7e3;border-color:#ccc}
     .cp-btn.active{background:var(--ink);border-color:var(--ink)}
@@ -646,6 +646,7 @@ let homeSection='home'; // 'home' | 'leaderboard'
 let hostNotice='';           // text of global notice fetched from server
 let joinRequests=[];         // [{id,name,email,username,createdAt}]
 let updateRequests=[];       // [{id,userId,userName,type,newValue,createdAt}]
+let registeredUsers=[];      // [{id,name,email,username,role,status,createdAt}]
 let adminLoading=false;      // whether admin requests are being fetched
 
 // All-time leaderboard cache
@@ -903,12 +904,14 @@ async function postNotice(text){
 async function fetchAdminRequests(){
   if(!authToken||currentUser?.role!=='host') return;
   try{
-    const [jr, ur] = await Promise.all([
+    const [jr, ur, ru] = await Promise.all([
       fetch('/api/admin/join-requests',{headers:{Authorization:'Bearer '+authToken}}).then(r=>r.json()),
       fetch('/api/admin/update-requests',{headers:{Authorization:'Bearer '+authToken}}).then(r=>r.json()),
+      fetch('/api/admin/users',{headers:{Authorization:'Bearer '+authToken}}).then(r=>r.json()),
     ]);
-    joinRequests  = jr.requests  || [];
-    updateRequests= ur.requests  || [];
+    joinRequests    = jr.requests  || [];
+    updateRequests  = ur.requests  || [];
+    registeredUsers = ru.users     || [];
     render();
   }catch(e){ console.warn('Admin fetch failed:',e.message); }
 }
@@ -947,6 +950,27 @@ async function rejectUpdateReq(id){
     const r=await fetch('/api/admin/update-requests/'+id+'/reject',{method:'POST',headers:{Authorization:'Bearer '+authToken}});
     if(!r.ok) throw new Error('Failed');
     showToast('Update rejected.','neutral');
+    await fetchAdminRequests();
+  }catch(e){ showToast('Error: '+e.message,'bad'); }
+}
+
+async function deleteUser(id, name){
+  if(!confirm(`Permanently delete "${name}"?\n\nThis will purge their account, session history, leaderboard scores and all pending requests. This cannot be undone.`)) return;
+  try{
+    const r=await fetch('/api/admin/users/'+id,{method:'DELETE',headers:{Authorization:'Bearer '+authToken}});
+    const d=await r.json();
+    if(!r.ok) throw new Error(d.error||'Failed');
+    showToast('🗑 Account deleted and fully purged.','neutral');
+    await fetchAdminRequests();
+  }catch(e){ showToast('Error: '+e.message,'bad'); }
+}
+
+async function changeUserRole(id, newRole){
+  try{
+    const r=await fetch('/api/admin/users/'+id+'/role',{method:'PATCH',headers:{'Authorization':'Bearer '+authToken,'Content-Type':'application/json'},body:JSON.stringify({role:newRole})});
+    const d=await r.json();
+    if(!r.ok) throw new Error(d.error||'Failed');
+    showToast(`Role updated to ${newRole}.`,'good');
     await fetchAdminRequests();
   }catch(e){ showToast('Error: '+e.message,'bad'); }
 }
@@ -1848,6 +1872,16 @@ function controlPanelHTML(){
         <span class="cp-btn-label">Global Notice</span>
         ${hostNotice?'<span class="cp-btn-active">ON</span>':''}
       </button>
+      <button class="cp-btn" id="cpbtn-users" onclick="cpToggle('users')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+          <circle cx="9" cy="7" r="4"/>
+          <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+          <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+        </svg>
+        <span class="cp-btn-label">Registered Users</span>
+        ${registeredUsers.length?`<span style="position:absolute;bottom:4px;right:5px;font-size:.52rem;color:var(--mid);font-weight:600">${registeredUsers.length}</span>`:''}
+      </button>
     </div>
 
     <!-- Expandable panels -->
@@ -1875,6 +1909,32 @@ function controlPanelHTML(){
       <div class="notice-board-body">
         <textarea id="notice-input" placeholder="Type a notice for students…" maxlength="500">${esc(hostNotice)}</textarea>
         <button class="btn btn-dark btn-sm" id="btn-notice-post" style="flex-shrink:0;padding:8px 14px">Post</button>
+      </div>
+    </div>
+
+    <div class="cp-panel" id="cppanel-users">
+      <div class="cp-panel-head">
+        <span class="cp-panel-title">Registered Users</span>
+        <span style="font-size:.68rem;color:var(--mid)">${registeredUsers.length} account${registeredUsers.length===1?'':'s'}</span>
+      </div>
+      <div style="max-height:260px;overflow-y:auto">
+        ${registeredUsers.length ? registeredUsers.map(u=>`
+          <div class="req-item" style="flex-wrap:wrap;gap:6px">
+            <div class="req-item-info" style="flex:1;min-width:0">
+              <div class="req-item-name" style="display:flex;align-items:center;gap:5px">
+                ${esc(u.name)}
+                <span style="font-size:.6rem;font-weight:600;padding:1px 5px;border-radius:6px;background:${u.role==='host'?'#7c3aed':'#0ea5e9'};color:#fff">${u.role}</span>
+              </div>
+              <div class="req-item-sub">${esc(u.email)}${u.username?' · @'+esc(u.username):''}</div>
+            </div>
+            <div class="req-actions" style="gap:4px">
+              <button class="btn btn-sm" style="padding:3px 8px;font-size:.68rem;background:#f3f4f6;border:1px solid var(--line);border-radius:6px" data-role-toggle="${u.id}" data-role-current="${u.role}">
+                ${u.role==='student'?'→ Host':'→ Student'}
+              </button>
+              <button class="btn btn-bad btn-sm" style="padding:3px 9px;font-size:.7rem" data-user-delete="${u.id}" data-user-name="${esc(u.name)}">🗑</button>
+            </div>
+          </div>`).join('')
+        : '<div class="req-empty">No registered users</div>'}
       </div>
     </div>
   </div>`;
@@ -3672,8 +3732,8 @@ function attach(){
 
   // Control Panel — box button toggle
   window.cpToggle = function(key){
-    const panels = ['join','update','notice'];
-    const btns   = ['join','update','notice'];
+    const panels = ['join','update','notice','users'];
+    const btns   = ['join','update','notice','users'];
     panels.forEach(k=>{
       const panel = document.getElementById('cppanel-'+k);
       const btn   = document.getElementById('cpbtn-'+k);
@@ -3701,6 +3761,16 @@ function attach(){
   });
   document.querySelectorAll('[data-ur-reject]').forEach(el=>{
     el.addEventListener('click',()=>rejectUpdateReq(el.dataset.urReject));
+  });
+  // Registered Users panel — delete and role toggle
+  document.querySelectorAll('[data-user-delete]').forEach(el=>{
+    el.addEventListener('click',()=>deleteUser(el.dataset.userDelete, el.dataset.userName));
+  });
+  document.querySelectorAll('[data-role-toggle]').forEach(el=>{
+    el.addEventListener('click',()=>{
+      const newRole = el.dataset.roleCurrent==='student'?'host':'student';
+      changeUserRole(el.dataset.roleToggle, newRole);
+    });
   });
   on('btn-notice-post', async ()=>{
     const txt=document.getElementById('notice-input')?.value||'';
