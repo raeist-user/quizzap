@@ -386,6 +386,58 @@ app.post('/api/admin/update-requests/:id/reject', requireHost, async (req, res) 
   } catch (e) { res.status(500).json({ error: 'Failed' }); }
 });
 
+// GET /api/admin/users — list all registered users
+app.get('/api/admin/users', requireHost, async (req, res) => {
+  try {
+    const users = await User.find().sort({ createdAt: 1 }).select('-password').lean();
+    res.json({ users: users.map(u => ({
+      id:        u._id,
+      name:      u.name,
+      email:     u.email || '',
+      username:  u.username || '',
+      role:      u.role,
+      status:    u.status,
+      createdAt: u.createdAt,
+    }))});
+  } catch (e) { res.status(500).json({ error: 'Failed' }); }
+});
+
+// DELETE /api/admin/users/:id — purge account + all related records
+app.delete('/api/admin/users/:id', requireHost, async (req, res) => {
+  try {
+    const uid = req.params.id;
+    // Prevent host from deleting their own account
+    if (uid === req.user.id) return res.status(400).json({ error: 'Cannot delete your own account' });
+    const user = await User.findById(uid);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    // Purge every trace from every collection
+    await Promise.all([
+      User.findByIdAndDelete(uid),
+      UpdateReq.deleteMany({ userId: uid }),
+      LeaderboardEntry.deleteMany({ userId: uid }),
+      SessionEntry.deleteMany({ userId: uid }),
+    ]);
+    console.log('[delete-user] Purged user:', uid, user.email);
+    res.json({ ok: true });
+  } catch (e) {
+    console.error('[delete-user] Error:', e.message);
+    res.status(500).json({ error: 'Failed to delete user' });
+  }
+});
+
+// PATCH /api/admin/users/:id/role — change student ↔ host
+app.patch('/api/admin/users/:id/role', requireHost, async (req, res) => {
+  try {
+    const { role } = req.body;
+    if (!['student', 'host'].includes(role)) return res.status(400).json({ error: 'Invalid role' });
+    const uid = req.params.id;
+    if (uid === req.user.id) return res.status(400).json({ error: 'Cannot change your own role' });
+    const user = await User.findByIdAndUpdate(uid, { role }, { new: true }).select('-password');
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    res.json({ ok: true, role: user.role });
+  } catch (e) { res.status(500).json({ error: 'Failed to update role' }); }
+});
+
 // GET /api/notice
 app.get('/api/notice', async (req, res) => {
   try {
