@@ -481,6 +481,34 @@
     .r-opt-reported{background:#fffbeb;border-color:#fcd34d}
     .r-opt-normal{background:var(--white);border-color:var(--line)}
     .reports-badge{position:absolute;top:-4px;right:-4px;background:var(--bad);color:#fff;font-size:.58rem;font-weight:700;padding:1px 5px;border-radius:10px;min-width:16px;text-align:center;line-height:1.6;pointer-events:none}
+
+    /* CONTROL PANEL (host home) */
+    .ctrl-panel{background:var(--white);border-bottom:1px solid var(--line);padding:10px 14px}
+    .ctrl-panel-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+    .ctrl-panel-title{font-size:.75rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--mid)}
+    .ctrl-panel-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px}
+    @media(max-width:480px){.ctrl-panel-grid{grid-template-columns:1fr}}
+    .req-box{border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+    .req-box-head{display:flex;align-items:center;justify-content:space-between;padding:8px 11px;background:var(--faint);border-bottom:1px solid var(--line)}
+    .req-box-title{font-size:.74rem;font-weight:600}
+    .req-badge{background:var(--bad);color:#fff;font-size:.6rem;font-weight:700;padding:1px 6px;border-radius:10px;line-height:1.6}
+    .req-item{display:flex;align-items:center;gap:8px;padding:8px 11px;border-bottom:1px solid var(--line);font-size:.8rem}
+    .req-item:last-child{border-bottom:none}
+    .req-item-info{flex:1;min-width:0}
+    .req-item-name{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .req-item-sub{font-size:.7rem;color:var(--mid);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .req-empty{padding:14px;text-align:center;color:var(--mid);font-size:.78rem}
+    .req-actions{display:flex;gap:5px;flex-shrink:0}
+    .notice-board{border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+    .notice-board-head{display:flex;align-items:center;justify-content:space-between;padding:8px 11px;background:var(--faint);border-bottom:1px solid var(--line)}
+    .notice-board-title{font-size:.74rem;font-weight:600}
+    .notice-board-body{padding:10px 11px;display:flex;gap:8px;align-items:flex-end}
+    .notice-board-body textarea{flex:1;padding:8px 10px;font-family:var(--sans);font-size:.82rem;border:1px solid var(--line);border-radius:var(--r);outline:none;resize:vertical;min-height:54px;max-height:120px;line-height:1.4}
+    .notice-board-body textarea:focus{border-color:#999}
+
+    /* STUDENT NOTICE DISPLAY */
+    .student-notice{margin-top:10px;padding:11px 14px;background:#fffbeb;border:1px solid #fcd34d;border-radius:var(--r);font-size:.83rem;color:#92400e;line-height:1.5;max-width:360px;width:100%;text-align:left}
+    .student-notice-label{font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#b45309;margin-bottom:4px}
   </style>
 </head>
 <body>
@@ -598,6 +626,12 @@ let studentQCount=0;       // how many questions this client has seen pushed (fo
 
 // Home tabs
 let homeSection='home'; // 'home' | 'leaderboard'
+
+// Role-based admin state
+let hostNotice='';           // text of global notice fetched from server
+let joinRequests=[];         // [{id,name,email,username,createdAt}]
+let updateRequests=[];       // [{id,userId,userName,type,newValue,createdAt}]
+let adminLoading=false;      // whether admin requests are being fetched
 
 // All-time leaderboard cache
 let allTimeLB=null;
@@ -831,6 +865,77 @@ async function fetchHostSchedules(){
   }catch(e){ hostSchedules=[]; }
 }
 
+// ── NOTICE ────────────────────────────────────────────────────────────────────
+async function fetchNotice(){
+  try{
+    const r=await fetch('/api/notice');
+    const d=await r.json();
+    hostNotice=d.text||'';
+    render();
+  }catch(e){}
+}
+
+async function postNotice(text){
+  try{
+    await apiPost('/api/notice',{text},true);
+    hostNotice=text;
+    showToast('📢 Notice broadcast to all students.','good');
+    render();
+  }catch(e){ showToast('Failed to post notice: '+e.message,'bad'); }
+}
+
+// ── ADMIN REQUESTS ────────────────────────────────────────────────────────────
+async function fetchAdminRequests(){
+  if(!authToken||currentUser?.role!=='host') return;
+  try{
+    const [jr, ur] = await Promise.all([
+      fetch('/api/admin/join-requests',{headers:{Authorization:'Bearer '+authToken}}).then(r=>r.json()),
+      fetch('/api/admin/update-requests',{headers:{Authorization:'Bearer '+authToken}}).then(r=>r.json()),
+    ]);
+    joinRequests  = jr.requests  || [];
+    updateRequests= ur.requests  || [];
+    render();
+  }catch(e){ console.warn('Admin fetch failed:',e.message); }
+}
+
+async function approveJoinReq(id){
+  try{
+    const r=await fetch('/api/admin/join-requests/'+id+'/approve',{method:'POST',headers:{Authorization:'Bearer '+authToken}});
+    const d=await r.json();
+    if(!r.ok) throw new Error(d.error||'Failed');
+    showToast('✅ User approved and account created.','good');
+    await fetchAdminRequests();
+  }catch(e){ showToast('Error: '+e.message,'bad'); }
+}
+
+async function rejectJoinReq(id){
+  try{
+    const r=await fetch('/api/admin/join-requests/'+id+'/reject',{method:'POST',headers:{Authorization:'Bearer '+authToken}});
+    if(!r.ok) throw new Error('Failed');
+    showToast('Request rejected.','neutral');
+    await fetchAdminRequests();
+  }catch(e){ showToast('Error: '+e.message,'bad'); }
+}
+
+async function approveUpdateReq(id){
+  try{
+    const r=await fetch('/api/admin/update-requests/'+id+'/approve',{method:'POST',headers:{Authorization:'Bearer '+authToken}});
+    const d=await r.json();
+    if(!r.ok) throw new Error(d.error||'Failed');
+    showToast('✅ Update approved.','good');
+    await fetchAdminRequests();
+  }catch(e){ showToast('Error: '+e.message,'bad'); }
+}
+
+async function rejectUpdateReq(id){
+  try{
+    const r=await fetch('/api/admin/update-requests/'+id+'/reject',{method:'POST',headers:{Authorization:'Bearer '+authToken}});
+    if(!r.ok) throw new Error('Failed');
+    showToast('Update rejected.','neutral');
+    await fetchAdminRequests();
+  }catch(e){ showToast('Error: '+e.message,'bad'); }
+}
+
 // ── LEADERBOARD ───────────────────────────────────────────────────────────────
 // Three separate fetch calls so each tab loads independently.
 // All three use the same endpoint with a ?period= param.
@@ -1003,7 +1108,7 @@ function connect(){
         render(); break;
       }
       case 'joined':    myPid=m.pid; sessionStorage.setItem('qz_pid',m.pid); break;
-      case 'auth_ok':   hostAuthed=true; fetchHostSchedules(); browseRepo(); navPush(); render(); break;
+      case 'auth_ok':   hostAuthed=true; fetchHostSchedules(); browseRepo(); fetchAdminRequests(); navPush(); render(); break;
       case 'auth_fail': { const el=document.getElementById('pw-err'); if(el)el.textContent='Incorrect password.'; break; }
       case 'left':      doLeave(); break;
       case 'hand_raised': {
@@ -1581,6 +1686,12 @@ function render(){
   saveNavState();
   const nav=document.getElementById('main-nav');
   if(!currentUser){nav.style.display='none'; document.getElementById('view').innerHTML=authHTML(); attach(); return;}
+
+  // Safety: prevent students from accessing host views (client-side guard, server enforces too)
+  if(role==='host' && currentUser.role!=='host'){
+    role=null; hostAuthed=false;
+  }
+
   const isParticipant=(role==='participant'&&myName);
   const isHome=(!role&&!showingProfile&&!showingHalted&&homeSection==='home');
   nav.style.display=(role==='host'&&hostAuthed)?'none':'flex';
@@ -1604,9 +1715,7 @@ function render(){
   if(showingDismissed){ v.innerHTML=studentDismissedHTML(); attach(); return; }
   if(showingHalted){ v.innerHTML=haltedHTML(); attach(); return; }
   if(showingProfile){ v.innerHTML=profilePageHTML(); attach();
-    // Load profile data immediately after inserting skeleton HTML
     if(profileTab==='overview'||profileTab==='history'){
-      // Use setTimeout(0) so the DOM is painted before async fetch starts
       setTimeout(loadProfileData, 0);
     }
     return; }
@@ -1655,103 +1764,153 @@ function registerFormHTML(){
 }
 
 /* ══════════════════════════════════════
+   CONTROL PANEL (host only — between nav and home tabs)
+══════════════════════════════════════ */
+function controlPanelHTML(){
+  const jrBadge=joinRequests.length?`<span class="req-badge">${joinRequests.length}</span>`:'';
+  const urBadge=updateRequests.length?`<span class="req-badge">${updateRequests.length}</span>`:'';
+
+  // Join Requests box
+  const jrRows=joinRequests.length
+    ?joinRequests.map(r=>`
+      <div class="req-item">
+        <div class="req-item-info">
+          <div class="req-item-name">${esc(r.name)}</div>
+          <div class="req-item-sub">${esc(r.email)}${r.username?' · @'+esc(r.username):''}</div>
+        </div>
+        <div class="req-actions">
+          <button class="btn btn-good btn-sm" style="padding:3px 9px;font-size:.7rem" data-jr-approve="${r.id}">✓</button>
+          <button class="btn btn-bad btn-sm" style="padding:3px 9px;font-size:.7rem" data-jr-reject="${r.id}">✕</button>
+        </div>
+      </div>`).join('')
+    :`<div class="req-empty">No pending join requests</div>`;
+
+  // Update Requests box
+  const urRows=updateRequests.length
+    ?updateRequests.map(r=>`
+      <div class="req-item">
+        <div class="req-item-info">
+          <div class="req-item-name">${esc(r.userName)} <span style="font-size:.68rem;font-weight:400;color:var(--mid)">wants to change ${r.type}</span></div>
+          <div class="req-item-sub">→ <strong>${esc(r.newValue)}</strong></div>
+        </div>
+        <div class="req-actions">
+          <button class="btn btn-good btn-sm" style="padding:3px 9px;font-size:.7rem" data-ur-approve="${r.id}">✓</button>
+          <button class="btn btn-bad btn-sm" style="padding:3px 9px;font-size:.7rem" data-ur-reject="${r.id}">✕</button>
+        </div>
+      </div>`).join('')
+    :`<div class="req-empty">No pending update requests</div>`;
+
+  return `<div class="ctrl-panel">
+    <div class="ctrl-panel-head">
+      <span class="ctrl-panel-title">⚙️ Control Panel</span>
+      <button class="btn btn-ghost btn-sm" id="btn-cp-refresh" style="font-size:.7rem;padding:3px 9px">↻ Refresh</button>
+    </div>
+    <div class="ctrl-panel-grid">
+      <div class="req-box">
+        <div class="req-box-head">
+          <span class="req-box-title">📥 Join Requests</span>
+          ${jrBadge}
+        </div>
+        <div style="max-height:180px;overflow-y:auto">${jrRows}</div>
+      </div>
+      <div class="req-box">
+        <div class="req-box-head">
+          <span class="req-box-title">✏️ Update Requests</span>
+          ${urBadge}
+        </div>
+        <div style="max-height:180px;overflow-y:auto">${urRows}</div>
+      </div>
+    </div>
+    <div class="notice-board">
+      <div class="req-box-head">
+        <span class="req-box-title">📢 Global Notice</span>
+        <span style="font-size:.68rem;color:var(--mid)">Broadcasts to all students</span>
+      </div>
+      <div class="notice-board-body">
+        <textarea id="notice-input" placeholder="Type a notice for students…" maxlength="500">${esc(hostNotice)}</textarea>
+        <button class="btn btn-dark btn-sm" id="btn-notice-post" style="flex-shrink:0;padding:8px 14px">Post</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+/* ══════════════════════════════════════
    LANDING (HOME)
 ══════════════════════════════════════ */
 function landingHTML(){
+  const isHost = currentUser?.role === 'host';
+
   const tabs=`<div class="home-tabs mb3">
     <button class="home-tab${homeSection==='home'?' active':''}" id="ht-home">🏠 Home</button>
     <button class="home-tab${homeSection==='leaderboard'?' active':''}" id="ht-lb">🏆 Leaderboard</button>
   </div>`;
 
   if(homeSection==='leaderboard'){
-    /* ── Pick the active dataset ──────────────────────────────────────────── */
-    const lbData = homeLbTab==='today' ? todayLB
-                 : homeLbTab==='week'  ? weekLB
-                 : allTimeLB;
-
-    const isLoading = lbData === null;           // null sentinel = in-flight
+    const lbData = homeLbTab==='today' ? todayLB : homeLbTab==='week' ? weekLB : allTimeLB;
+    const isLoading = lbData === null;
     const hasError  = lbErrors[homeLbTab];
 
-    /* ── Render the rows for the active tab ──────────────────────────────── */
     function buildRows(){
       if(isLoading){
         return `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:48px 20px;gap:12px;color:var(--mid)">
-          <div class="spinner"></div>
-          <span style="font-size:.84rem">Loading…</span>
-        </div>`;
+          <div class="spinner"></div><span style="font-size:.84rem">Loading…</span></div>`;
       }
       if(hasError){
         return `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 20px;gap:10px;color:var(--mid);text-align:center">
           <div style="font-size:1.8rem">⚠️</div>
           <span style="font-size:.84rem">${esc(hasError)}</span>
-          <button class="btn btn-ghost btn-sm" id="btn-lb-refresh" style="margin-top:4px">Try again</button>
-        </div>`;
+          <button class="btn btn-ghost btn-sm" id="btn-lb-refresh" style="margin-top:4px">Try again</button></div>`;
       }
       if(!lbData.length){
         return `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:48px 20px;gap:10px;color:var(--mid)">
           <div style="font-size:2.4rem">🏆</div>
-          <span style="font-size:.84rem">No scores yet for this period</span>
-        </div>`;
+          <span style="font-size:.84rem">No scores yet for this period</span></div>`;
       }
-
-      const medals = ['🥇','🥈','🥉'];
-      const myId   = String(currentUser?.id || '');
-      const myIdx  = lbData.findIndex(e => String(e.userId) === myId);
-
-      const rows = lbData.map((e, i) => {
-        const isMe   = String(e.userId) === myId;
-        const medal  = medals[i] || ('<span style="font-size:.75rem;color:var(--mid)">#' + (i+1) + '</span>');
-        const nameWt = isMe ? '700' : (i < 3 ? '600' : '400');
-        const youTag = isMe ? ' <span style="font-size:.68rem;font-weight:400;color:var(--mid)">← you</span>' : '';
-        const sessions = e.sessions > 0
-          ? `<span class="lb-sessions">${e.sessions} session${e.sessions!==1?'s':''}</span>`
-          : '';
+      const medals=['🥇','🥈','🥉'];
+      const myId=String(currentUser?.id||'');
+      const myIdx=lbData.findIndex(e=>String(e.userId)===myId);
+      const rows=lbData.map((e,i)=>{
+        const isMe=String(e.userId)===myId;
+        const medal=medals[i]||('<span style="font-size:.75rem;color:var(--mid)">#'+(i+1)+'</span>');
+        const nameWt=isMe?'700':(i<3?'600':'400');
+        const youTag=isMe?' <span style="font-size:.68rem;font-weight:400;color:var(--mid)">← you</span>':'';
         return `<div class="lb-row${isMe?' me':''}">
           <div class="score-rank" style="min-width:28px;text-align:center">${medal}</div>
           <div style="flex:1;font-weight:${nameWt};min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(e.userName||'—')}${youTag}</div>
-          <div style="display:flex;align-items:center;gap:4px;flex-shrink:0">${sessions}<span class="score-pts">${e.totalScore||0}<span style="font-size:.7rem;font-weight:400;color:var(--mid)"> pts</span></span></div>
+          <div style="display:flex;align-items:center;gap:4px;flex-shrink:0"><span class="score-pts">${e.totalScore||0}<span style="font-size:.7rem;font-weight:400;color:var(--mid)"> pts</span></span></div>
         </div>`;
       }).join('');
-
-      // Current user is not ranked yet — append a ghost row at the bottom
-      if(myIdx === -1 && myId){
-        return rows + `<div style="border-top:2px dashed var(--line)">
+      if(myIdx===-1&&myId){
+        return rows+`<div style="border-top:2px dashed var(--line)">
           <div class="lb-row me" style="opacity:.7">
             <div class="score-rank" style="min-width:28px;text-align:center"><span style="font-size:.75rem;color:var(--mid)">—</span></div>
             <div style="flex:1;font-weight:700;min-width:0">${esc(currentUser.name||'—')} <span style="font-size:.68rem;font-weight:400;color:var(--mid)">← you · not ranked yet</span></div>
             <div class="score-pts">0<span style="font-size:.7rem;font-weight:400;color:var(--mid)"> pts</span></div>
-          </div>
-        </div>`;
+          </div></div>`;
       }
-
       return rows;
     }
 
-    /* ── Tab definitions ──────────────────────────────────────────────────── */
-    const tabDefs = [
-      { id:'today', label:'📅 Today',   sub:'Scores earned today'                     },
-      { id:'week',  label:'📆 Week',    sub:'Scores from the last 7 days'             },
-      { id:'all',   label:'🏆 All-time',sub:'Cumulative scores across all sessions'   },
+    const tabDefs=[
+      {id:'today',label:'📅 Today',sub:'Scores earned today'},
+      {id:'week', label:'📆 Week', sub:'Scores from the last 7 days'},
+      {id:'all',  label:'🏆 All-time',sub:'Cumulative scores across all sessions'},
     ];
-    const activeDef = tabDefs.find(t => t.id === homeLbTab);
-
-    const tabBar = `<div style="display:flex;border:1px solid var(--line);border-radius:var(--r);overflow:hidden;margin-bottom:14px">
-      ${tabDefs.map(t => `<button
-          data-hlb="${t.id}"
+    const activeDef=tabDefs.find(t=>t.id===homeLbTab);
+    const tabBar=`<div style="display:flex;border:1px solid var(--line);border-radius:var(--r);overflow:hidden;margin-bottom:14px">
+      ${tabDefs.map(t=>`<button data-hlb="${t.id}"
           style="flex:1;padding:8px 4px;font-size:.8rem;font-weight:500;border:none;cursor:pointer;
                  background:${homeLbTab===t.id?'var(--ink)':'var(--faint)'};
                  color:${homeLbTab===t.id?'#fff':'var(--mid)'};
                  transition:background .15s;border-right:1px solid var(--line)"
         >${t.label}</button>`).join('')}
     </div>`;
-
-    const count    = (!isLoading && !hasError && lbData?.length) ? lbData.length : null;
-    const countTag = count !== null
-      ? `<span style="font-size:.74rem;color:var(--mid)">${count} player${count!==1?'s':''}</span>`
-      : '';
+    const count=(!isLoading&&!hasError&&lbData?.length)?lbData.length:null;
+    const countTag=count!==null?`<span style="font-size:.74rem;color:var(--mid)">${count} player${count!==1?'s':''}</span>`:'';
 
     return `<div class="lb-full-screen">
       <div class="lb-full-inner">
+        ${isHost ? controlPanelHTML() : ''}
         ${tabs}
         ${tabBar}
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;gap:6px">
@@ -1766,6 +1925,7 @@ function landingHTML(){
     </div>`;
   }
 
+  // ── HOME section ──────────────────────────────────────────────────────────
   const n=(S.participants||[]).length;
   const nextS=serverSchedules&&serverSchedules.length?serverSchedules[0]:null;
   const schedHint=nextS
@@ -1773,15 +1933,30 @@ function landingHTML(){
         📅 Next: <strong>${esc(nextS.title)}</strong> · ${new Date(nextS.ts).toLocaleDateString('en-GB',{day:'numeric',month:'short'})} at ${new Date(nextS.ts).toLocaleTimeString('en',{hour:'2-digit',minute:'2-digit'})} (${cdStr(nextS.ts)})
       </div>`
     :'';
+
+  // Notice display for students
+  const noticeDisplay=(!isHost&&hostNotice)
+    ?`<div class="student-notice">
+        <div class="student-notice-label">📢 Notice from Host</div>
+        ${esc(hostNotice)}
+      </div>`
+    :'';
+
+  // Buttons differ by role
+  const actionButtons = isHost
+    ? `<button class="btn btn-dark btn-lg" id="go-host">🖥 Host Interface</button>`
+    : `<button class="btn btn-dark btn-lg" id="go-join">🎓 Join Session</button>`;
+
   return `<div class="lb-full-screen">
     <div class="lb-full-inner">
+      ${isHost ? controlPanelHTML() : ''}
       ${tabs}
       <h1 class="mb1">Live Quiz</h1>
       <p class="muted mb3">Welcome, ${esc(currentUser.name.split(' ')[0])} 👋</p>
       <div class="col gap3">
-        <button class="btn btn-dark btn-lg" id="go-host">🖥 Join as a host</button>
-        <button class="btn btn-white btn-lg" id="go-join">🎓 Join as student</button>
+        ${actionButtons}
       </div>
+      ${noticeDisplay}
       ${n?`<p class="muted small mt3" style="text-align:center">${n} student${n!==1?'s':''} in session</p>`:''}
       ${schedHint}
     </div>
@@ -2085,12 +2260,17 @@ function profilePageHTML(){
   }
   if(profileTab==='settings'){
     const hasUsername=!!(u.username);
+    const isStudent = u.role !== 'host';
+    const approvalNote = isStudent
+      ? `<div class="notice n-accent" style="font-size:.77rem;margin-bottom:10px">ℹ️ Name and username changes require host approval before taking effect.</div>`
+      : '';
     body=`
     <div class="psec">
       <h3>🎭 Session Display Name</h3>
+      ${approvalNote}
       <p class="muted small mb2" style="font-size:.77rem">Shown during quizzes instead of your full name.</p>
       <div class="form-row"><label>Display name</label><input class="form-input" id="p-disp-in" maxlength="32" value="${esc(u.name)}" placeholder="Your quiz nickname"/></div>
-      <button class="btn btn-dark btn-sm" id="btn-save-disp">Save</button>
+      <button class="btn btn-dark btn-sm" id="btn-save-disp">Submit${isStudent?' for approval':''}</button>
       <div class="form-msg" id="p-disp-msg"></div>
     </div>
     <div class="psec">
@@ -2103,7 +2283,7 @@ function profilePageHTML(){
            <div class="form-row"><label>Username</label><div style="position:relative"><input class="form-input" id="p-uname-in" maxlength="30" placeholder="your_username" autocapitalize="none" spellcheck="false" style="padding-right:36px"/><span id="p-un-status" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);font-size:.85rem;line-height:1;pointer-events:none"></span></div></div>
            <small id="p-un-hint" style="font-size:.72rem;margin-top:3px;display:block;color:var(--mid)">Letters, numbers, underscores · 3–30 characters</small>`
       }
-      <button class="btn btn-dark btn-sm mt1" id="btn-save-uname">${hasUsername?'Update username':'Set username'}</button>
+      <button class="btn btn-dark btn-sm mt1" id="btn-save-uname">${hasUsername?`Update username${isStudent?' (submit for approval)':''}`:isStudent?'Set username (submit for approval)':'Set username'}</button>
       <div class="form-msg" id="p-uname-msg"></div>
     </div>
     <div class="psec">
@@ -2138,7 +2318,7 @@ function profilePageHTML(){
 ══════════════════════════════════════ */
 function hostPassHTML(){
   return `<div class="center"><div class="box">
-    <h2 class="mb1">Join as a host</h2>
+    <h2 class="mb1">Host Interface</h2>
     <p class="muted mb3">Enter the host password to continue.</p>
     <input type="password" id="pw-in" placeholder="Password" maxlength="20" autocomplete="off" class="form-input"/>
     <p id="pw-err" style="color:var(--bad);font-size:.8rem;min-height:1.2em;margin-top:5px"></p>
@@ -3104,10 +3284,9 @@ function waitHTML(){
     const answeredLast=lastH&&lastH.myAnswer!==null&&lastH.myAnswer!==undefined;
     const gotRight=answeredLast&&lastH.myAnswer===lastH.correct;
     const scoreColor=isMe&&answeredLast?(gotRight?'#16a34a':'var(--ink)'):'inherit';
-    const onlineDot=online?'<span style="width:6px;height:6px;border-radius:50%;background:#16a34a;flex-shrink:0;display:inline-block;margin-left:4px;vertical-align:middle"></span>':'';
-    lbRows+='<div class="lb-row'+(isMe?' me':'')+(online?' style="border-left:2px solid #b7dfc7"':'')+'">'+
+    lbRows+='<div class="lb-row'+(isMe?' me':'')+(online?'" style="border-left:2px solid #b7dfc7':'"')+'">'+
       '<div class="score-rank">'+(medals[i]||('#'+(i+1)))+'</div>'+
-      '<div style="flex:1">'+esc(p.name)+onlineDot+(isMe?' <span style="font-size:.7rem;color:var(--mid)">\u2190 you</span>':'')+'</div>'+
+      '<div style="flex:1">'+esc(p.name)+(isMe?' <span style="font-size:.7rem;color:var(--mid)">\u2190 you</span>':'')+'</div>'+
       (ansTimeStr?'<span style="font-size:.72rem;color:var(--mid);min-width:42px;text-align:right;margin-right:5px">'+ansTimeStr+'</span>':'')+
       '<div class="score-pts" style="color:'+scoreColor+';font-weight:600">'+(p.score||0)+'</div>'+
       '</div>';
@@ -3123,15 +3302,14 @@ function waitHTML(){
   } else if(parts.length){
     // Before any question: show who has joined as chips with online/offline indicator
     const chips=parts.map(p=>{
-      const online=p.online!==false; // treat as online if flag missing (legacy)
       const isMe=p.id===myPid;
-      const avatarBg=online?'#16a34a':'var(--line)';
-      const chipBorder=online?'1px solid #b7dfc7':'1px solid var(--line)';
-      const chipBg=online?'#f0fdf4':'var(--white)';
+      // Only highlight the current student's own chip as green
+      const avatarBg=isMe?'#16a34a':'var(--line)';
+      const chipBorder=isMe?'1px solid #b7dfc7':'1px solid var(--line)';
+      const chipBg=isMe?'#f0fdf4':'var(--white)';
       return '<div class="student-chip" style="background:'+chipBg+';border:'+chipBorder+'">'+
         '<div class="s-av" style="background:'+avatarBg+';color:#fff;border:none">'+esc(p.name.slice(0,2).toUpperCase())+'</div>'+
         '<span>'+esc(p.name)+(isMe?' <span style="font-size:.68rem;color:var(--mid)">\u2190 you</span>':'')+'</span>'+
-        (online?'<span style="width:6px;height:6px;border-radius:50%;background:#16a34a;flex-shrink:0;margin-left:auto"></span>':'')+
         '</div>';
     }).join('');
     lbHTML='<div style="width:100%;max-width:480px;margin-top:4px">'+
@@ -3356,8 +3534,13 @@ function attach(){
     if(!v){msg.className='form-msg err';msg.textContent='Name required';return;}
     try{
       const d=await apiPost('/api/update-name',{displayName:v},true);
-      saveAuth(d.token,d.user); msg.className='form-msg ok'; msg.textContent='✓ Saved!';
-      setTimeout(()=>render(),700);
+      if(d.pending){
+        msg.className='form-msg ok';
+        msg.textContent='⏳ '+d.message;
+      } else {
+        saveAuth(d.token,d.user); msg.className='form-msg ok'; msg.textContent='✓ Saved!';
+        setTimeout(()=>render(),700);
+      }
     }catch(e){msg.className='form-msg err';msg.textContent=e.message;}
   });
   // Username live availability check in profile settings
@@ -3386,8 +3569,13 @@ function attach(){
     if(status?.textContent==='🚫'){msg.className='form-msg err';msg.textContent='That username is already taken';return;}
     try{
       const d=await apiPost('/api/update-username',{username:v},true);
-      saveAuth(d.token,d.user); msg.className='form-msg ok'; msg.textContent='✓ Username saved!';
-      setTimeout(()=>render(),800);
+      if(d.pending){
+        msg.className='form-msg ok';
+        msg.textContent='⏳ '+d.message;
+      } else {
+        saveAuth(d.token,d.user); msg.className='form-msg ok'; msg.textContent='✓ Username saved!';
+        setTimeout(()=>render(),800);
+      }
     }catch(e){msg.className='form-msg err';msg.textContent=e.message;}
   });
   on('btn-save-pw', async ()=>{
@@ -3428,16 +3616,34 @@ function attach(){
   on('ht-home',()=>{ homeSection='home'; render(); });
   on('ht-lb',()=>{
     homeSection='leaderboard';
-    // Start on today tab; reset everything so data is always fresh when opening LB
     homeLbTab='today';
     todayLB=null; weekLB=null; allTimeLB=null;
     lbFetched={today:null, week:null, all:null};
     lbErrors={today:null, week:null, all:null};
     render();
-    fetchLeaderboard(); // fetch all three in parallel on open
+    fetchLeaderboard();
   });
 
-  // Landing nav
+  // Control Panel — admin request actions
+  on('btn-cp-refresh', ()=>fetchAdminRequests());
+  document.querySelectorAll('[data-jr-approve]').forEach(el=>{
+    el.addEventListener('click',()=>approveJoinReq(el.dataset.jrApprove));
+  });
+  document.querySelectorAll('[data-jr-reject]').forEach(el=>{
+    el.addEventListener('click',()=>rejectJoinReq(el.dataset.jrReject));
+  });
+  document.querySelectorAll('[data-ur-approve]').forEach(el=>{
+    el.addEventListener('click',()=>approveUpdateReq(el.dataset.urApprove));
+  });
+  document.querySelectorAll('[data-ur-reject]').forEach(el=>{
+    el.addEventListener('click',()=>rejectUpdateReq(el.dataset.urReject));
+  });
+  on('btn-notice-post', async ()=>{
+    const txt=document.getElementById('notice-input')?.value||'';
+    await postNotice(txt);
+  });
+
+  // Landing nav — role-based
   on('go-host', ()=>{ role='host'; hostAuthed=false; navPush(); render(); });
   on('go-join',  ()=>{
     role='participant';
@@ -3954,7 +4160,7 @@ function doDismissHome(){
   // Pre-fetch all three tabs in the background ready for when the user opens LB
   fetchLeaderboard();
 }
-function doLogout(){ clearAuth(); role=null; myPid=null; myName=null; hostAuthed=false; HOST_PASSWORD_INPUT=''; showingProfile=false; prevMyScore=0; scoreGain=0; myLastAnswerTime=null; localAnswerTimes={}; sessionCorrectTimes=[]; startTimerDisplay._lastStart=null; studentQCount=0; todayLB=null; weekLB=null; allTimeLB=null; lbFetched={today:null,week:null,all:null}; lbErrors={today:null,week:null,all:null}; serverSchedules=null; hostSchedules=[]; sessionStorage.removeItem(NAV_KEY); sessionStorage.removeItem('scc_hpw'); render(); }
+function doLogout(){ clearAuth(); role=null; myPid=null; myName=null; hostAuthed=false; HOST_PASSWORD_INPUT=''; showingProfile=false; prevMyScore=0; scoreGain=0; myLastAnswerTime=null; localAnswerTimes={}; sessionCorrectTimes=[]; startTimerDisplay._lastStart=null; studentQCount=0; todayLB=null; weekLB=null; allTimeLB=null; lbFetched={today:null,week:null,all:null}; lbErrors={today:null,week:null,all:null}; serverSchedules=null; hostSchedules=[]; hostNotice=''; joinRequests=[]; updateRequests=[]; sessionStorage.removeItem(NAV_KEY); sessionStorage.removeItem('scc_hpw'); render(); }
 
 /* Shared back navigation */
 function doBack(){
@@ -4061,7 +4267,6 @@ async function doRegister(){
   if(!name){if(err)err.textContent='Full name is required';return;}
   if(!email){if(err)err.textContent='Email is required';return;}
   if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){if(err)err.textContent='Enter a valid email address';return;}
-  // Username optional — validate only if filled
   if(username){
     if(!/^[a-zA-Z0-9_]+$/.test(username)){if(err)err.textContent='Username may only contain letters, numbers and underscores';return;}
     if(username.length<3){if(err)err.textContent='Username must be at least 3 characters';return;}
@@ -4070,8 +4275,20 @@ async function doRegister(){
   }
   try{
     const d=await apiPost('/api/register',{name,email,username:username||undefined,password:pw});
-    saveAuth(d.token,d.user); render(); connect();
-  }catch(e){ if(err)err.textContent=e.message; }
+    if(d.pending){
+      // Show pending message — do NOT log in
+      if(err){
+        err.style.color='var(--good)';
+        err.textContent='✅ '+d.message;
+      }
+      // Clear the form fields
+      ['auth-name','auth-email','auth-username','auth-pw'].forEach(id=>{
+        const el=document.getElementById(id); if(el) el.value='';
+      });
+    } else {
+      saveAuth(d.token,d.user); render(); connect();
+    }
+  }catch(e){ if(err){ err.style.color='var(--bad)'; err.textContent=e.message; } }
 }
 
 function esc(s){ return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
@@ -4136,11 +4353,21 @@ connect();
 if(currentUser){
   fetchSchedules();
   fetchLeaderboard();
+  fetchNotice();
+  if(currentUser.role==='host') fetchAdminRequests();
 }
 // Sync session with DB on every page load:
 // - Clears session if account was deleted
 // - Refreshes user data if anything was manually updated (e.g. username added)
-syncAuthWithServer().then(()=>{ render(); if(currentUser){ fetchSchedules(); fetchLeaderboard(); } });
+syncAuthWithServer().then(()=>{
+  render();
+  if(currentUser){
+    fetchSchedules();
+    fetchLeaderboard();
+    fetchNotice();
+    if(currentUser.role==='host') fetchAdminRequests();
+  }
+});
 </script>
 </body>
 </html>
