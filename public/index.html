@@ -488,14 +488,14 @@
     .ctrl-panel-title{font-size:.75rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--mid)}
 
     /* Box-button row */
-    .cp-btn-row{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px}
-    .cp-btn{display:flex;flex-direction:row;align-items:center;justify-content:center;gap:7px;padding:10px 8px;background:var(--faint);color:var(--ink);border:1px solid var(--line);border-radius:10px;cursor:pointer;font-family:var(--sans);transition:background .15s,border-color .15s;position:relative;min-height:44px}
-    .cp-btn:hover{background:#ebebea;border-color:#ccc}
-    .cp-btn.active{background:#e4e3df;border-color:#bbb;box-shadow:inset 0 1px 3px rgba(0,0,0,.08)}
-    .cp-btn svg{width:16px;height:16px;flex-shrink:0;color:var(--mid)}
-    .cp-btn.active svg{color:var(--ink)}
-    .cp-btn-label{font-size:.72rem;font-weight:600;color:var(--mid);white-space:nowrap;line-height:1.2}
-    .cp-btn.active .cp-btn-label{color:var(--ink)}
+    .cp-btn-row{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:10px}
+    .cp-btn{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;padding:11px 6px;background:var(--faint);color:var(--ink);border:1px solid var(--line);border-radius:10px;cursor:pointer;font-family:var(--sans);transition:background .18s,border-color .18s,color .18s;position:relative;min-height:60px;width:100%}
+    .cp-btn:hover{background:#e8e7e3;border-color:#ccc}
+    .cp-btn.active{background:var(--ink);border-color:var(--ink)}
+    .cp-btn svg{width:18px;height:18px;flex-shrink:0;color:var(--mid);transition:color .18s}
+    .cp-btn.active svg{color:#fff}
+    .cp-btn-label{font-size:.68rem;font-weight:600;color:var(--mid);white-space:nowrap;line-height:1.2;transition:color .18s}
+    .cp-btn.active .cp-btn-label{color:#fff}
     .cp-btn-badge{position:absolute;top:-5px;right:-5px;background:#ef4444;color:#fff;font-size:.52rem;font-weight:700;padding:1px 5px;border-radius:10px;min-width:15px;text-align:center;line-height:1.6}
     .cp-btn-active{position:absolute;top:-5px;right:-5px;background:#f97316;color:#fff;font-size:.52rem;font-weight:700;padding:1px 5px;border-radius:10px;text-align:center;line-height:1.6;letter-spacing:.02em}
 
@@ -1829,7 +1829,7 @@ function controlPanelHTML(){
           <circle cx="9" cy="7" r="4"/>
           <line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/>
         </svg>
-        <span class="cp-btn-label">Join<br>Requests</span>
+        <span class="cp-btn-label">Join Requests</span>
         ${joinRequests.length?`<span class="cp-btn-badge">${joinRequests.length}</span>`:''}
       </button>
       <button class="cp-btn" id="cpbtn-update" onclick="cpToggle('update')">
@@ -1837,7 +1837,7 @@ function controlPanelHTML(){
           <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
           <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
         </svg>
-        <span class="cp-btn-label">Update<br>Requests</span>
+        <span class="cp-btn-label">Update Requests</span>
         ${updateRequests.length?`<span class="cp-btn-badge">${updateRequests.length}</span>`:''}
       </button>
       <button class="cp-btn" id="cpbtn-notice" onclick="cpToggle('notice')">
