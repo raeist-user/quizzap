@@ -486,8 +486,26 @@
     .ctrl-panel{background:var(--white);border-bottom:1px solid var(--line);padding:10px 14px}
     .ctrl-panel-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
     .ctrl-panel-title{font-size:.75rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--mid)}
-    .ctrl-panel-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px}
-    @media(max-width:480px){.ctrl-panel-grid{grid-template-columns:1fr}}
+
+    /* Box-button row */
+    .cp-btn-row{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px}
+    .cp-btn{display:flex;flex-direction:row;align-items:center;justify-content:center;gap:7px;padding:10px 8px;background:var(--faint);color:var(--ink);border:1px solid var(--line);border-radius:10px;cursor:pointer;font-family:var(--sans);transition:background .15s,border-color .15s;position:relative;min-height:44px}
+    .cp-btn:hover{background:#ebebea;border-color:#ccc}
+    .cp-btn.active{background:#e4e3df;border-color:#bbb;box-shadow:inset 0 1px 3px rgba(0,0,0,.08)}
+    .cp-btn svg{width:16px;height:16px;flex-shrink:0;color:var(--mid)}
+    .cp-btn.active svg{color:var(--ink)}
+    .cp-btn-label{font-size:.72rem;font-weight:600;color:var(--mid);white-space:nowrap;line-height:1.2}
+    .cp-btn.active .cp-btn-label{color:var(--ink)}
+    .cp-btn-badge{position:absolute;top:-5px;right:-5px;background:#ef4444;color:#fff;font-size:.52rem;font-weight:700;padding:1px 5px;border-radius:10px;min-width:15px;text-align:center;line-height:1.6}
+    .cp-btn-active{position:absolute;top:-5px;right:-5px;background:#f97316;color:#fff;font-size:.52rem;font-weight:700;padding:1px 5px;border-radius:10px;text-align:center;line-height:1.6;letter-spacing:.02em}
+
+    /* Expandable panels */
+    .cp-panel{display:none;border:1px solid var(--line);border-radius:var(--r);overflow:hidden;margin-bottom:10px;animation:slideDown .18s ease}
+    .cp-panel.open{display:block}
+    @keyframes slideDown{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}
+    .cp-panel-head{display:flex;align-items:center;justify-content:space-between;padding:8px 11px;background:var(--faint);border-bottom:1px solid var(--line)}
+    .cp-panel-title{font-size:.74rem;font-weight:600}
+
     .req-box{border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
     .req-box-head{display:flex;align-items:center;justify-content:space-between;padding:8px 11px;background:var(--faint);border-bottom:1px solid var(--line)}
     .req-box-title{font-size:.74rem;font-weight:600}
@@ -499,9 +517,6 @@
     .req-item-sub{font-size:.7rem;color:var(--mid);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
     .req-empty{padding:14px;text-align:center;color:var(--mid);font-size:.78rem}
     .req-actions{display:flex;gap:5px;flex-shrink:0}
-    .notice-board{border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
-    .notice-board-head{display:flex;align-items:center;justify-content:space-between;padding:8px 11px;background:var(--faint);border-bottom:1px solid var(--line)}
-    .notice-board-title{font-size:.74rem;font-weight:600}
     .notice-board-body{padding:10px 11px;display:flex;gap:8px;align-items:flex-end}
     .notice-board-body textarea{flex:1;padding:8px 10px;font-family:var(--sans);font-size:.82rem;border:1px solid var(--line);border-radius:var(--r);outline:none;resize:vertical;min-height:54px;max-height:120px;line-height:1.4}
     .notice-board-body textarea:focus{border-color:#999}
@@ -1805,25 +1820,56 @@ function controlPanelHTML(){
       <span class="ctrl-panel-title">⚙️ Control Panel</span>
       <button class="btn btn-ghost btn-sm" id="btn-cp-refresh" style="font-size:.7rem;padding:3px 9px">↻ Refresh</button>
     </div>
-    <div class="ctrl-panel-grid">
-      <div class="req-box">
-        <div class="req-box-head">
-          <span class="req-box-title">📥 Join Requests</span>
-          ${jrBadge}
-        </div>
-        <div style="max-height:180px;overflow-y:auto">${jrRows}</div>
-      </div>
-      <div class="req-box">
-        <div class="req-box-head">
-          <span class="req-box-title">✏️ Update Requests</span>
-          ${urBadge}
-        </div>
-        <div style="max-height:180px;overflow-y:auto">${urRows}</div>
-      </div>
+
+    <!-- Box-button row -->
+    <div class="cp-btn-row">
+      <button class="cp-btn" id="cpbtn-join" onclick="cpToggle('join')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
+          <circle cx="9" cy="7" r="4"/>
+          <line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/>
+        </svg>
+        <span class="cp-btn-label">Join<br>Requests</span>
+        ${joinRequests.length?`<span class="cp-btn-badge">${joinRequests.length}</span>`:''}
+      </button>
+      <button class="cp-btn" id="cpbtn-update" onclick="cpToggle('update')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+          <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+        </svg>
+        <span class="cp-btn-label">Update<br>Requests</span>
+        ${updateRequests.length?`<span class="cp-btn-badge">${updateRequests.length}</span>`:''}
+      </button>
+      <button class="cp-btn" id="cpbtn-notice" onclick="cpToggle('notice')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+          <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+        </svg>
+        <span class="cp-btn-label">Global Notice</span>
+        ${hostNotice?'<span class="cp-btn-active">ON</span>':''}
+      </button>
     </div>
-    <div class="notice-board">
-      <div class="req-box-head">
-        <span class="req-box-title">📢 Global Notice</span>
+
+    <!-- Expandable panels -->
+    <div class="cp-panel" id="cppanel-join">
+      <div class="cp-panel-head">
+        <span class="cp-panel-title">Join Requests</span>
+        ${joinRequests.length?`<span class="req-badge">${joinRequests.length}</span>`:''}
+      </div>
+      <div style="max-height:200px;overflow-y:auto">${jrRows}</div>
+    </div>
+
+    <div class="cp-panel" id="cppanel-update">
+      <div class="cp-panel-head">
+        <span class="cp-panel-title">Update Requests</span>
+        ${updateRequests.length?`<span class="req-badge">${updateRequests.length}</span>`:''}
+      </div>
+      <div style="max-height:200px;overflow-y:auto">${urRows}</div>
+    </div>
+
+    <div class="cp-panel" id="cppanel-notice">
+      <div class="cp-panel-head">
+        <span class="cp-panel-title">Global Notice</span>
         <span style="font-size:.68rem;color:var(--mid)">Broadcasts to all students</span>
       </div>
       <div class="notice-board-body">
@@ -3623,6 +3669,24 @@ function attach(){
     render();
     fetchLeaderboard();
   });
+
+  // Control Panel — box button toggle
+  window.cpToggle = function(key){
+    const panels = ['join','update','notice'];
+    const btns   = ['join','update','notice'];
+    panels.forEach(k=>{
+      const panel = document.getElementById('cppanel-'+k);
+      const btn   = document.getElementById('cpbtn-'+k);
+      if(k===key){
+        const isOpen = panel && panel.classList.contains('open');
+        if(panel) panel.classList.toggle('open',!isOpen);
+        if(btn)   btn.classList.toggle('active',!isOpen);
+      } else {
+        if(panel) panel.classList.remove('open');
+        if(btn)   btn.classList.remove('active');
+      }
+    });
+  };
 
   // Control Panel — admin request actions
   on('btn-cp-refresh', ()=>fetchAdminRequests());
