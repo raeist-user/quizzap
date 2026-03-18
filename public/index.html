@@ -519,6 +519,12 @@
     .user-inspect-row{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:9px 12px;border-bottom:1px solid var(--line);cursor:pointer;transition:background .12s}
     .user-inspect-row:last-child{border-bottom:none}
     .user-inspect-row:hover{background:var(--faint)}
+    .user-inspect-row.preview-active{background:#eff6ff;border-left:3px solid var(--accent)}
+    .user-mini-preview{position:absolute;left:50%;transform:translateX(-50%);bottom:calc(100% + 6px);background:var(--white);border:1px solid var(--line);border-radius:10px;box-shadow:0 4px 20px rgba(0,0,0,.14);padding:12px 14px;z-index:200;min-width:220px;max-width:280px;animation:sd .15s ease;pointer-events:auto}
+    .user-mini-preview::after{content:'';position:absolute;top:100%;left:50%;transform:translateX(-50%);border:6px solid transparent;border-top-color:var(--line)}
+    .ump-name{font-size:.85rem;font-weight:700;margin-bottom:2px}
+    .ump-email{font-size:.7rem;color:var(--mid);margin-bottom:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .ump-open{display:block;width:100%;padding:7px;background:var(--ink);color:#fff;border:none;border-radius:7px;font-size:.78rem;font-weight:600;cursor:pointer;font-family:var(--sans);text-align:center}
     .user-inspect-info{min-width:0;flex:1;overflow:hidden}
     .user-inspect-name{display:flex;align-items:center;gap:5px;margin-bottom:2px}
     .user-inspect-name span.name{font-size:.78rem;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:150px}
@@ -993,6 +999,57 @@ async function deleteUser(id, name){
   }catch(e){ showToast('Error: '+e.message,'bad'); }
 }
 
+let _previewUserId = null;
+
+function dismissPreview(){
+  _previewUserId = null;
+  document.querySelectorAll('.user-mini-preview').forEach(el=>el.remove());
+  document.querySelectorAll('.user-inspect-row').forEach(el=>el.classList.remove('preview-active'));
+}
+
+function previewUser(id){
+  // If already previewing this user — open full inspect
+  if(_previewUserId === id){
+    dismissPreview();
+    openInspect(id);
+    return;
+  }
+  // Dismiss any existing preview
+  dismissPreview();
+  const u = registeredUsers.find(u=>String(u.id)===String(id));
+  if(!u) return;
+  _previewUserId = id;
+  const row = document.getElementById('urow-'+id);
+  if(!row) return;
+  row.classList.add('preview-active');
+  const initials = u.name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+  const popup = document.createElement('div');
+  popup.className = 'user-mini-preview';
+  popup.id = 'ump-'+id;
+  popup.innerHTML =
+    '<div style="display:flex;align-items:center;gap:9px;margin-bottom:8px">'
+    +'<div style="width:34px;height:34px;border-radius:50%;background:var(--ink);color:#fff;display:flex;align-items:center;justify-content:center;font-size:.82rem;font-weight:700;flex-shrink:0">'+initials+'</div>'
+    +'<div style="min-width:0"><div class="ump-name">'+esc(u.name)+'</div>'
+    +'<span style="font-size:.6rem;font-weight:700;padding:1px 6px;border-radius:6px;color:#fff;background:'+(u.role==='host'?'#7c3aed':'#0ea5e9')+'">'+u.role+'</span></div></div>'
+    +'<div class="ump-email">'+esc(u.email)+(u.username?' · @'+esc(u.username):'')+'</div>'
+    +'<button class="ump-open" data-ump-id="'+id+'">View Full Profile →</button>';
+  row.appendChild(popup);
+  popup.querySelector('.ump-open').addEventListener('click', function(e){
+    e.stopPropagation();
+    dismissPreview();
+    openInspect(id);
+  });
+  // Dismiss on outside click
+  setTimeout(()=>{
+    document.addEventListener('click', function handler(e){
+      if(!popup.contains(e.target) && e.target!==row && !row.contains(e.target)){
+        dismissPreview();
+        document.removeEventListener('click', handler);
+      }
+    });
+  }, 0);
+}
+
 function openInspect(id){
   const u = registeredUsers.find(u=>String(u.id)===String(id));
   if(!u) return;
@@ -1022,6 +1079,7 @@ function inspectProfileHTML(){
           ${joined?`<span style="font-size:.68rem;color:var(--mid)">Joined ${joined}</span>`:''}
         </div>
       </div>
+      <button class="btn btn-bad btn-sm" style="flex-shrink:0;align-self:flex-start;padding:5px 10px" data-user-delete="${u.id}" data-user-name="${esc(u.name)}">🗑</button>
     </div>
     <div class="ptabs">${tabsHTML}</div>
     <div id="inspect-data-body">
@@ -1039,14 +1097,18 @@ async function loadInspectData(){
   try{
     if(!inspectCache){
       const r = await fetch('/api/admin/sessions/'+inspectingUser.id, {headers:{Authorization:'Bearer '+authToken}});
-      const d = await r.json();
-      inspectCache = d.history || [];
+      if(!r.ok){ inspectCache = []; }
+      else {
+        let d; try{ d = await r.json(); }catch(_){ d = {}; }
+        inspectCache = d.history || [];
+      }
     }
     if(inspectTab==='overview') el.innerHTML = buildOverviewHTML(inspectCache);
     else el.innerHTML = buildHistoryHTML(inspectCache);
     requestAnimationFrame(setupProfileCharts);
   }catch(err){
     if(el) el.innerHTML=`<div class="no-data-notice"><span>⚠️</span>Failed to load</div>`;
+    console.error('loadInspectData:', err.message);
   }
 }
 
@@ -1995,7 +2057,7 @@ function controlPanelHTML(){
       </div>
       <div style="max-height:260px;overflow-y:auto">
         ${registeredUsers.length ? registeredUsers.map(u=>`
-          <div class="user-inspect-row" onclick="openInspect('${u.id}')">
+          <div class="user-inspect-row" id="urow-${u.id}" style="position:relative" onclick="previewUser('${u.id}')">
             <div class="user-inspect-info">
               <div class="user-inspect-name">
                 <span class="name">${esc(u.name)}</span>
@@ -2003,9 +2065,7 @@ function controlPanelHTML(){
               </div>
               <div class="user-inspect-sub">${esc(u.email)}${u.username?' · @'+esc(u.username):''}</div>
             </div>
-            <div onclick="event.stopPropagation()">
-              <button class="btn btn-bad btn-sm" style="padding:3px 9px;font-size:.7rem" data-user-delete="${u.id}" data-user-name="${esc(u.name)}">🗑</button>
-            </div>
+            <div style="color:var(--mid);font-size:.72rem;flex-shrink:0">›</div>
           </div>`).join('')
         : '<div class="req-empty">No registered users</div>'}
       </div>
@@ -3809,6 +3869,8 @@ function attach(){
 
   // Control Panel — box button toggle
   window.openInspect = openInspect;
+  window.previewUser = previewUser;
+  window.dismissPreview = dismissPreview;
   window.cpToggle = function(key){
     const panels = ['join','update','notice','users'];
     const btns   = ['join','update','notice','users'];
