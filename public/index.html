@@ -483,27 +483,47 @@
     .reports-badge{position:absolute;top:-4px;right:-4px;background:var(--bad);color:#fff;font-size:.58rem;font-weight:700;padding:1px 5px;border-radius:10px;min-width:16px;text-align:center;line-height:1.6;pointer-events:none}
 
     /* CONTROL PANEL (host home) */
-    .ctrl-panel{background:var(--white);border-bottom:1px solid var(--line);padding:10px 14px}
+    .ctrl-panel{background:var(--white);border-bottom:1px solid var(--line);padding:12px 14px}
     .ctrl-panel-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
-    .ctrl-panel-title{font-size:.75rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--mid)}
+    .ctrl-panel-title{font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--mid)}
 
-    /* Box-button row */
+    /* Icon-button row */
     .cp-btn-row{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:10px}
-    .cp-btn{display:flex;align-items:center;justify-content:center;padding:10px 4px;background:var(--faint);color:var(--ink);border:1px solid var(--line);border-radius:10px;cursor:pointer;font-family:var(--sans);transition:background .18s,border-color .18s,color .18s;position:relative;min-height:44px;width:100%}
-    .cp-btn:hover{background:#e8e7e3;border-color:#ccc}
-    .cp-btn.active{background:var(--ink);border-color:var(--ink)}
-    .cp-btn svg{width:20px;height:20px;flex-shrink:0;color:var(--mid);transition:color .18s}
+    .cp-btn{display:flex;align-items:center;justify-content:center;padding:0;background:var(--faint);color:var(--ink);border:1px solid var(--line);border-radius:10px;cursor:pointer;font-family:var(--sans);transition:background .15s,border-color .15s,box-shadow .15s;position:relative;height:42px;width:100%}
+    .cp-btn:hover{background:#eceae6;border-color:#c8c6c0;box-shadow:0 1px 3px rgba(0,0,0,.07)}
+    .cp-btn.active{background:var(--ink);border-color:var(--ink);box-shadow:0 1px 4px rgba(0,0,0,.18)}
+    .cp-btn svg{width:19px;height:19px;flex-shrink:0;color:var(--mid);transition:color .15s}
     .cp-btn.active svg{color:#fff}
     .cp-btn-label{display:none}
-    .cp-btn-badge{position:absolute;top:-5px;right:-5px;background:#ef4444;color:#fff;font-size:.52rem;font-weight:700;padding:1px 5px;border-radius:10px;min-width:15px;text-align:center;line-height:1.6}
-    .cp-btn-active{position:absolute;top:-5px;right:-5px;background:#f97316;color:#fff;font-size:.52rem;font-weight:700;padding:1px 5px;border-radius:10px;text-align:center;line-height:1.6;letter-spacing:.02em}
+    .cp-btn-badge{position:absolute;top:-6px;right:-6px;background:#ef4444;color:#fff;font-size:.5rem;font-weight:700;padding:1px 5px;border-radius:10px;min-width:16px;text-align:center;line-height:1.7;box-shadow:0 1px 3px rgba(0,0,0,.2)}
+    .cp-btn-active{position:absolute;top:-6px;right:-6px;background:#f97316;color:#fff;font-size:.5rem;font-weight:700;padding:1px 6px;border-radius:10px;line-height:1.7;letter-spacing:.02em;box-shadow:0 1px 3px rgba(0,0,0,.2)}
 
     /* Expandable panels */
-    .cp-panel{display:none;border:1px solid var(--line);border-radius:var(--r);overflow:hidden;margin-bottom:10px;animation:slideDown .18s ease}
+    .cp-panel{display:none;border:1px solid var(--line);border-radius:var(--r);overflow:hidden;margin-bottom:10px;animation:slideDown .16s ease}
     .cp-panel.open{display:block}
-    @keyframes slideDown{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}
-    .cp-panel-head{display:flex;align-items:center;justify-content:space-between;padding:8px 11px;background:var(--faint);border-bottom:1px solid var(--line)}
-    .cp-panel-title{font-size:.74rem;font-weight:600}
+    @keyframes slideDown{from{opacity:0;transform:translateY(-5px)}to{opacity:1;transform:translateY(0)}}
+    .cp-panel-head{display:flex;align-items:center;justify-content:space-between;padding:7px 12px;background:var(--faint);border-bottom:1px solid var(--line)}
+    .cp-panel-title{font-size:.72rem;font-weight:700;color:var(--ink)}
+
+    /* Req rows — join/update requests */
+    .req-item{display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--line);font-size:.8rem}
+    .req-item:last-child{border-bottom:none}
+    .req-item-info{flex:1;min-width:0}
+    .req-item-name{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .req-item-sub{font-size:.7rem;color:var(--mid);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .req-actions{display:flex;gap:4px;flex-shrink:0}
+    .req-empty{padding:14px 12px;font-size:.78rem;color:var(--mid);text-align:center}
+    .req-badge{background:#ef4444;color:#fff;font-size:.58rem;font-weight:700;padding:1px 6px;border-radius:10px;line-height:1.7}
+
+    /* User rows inside Registered Users panel */
+    .user-inspect-row{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:9px 12px;border-bottom:1px solid var(--line);cursor:pointer;transition:background .12s}
+    .user-inspect-row:last-child{border-bottom:none}
+    .user-inspect-row:hover{background:var(--faint)}
+    .user-inspect-info{min-width:0;flex:1;overflow:hidden}
+    .user-inspect-name{display:flex;align-items:center;gap:5px;margin-bottom:2px}
+    .user-inspect-name span.name{font-size:.78rem;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:150px}
+    .user-role-pill{font-size:.58rem;font-weight:700;padding:1px 6px;border-radius:6px;flex-shrink:0;color:#fff;line-height:1.7}
+    .user-inspect-sub{font-size:.68rem;color:var(--mid);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 
     .req-box{border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
     .req-box-head{display:flex;align-items:center;justify-content:space-between;padding:8px 11px;background:var(--faint);border-bottom:1px solid var(--line)}
@@ -646,6 +666,9 @@ let hostNotice='';           // text of global notice fetched from server
 let joinRequests=[];         // [{id,name,email,username,createdAt}]
 let updateRequests=[];       // [{id,userId,userName,type,newValue,createdAt}]
 let registeredUsers=[];      // [{id,name,email,username,role,status,createdAt}]
+let inspectingUser=null;     // user object host is currently inspecting
+let inspectTab='overview';   // 'overview' | 'history'
+let inspectCache=null;       // cached session history for inspected user
 let adminLoading=false;      // whether admin requests are being fetched
 
 // All-time leaderboard cache
@@ -970,14 +993,61 @@ async function deleteUser(id, name){
   }catch(e){ showToast('Error: '+e.message,'bad'); }
 }
 
-async function changeUserRole(id, newRole){
+function openInspect(id){
+  const u = registeredUsers.find(u=>String(u.id)===String(id));
+  if(!u) return;
+  inspectingUser = u;
+  inspectTab = 'overview';
+  inspectCache = null;
+  render();
+}
+
+function inspectProfileHTML(){
+  const u = inspectingUser;
+  const initials = u.name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+  const TABS = [['overview','📈 Overview'],['history','📋 History']];
+  const tabsHTML = TABS.map(([t,l])=>`<div class="ptab${inspectTab===t?' active':''}" data-itab="${t}">${l}</div>`).join('');
+  const joined = u.createdAt ? new Date(u.createdAt).toLocaleDateString('en',{year:'numeric',month:'short',day:'numeric'}) : '';
+  return `<div class="profile-page">
+    <div class="row gap2 mb3">
+      <span style="font-size:.95rem;font-weight:600">Inspecting Account</span>
+    </div>
+    <div class="profile-hero">
+      <div class="ph-avatar">${initials}</div>
+      <div class="ph-info">
+        <div class="ph-name">${esc(u.name)}</div>
+        <div class="ph-email">${esc(u.email)}${u.username?`<span style="color:var(--mid);margin-left:5px">· @${esc(u.username)}</span>`:''}</div>
+        <div style="display:flex;align-items:center;gap:6px;margin-top:5px">
+          <span class="user-role-pill" style="background:${u.role==='host'?'#7c3aed':'#0ea5e9'}">${u.role}</span>
+          ${joined?`<span style="font-size:.68rem;color:var(--mid)">Joined ${joined}</span>`:''}
+        </div>
+      </div>
+    </div>
+    <div class="ptabs">${tabsHTML}</div>
+    <div id="inspect-data-body">
+      <div style="text-align:center;padding:48px 16px;color:var(--mid)">
+        <div style="font-size:1.5rem;margin-bottom:10px;opacity:.4">⏳</div>
+        <div style="font-size:.83rem">Loading…</div>
+      </div>
+    </div>
+  </div>`;
+}
+
+async function loadInspectData(){
+  const el = document.getElementById('inspect-data-body');
+  if(!el || !inspectingUser) return;
   try{
-    const r=await fetch('/api/admin/users/'+id+'/role',{method:'PATCH',headers:{'Authorization':'Bearer '+authToken,'Content-Type':'application/json'},body:JSON.stringify({role:newRole})});
-    const d=await r.json();
-    if(!r.ok) throw new Error(d.error||'Failed');
-    showToast(`Role updated to ${newRole}.`,'good');
-    await fetchAdminRequests();
-  }catch(e){ showToast('Error: '+e.message,'bad'); }
+    if(!inspectCache){
+      const r = await fetch('/api/admin/sessions/'+inspectingUser.id, {headers:{Authorization:'Bearer '+authToken}});
+      const d = await r.json();
+      inspectCache = d.history || [];
+    }
+    if(inspectTab==='overview') el.innerHTML = buildOverviewHTML(inspectCache);
+    else el.innerHTML = buildHistoryHTML(inspectCache);
+    requestAnimationFrame(setupProfileCharts);
+  }catch(err){
+    if(el) el.innerHTML=`<div class="no-data-notice"><span>⚠️</span>Failed to load</div>`;
+  }
 }
 
 // ── LEADERBOARD ───────────────────────────────────────────────────────────────
@@ -1741,12 +1811,12 @@ function render(){
   nav.style.display=(role==='host'&&hostAuthed)?'none':'flex';
   // Back button: show when not at plain home
   document.getElementById('nav-back-wrap').style.display=
-    (!isParticipant&&(role||showingProfile||showingHalted))?'block':'none';
+    (!isParticipant&&(role||showingProfile||showingHalted||inspectingUser))?'block':'none';
   // Profile: only visible on the home landing section
   document.getElementById('profile-wrap').style.display=isHome?'flex':'none';
   // Conn indicator: hide for participants and on profile page (clean look)
-  document.getElementById('ci').style.display=(isParticipant||showingProfile)?'none':'';
-  document.getElementById('conn-lbl').style.display=(isParticipant||showingProfile)?'none':'';
+  document.getElementById('ci').style.display=(isParticipant||showingProfile||inspectingUser)?'none':'';
+  document.getElementById('conn-lbl').style.display=(isParticipant||showingProfile||inspectingUser)?'none':'';
   // Center brand for participants
   document.getElementById('nav-brand').style.cssText=isParticipant?'flex:1;text-align:center;font-size:1rem':'';
   const u=currentUser;
@@ -1758,6 +1828,7 @@ function render(){
 
   if(showingDismissed){ v.innerHTML=studentDismissedHTML(); attach(); return; }
   if(showingHalted){ v.innerHTML=haltedHTML(); attach(); return; }
+  if(inspectingUser){ v.innerHTML=inspectProfileHTML(); attach(); setTimeout(loadInspectData,0); return; }
   if(showingProfile){ v.innerHTML=profilePageHTML(); attach();
     if(profileTab==='overview'||profileTab==='history'){
       setTimeout(loadProfileData, 0);
@@ -1885,7 +1956,7 @@ function controlPanelHTML(){
           <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
         </svg>
         <span class="cp-btn-label">Registered Users</span>
-        ${registeredUsers.length?`<span style="position:absolute;bottom:4px;right:5px;font-size:.52rem;color:var(--mid);font-weight:600">${registeredUsers.length}</span>`:''}
+        ${registeredUsers.length?('<span style="position:absolute;bottom:4px;right:5px;font-size:.52rem;color:#9ca3af;font-weight:600">'+registeredUsers.length+'</span>'):''}
       </button>
     </div>
 
@@ -1924,21 +1995,16 @@ function controlPanelHTML(){
       </div>
       <div style="max-height:260px;overflow-y:auto">
         ${registeredUsers.length ? registeredUsers.map(u=>`
-          <div class="req-item" style="flex-direction:column;align-items:stretch;gap:6px;padding:9px 11px">
-            <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;min-width:0">
-              <div style="min-width:0;flex:1;overflow:hidden">
-                <div class="req-item-name" style="display:flex;align-items:center;gap:5px;flex-wrap:wrap">
-                  <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:160px">${esc(u.name)}</span>
-                  <span style="font-size:.6rem;font-weight:600;padding:1px 5px;border-radius:6px;flex-shrink:0;background:${u.role==='host'?'#7c3aed':'#0ea5e9'};color:#fff">${u.role}</span>
-                </div>
-                <div class="req-item-sub" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(u.email)}${u.username?' · @'+esc(u.username):''}</div>
+          <div class="user-inspect-row" onclick="openInspect('${u.id}')">
+            <div class="user-inspect-info">
+              <div class="user-inspect-name">
+                <span class="name">${esc(u.name)}</span>
+                <span class="user-role-pill" style="background:${u.role==='host'?'#7c3aed':'#0ea5e9'}">${u.role}</span>
               </div>
-              <div style="display:flex;gap:4px;flex-shrink:0">
-                <button class="btn btn-sm" style="padding:3px 8px;font-size:.68rem;background:#f3f4f6;border:1px solid var(--line);border-radius:6px;white-space:nowrap" data-role-toggle="${u.id}" data-role-current="${u.role}">
-                  ${u.role==='student'?'→ Host':'→ Student'}
-                </button>
-                <button class="btn btn-bad btn-sm" style="padding:3px 9px;font-size:.7rem;flex-shrink:0" data-user-delete="${u.id}" data-user-name="${esc(u.name)}">🗑</button>
-              </div>
+              <div class="user-inspect-sub">${esc(u.email)}${u.username?' · @'+esc(u.username):''}</div>
+            </div>
+            <div onclick="event.stopPropagation()">
+              <button class="btn btn-bad btn-sm" style="padding:3px 9px;font-size:.7rem" data-user-delete="${u.id}" data-user-name="${esc(u.name)}">🗑</button>
             </div>
           </div>`).join('')
         : '<div class="req-empty">No registered users</div>'}
@@ -3600,7 +3666,11 @@ function attach(){
     profileTab=el.dataset.ptab;
     render();
     if(profileTab==='overview'&&!allTimeLB) fetchLeaderboard('all');
-    // loadProfileData is already called inside render() for profile pages
+  }));
+  document.querySelectorAll('.ptab[data-itab]').forEach(el=>el.addEventListener('click',()=>{
+    inspectTab=el.dataset.itab;
+    inspectCache=null;
+    render();
   }));
   if(showingProfile){
     requestAnimationFrame(setupProfileCharts);
@@ -3738,6 +3808,7 @@ function attach(){
   });
 
   // Control Panel — box button toggle
+  window.openInspect = openInspect;
   window.cpToggle = function(key){
     const panels = ['join','update','notice','users'];
     const btns   = ['join','update','notice','users'];
@@ -3769,15 +3840,9 @@ function attach(){
   document.querySelectorAll('[data-ur-reject]').forEach(el=>{
     el.addEventListener('click',()=>rejectUpdateReq(el.dataset.urReject));
   });
-  // Registered Users panel — delete and role toggle
+  // Registered Users panel — delete
   document.querySelectorAll('[data-user-delete]').forEach(el=>{
     el.addEventListener('click',()=>deleteUser(el.dataset.userDelete, el.dataset.userName));
-  });
-  document.querySelectorAll('[data-role-toggle]').forEach(el=>{
-    el.addEventListener('click',()=>{
-      const newRole = el.dataset.roleCurrent==='student'?'host':'student';
-      changeUserRole(el.dataset.roleToggle, newRole);
-    });
   });
   on('btn-notice-post', async ()=>{
     const txt=document.getElementById('notice-input')?.value||'';
@@ -4306,6 +4371,7 @@ function doLogout(){ clearAuth(); role=null; myPid=null; myName=null; hostAuthed
 /* Shared back navigation */
 function doBack(){
   if(showingDismissed){ doDismissHome(); return; }
+  if(inspectingUser){ inspectingUser=null; inspectTab='overview'; inspectCache=null; render(); return; }
   if(showingProfile){
     showingProfile=false;
     navPush(); // push a new state so further back press goes home
