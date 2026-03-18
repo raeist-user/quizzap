@@ -724,7 +724,8 @@ function fresh() {
     question:         null,
     correct:          null,
     answers:          {},       // pid → optIdx
-    answerTimes:      {},       // pid → seconds (server-recorded, sourced from student timeTaken)
+    answerTimes:      {},       // pid → seconds for the CURRENT question only
+    cumulativeTimes:  {},       // pid → total seconds summed across all answered questions (tie-breaker)
     participants:     {},       // pid → { id, name, score, userId }
     history:          [],
     timerSeconds:     0,
@@ -752,11 +753,26 @@ function project(role, pid) {
   const onlinePids = new Set();
   clients.forEach(c => { if (c.role === 'participant' && c.pid) onlinePids.add(c.pid); });
 
+  // ── RANKED PARTICIPANTS ────────────────────────────────────────────────────
+  // Per-question leaderboard (question / revealed / idle): score desc, time asc tie-breaker.
+  // Final leaderboard (ended): score desc only — time tie-breaker does NOT apply.
+  const isEnded = state.status === 'ended';
+  const ranked = Object.values(state.participants)
+    .map(p => ({ ...p, online: onlinePids.has(p.id) }))
+    .sort((a, b) => {
+      if (b.score !== a.score) return b.score - a.score;           // higher score first
+      if (isEnded) return 0;                                       // final board: no time tie-breaker
+      const tA = state.cumulativeTimes[a.id] ?? Infinity;          // no time → worst
+      const tB = state.cumulativeTimes[b.id] ?? Infinity;
+      return tA - tB;                                              // less time first
+    })
+    .map((p, i) => ({ ...p, rank: i + 1 }));                       // attach 1-based rank
+
   const base = {
     status:           state.status,
     sessionOpen:      state.sessionOpen,
     question:         state.question,
-    participants:     Object.values(state.participants).map(p => ({ ...p, online: onlinePids.has(p.id) })),
+    participants:     ranked,
     totalAnswered:    Object.keys(state.answers).length,
     answerCounts:     state.question
       ? state.question.options.map((_, i) =>
@@ -764,7 +780,8 @@ function project(role, pid) {
       : [],
     timerSeconds:     state.timerSeconds,
     questionPushedAt: state.questionPushedAt,
-    answerTimes:      state.answerTimes,       // server-recorded per-student times
+    answerTimes:      state.answerTimes,       // per-question times (current question)
+    cumulativeTimes:  state.cumulativeTimes,   // cumulative times for tie-breaking display
     totalQuestions:   state.totalQuestions,    // denominator — total questions loaded by host
     pushedCount:      state.pushedCount,       // questions actually pushed this session
   };
@@ -775,13 +792,15 @@ function project(role, pid) {
     }));
     return {
       ...base,
-      correct:  (state.status === 'revealed' || state.status === 'ended') ? state.correct : null,
-      myAnswer: state.answers[pid] ?? null,
-      myScore:  state.participants[pid]?.score ?? 0,
+      correct:         (state.status === 'revealed' || state.status === 'ended') ? state.correct : null,
+      myAnswer:        state.answers[pid] ?? null,
+      myScore:         state.participants[pid]?.score ?? 0,
+      myTime:          state.cumulativeTimes[pid] ?? null,  // own cumulative time
+      myRank:          ranked.find(p => p.id === pid)?.rank ?? null,
       myHistory,
     };
   }
-  return { status: base.status, sessionOpen: base.sessionOpen, participants: base.participants };
+  return { status: base.status, sessionOpen: base.sessionOpen, participants: ranked };
 }
 
 // ── WEBSOCKET ─────────────────────────────────────────────────────────────────
@@ -870,6 +889,12 @@ wss.on('connection', ws => {
         Object.entries(state.answers).forEach(([pid, ans]) => {
           if (ans === state.correct && state.participants[pid])
             state.participants[pid].score += 1;
+          // Accumulate time for every participant who answered (tie-breaker: less total time = better rank)
+          if (state.answerTimes[pid] != null) {
+            state.cumulativeTimes[pid] = parseFloat(
+              ((state.cumulativeTimes[pid] || 0) + state.answerTimes[pid]).toFixed(2)
+            );
+          }
         });
         state.history.push({ question: state.question, correct: state.correct, answers: { ...state.answers } });
         state.status = 'revealed'; state.timerSeconds = 0;
@@ -893,6 +918,12 @@ wss.on('connection', ws => {
           Object.entries(state.answers).forEach(([pid, ans]) => {
             if (ans === state.correct && state.participants[pid])
               state.participants[pid].score += 1;
+            // Accumulate time for this final question too
+            if (state.answerTimes[pid] != null) {
+              state.cumulativeTimes[pid] = parseFloat(
+                ((state.cumulativeTimes[pid] || 0) + state.answerTimes[pid]).toFixed(2)
+              );
+            }
           });
           state.history.push({ question: state.question, correct: state.correct, answers: { ...state.answers } });
         }
@@ -937,10 +968,16 @@ wss.on('connection', ws => {
       // halt: sends halted message to students, host sees the halt menu
       case 'halt':
         if (client.role !== 'host') break;
-        clients.forEach((c) => {
-          if (c.role === 'participant')
-            tx(c.ws, { type: 'halted', payload: { participants: Object.values(state.participants), totalQuestions: state.pushedCount } });
-        });
+        {
+          // Final halt leaderboard: score only — no time tie-breaker
+          const haltParticipants = Object.values(state.participants)
+            .slice()
+            .sort((a, b) => b.score - a.score);
+          clients.forEach((c) => {
+            if (c.role === 'participant')
+              tx(c.ws, { type: 'halted', payload: { participants: haltParticipants, totalQuestions: state.pushedCount } });
+          });
+        }
         broadcast();
         break;
 
