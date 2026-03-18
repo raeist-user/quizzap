@@ -23,7 +23,13 @@ mongoose.connect(MONGODB_URI)
 const userSchema = new mongoose.Schema({
   name:        { type: String, required: true, trim: true, maxlength: 50 },
   email:       { type: String, required: true, trim: true, lowercase: true, unique: true },
-  username:    { type: String, lowercase: true, trim: true, sparse: true, unique: true, match: /^[a-zA-Z0-9_]{3,30}$/, default: null },
+  username:    {
+    type: String, lowercase: true, trim: true, sparse: true, unique: true, default: null,
+    validate: {
+      validator: v => v === null || v === undefined || /^[a-zA-Z0-9_]{3,30}$/.test(v),
+      message:   'Username must be 3–30 characters: letters, numbers, underscores only',
+    },
+  },
   password:    { type: String, required: true },
   role:        { type: String, enum: ['student','host'], default: 'student' },
   status:      { type: String, enum: ['pending','approved'], default: 'approved' },
@@ -609,6 +615,32 @@ app.post('/api/leaderboard', requireAuth, async (req, res) => {
 });
 
 // ── SESSION HISTORY ROUTES ────────────────────────────────────────────────────
+
+// GET /api/admin/sessions/:userId — host inspects any user's session history
+app.get('/api/admin/sessions/:userId', requireHost, async (req, res) => {
+  try {
+    // Explicitly cast to ObjectId — Mongoose 8 does not auto-cast strings in find()
+    let uid;
+    try { uid = new mongoose.Types.ObjectId(req.params.userId); }
+    catch(castErr) { return res.status(400).json({ error: 'Invalid user ID' }); }
+    const sessions = await SessionEntry.find({ userId: uid })
+      .sort({ date: -1 })
+      .limit(100)
+      .lean();
+    const history = sessions.map(s => ({
+      date:         s.date.toISOString(),
+      score:        s.score,
+      total:        s.total,
+      correct:      s.correct,
+      rank:         s.rank,
+      participants: s.participants,
+      fastestMs:    s.fastestMs ?? null,
+    }));
+    res.json({ history });
+  } catch (e) {
+    res.status(500).json({ error: 'Failed to fetch sessions' });
+  }
+});
 
 // GET /api/sessions — return logged-in user's history (newest first, max 100)
 app.get('/api/sessions', requireAuth, async (req, res) => {
