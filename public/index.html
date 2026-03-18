@@ -673,6 +673,9 @@ let myLastAnswerTime=null;
 let localAnswerTimes={};   // {pid: secs} built client-side from S.answers appearance time
 let sessionCorrectTimes=[]; // secs for each correctly answered question this session
 let studentQCount=0;       // how many questions this client has seen pushed (for student denominator)
+// Cumulative answer times per player — accumulated across all revealed questions this session
+// Used for tiebreaking: same pts → less total time = higher rank
+let cumulativeAnswerTimes={};  // {pid: totalSecs}
 
 // Cumulative scoring is now handled server-side via gameScores in server.js
 
@@ -1221,6 +1224,13 @@ function connect(){
           // Clear push-stuck state
           pushing=false;
           if(pushTimeout){ clearTimeout(pushTimeout); pushTimeout=null; }
+        }
+        // Accumulate per-player answer times from server when question is revealed
+        if(ns==='revealed'&&prevStatus==='question'){
+          const revTimes=m.payload.answerTimes||{};
+          for(const [pid,secs] of Object.entries(revTimes)){
+            if(secs!=null) cumulativeAnswerTimes[pid]=(cumulativeAnswerTimes[pid]||0)+parseFloat(secs);
+          }
         }
         if(ns==='idle'&&prevStatus==='idle'){ prevMyScore=inc; }
         // Save session on end (natural end — all questions done)
@@ -1810,9 +1820,24 @@ async function generateQuiz(){
 /* ══════════════════════════════════════
    SCORE BANNER (student)
 ══════════════════════════════════════ */
+/* ══════════════════════════════════════
+   SORT HELPERS
+══════════════════════════════════════ */
+// Primary: pts descending. Tiebreaker: cumulative answer time ascending (less time = higher rank).
+// Players who never answered have Infinity time (go to bottom within same pts band).
+function sortParticipants(parts){
+  return [...parts].sort((a,b)=>{
+    const sd=(b.score||0)-(a.score||0);
+    if(sd!==0) return sd;
+    const ta=cumulativeAnswerTimes[a.id]??Infinity;
+    const tb=cumulativeAnswerTimes[b.id]??Infinity;
+    return ta-tb;
+  });
+}
+
 function scoreBannerHTML(){
   if(!myPid||(S.status!=='question'&&S.status!=='revealed')) return '';
-  const sorted=[...(S.participants||[])].sort((a,b)=>(b.score||0)-(a.score||0));
+  const sorted=sortParticipants(S.participants||[]);
   if(!sorted.length) return '';
   const medals=['🥇','🥈','🥉'];
   const myRank=sorted.findIndex(p=>p.id===myPid)+1;
@@ -1837,6 +1862,7 @@ function render(){
 
   const isParticipant=(role==='participant'&&myName);
   const isHome=(!role&&!showingProfile&&!showingHalted&&homeSection==='home');
+  const isLanding=(!role&&!showingProfile&&!showingHalted); // any home tab
   nav.style.display=(role==='host'&&hostAuthed)?'none':'flex';
   // Back button: show when not at plain home
   document.getElementById('nav-back-wrap').style.display=
@@ -1848,8 +1874,8 @@ function render(){
     else if(showingProfile) navBackEl.textContent = '← Home';
     else navBackEl.textContent = '← Home';
   }
-  // Profile: only visible on the home landing section
-  document.getElementById('profile-wrap').style.display=isHome?'flex':'none';
+  // Profile: visible on both home and leaderboard landing tabs (any !role state)
+  document.getElementById('profile-wrap').style.display=isLanding?'flex':'none';
   // Conn indicator: hide for participants and on profile page (clean look)
   document.getElementById('ci').style.display=(isParticipant||showingProfile||inspectingUser)?'none':'';
   document.getElementById('conn-lbl').style.display=(isParticipant||showingProfile||inspectingUser)?'none':'';
@@ -2180,7 +2206,7 @@ function landingHTML(){
    HALTED SCREEN (students)
 ══════════════════════════════════════ */
 function haltedHTML(){
-  const sorted=[...haltedSnapshot].sort((a,b)=>(b.score||0)-(a.score||0));
+  const sorted=sortParticipants(haltedSnapshot);
   const medals=['🥇','🥈','🥉'];
   const myP=sorted.find(p=>p.id===myPid);
   const myRank=sorted.findIndex(p=>p.id===myPid)+1;
@@ -2212,7 +2238,7 @@ function haltedHTML(){
    DISMISSED SCREEN
 ══════════════════════════════════════ */
 function studentDismissedHTML(){
-  const sorted=[...haltedSnapshot].sort((a,b)=>(b.score||0)-(a.score||0));
+  const sorted=sortParticipants(haltedSnapshot);
   const medals=['🥇','🥈','🥉'];
   const myP=sorted.find(p=>p.id===myPid);
   const myRank=sorted.findIndex(p=>p.id===myPid)+1;
@@ -3079,7 +3105,7 @@ function hostHTML(){
   if(S.status==='ended') return hostEndedHTML();
 
   const parts=S.participants||[];
-  const sorted=[...parts].sort((a,b)=>(b.score||0)-(a.score||0));
+  const sorted=sortParticipants(parts);
   const isLive=S.status==='question'||S.status==='revealed';
   const isRevealed=S.status==='revealed';
   const answered=S.totalAnswered||0;
@@ -3486,13 +3512,13 @@ function waitHTML(){
   const medals=['🥇','🥈','🥉'];
 
   // ALL students always shown, even with 0 score
-  const sortedParts=[...parts].sort((a,b)=>(b.score||0)-(a.score||0));
+  const sortedParts=sortParticipants(parts);
   let lbRows='';
   sortedParts.forEach((p,i)=>{
     const isMe=p.id===myPid;
     const online=p.online!==false;
-    const ansTime=S.answerTimes?.[p.id]??null;
-    const ansTimeStr=ansTime!==null?parseFloat(ansTime).toFixed(2)+'s':'';
+    const cumTime=cumulativeAnswerTimes[p.id]??null;
+    const cumTimeStr=cumTime!==null?(cumTime).toFixed(2)+'s':'';
     const lastH=isMe&&history.length?history[history.length-1]:null;
     const answeredLast=lastH&&lastH.myAnswer!==null&&lastH.myAnswer!==undefined;
     const gotRight=answeredLast&&lastH.myAnswer===lastH.correct;
@@ -3500,7 +3526,7 @@ function waitHTML(){
     lbRows+='<div class="lb-row'+(isMe?' me':'')+(online?'" style="border-left:2px solid #b7dfc7':'"')+'">'+
       '<div class="score-rank">'+(medals[i]||('#'+(i+1)))+'</div>'+
       '<div style="flex:1">'+esc(p.name)+(isMe?' <span style="font-size:.7rem;color:var(--mid)">\u2190 you</span>':'')+'</div>'+
-      (ansTimeStr?'<span style="font-size:.72rem;color:var(--mid);min-width:42px;text-align:right;margin-right:5px">'+ansTimeStr+'</span>':'')+
+      (cumTimeStr?'<span style="font-size:.68rem;color:var(--mid);min-width:42px;text-align:right;margin-right:5px" title="Cumulative answer time">⏱'+cumTimeStr+'</span>':'')+
       '<div class="score-pts" style="color:'+scoreColor+';font-weight:600">'+(p.score||0)+'</div>'+
       '</div>';
   });
@@ -3585,7 +3611,7 @@ function questionViewHTML(){
 }
 
 function studentEndHTML(){
-  const sorted=[...(S.participants||[])].sort((a,b)=>(b.score||0)-(a.score||0));
+  const sorted=sortParticipants(S.participants||[]);
   const myRank=sorted.findIndex(p=>p.id===myPid)+1;
   const medals=['🥇','🥈','🥉'];
   return `<div class="page">
@@ -3833,12 +3859,14 @@ function attach(){
   on('ht-home',()=>{ homeSection='home'; render(); });
   on('ht-lb',()=>{
     homeSection='leaderboard';
-    homeLbTab='today';
-    todayLB=null; weekLB=null; allTimeLB=null;
-    lbFetched={today:null, week:null, all:null};
-    lbErrors={today:null, week:null, all:null};
+    // Only reset to 'today' if we weren't already on the leaderboard
+    if(homeSection!=='leaderboard') homeLbTab='today';
     render();
-    fetchLeaderboard();
+    // Fetch only tabs that haven't been loaded yet — preserve cached data
+    ['today','week','all'].forEach(p=>{
+      const cached=p==='today'?todayLB:p==='week'?weekLB:allTimeLB;
+      if(cached===null&&lbFetched[p]!==false) fetchLeaderboard(p);
+    });
   });
 
   // Control Panel — box button toggle
@@ -4205,7 +4233,7 @@ function attach(){
   on('btn-reveal',()=>send({type:'reveal'}));
   on('btn-next',  ()=>{ send({type:'clear'}); selIdx=selIdx+1<questions.length?selIdx+1:-1; answerKey=selIdx>=0?(questions[selIdx]?.correct??-1):-1; });
   on('btn-end',   ()=>{ if(confirm('End session and show results?')) send({type:'end_session'}); });
-  on('btn-reset', ()=>{ if(confirm('Reset everything?')){ send({type:'reset'}); questions=[]; selIdx=-1; answerKey=-1; inspectPid=null; subjects=[]; repoPath=null; stopMic(); render(); } });
+  on('btn-reset', ()=>{ if(confirm('Reset everything?')){ send({type:'reset'}); questions=[]; selIdx=-1; answerKey=-1; inspectPid=null; subjects=[]; repoPath=null; stopMic(); cumulativeAnswerTimes={}; render(); } });
   on('btn-close-inspect',()=>{ inspectPid=null; render(); });
 
   // Host ended — Continue
@@ -4216,6 +4244,7 @@ function attach(){
   // New Session: server banks current scores then resets to 0
   on('btn-new-session',()=>{
     showingHaltMenu=false;
+    cumulativeAnswerTimes={};
     send({type:'reset'});
     selIdx=questions.length>0?0:-1; answerKey=selIdx>=0?(questions[0]?.correct??-1):-1; inspectPid=null;
     render();
@@ -4390,7 +4419,7 @@ function on(id,fn){ document.getElementById(id)?.addEventListener('click',fn); }
 function doDismissHome(){
   if(dismissedTimer){clearInterval(dismissedTimer);dismissedTimer=null;}
   showingDismissed=false; showingHalted=false; haltedSnapshot=[]; haltedTotalQuestions=0;
-  role=null; myName=null; myPid=null; showingProfile=false; prevMyScore=0; scoreGain=0; myLastAnswerTime=null; localAnswerTimes={}; sessionCorrectTimes=[]; startTimerDisplay._lastStart=null; studentQCount=0; haltedTotalLabel=''; haltedTotalQuestions=0;
+  role=null; myName=null; myPid=null; showingProfile=false; prevMyScore=0; scoreGain=0; myLastAnswerTime=null; localAnswerTimes={}; cumulativeAnswerTimes={}; sessionCorrectTimes=[]; startTimerDisplay._lastStart=null; studentQCount=0; haltedTotalLabel=''; haltedTotalQuestions=0;
   // Wipe all LB caches so scores are fresh the next time the user opens the leaderboard
   todayLB=null; weekLB=null; allTimeLB=null;
   lbFetched={today:null, week:null, all:null};
@@ -4432,7 +4461,7 @@ function doHostLogin(){
   sessionStorage.setItem('scc_hpw', v);
   send({type:'set_host',password:v});
 }
-function doLeave(){ role=null; myName=null; myPid=null; showingProfile=false; prevMyScore=0; scoreGain=0; myLastAnswerTime=null; localAnswerTimes={}; sessionCorrectTimes=[]; startTimerDisplay._lastStart=null; studentQCount=0; haltedTotalLabel=''; haltedTotalQuestions=0; sessionStorage.removeItem('qz_pid'); sessionStorage.removeItem(NAV_KEY); render(); }
+function doLeave(){ role=null; myName=null; myPid=null; showingProfile=false; prevMyScore=0; scoreGain=0; myLastAnswerTime=null; localAnswerTimes={}; cumulativeAnswerTimes={}; sessionCorrectTimes=[]; startTimerDisplay._lastStart=null; studentQCount=0; haltedTotalLabel=''; haltedTotalQuestions=0; sessionStorage.removeItem('qz_pid'); sessionStorage.removeItem(NAV_KEY); render(); }
 function doJoin(){
   const name=currentUser?.name||'';
   if(!name)return;
