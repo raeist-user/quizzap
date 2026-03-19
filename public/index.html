@@ -668,6 +668,7 @@ let pushing=false, pushTimeout=null;
 let showingHalted=false, haltedCountdown=0, haltedTimer=null, haltedSnapshot=[];
 let haltedTotalQuestions=0;   // total questions asked in the session (for score/total display)
 let haltedTotalLabel='';      // denominator label for final leaderboard: 'all' or specific count string
+let hostShutdownLeaderboard=null; // captured final leaderboard shown to host after Stop & Dismiss
 
 // ── QUESTION REPORT STATE ────────────────────────────────────────────────────
 let receivedReports=[];          // [{rid,question,correct,reportedAnswer,reporterName,ts,count}]
@@ -2660,6 +2661,37 @@ function haltMenuOverlayHTML(){
   </div>`;
 }
 
+function hostFinalLeaderboardHTML(){
+  if(!hostShutdownLeaderboard) return '';
+  const entries=hostShutdownLeaderboard;
+  const medals=['🥇','🥈','🥉'];
+  const totalQ=hostShutdownLeaderboard._totalQ||0;
+  const totalQStr=totalQ>0?String(totalQ):'?';
+  const rows=entries.length
+    ?entries.map((e,i)=>`
+      <div style="display:flex;align-items:center;gap:10px;padding:9px 14px;border-bottom:1px solid var(--line);animation:rowIn .18s ease both;animation-delay:${i*30}ms">
+        <div style="min-width:28px;text-align:center;font-size:${i<3?'1.1rem':'.78rem'};color:var(--mid)">${medals[i]||('#'+(i+1))}</div>
+        <div style="flex:1;font-weight:${i<3?'700':'500'};font-size:.88rem;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">${esc(e.name)}</div>
+        <div style="font-weight:700;font-size:.9rem">${e.score||0}<span style="font-size:.68rem;color:var(--mid);font-weight:400"> /${totalQStr}</span></div>
+      </div>`).join('')
+    :`<div style="padding:24px;text-align:center;color:var(--mid)">No scores to display.</div>`;
+  return `<div style="position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:flex-end;justify-content:center;z-index:600;backdrop-filter:blur(3px)">
+    <div style="background:var(--white);border-radius:20px 20px 0 0;width:100%;max-width:520px;max-height:88vh;display:flex;flex-direction:column;animation:slideUp .25s ease">
+      <div style="padding:16px 20px 14px;border-bottom:1px solid var(--line);flex-shrink:0;text-align:center">
+        <div style="width:36px;height:4px;background:var(--line);border-radius:2px;margin:0 auto 14px"></div>
+        <div style="font-size:2rem;margin-bottom:6px">🏆</div>
+        <div style="font-size:1.05rem;font-weight:700;margin-bottom:3px">Final Leaderboard</div>
+        <p style="font-size:.78rem;color:var(--mid)">${entries.length} student${entries.length!==1?'s':''} &nbsp;·&nbsp; ${totalQStr} question${totalQ!==1?'s':''}</p>
+      </div>
+      <div style="overflow-y:auto;flex:1">${rows}</div>
+      <div style="padding:14px 16px 24px;flex-shrink:0;border-top:1px solid var(--line)">
+        <button class="btn btn-dark" id="btn-host-lb-close" style="width:100%;justify-content:center;gap:8px">
+          ← Back to Host Menu
+        </button>
+      </div>
+    </div>
+  </div>`;
+}
 
 function schedOverlayHTML(){
   if(!sidebarSchedOpen) return '';
@@ -3190,8 +3222,8 @@ function hostHTML(){
     : pushedSoFar > 0 ? `Q${pushedSoFar}` : '';
   const liveNav=`
     <div class="host-live-nav">
-      <button class="btn btn-ghost btn-sm" id="btn-host-home" style="flex-shrink:0;padding:4px 8px;font-size:.75rem">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:3px"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9,22 9,12 15,12 15,22"/></svg>Home
+      <button class="btn btn-ghost btn-sm" id="btn-host-home" style="flex-shrink:0;padding:4px 10px;font-size:.75rem;gap:4px">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15,18 9,12 15,6"/></svg>Host Menu
       </button>
       <div style="flex:1;min-width:0;display:flex;align-items:center;justify-content:center">
           ${standingsLabel}
@@ -3374,6 +3406,7 @@ function hostHTML(){
       ${standingsOverlayHTML()}
       ${reportsOverlayHTML()}
       ${hostSettingsOverlayHTML()}
+      ${hostFinalLeaderboardHTML()}
     </div>`;
   }
 
@@ -3475,6 +3508,7 @@ function hostHTML(){
     ${standingsOverlayHTML()}
     ${reportsOverlayHTML()}
     ${hostSettingsOverlayHTML()}
+    ${hostFinalLeaderboardHTML()}
   </div>`;
 }
 
@@ -3517,6 +3551,7 @@ function hostEndedHTML(){
     </div>
     <p class="muted small mb2">Tap any row to inspect answers.</p>${table}${detail}
     ${haltMenuOverlayHTML()}
+    ${hostFinalLeaderboardHTML()}
   </div>`;
 }
 
@@ -4310,6 +4345,7 @@ function attach(){
   // New Session: server banks current scores then resets to 0
   on('btn-new-session',()=>{
     showingHaltMenu=false;
+    hostShutdownLeaderboard=null;
     cumulativeAnswerTimes={};
     send({type:'reset'});
     selIdx=questions.length>0?0:-1; answerKey=selIdx>=0?(questions[0]?.correct??-1):-1; inspectPid=null;
@@ -4321,11 +4357,34 @@ function attach(){
   on('btn-stop-dismiss',()=>{
     showingHaltMenu=false;
     playMp3('stop.mp3');
+    // Capture final leaderboard from server-projected gameScores before state resets
+    const gcores = S.gameScores || [];
+    const parts  = S.participants || [];
+    // Merge: gameScores has cumulative, participants has current-session scores
+    const merged = {};
+    // Start with banked game scores
+    gcores.forEach(g => { merged[g.id] = { name: g.name, score: g.total }; });
+    // Add current session scores for any participant not yet banked
+    parts.forEach(p => {
+      if (merged[p.id]) {
+        // already banked — the server will add current session on shutdown, so add it here too
+        merged[p.id].score += (p.score || 0);
+        merged[p.id].name   = p.name;
+      } else {
+        merged[p.id] = { name: p.name, score: p.score || 0 };
+      }
+    });
+    const finalList = Object.entries(merged)
+      .map(([id,g]) => ({ id, name: g.name, score: g.score }))
+      .sort((a,b) => b.score - a.score);
+    finalList._totalQ = S.pushedCount || 0;
+    hostShutdownLeaderboard = finalList;
     send({type:'shutdown'});
     render();
   });
 
   on('btn-halt-cancel',()=>{ showingHaltMenu=false; render(); });
+  on('btn-host-lb-close',()=>{ hostShutdownLeaderboard=null; render(); });
   on('btn-shutdown',()=>{ if(confirm('Shut down session?')) send({type:'shutdown'}); });
 
   document.querySelectorAll('.itbl tbody tr[data-pid]').forEach(row=>
@@ -4508,7 +4567,7 @@ function doBack(){
   }
   if(role==='host'&&hostAuthed){
     if(!confirm('Leave host panel and go home?')) return;
-    role=null; hostAuthed=false; HOST_PASSWORD_INPUT=''; sessionStorage.removeItem('scc_hpw'); stopMic();
+    role=null; hostAuthed=false; hostShutdownLeaderboard=null; HOST_PASSWORD_INPUT=''; sessionStorage.removeItem('scc_hpw'); stopMic();
     navPush(); render(); return;
   }
   if(role==='host'&&!hostAuthed){
