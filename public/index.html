@@ -44,6 +44,19 @@
     @keyframes barGrow{from{width:0}}
     @keyframes shimmer{from{background-position:-200% center}to{background-position:200% center}}
     @keyframes rowIn{from{opacity:0;transform:translateX(-8px)}to{opacity:1;transform:translateX(0)}}
+    @keyframes fastFingerIn{0%{opacity:0;transform:scale(.6) rotate(-15deg)}60%{transform:scale(1.2) rotate(4deg)}100%{opacity:1;transform:scale(1) rotate(0deg)}}
+    @keyframes timerUrgent{0%,100%{transform:scale(1)}50%{transform:scale(1.08)}}
+    @keyframes confettiFall{to{transform:translateY(110vh) rotate(720deg);opacity:0}}
+
+    /* Fastest finger badge */
+    .ff-badge{display:inline-flex;align-items:center;gap:3px;font-size:.63rem;font-weight:700;letter-spacing:.04em;padding:2px 6px;background:linear-gradient(135deg,#fbbf24,#f59e0b);color:#7c2d12;border-radius:10px;vertical-align:middle;animation:fastFingerIn .4s cubic-bezier(.34,1.56,.64,1) both;white-space:nowrap;flex-shrink:0}
+
+    /* Confetti canvas */
+    #confetti-canvas{position:fixed;inset:0;pointer-events:none;z-index:9999;opacity:1;transition:opacity .6s ease}
+    #confetti-canvas.fade{opacity:0}
+
+    /* Timer urgent pulse on the digit */
+    .timer-digits.urgent{color:var(--bad);animation:timerUrgent .5s ease-in-out infinite}
 
     html,body{height:100%;scroll-behavior:smooth}
     body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
@@ -607,6 +620,7 @@
   <main><div id="view"></div></main>
 </div>
 <audio id="remote-audio" autoplay playsinline style="display:none"></audio>
+<canvas id="confetti-canvas"></canvas>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"></script>
 <script>
 /* ══════════════════════════════════════
@@ -772,6 +786,104 @@ function playWrong(){
     o.start();o.stop(a.currentTime+.5);
   }catch(e){}
 }
+
+/* ── Timer tick sound — called each second when ≤ 5s remain ── */
+let _lastTickSec = -1;
+function playTimerTick(remaining){
+  try{
+    const sec = Math.ceil(remaining);
+    if(sec < 1 || sec === _lastTickSec) return;
+    _lastTickSec = sec;
+    const a = getAudio();
+    const t = a.currentTime;
+    const isLast = sec <= 2;
+    // Pitch rises as we get closer to 0; last 2 secs are louder/higher
+    const freq = isLast ? 1400 : 900 + (5 - sec) * 80;
+    const vol  = isLast ? .28 : .16;
+    const dur  = isLast ? .07 : .055;
+    const o = a.createOscillator(), g = a.createGain();
+    o.connect(g); g.connect(a.destination);
+    o.type = 'square'; o.frequency.value = freq;
+    g.gain.setValueAtTime(vol, t);
+    g.gain.exponentialRampToValueAtTime(.001, t + dur);
+    o.start(t); o.stop(t + dur);
+  }catch(e){}
+}
+
+/* ══════════════════════════════════════
+   CONFETTI ENGINE
+══════════════════════════════════════ */
+(function(){
+  const COLORS=['#f87171','#fbbf24','#34d399','#60a5fa','#a78bfa','#f472b6','#fb923c'];
+  let particles=[], raf=null, canvas, ctx;
+
+  function init(){
+    canvas=document.getElementById('confetti-canvas');
+    if(!canvas) return false;
+    ctx=canvas.getContext('2d');
+    canvas.width=window.innerWidth; canvas.height=window.innerHeight;
+    window.addEventListener('resize',()=>{if(canvas){canvas.width=window.innerWidth;canvas.height=window.innerHeight;}});
+    return true;
+  }
+
+  function Particle(x,y,power){
+    this.x=x; this.y=y;
+    this.vx=(Math.random()-0.5)*power*2.4;
+    this.vy=-(Math.random()*power*2.2+power*0.8);
+    this.r=Math.random()*5+3;
+    this.color=COLORS[Math.floor(Math.random()*COLORS.length)];
+    this.rot=Math.random()*360;
+    this.rotV=(Math.random()-0.5)*8;
+    this.shape=Math.random()<0.5?'rect':'circle';
+    this.gravity=0.22+Math.random()*0.12;
+    this.drag=0.988;
+    this.alpha=1;
+    this.fadeStart=0;
+  }
+
+  Particle.prototype.update=function(elapsed){
+    this.vy+=this.gravity;
+    this.vx*=this.drag; this.vy*=this.drag;
+    this.x+=this.vx; this.y+=this.vy;
+    this.rot+=this.rotV;
+    if(elapsed>1600) this.alpha=Math.max(0,1-(elapsed-1600)/800);
+  };
+  Particle.prototype.draw=function(){
+    ctx.save();
+    ctx.globalAlpha=this.alpha;
+    ctx.fillStyle=this.color;
+    ctx.translate(this.x,this.y);
+    ctx.rotate(this.rot*Math.PI/180);
+    if(this.shape==='circle'){ ctx.beginPath(); ctx.arc(0,0,this.r,0,Math.PI*2); ctx.fill(); }
+    else { ctx.fillRect(-this.r,-this.r/2,this.r*2,this.r); }
+    ctx.restore();
+  };
+
+  function loop(start){
+    const elapsed=performance.now()-start;
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    particles.forEach(p=>{ p.update(elapsed); p.draw(); });
+    particles=particles.filter(p=>p.alpha>0.01&&p.y<canvas.height+40);
+    if(particles.length) raf=requestAnimationFrame(()=>loop(start));
+    else{ ctx.clearRect(0,0,canvas.width,canvas.height); raf=null; }
+  }
+
+  window.launchConfetti=function(opts={}){
+    if(!canvas&&!init()) return;
+    if(raf){ cancelAnimationFrame(raf); raf=null; }
+    const cx=opts.x??canvas.width/2, cy=opts.y??canvas.height*0.38;
+    const count=opts.count??120, power=opts.power??9;
+    for(let i=0;i<count;i++) particles.push(new Particle(cx+(Math.random()-0.5)*40,cy,power));
+    raf=requestAnimationFrame(()=>loop(performance.now()));
+  };
+
+  window.launchConfettiSmall=function(x,y){
+    if(!canvas&&!init()) return;
+    const count=28, power=5;
+    for(let i=0;i<count;i++) particles.push(new Particle(x,y,power));
+    if(!raf) raf=requestAnimationFrame(()=>loop(performance.now()));
+  };
+})();
 
 /* ══════════════════════════════════════
    AUTH
@@ -1263,9 +1375,26 @@ function connect(){
             const myAns=m.payload.myAnswer;
             const correct=m.payload.correct;
             if(myAns!==null&&myAns!==undefined){
-              setTimeout(()=>{ myAns===correct?playCorrect():playWrong(); },200);
+              setTimeout(()=>{
+                myAns===correct?playCorrect():playWrong();
+                // 🎉 Small confetti burst on correct answer
+                if(myAns===correct && typeof launchConfettiSmall==='function'){
+                  const el=document.querySelector('.opt-card.correct');
+                  if(el){ const r=el.getBoundingClientRect(); launchConfettiSmall(r.left+r.width/2, r.top+r.height/2); }
+                  else launchConfettiSmall(window.innerWidth/2, window.innerHeight*0.5);
+                }
+              },200);
               if(myAns===correct&&myLastAnswerTime!==null) sessionCorrectTimes.push(myLastAnswerTime);
             }
+          }
+        }
+        // 🎊 Big confetti on session end if player is in top 3
+        if(ns==='ended'&&prevStatus!=='ended'&&role==='participant'&&myPid){
+          const endParts=m.payload.participants||[];
+          const endSorted=[...endParts].sort((a,b)=>(b.score||0)-(a.score||0));
+          const myEndRank=endSorted.findIndex(p=>p.id===myPid)+1;
+          if(myEndRank>=1&&myEndRank<=3&&typeof launchConfetti==='function'){
+            setTimeout(()=>launchConfetti({count: myEndRank===1?200:140, power: myEndRank===1?12:9}), 400);
           }
         }
         prevStatus=ns; S=m.payload;
@@ -1434,6 +1563,7 @@ function startTimerDisplay(){
   if(timerInterval && startTimerDisplay._lastStart===start) return;
   if(timerInterval){clearInterval(timerInterval);timerInterval=null;}
   startTimerDisplay._lastStart=start;
+  _lastTickSec=-1; // reset tick deduplication for each new question
   function tick(){
     const elapsed=Math.max(0,(Date.now()-start)/1000);
     const remaining=Math.max(0, total-elapsed);
@@ -1459,6 +1589,8 @@ function startTimerDisplay(){
       hDig.textContent=displaySecs+'s';
       hDig.style.color=urgent?'var(--bad)':'var(--ink)';
     }
+    // 🔔 Timer tick sound: beep each second for last 5 seconds
+    if(remaining>0 && remaining<=5) playTimerTick(remaining);
     if(remaining<=0){
       clearInterval(timerInterval);timerInterval=null;
       document.querySelectorAll('.opt-card').forEach(c=>c.classList.add('locked'));
@@ -3272,6 +3404,18 @@ function hostHTML(){
 
   // ── 3. STUDENTS PANEL ────────────────────────────────────────────────
   function initials(n){return n.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();}
+
+  // Compute fastest-finger: the correct answerer with the lowest answerTime this question
+  let fastestPid = null;
+  if(isRevealed && S.correct !== null && S.correct !== undefined){
+    let bestTime = Infinity;
+    Object.entries(S.answerTimes||{}).forEach(([pid,t])=>{
+      if(S.answers?.[pid]===S.correct && t!=null && parseFloat(t)<bestTime){
+        bestTime=parseFloat(t); fastestPid=pid;
+      }
+    });
+  }
+
   const studentRows=sorted.length
     ?sorted.map((p,i)=>{
         const ans=S.answers?.[p.id];
@@ -3279,10 +3423,14 @@ function hostHTML(){
         const ansTime = S.answerTimes?.[p.id] ?? null;
         const isCorrect=ans!==undefined&&ans!==null&&ans===S.correct;
         const isWrong=ans!==undefined&&ans!==null&&ans!==S.correct;
-        return `<div style="display:flex;align-items:center;gap:8px;padding:7px 10px;border-bottom:1px solid var(--line);font-size:.83rem">
+        const isFastest = isRevealed && p.id===fastestPid;
+        return `<div style="display:flex;align-items:center;gap:8px;padding:7px 10px;border-bottom:1px solid var(--line);font-size:.83rem${isFastest?';background:#fffbeb':''}">
           <div style="min-width:22px;text-align:center;font-size:.72rem;color:var(--mid)">${medals[i]||('#'+(i+1))}</div>
-          <div class="j-av" style="flex-shrink:0">${initials(p.name)}</div>
-          <div style="flex:1;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">${esc(p.name)}</div>
+          <div class="j-av" style="flex-shrink:0${isFastest?';background:#f59e0b;color:#fff':''}">${initials(p.name)}</div>
+          <div style="flex:1;overflow:hidden;min-width:0">
+            <div style="white-space:nowrap;text-overflow:ellipsis;overflow:hidden">${esc(p.name)}</div>
+            ${isFastest?'<span class="ff-badge">⚡ Fastest</span>':''}
+          </div>
           <div style="font-size:.72rem;font-weight:700;min-width:26px;text-align:center;padding:2px 5px;border-radius:4px;${isCorrect?'background:#dcfce7;color:#16a34a':isWrong?'background:#fee2e2;color:#be123c':ans!==undefined&&ans!==null?'background:var(--faint);color:var(--mid)':'color:var(--mid)'}">${ansStr}</div>
           ${ansTime!=null?`<div style="font-size:.7rem;color:var(--mid);min-width:40px;text-align:right">${parseFloat(ansTime).toFixed(2)}s</div>`:'<div style="min-width:40px"></div>'}
           <div style="font-weight:600;min-width:44px;text-align:right">${p.score||0} <span style="font-size:.68rem;color:var(--mid)">pts</span></div>
@@ -3614,6 +3762,16 @@ function waitHTML(){
 
   // ALL students always shown, even with 0 score
   const sortedParts=sortParticipants(parts);
+
+  // Fastest finger for participant view: find who answered the last revealed question the fastest
+  let fastestPidP=null;
+  if(S.status==='revealed'&&S.correct!==null&&S.correct!==undefined){
+    let bestT=Infinity;
+    Object.entries(S.answerTimes||{}).forEach(([pid,t])=>{
+      if(S.answers?.[pid]===S.correct&&t!=null&&parseFloat(t)<bestT){bestT=parseFloat(t);fastestPidP=pid;}
+    });
+  }
+
   let lbRows='';
   sortedParts.forEach((p,i)=>{
     const isMe=p.id===myPid;
@@ -3624,9 +3782,13 @@ function waitHTML(){
     const answeredLast=lastH&&lastH.myAnswer!==null&&lastH.myAnswer!==undefined;
     const gotRight=answeredLast&&lastH.myAnswer===lastH.correct;
     const scoreColor=isMe&&answeredLast?(gotRight?'#16a34a':'var(--ink)'):'inherit';
-    lbRows+='<div class="lb-row'+(isMe?' me':'')+(online?'" style="border-left:2px solid #b7dfc7':'"')+'">'+
+    const isFastP=p.id===fastestPidP;
+    lbRows+='<div class="lb-row'+(isMe?' me':'')+(online?'" style="border-left:2px solid #b7dfc7'+(isFastP?';background:#fffbeb':''):'"'+(isFastP?' style="background:#fffbeb"':''))+'">'+
       '<div class="score-rank">'+(medals[i]||('#'+(i+1)))+'</div>'+
-      '<div style="flex:1">'+esc(p.name)+(isMe?' <span style="font-size:.7rem;color:var(--mid)">\u2190 you</span>':'')+'</div>'+
+      '<div style="flex:1;min-width:0">'+
+        '<div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(p.name)+(isMe?' <span style="font-size:.7rem;color:var(--mid)">\u2190 you</span>':'')+'</div>'+
+        (isFastP?'<span class="ff-badge">⚡ Fastest</span>':'')+
+      '</div>'+
       (cumTimeStr?'<span style="font-size:.68rem;color:var(--mid);min-width:42px;text-align:right;margin-right:5px" title="Cumulative answer time">⏱'+cumTimeStr+'</span>':'')+
       '<div class="score-pts" style="color:'+scoreColor+';font-weight:600">'+(p.score||0)+'</div>'+
       '</div>';
@@ -4379,6 +4541,10 @@ function attach(){
       .sort((a,b) => b.score - a.score);
     finalList._totalQ = S.pushedCount || 0;
     hostShutdownLeaderboard = finalList;
+    // 🎊 Confetti for the host too — celebrate the session ending!
+    if(finalList.length && typeof launchConfetti==='function'){
+      setTimeout(()=>launchConfetti({count:160, power:10}), 300);
+    }
     send({type:'shutdown'});
     render();
   });
