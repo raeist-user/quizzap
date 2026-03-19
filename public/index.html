@@ -47,9 +47,22 @@
     @keyframes fastFingerIn{0%{opacity:0;transform:scale(.6) rotate(-15deg)}60%{transform:scale(1.2) rotate(4deg)}100%{opacity:1;transform:scale(1) rotate(0deg)}}
     @keyframes timerUrgent{0%,100%{transform:scale(1)}50%{transform:scale(1.08)}}
     @keyframes confettiFall{to{transform:translateY(110vh) rotate(720deg);opacity:0}}
+    @keyframes bombDrop{0%{opacity:0;transform:translateY(-120px) scale(.7)}60%{transform:translateY(8px) scale(1.08)}80%{transform:translateY(-4px) scale(.97)}100%{opacity:1;transform:translateY(0) scale(1)}}
+    @keyframes bombWobble{0%,100%{transform:rotate(-8deg)}50%{transform:rotate(8deg)}}
+    @keyframes bombGrow{0%{transform:scale(1)}100%{transform:scale(2.2)}}
+    @keyframes blastRing{0%{transform:scale(.3);opacity:.9}100%{transform:scale(3.5);opacity:0}}
+    @keyframes screenShake{0%,100%{transform:translate(0,0)}20%{transform:translate(-6px,4px)}40%{transform:translate(6px,-4px)}60%{transform:translate(-4px,6px)}80%{transform:translate(4px,-2px)}}
+    .blast-ring{position:absolute;border-radius:50%;pointer-events:none;animation:blastRing .7s ease-out both}
 
     /* Fastest finger badge */
     .ff-badge{display:inline-flex;align-items:center;gap:3px;font-size:.63rem;font-weight:700;letter-spacing:.04em;padding:2px 6px;background:linear-gradient(135deg,#fbbf24,#f59e0b);color:#7c2d12;border-radius:10px;vertical-align:middle;animation:fastFingerIn .4s cubic-bezier(.34,1.56,.64,1) both;white-space:nowrap;flex-shrink:0}
+
+    /* Streak fire badge */
+    .streak-badge{display:inline-flex;align-items:center;gap:2px;font-size:.63rem;font-weight:800;padding:2px 6px;border-radius:10px;white-space:nowrap;flex-shrink:0;animation:fastFingerIn .35s cubic-bezier(.34,1.56,.64,1) both}
+    .streak-badge.s3{background:linear-gradient(135deg,#fed7aa,#fb923c);color:#7c2d12}
+    .streak-badge.s5{background:linear-gradient(135deg,#fca5a5,#ef4444);color:#7f1d1d}
+    .streak-badge.s8{background:linear-gradient(135deg,#c084fc,#9333ea);color:#3b0764}
+    .streak-badge.s10{background:linear-gradient(135deg,#f0abfc,#e879f9,#818cf8);color:#1e1b4b;box-shadow:0 0 8px rgba(168,85,247,.5)}
 
     /* Confetti canvas */
     #confetti-canvas{position:fixed;inset:0;pointer-events:none;z-index:9999;opacity:1;transition:opacity .6s ease}
@@ -654,6 +667,7 @@ let repoLoading=false;
 
 // Host halt confirmation menu state
 let showingHaltMenu=false;
+let showingHaltBomb=false, haltBombTimer=null; // bomb drop animation before halt menu
 
 // Host settings/shortcuts overlay
 let hostSettingsOpen=false;
@@ -705,6 +719,10 @@ let studentQCount=0;       // how many questions this client has seen pushed (fo
 let cumulativeAnswerTimes={};  // {pid: totalSecs}
 
 // Cumulative scoring is now handled server-side via gameScores in server.js
+
+// 🔥 Streak tracking — computed from S.history on each render
+// streakMap: {pid: number} — current consecutive correct answers at tail of history
+let _streakCache = { histLen: -1, map: {} }; // memoised so we don't recompute every tick
 
 // Home tabs
 let homeSection='home'; // 'home' | 'leaderboard'
@@ -784,6 +802,25 @@ function playWrong(){
     g.gain.setValueAtTime(.2,a.currentTime);
     g.gain.exponentialRampToValueAtTime(.001,a.currentTime+.5);
     o.start();o.stop(a.currentTime+.5);
+  }catch(e){}
+}
+
+/* ── Streak milestone sound — ascending chime ── */
+function playStreakSound(streak){
+  try{
+    const a=getAudio(); const t=a.currentTime;
+    const baseFreqs = streak>=10?[784,1047,1319,1568]:streak>=8?[659,880,1047,1319]:streak>=5?[523,659,784,1047]:[440,523,659];
+    const vol = streak>=8 ? .22 : .16;
+    baseFreqs.forEach((f,i)=>{
+      const o=a.createOscillator(),g=a.createGain();
+      o.connect(g);g.connect(a.destination);
+      o.type='sine'; o.frequency.value=f;
+      const s=t+i*.1;
+      g.gain.setValueAtTime(0,s);
+      g.gain.linearRampToValueAtTime(vol,s+.04);
+      g.gain.exponentialRampToValueAtTime(.001,s+.32);
+      o.start(s);o.stop(s+.35);
+    });
   }catch(e){}
 }
 
@@ -884,6 +921,43 @@ function playTimerTick(remaining){
     if(!raf) raf=requestAnimationFrame(()=>loop(performance.now()));
   };
 })();
+
+/* ══════════════════════════════════════
+   🔥 STREAK HELPER
+   Computes current consecutive-correct tail for every pid from S.history.
+   Memoised on history length so it's O(1) on re-renders with no new question.
+══════════════════════════════════════ */
+function getStreakMap(){
+  const hist = S.history || [];
+  if(hist.length === _streakCache.histLen) return _streakCache.map;
+  const map = {};
+  // Walk history newest-first to count consecutive correct tail per pid
+  // We do a forward pass building per-pid answer arrays, then count tail
+  const pids = new Set();
+  hist.forEach(h => Object.keys(h.answers||{}).forEach(pid => pids.add(pid)));
+  pids.forEach(pid => {
+    let streak = 0;
+    for(let i = hist.length - 1; i >= 0; i--){
+      const ans = hist[i].answers?.[pid];
+      if(ans === undefined || ans === null) break; // didn't answer — streak broken
+      if(ans === hist[i].correct) streak++;
+      else break;
+    }
+    if(streak > 0) map[pid] = streak;
+  });
+  _streakCache = { histLen: hist.length, map };
+  return map;
+}
+
+function streakBadgeHTML(n){
+  if(!n || n < 3) return '';
+  let cls, label;
+  if(n >= 10)     { cls='s10'; label=`🔥×${n} LEGENDARY`; }
+  else if(n >= 8) { cls='s8';  label=`🔥×${n} On Fire!`; }
+  else if(n >= 5) { cls='s5';  label=`🔥×${n} Hot!`; }
+  else            { cls='s3';  label=`🔥×${n}`; }
+  return `<span class="streak-badge ${cls}">${label}</span>`;
+}
 
 /* ══════════════════════════════════════
    AUTH
@@ -1310,6 +1384,15 @@ function connect(){
           }
         }
         showingHalted=false; showingDismissed=true; dismissedCountdown=120;
+        // 🎊 Confetti for top-3 students on final dismissal
+        if(role==='participant'&&myPid){
+          const kickPartsForRank=m.payload?.finalLeaderboard||m.payload?.participants||S.participants||[];
+          const kickSortedForRank=[...kickPartsForRank].sort((a,b)=>(b.score||0)-(a.score||0));
+          const myKickRank=kickSortedForRank.findIndex(p=>p.id===myPid)+1;
+          if(myKickRank>=1&&myKickRank<=3&&typeof launchConfetti==='function'){
+            setTimeout(()=>launchConfetti({count:myKickRank===1?200:140, power:myKickRank===1?12:9}), 500);
+          }
+        }
         if(dismissedTimer){clearInterval(dismissedTimer);dismissedTimer=null;}
         dismissedTimer=setInterval(()=>{
           dismissedCountdown=Math.max(0,dismissedCountdown-1);
@@ -1376,12 +1459,16 @@ function connect(){
             const correct=m.payload.correct;
             if(myAns!==null&&myAns!==undefined){
               setTimeout(()=>{
-                myAns===correct?playCorrect():playWrong();
-                // 🎉 Small confetti burst on correct answer
-                if(myAns===correct && typeof launchConfettiSmall==='function'){
-                  const el=document.querySelector('.opt-card.correct');
-                  if(el){ const r=el.getBoundingClientRect(); launchConfettiSmall(r.left+r.width/2, r.top+r.height/2); }
-                  else launchConfettiSmall(window.innerWidth/2, window.innerHeight*0.5);
+                if(myAns===correct){
+                  playCorrect();
+                  // 🔥 Streak milestone sound — fire after streakMap is built from new S
+                  setTimeout(()=>{
+                    const sm=getStreakMap();
+                    const myStreak=myPid?sm[myPid]:0;
+                    if(myStreak>=3) playStreakSound(myStreak);
+                  }, 120);
+                } else {
+                  playWrong();
                 }
               },200);
               if(myAns===correct&&myLastAnswerTime!==null) sessionCorrectTimes.push(myLastAnswerTime);
@@ -1398,6 +1485,8 @@ function connect(){
           }
         }
         prevStatus=ns; S=m.payload;
+        // Invalidate streak cache when history length changes
+        if((S.history||[]).length !== _streakCache.histLen) _streakCache = { histLen: -1, map: {} };
         // Exit halted screen when new session state arrives
         if(ns==='idle'&&showingHalted){ showingHalted=false; haltedSnapshot=[]; }
         render(); break;
@@ -2770,6 +2859,17 @@ function hostPassHTML(){
 /* ══════════════════════════════════════
    HALT CONFIRMATION OVERLAY (host)
 ══════════════════════════════════════ */
+function haltBombOverlayHTML(){
+  if(!showingHaltBomb) return '';
+  return `<div id="halt-bomb-overlay" style="position:fixed;inset:0;background:rgba(0,0,0,.72);display:flex;align-items:center;justify-content:center;z-index:800;backdrop-filter:blur(3px)">
+    <div style="text-align:center;user-select:none">
+      <div id="bomb-emoji" style="font-size:5rem;line-height:1;animation:bombDrop .5s cubic-bezier(.34,1.56,.64,1) both,bombWobble .35s ease-in-out .55s 4 alternate;display:inline-block">💣</div>
+      <div id="blast-rings-wrap" style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);pointer-events:none"></div>
+      <div style="margin-top:18px;color:rgba(255,255,255,.7);font-size:.85rem;font-weight:600;letter-spacing:.06em;text-transform:uppercase" id="bomb-label">Halting session…</div>
+    </div>
+  </div>`;
+}
+
 function haltMenuOverlayHTML(){
   if(!showingHaltMenu) return '';
   return `<div style="position:absolute;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:flex-end;justify-content:center;z-index:500;backdrop-filter:blur(2px)">
@@ -3416,6 +3516,9 @@ function hostHTML(){
     });
   }
 
+  // 🔥 Streak map for all participants
+  const streakMap = getStreakMap();
+
   const studentRows=sorted.length
     ?sorted.map((p,i)=>{
         const ans=S.answers?.[p.id];
@@ -3424,12 +3527,16 @@ function hostHTML(){
         const isCorrect=ans!==undefined&&ans!==null&&ans===S.correct;
         const isWrong=ans!==undefined&&ans!==null&&ans!==S.correct;
         const isFastest = isRevealed && p.id===fastestPid;
+        const pStreak = streakMap[p.id] || 0;
         return `<div style="display:flex;align-items:center;gap:8px;padding:7px 10px;border-bottom:1px solid var(--line);font-size:.83rem${isFastest?';background:#fffbeb':''}">
           <div style="min-width:22px;text-align:center;font-size:.72rem;color:var(--mid)">${medals[i]||('#'+(i+1))}</div>
           <div class="j-av" style="flex-shrink:0${isFastest?';background:#f59e0b;color:#fff':''}">${initials(p.name)}</div>
           <div style="flex:1;overflow:hidden;min-width:0">
             <div style="white-space:nowrap;text-overflow:ellipsis;overflow:hidden">${esc(p.name)}</div>
-            ${isFastest?'<span class="ff-badge">⚡ Fastest</span>':''}
+            <div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:1px">
+              ${isFastest?'<span class="ff-badge">⚡ Fastest</span>':''}
+              ${streakBadgeHTML(pStreak)}
+            </div>
           </div>
           <div style="font-size:.72rem;font-weight:700;min-width:26px;text-align:center;padding:2px 5px;border-radius:4px;${isCorrect?'background:#dcfce7;color:#16a34a':isWrong?'background:#fee2e2;color:#be123c':ans!==undefined&&ans!==null?'background:var(--faint);color:var(--mid)':'color:var(--mid)'}">${ansStr}</div>
           ${ansTime!=null?`<div style="font-size:.7rem;color:var(--mid);min-width:40px;text-align:right">${parseFloat(ansTime).toFixed(2)}s</div>`:'<div style="min-width:40px"></div>'}
@@ -3550,6 +3657,7 @@ function hostHTML(){
       </div>
       ${manageOverlayHTML()}
       ${schedOverlayHTML()}
+      ${haltBombOverlayHTML()}
       ${haltMenuOverlayHTML()}
       ${standingsOverlayHTML()}
       ${reportsOverlayHTML()}
@@ -3652,6 +3760,7 @@ function hostHTML(){
       ${actionBtns}
     </div>
     ${schedOverlayHTML()}
+    ${haltBombOverlayHTML()}
     ${haltMenuOverlayHTML()}
     ${standingsOverlayHTML()}
     ${reportsOverlayHTML()}
@@ -3698,6 +3807,7 @@ function hostEndedHTML(){
       <strong>Continue</strong> — return to waiting room &nbsp;·&nbsp; <strong>Halt</strong> — send students home
     </div>
     <p class="muted small mb2">Tap any row to inspect answers.</p>${table}${detail}
+    ${haltBombOverlayHTML()}
     ${haltMenuOverlayHTML()}
     ${hostFinalLeaderboardHTML()}
   </div>`;
@@ -3772,6 +3882,9 @@ function waitHTML(){
     });
   }
 
+  // 🔥 Streak map for participant view
+  const streakMapP = getStreakMap();
+
   let lbRows='';
   sortedParts.forEach((p,i)=>{
     const isMe=p.id===myPid;
@@ -3783,11 +3896,16 @@ function waitHTML(){
     const gotRight=answeredLast&&lastH.myAnswer===lastH.correct;
     const scoreColor=isMe&&answeredLast?(gotRight?'#16a34a':'var(--ink)'):'inherit';
     const isFastP=p.id===fastestPidP;
-    lbRows+='<div class="lb-row'+(isMe?' me':'')+(online?'" style="border-left:2px solid #b7dfc7'+(isFastP?';background:#fffbeb':''):'"'+(isFastP?' style="background:#fffbeb"':''))+'">'+
+    const pStreak=streakMapP[p.id]||0;
+    const rowBg=isFastP?';background:#fffbeb':'';
+    lbRows+='<div class="lb-row'+(isMe?' me':'')+(online?'" style="border-left:2px solid #b7dfc7'+rowBg:'"'+(rowBg?' style="'+rowBg.slice(1)+'"':''))+'">'+
       '<div class="score-rank">'+(medals[i]||('#'+(i+1)))+'</div>'+
       '<div style="flex:1;min-width:0">'+
         '<div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(p.name)+(isMe?' <span style="font-size:.7rem;color:var(--mid)">\u2190 you</span>':'')+'</div>'+
-        (isFastP?'<span class="ff-badge">⚡ Fastest</span>':'')+
+        ((isFastP||pStreak>=3)?'<div style="display:flex;gap:4px;margin-top:2px">'+
+          (isFastP?'<span class="ff-badge">⚡ Fastest</span>':'')+
+          streakBadgeHTML(pStreak)+
+        '</div>':'')+
       '</div>'+
       (cumTimeStr?'<span style="font-size:.68rem;color:var(--mid);min-width:42px;text-align:right;margin-right:5px" title="Cumulative answer time">⏱'+cumTimeStr+'</span>':'')+
       '<div class="score-pts" style="color:'+scoreColor+';font-weight:600">'+(p.score||0)+'</div>'+
@@ -4501,12 +4619,51 @@ function attach(){
 
   // Host ended — Continue
   on('btn-continue-session',()=>{ send({type:'continue_session'}); });
-  // Halt: just show the local overlay — no server message yet
-  on('btn-halt',()=>{ showingHaltMenu=true; render(); });
+  // Halt: drop bomb 💣 animation for 3 seconds, then show halt menu
+  on('btn-halt',()=>{
+    if(showingHaltBomb) return; // prevent double-trigger
+    showingHaltBomb=true; showingHaltMenu=false; render();
+
+    // Phase 1 (0–1.8s): bomb is visible, wobbling
+    // Phase 2 (1.8s): label changes to "BOOM!", bomb grows
+    // Phase 3 (2.2s): blast rings fire + screen shake
+    // Phase 4 (3.0s): overlay gone, halt menu opens
+
+    setTimeout(()=>{
+      const lbl=document.getElementById('bomb-label');
+      const bomb=document.getElementById('bomb-emoji');
+      if(lbl) lbl.textContent='💥 BOOM!';
+      if(bomb){
+        bomb.style.animation='bombGrow .25s ease-in both';
+        bomb.style.filter='drop-shadow(0 0 24px #f97316)';
+      }
+      // Blast rings
+      const wrap=document.getElementById('blast-rings-wrap');
+      if(wrap){
+        [[0,'rgba(251,146,60,.6)',70],[80,'rgba(253,186,116,.45)',100],[160,'rgba(254,215,170,.3)',130]].forEach(([delay,col,size])=>{
+          const r=document.createElement('div');
+          r.className='blast-ring';
+          r.style.cssText=`width:${size}px;height:${size}px;margin-left:-${size/2}px;margin-top:-${size/2}px;background:${col};animation-delay:${delay}ms`;
+          wrap.appendChild(r);
+        });
+      }
+      // Screen shake on the host panel
+      const panel=document.querySelector('#main-view>div')||document.body;
+      panel.style.animation='screenShake .35s ease both';
+      setTimeout(()=>{ if(panel) panel.style.animation=''; }, 380);
+    }, 1800);
+
+    // Open halt menu after full 3 seconds
+    if(haltBombTimer){ clearTimeout(haltBombTimer); }
+    haltBombTimer=setTimeout(()=>{
+      showingHaltBomb=false; showingHaltMenu=true; haltBombTimer=null; render();
+    }, 3000);
+  });
 
   // New Session: server banks current scores then resets to 0
   on('btn-new-session',()=>{
-    showingHaltMenu=false;
+    if(haltBombTimer){ clearTimeout(haltBombTimer); haltBombTimer=null; }
+    showingHaltMenu=false; showingHaltBomb=false;
     hostShutdownLeaderboard=null;
     cumulativeAnswerTimes={};
     send({type:'reset'});
@@ -4549,7 +4706,10 @@ function attach(){
     render();
   });
 
-  on('btn-halt-cancel',()=>{ showingHaltMenu=false; render(); });
+  on('btn-halt-cancel',()=>{
+    if(haltBombTimer){ clearTimeout(haltBombTimer); haltBombTimer=null; }
+    showingHaltBomb=false; showingHaltMenu=false; render();
+  });
   on('btn-host-lb-close',()=>{ hostShutdownLeaderboard=null; render(); });
   on('btn-shutdown',()=>{ if(confirm('Shut down session?')) send({type:'shutdown'}); });
 
@@ -4733,7 +4893,7 @@ function doBack(){
   }
   if(role==='host'&&hostAuthed){
     if(!confirm('Leave host panel and go home?')) return;
-    role=null; hostAuthed=false; hostShutdownLeaderboard=null; HOST_PASSWORD_INPUT=''; sessionStorage.removeItem('scc_hpw'); stopMic();
+    role=null; hostAuthed=false; hostShutdownLeaderboard=null; showingHaltBomb=false; if(haltBombTimer){clearTimeout(haltBombTimer);haltBombTimer=null;} HOST_PASSWORD_INPUT=''; sessionStorage.removeItem('scc_hpw'); stopMic();
     navPush(); render(); return;
   }
   if(role==='host'&&!hostAuthed){
