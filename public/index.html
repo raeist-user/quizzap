@@ -728,6 +728,7 @@ let cumulativeAnswerTimes={};  // {pid: totalSecs}
 // For participants: tracked live in clientStreaks (persisted across renders)
 let _streakCache = { histLen: -1, map: {} };
 let clientStreaks = {}; // {pid: number} — maintained by participant client on each reveal
+let lastFastestPid = null; // persists from revealed → idle so badge shows on waiting screen
 
 // Home tabs
 let homeSection='home'; // 'home' | 'leaderboard'
@@ -1452,15 +1453,28 @@ function connect(){
           for(const [pid,secs] of Object.entries(revTimes)){
             if(secs!=null) cumulativeAnswerTimes[pid]=(cumulativeAnswerTimes[pid]||0)+parseFloat(secs);
           }
-          // 🔥 Update client-side streak map for participant view
+          // 🔥 Update client-side streaks for participant view
+          // Participants don't receive S.answers — detect correct answers via score change
           if(role==='participant'){
-            const revAnswers=m.payload.answers||{};
-            const revCorrect=m.payload.correct;
-            (m.payload.participants||[]).forEach(p=>{
-              const ans=revAnswers[p.id];
-              if(ans===revCorrect) clientStreaks[p.id]=(clientStreaks[p.id]||0)+1;
+            const prevParts = S.participants||[];
+            const newParts  = m.payload.participants||[];
+            const prevScoreMap = {};
+            prevParts.forEach(p=>{ prevScoreMap[p.id]=p.score||0; });
+            newParts.forEach(p=>{
+              const gained = (p.score||0) - (prevScoreMap[p.id]||0);
+              if(gained > 0) clientStreaks[p.id]=(clientStreaks[p.id]||0)+1;
               else clientStreaks[p.id]=0;
             });
+            // Fastest: participant with lowest answerTime who got it right
+            // We can infer "got it right" by score gain; pick lowest answerTime among them
+            const revTimes2=m.payload.answerTimes||{};
+            let bestT2=Infinity, bestPid2=null;
+            newParts.forEach(p=>{
+              const gained=(p.score||0)-(prevScoreMap[p.id]||0);
+              const t=revTimes2[p.id];
+              if(gained>0 && t!=null && parseFloat(t)<bestT2){ bestT2=parseFloat(t); bestPid2=p.id; }
+            });
+            if(bestPid2) lastFastestPid=bestPid2;
           }
         }
         if(ns==='idle'&&prevStatus==='idle'){ prevMyScore=inc; }
@@ -3909,16 +3923,10 @@ function waitHTML(){
   // ALL students always shown, even with 0 score
   const sortedParts=sortParticipants(parts);
 
-  // Fastest finger for participant view: find who answered the last revealed question the fastest
-  let fastestPidP=null;
-  if(S.status==='revealed'&&S.correct!==null&&S.correct!==undefined){
-    let bestT=Infinity;
-    Object.entries(S.answerTimes||{}).forEach(([pid,t])=>{
-      if(S.answers?.[pid]===S.correct&&t!=null&&parseFloat(t)<bestT){bestT=parseFloat(t);fastestPidP=pid;}
-    });
-  }
+  // 🔥 Fastest finger: use persisted lastFastestPid (survives revealed → idle transition)
+  const fastestPidP = lastFastestPid;
 
-  // 🔥 Streak map for participant view
+  // 🔥 Streak map for participant view (clientStreaks, score-diff-tracked)
   const streakMapP = getStreakMap();
 
   let lbRows='';
@@ -4916,7 +4924,7 @@ function doHostLogin(){
   sessionStorage.setItem('scc_hpw', v);
   send({type:'set_host',password:v});
 }
-function doLeave(){ role=null; myName=null; myPid=null; showingProfile=false; prevMyScore=0; scoreGain=0; myLastAnswerTime=null; localAnswerTimes={}; cumulativeAnswerTimes={}; clientStreaks={}; sessionCorrectTimes=[]; startTimerDisplay._lastStart=null; studentQCount=0; haltedTotalLabel=''; haltedTotalQuestions=0; sessionStorage.removeItem('qz_pid'); sessionStorage.removeItem(NAV_KEY); _screenKey=''; render(); }
+function doLeave(){ role=null; myName=null; myPid=null; showingProfile=false; prevMyScore=0; scoreGain=0; myLastAnswerTime=null; localAnswerTimes={}; cumulativeAnswerTimes={}; clientStreaks={}; lastFastestPid=null; sessionCorrectTimes=[]; startTimerDisplay._lastStart=null; studentQCount=0; haltedTotalLabel=''; haltedTotalQuestions=0; sessionStorage.removeItem('qz_pid'); sessionStorage.removeItem(NAV_KEY); _screenKey=''; render(); }
 function doJoin(){
   const name=currentUser?.name||'';
   if(!name)return;
