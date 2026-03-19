@@ -655,6 +655,8 @@ let prevMyScore=0, scoreGain=0;
 let questions=[], selIdx=-1, answerKey=-1, inspectPid=null;
 let sidebarQOpen=false, sidebarStudOpen=false, sidebarScoreOpen=false, sidebarSchedOpen=false, showStandingsOverlay=false;
 let hostTimerSeconds=0;
+let tickMuted=false;     // host can mute the tick sound for all students
+let tickStartAt=5;       // host controls when tick starts (seconds remaining)
 let hostRandomize=false; // OFF by default — questions load in file order
 
 // Resource browser
@@ -1442,6 +1444,7 @@ function connect(){
             localAnswerTimes={};
             studentQCount++;
             startTimerDisplay._lastStart=null; // force timer restart for new question
+            lastFastestPid=null; // clear fastest badge so it doesn't carry over from previous question
           }
           // Clear push-stuck state
           pushing=false;
@@ -1474,7 +1477,8 @@ function connect(){
               const t=revTimes2[p.id];
               if(gained>0 && t!=null && parseFloat(t)<bestT2){ bestT2=parseFloat(t); bestPid2=p.id; }
             });
-            if(bestPid2) lastFastestPid=bestPid2;
+            // Always update (null if nobody answered correctly this round)
+            lastFastestPid=bestPid2;
           }
         }
         if(ns==='idle'&&prevStatus==='idle'){ prevMyScore=inc; }
@@ -1710,8 +1714,8 @@ function startTimerDisplay(){
       hDig.textContent=displaySecs+'s';
       hDig.style.color=urgent?'var(--bad)':'var(--ink)';
     }
-    // 🔔 Timer tick: only if student hasn't answered
-    if(remaining>0 && remaining<=5 && !studentAnswered) playTimerTick(remaining);
+    // 🔔 Timer tick: only if student hasn't answered, not muted, and within tick window
+    if(remaining>0 && remaining<=tickStartAt && !studentAnswered && !tickMuted) playTimerTick(remaining);
     if(remaining<=0){
       clearInterval(timerInterval);timerInterval=null;
       document.querySelectorAll('.opt-card').forEach(c=>c.classList.add('locked'));
@@ -3665,6 +3669,12 @@ function hostHTML(){
             <span style="font-size:.72rem;color:var(--mid)">⏱</span>
             <input type="number" min="0" max="300" value="${hostTimerSeconds}" id="timer-sec-input" class="q-count-input" style="width:46px;font-size:.75rem;padding:3px 6px"/>
             <span style="font-size:.72rem;color:var(--mid)">s</span>
+            <button id="btn-tick-mute" title="${tickMuted?'Tick sound muted — click to unmute':'Tick sound ON — click to mute'}"
+              style="padding:3px 8px;font-size:.7rem;font-weight:600;border-radius:var(--r);border:1.5px solid ${tickMuted?'var(--bad)':'var(--line)'};background:${tickMuted?'#fff1f2':'var(--faint)'};color:${tickMuted?'var(--bad)':'var(--mid)'};cursor:pointer;display:flex;align-items:center;gap:3px;white-space:nowrap;transition:all .15s">
+              ${tickMuted?'🔇':'🔔'}
+            </button>
+            <input type="number" min="1" max="30" value="${tickStartAt}" id="tick-start-input" class="q-count-input" title="Tick starts when this many seconds remain" style="width:38px;font-size:.75rem;padding:3px 6px"/>
+            <span style="font-size:.68rem;color:var(--mid)" title="Tick starts at Ns remaining">s↩</span>
           </div>
         </div>
         <button class="btn btn-accent btn-sm btn-full" id="btn-gen" style="font-size:.8rem;margin-bottom:7px" ${subjects.some(s=>s.files.some(f=>f.selected))?'':'disabled'}>Generate quiz →</button>
@@ -3741,7 +3751,13 @@ function hostHTML(){
             <span id="host-timer-digits" style="font-size:.85rem;font-weight:700;color:${timerLeft<timerTotal*0.25?'var(--bad)':'var(--ink)'};min-width:28px;text-align:right">${Math.min(timerTotal,Math.ceil(timerLeft))}s</span>
           </div>`
         :`<input type="number" min="0" max="300" value="${hostTimerSeconds}" id="timer-sec-live" class="q-count-input" style="width:60px"/>
-           <span class="muted small">sec</span>`}
+           <span class="muted small">sec</span>
+           <button id="btn-tick-mute" title="${tickMuted?'Tick muted':'Tick ON'}"
+             style="padding:3px 8px;font-size:.7rem;font-weight:600;border-radius:var(--r);border:1.5px solid ${tickMuted?'var(--bad)':'var(--line)'};background:${tickMuted?'#fff1f2':'var(--faint)'};color:${tickMuted?'var(--bad)':'var(--mid)'};cursor:pointer;transition:all .15s">
+             ${tickMuted?'🔇':'🔔'}
+           </button>
+           <input type="number" min="1" max="30" value="${tickStartAt}" id="tick-start-input" class="q-count-input" title="Tick starts at Ns remaining" style="width:38px;font-size:.75rem;padding:3px 5px"/>
+           <span class="muted small">s↩</span>`}
     </div>`;
 
   // Question text
@@ -4598,6 +4614,16 @@ function attach(){
 
   // Timer input (live)
   document.getElementById('timer-sec-live')?.addEventListener('change',e=>{ hostTimerSeconds=Math.max(0,parseInt(e.target.value)||0); });
+
+  // 🔔 Tick mute toggle
+  on('btn-tick-mute',()=>{ tickMuted=!tickMuted; render(); });
+
+  // Tick-start input — works for both locations (generate panel + live timer row)
+  document.querySelectorAll('#tick-start-input').forEach(el=>{
+    el.addEventListener('change',e=>{
+      tickStartAt=Math.max(1,Math.min(30,parseInt(e.target.value)||5));
+    });
+  });
 
   // Host open session — re-authenticate if needed, then open
   on('btn-open-session',()=>{
