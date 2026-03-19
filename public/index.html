@@ -668,6 +668,7 @@ let repoLoading=false;
 // Host halt confirmation menu state
 let showingHaltMenu=false;
 let showingHaltBomb=false, haltBombTimer=null; // bomb drop animation before halt menu
+let showingDismissBomb=false, dismissBombTimer=null; // bomb before stop & dismiss fires
 
 // Host settings/shortcuts overlay
 let hostSettingsOpen=false;
@@ -763,7 +764,18 @@ const GITHUB_BRANCH = 'main';
    SOUNDS (Web Audio API)
 ══════════════════════════════════════ */
 let audioCtx=null;
-function getAudio(){ return audioCtx||(audioCtx=new(window.AudioContext||window.webkitAudioContext)()); }
+function getAudio(){
+  if(!audioCtx) audioCtx=new(window.AudioContext||window.webkitAudioContext)();
+  // Resume if suspended (browser blocks audio until first user gesture)
+  if(audioCtx.state==='suspended') audioCtx.resume();
+  return audioCtx;
+}
+// Unlock AudioContext on first any touch/click so sounds work on mobile & after page load
+(function(){
+  const unlock=()=>{ try{ getAudio(); }catch(e){} document.removeEventListener('click',unlock); document.removeEventListener('touchend',unlock); };
+  document.addEventListener('click',unlock,{once:true});
+  document.addEventListener('touchend',unlock,{once:true,passive:true});
+})();
 
 const SOUND_BASE='https://raw.githubusercontent.com/raeist-user/quizzap/main/Utility/Sounds/';
 function playMp3(name){
@@ -808,18 +820,26 @@ function playWrong(){
 /* ── Streak milestone sound — ascending chime ── */
 function playStreakSound(streak){
   try{
-    const a=getAudio(); const t=a.currentTime;
+    const a=getAudio();
+    // Resume suspended context (browser autoplay policy)
+    if(a.state==='suspended') a.resume().then(()=>_doStreakTones(a,streak)).catch(()=>{});
+    else _doStreakTones(a,streak);
+  }catch(e){}
+}
+function _doStreakTones(a,streak){
+  try{
+    const t=a.currentTime;
     const baseFreqs = streak>=10?[784,1047,1319,1568]:streak>=8?[659,880,1047,1319]:streak>=5?[523,659,784,1047]:[440,523,659];
-    const vol = streak>=8 ? .22 : .16;
+    const vol = streak>=8 ? .28 : .22;
     baseFreqs.forEach((f,i)=>{
       const o=a.createOscillator(),g=a.createGain();
       o.connect(g);g.connect(a.destination);
-      o.type='sine'; o.frequency.value=f;
-      const s=t+i*.1;
+      o.type='triangle'; o.frequency.value=f;
+      const s=t+i*.12;
       g.gain.setValueAtTime(0,s);
-      g.gain.linearRampToValueAtTime(vol,s+.04);
-      g.gain.exponentialRampToValueAtTime(.001,s+.32);
-      o.start(s);o.stop(s+.35);
+      g.gain.linearRampToValueAtTime(vol,s+.05);
+      g.gain.exponentialRampToValueAtTime(.001,s+.45);
+      o.start(s);o.stop(s+.5);
     });
   }catch(e){}
 }
@@ -2865,7 +2885,19 @@ function haltBombOverlayHTML(){
     <div style="text-align:center;user-select:none">
       <div id="bomb-emoji" style="font-size:5rem;line-height:1;animation:bombDrop .5s cubic-bezier(.34,1.56,.64,1) both,bombWobble .35s ease-in-out .55s 4 alternate;display:inline-block">💣</div>
       <div id="blast-rings-wrap" style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);pointer-events:none"></div>
-      <div style="margin-top:18px;color:rgba(255,255,255,.7);font-size:.85rem;font-weight:600;letter-spacing:.06em;text-transform:uppercase" id="bomb-label">Halting session…</div>
+      <div style="margin-top:18px;color:rgba(255,255,255,.7);font-size:.85rem;font-weight:600;letter-spacing:.06em;text-transform:uppercase" id="bomb-label">${showingHaltMenu?'Halting session…':'Ending session…'}</div>
+    </div>
+  </div>`;
+}
+
+function dismissBombOverlayHTML(){
+  if(!showingDismissBomb) return '';
+  return `<div id="dismiss-bomb-overlay" style="position:fixed;inset:0;background:rgba(0,0,0,.82);display:flex;align-items:center;justify-content:center;z-index:810;backdrop-filter:blur(4px)">
+    <div style="text-align:center;user-select:none;position:relative">
+      <div id="dismiss-bomb-emoji" style="font-size:6rem;line-height:1;animation:bombDrop .5s cubic-bezier(.34,1.56,.64,1) both,bombWobble .3s ease-in-out .6s 5 alternate;display:inline-block">💣</div>
+      <div id="dismiss-blast-rings-wrap" style="position:absolute;left:50%;top:40%;transform:translate(-50%,-50%);pointer-events:none"></div>
+      <div style="margin-top:20px;color:rgba(255,255,255,.85);font-size:1rem;font-weight:700;letter-spacing:.07em;text-transform:uppercase" id="dismiss-bomb-label">Sending students home…</div>
+      <div style="margin-top:6px;color:rgba(255,255,255,.45);font-size:.72rem">Session shutting down</div>
     </div>
   </div>`;
 }
@@ -3524,6 +3556,7 @@ function hostHTML(){
         const ans=S.answers?.[p.id];
         const ansStr=ans!==undefined&&ans!==null?'ABCD'[ans]:'—';
         const ansTime = S.answerTimes?.[p.id] ?? null;
+        const cumTime = S.cumulativeTimes?.[p.id] ?? null;
         const isCorrect=ans!==undefined&&ans!==null&&ans===S.correct;
         const isWrong=ans!==undefined&&ans!==null&&ans!==S.correct;
         const isFastest = isRevealed && p.id===fastestPid;
@@ -3539,7 +3572,10 @@ function hostHTML(){
             </div>
           </div>
           <div style="font-size:.72rem;font-weight:700;min-width:26px;text-align:center;padding:2px 5px;border-radius:4px;${isCorrect?'background:#dcfce7;color:#16a34a':isWrong?'background:#fee2e2;color:#be123c':ans!==undefined&&ans!==null?'background:var(--faint);color:var(--mid)':'color:var(--mid)'}">${ansStr}</div>
-          ${ansTime!=null?`<div style="font-size:.7rem;color:var(--mid);min-width:40px;text-align:right">${parseFloat(ansTime).toFixed(2)}s</div>`:'<div style="min-width:40px"></div>'}
+          <div style="display:flex;flex-direction:column;align-items:flex-end;min-width:52px;gap:1px">
+            ${ansTime!=null?`<span style="font-size:.7rem;color:var(--mid)">${parseFloat(ansTime).toFixed(2)}s</span>`:'<span style="min-height:14px"></span>'}
+            ${cumTime!=null?`<span style="font-size:.62rem;color:#a0a0ac" title="Cumulative">Σ${parseFloat(cumTime).toFixed(1)}s</span>`:''}
+          </div>
           <div style="font-weight:600;min-width:44px;text-align:right">${p.score||0} <span style="font-size:.68rem;color:var(--mid)">pts</span></div>
         </div>`;
       }).join('')
@@ -3663,6 +3699,7 @@ function hostHTML(){
       ${reportsOverlayHTML()}
       ${hostSettingsOverlayHTML()}
       ${hostFinalLeaderboardHTML()}
+    ${dismissBombOverlayHTML()}
     </div>`;
   }
 
@@ -3810,6 +3847,7 @@ function hostEndedHTML(){
     ${haltBombOverlayHTML()}
     ${haltMenuOverlayHTML()}
     ${hostFinalLeaderboardHTML()}
+    ${dismissBombOverlayHTML()}
   </div>`;
 }
 
@@ -3975,6 +4013,49 @@ function questionViewHTML(){
   const canReport=revealed&&q&&!myReportedQuestions.has(q.text);
   const alreadyReported=revealed&&q&&myReportedQuestions.has(q.text);
   const reportRow=revealed?`<div style="text-align:center;margin-top:14px">${canReport?`<button class="btn btn-ghost btn-sm" id="btn-report-q" style="color:var(--mid);font-size:.73rem;gap:5px;padding:5px 13px;border-color:var(--line)"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>Report wrong answer</button>`:alreadyReported?`<span style="font-size:.72rem;color:var(--good)">✓ Reported — thanks for flagging</span>`:''}</div>`:'';
+
+  // ── Per-question leaderboard (shown after reveal, visible to all students) ──
+  let qLbHTML = '';
+  if(revealed){
+    const allParts = sortParticipants(S.participants||[]);
+    const medals2=['🥇','🥈','🥉'];
+    const qStreakMap = getStreakMap();
+    // Find fastest correct answerer
+    let qFastestPid=null;
+    if(S.correct!==null&&S.correct!==undefined){
+      let bestT=Infinity;
+      Object.entries(S.answerTimes||{}).forEach(([pid,t])=>{
+        if(S.answers?.[pid]===S.correct&&t!=null&&parseFloat(t)<bestT){bestT=parseFloat(t);qFastestPid=pid;}
+      });
+    }
+    const qRows = allParts.map((p,i)=>{
+      const isMe=p.id===myPid;
+      const pAns=S.answers?.[p.id];
+      const pIsCorrect=pAns!==undefined&&pAns!==null&&pAns===S.correct;
+      const pIsWrong=pAns!==undefined&&pAns!==null&&pAns!==S.correct;
+      const pTime=S.answerTimes?.[p.id]??null;
+      const isFastest=p.id===qFastestPid;
+      const pStreak=qStreakMap[p.id]||0;
+      const rowBg=isMe?'#e8f5ee':isFastest?'#fffbeb':'';
+      return `<div style="display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--line);font-size:.82rem${rowBg?';background:'+rowBg:''}">
+        <div style="min-width:24px;text-align:center;font-size:.8rem">${medals2[i]||('#'+(i+1))}</div>
+        <div style="flex:1;min-width:0">
+          <div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:${isMe?'700':'500'}">${esc(p.name)}${isMe?' <span style="font-size:.65rem;color:var(--mid)">← you</span>':''}</div>
+          ${(isFastest||pStreak>=3)?`<div style="display:flex;gap:3px;margin-top:2px">${isFastest?'<span class="ff-badge">⚡ Fastest</span>':''}${streakBadgeHTML(pStreak)}</div>`:''}
+        </div>
+        <div style="font-size:.7rem;font-weight:700;padding:2px 5px;border-radius:4px;${pIsCorrect?'background:#dcfce7;color:#16a34a':pIsWrong?'background:#fee2e2;color:#be123c':pAns!==undefined&&pAns!==null?'background:var(--faint);color:var(--mid)':'color:var(--mid)'}">${pAns!==undefined&&pAns!==null?'ABCD'[pAns]:'—'}</div>
+        ${pTime!=null?`<div style="font-size:.68rem;color:var(--mid);min-width:36px;text-align:right">${parseFloat(pTime).toFixed(2)}s</div>`:'<div style="min-width:36px"></div>'}
+        <div style="font-weight:700;min-width:28px;text-align:right;color:${pIsCorrect?'#16a34a':'var(--ink)'}">${p.score||0}</div>
+      </div>`;
+    }).join('');
+    qLbHTML = `<div style="margin-top:16px;border-radius:var(--r-lg);border:1px solid var(--line);overflow:hidden;background:var(--white)">
+      <div style="padding:8px 12px;background:var(--faint);border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center">
+        <span style="font-size:.78rem;font-weight:700">🏆 Standings</span>
+        <span style="font-size:.7rem;color:var(--mid)">${allParts.length} students</span>
+      </div>
+      ${qRows||'<div style="padding:12px;text-align:center;color:var(--mid)">No data</div>'}
+    </div>`;
+  }
   return `${scoreBannerHTML()}<div class="page">
     <div class="row between mb2">
       <div class="row gap2"><div id="mic-dot" class="mic-dot"></div><span class="small muted">Score: <strong>${S.myScore||0}</strong> pts</span></div>
@@ -3988,6 +4069,7 @@ function questionViewHTML(){
     <div class="opt-grid">${opts}</div>
     ${notice}
     ${reportRow}
+    ${qLbHTML}
   </div>`;
 }
 
@@ -4674,36 +4756,50 @@ function attach(){
   // Stop & Dismiss: server builds authoritative final leaderboard from its own gameScores
   // and sends it to every student inside the kicked message
   on('btn-stop-dismiss',()=>{
+    // 💣 Bomb animation for 2 seconds, then actually shut down
     showingHaltMenu=false;
-    playMp3('stop.mp3');
-    // Capture final leaderboard from server-projected gameScores before state resets
-    const gcores = S.gameScores || [];
-    const parts  = S.participants || [];
-    // Merge: gameScores has cumulative, participants has current-session scores
-    const merged = {};
-    // Start with banked game scores
-    gcores.forEach(g => { merged[g.id] = { name: g.name, score: g.total }; });
-    // Add current session scores for any participant not yet banked
-    parts.forEach(p => {
-      if (merged[p.id]) {
-        // already banked — the server will add current session on shutdown, so add it here too
-        merged[p.id].score += (p.score || 0);
-        merged[p.id].name   = p.name;
-      } else {
-        merged[p.id] = { name: p.name, score: p.score || 0 };
+    showingHaltBomb=true; render();
+
+    // Phase 1 (0–1.2s): bomb drops and wobbles
+    // Phase 2 (1.2s): BOOM! label + blast rings + screen shake
+    // Phase 3 (2.0s): shutdown fires
+    setTimeout(()=>{
+      const lbl=document.getElementById('bomb-label');
+      const bomb=document.getElementById('bomb-emoji');
+      if(lbl) lbl.textContent='💥 BOOM!';
+      if(bomb){ bomb.style.animation='bombGrow .2s ease-in both'; bomb.style.filter='drop-shadow(0 0 24px #f97316)'; }
+      const wrap=document.getElementById('blast-rings-wrap');
+      if(wrap){
+        [[0,'rgba(251,146,60,.6)',70],[60,'rgba(253,186,116,.45)',100],[130,'rgba(254,215,170,.3)',130]].forEach(([delay,col,size])=>{
+          const r=document.createElement('div'); r.className='blast-ring';
+          r.style.cssText=`width:${size}px;height:${size}px;margin-left:-${size/2}px;margin-top:-${size/2}px;background:${col};animation-delay:${delay}ms`;
+          wrap.appendChild(r);
+        });
       }
-    });
-    const finalList = Object.entries(merged)
-      .map(([id,g]) => ({ id, name: g.name, score: g.score }))
-      .sort((a,b) => b.score - a.score);
-    finalList._totalQ = S.pushedCount || 0;
-    hostShutdownLeaderboard = finalList;
-    // 🎊 Confetti for the host too — celebrate the session ending!
-    if(finalList.length && typeof launchConfetti==='function'){
-      setTimeout(()=>launchConfetti({count:160, power:10}), 300);
-    }
-    send({type:'shutdown'});
-    render();
+      const panel=document.querySelector('#main-view>div')||document.body;
+      panel.style.animation='screenShake .3s ease both';
+      setTimeout(()=>{ if(panel) panel.style.animation=''; },320);
+    }, 1200);
+
+    if(haltBombTimer){ clearTimeout(haltBombTimer); }
+    haltBombTimer=setTimeout(()=>{
+      showingHaltBomb=false; haltBombTimer=null;
+      playMp3('stop.mp3');
+      // Capture final leaderboard
+      const gcores = S.gameScores || [];
+      const parts  = S.participants || [];
+      const merged = {};
+      gcores.forEach(g => { merged[g.id] = { name: g.name, score: g.total }; });
+      parts.forEach(p => {
+        if (merged[p.id]) { merged[p.id].score += (p.score || 0); merged[p.id].name = p.name; }
+        else { merged[p.id] = { name: p.name, score: p.score || 0 }; }
+      });
+      const finalList = Object.entries(merged).map(([id,g]) => ({ id, name: g.name, score: g.score })).sort((a,b) => b.score - a.score);
+      finalList._totalQ = S.pushedCount || 0;
+      hostShutdownLeaderboard = finalList;
+      if(finalList.length && typeof launchConfetti==='function') setTimeout(()=>launchConfetti({count:160, power:10}), 200);
+      send({type:'shutdown'}); render();
+    }, 2000);
   });
 
   on('btn-halt-cancel',()=>{
