@@ -655,8 +655,6 @@ let prevMyScore=0, scoreGain=0;
 let questions=[], selIdx=-1, answerKey=-1, inspectPid=null;
 let sidebarQOpen=false, sidebarStudOpen=false, sidebarScoreOpen=false, sidebarSchedOpen=false, showStandingsOverlay=false;
 let hostTimerSeconds=0;
-let tickMuted=false;     // host can mute the tick sound for all students
-let tickStartAt=5;       // host controls when tick starts (seconds remaining)
 let hostRandomize=false; // OFF by default — questions load in file order
 
 // Resource browser
@@ -773,11 +771,10 @@ const GITHUB_BRANCH = 'main';
 let audioCtx=null;
 function getAudio(){
   if(!audioCtx) audioCtx=new(window.AudioContext||window.webkitAudioContext)();
-  // Resume if suspended (browser blocks audio until first user gesture)
   if(audioCtx.state==='suspended') audioCtx.resume();
   return audioCtx;
 }
-// Unlock AudioContext on first any touch/click so sounds work on mobile & after page load
+// Unlock AudioContext on first touch/click so sounds work on mobile
 (function(){
   const unlock=()=>{ try{ getAudio(); }catch(e){} document.removeEventListener('click',unlock); document.removeEventListener('touchend',unlock); };
   document.addEventListener('click',unlock,{once:true});
@@ -823,12 +820,9 @@ function playWrong(){
     o.start();o.stop(a.currentTime+.5);
   }catch(e){}
 }
-
-/* ── Streak milestone sound — ascending chime ── */
 function playStreakSound(streak){
   try{
     const a=getAudio();
-    // Resume suspended context (browser autoplay policy)
     if(a.state==='suspended') a.resume().then(()=>_doStreakTones(a,streak)).catch(()=>{});
     else _doStreakTones(a,streak);
   }catch(e){}
@@ -836,41 +830,18 @@ function playStreakSound(streak){
 function _doStreakTones(a,streak){
   try{
     const t=a.currentTime;
-    const baseFreqs = streak>=10?[784,1047,1319,1568]:streak>=8?[659,880,1047,1319]:streak>=5?[523,659,784,1047]:[440,523,659];
-    const vol = streak>=8 ? .28 : .22;
+    const baseFreqs=streak>=10?[784,1047,1319,1568]:streak>=8?[659,880,1047,1319]:streak>=5?[523,659,784,1047]:[440,523,659];
+    const vol=streak>=8?.28:.22;
     baseFreqs.forEach((f,i)=>{
       const o=a.createOscillator(),g=a.createGain();
       o.connect(g);g.connect(a.destination);
-      o.type='triangle'; o.frequency.value=f;
+      o.type='triangle';o.frequency.value=f;
       const s=t+i*.12;
       g.gain.setValueAtTime(0,s);
       g.gain.linearRampToValueAtTime(vol,s+.05);
       g.gain.exponentialRampToValueAtTime(.001,s+.45);
       o.start(s);o.stop(s+.5);
     });
-  }catch(e){}
-}
-
-/* ── Timer tick sound — called each second when ≤ 5s remain ── */
-let _lastTickSec = -1;
-function playTimerTick(remaining){
-  try{
-    const sec = Math.ceil(remaining);
-    if(sec < 1 || sec === _lastTickSec) return;
-    _lastTickSec = sec;
-    const a = getAudio();
-    const t = a.currentTime;
-    const isLast = sec <= 2;
-    // Pitch rises as we get closer to 0; last 2 secs are louder/higher
-    const freq = isLast ? 1400 : 900 + (5 - sec) * 80;
-    const vol  = isLast ? .28 : .16;
-    const dur  = isLast ? .07 : .055;
-    const o = a.createOscillator(), g = a.createGain();
-    o.connect(g); g.connect(a.destination);
-    o.type = 'square'; o.frequency.value = freq;
-    g.gain.setValueAtTime(vol, t);
-    g.gain.exponentialRampToValueAtTime(.001, t + dur);
-    o.start(t); o.stop(t + dur);
   }catch(e){}
 }
 
@@ -1502,7 +1473,6 @@ function connect(){
               setTimeout(()=>{
                 if(myAns===correct){
                   playCorrect();
-                  // 🔥 Streak milestone sound — fire after streakMap is built from new S
                   setTimeout(()=>{
                     const sm=getStreakMap();
                     const myStreak=myPid?sm[myPid]:0;
@@ -1511,7 +1481,7 @@ function connect(){
                 } else {
                   playWrong();
                 }
-              },200);
+              }, 200);
               if(myAns===correct&&myLastAnswerTime!==null) sessionCorrectTimes.push(myLastAnswerTime);
             }
           }
@@ -1685,7 +1655,6 @@ function startTimerDisplay(){
   if(timerInterval && startTimerDisplay._lastStart===start) return;
   if(timerInterval){clearInterval(timerInterval);timerInterval=null;}
   startTimerDisplay._lastStart=start;
-  _lastTickSec=-1; // reset tick deduplication for each new question
   function tick(){
     const elapsed=Math.max(0,(Date.now()-start)/1000);
     const remaining=Math.max(0, total-elapsed);
@@ -1714,8 +1683,7 @@ function startTimerDisplay(){
       hDig.textContent=displaySecs+'s';
       hDig.style.color=urgent?'var(--bad)':'var(--ink)';
     }
-    // 🔔 Timer tick: only if student hasn't answered, not muted, and within tick window
-    if(remaining>0 && remaining<=tickStartAt && !studentAnswered && !tickMuted) playTimerTick(remaining);
+
     if(remaining<=0){
       clearInterval(timerInterval);timerInterval=null;
       document.querySelectorAll('.opt-card').forEach(c=>c.classList.add('locked'));
@@ -3669,12 +3637,6 @@ function hostHTML(){
             <span style="font-size:.72rem;color:var(--mid)">⏱</span>
             <input type="number" min="0" max="300" value="${hostTimerSeconds}" id="timer-sec-input" class="q-count-input" style="width:46px;font-size:.75rem;padding:3px 6px"/>
             <span style="font-size:.72rem;color:var(--mid)">s</span>
-            <button id="btn-tick-mute" title="${tickMuted?'Tick sound muted — click to unmute':'Tick sound ON — click to mute'}"
-              style="padding:3px 8px;font-size:.7rem;font-weight:600;border-radius:var(--r);border:1.5px solid ${tickMuted?'var(--bad)':'var(--line)'};background:${tickMuted?'#fff1f2':'var(--faint)'};color:${tickMuted?'var(--bad)':'var(--mid)'};cursor:pointer;display:flex;align-items:center;gap:3px;white-space:nowrap;transition:all .15s">
-              ${tickMuted?'🔇':'🔔'}
-            </button>
-            <input type="number" min="1" max="30" value="${tickStartAt}" id="tick-start-input" class="q-count-input" title="Tick starts when this many seconds remain" style="width:38px;font-size:.75rem;padding:3px 6px"/>
-            <span style="font-size:.68rem;color:var(--mid)" title="Tick starts at Ns remaining">s↩</span>
           </div>
         </div>
         <button class="btn btn-accent btn-sm btn-full" id="btn-gen" style="font-size:.8rem;margin-bottom:7px" ${subjects.some(s=>s.files.some(f=>f.selected))?'':'disabled'}>Generate quiz →</button>
@@ -3751,13 +3713,7 @@ function hostHTML(){
             <span id="host-timer-digits" style="font-size:.85rem;font-weight:700;color:${timerLeft<timerTotal*0.25?'var(--bad)':'var(--ink)'};min-width:28px;text-align:right">${Math.min(timerTotal,Math.ceil(timerLeft))}s</span>
           </div>`
         :`<input type="number" min="0" max="300" value="${hostTimerSeconds}" id="timer-sec-live" class="q-count-input" style="width:60px"/>
-           <span class="muted small">sec</span>
-           <button id="btn-tick-mute" title="${tickMuted?'Tick muted':'Tick ON'}"
-             style="padding:3px 8px;font-size:.7rem;font-weight:600;border-radius:var(--r);border:1.5px solid ${tickMuted?'var(--bad)':'var(--line)'};background:${tickMuted?'#fff1f2':'var(--faint)'};color:${tickMuted?'var(--bad)':'var(--mid)'};cursor:pointer;transition:all .15s">
-             ${tickMuted?'🔇':'🔔'}
-           </button>
-           <input type="number" min="1" max="30" value="${tickStartAt}" id="tick-start-input" class="q-count-input" title="Tick starts at Ns remaining" style="width:38px;font-size:.75rem;padding:3px 5px"/>
-           <span class="muted small">s↩</span>`}
+           <span class="muted small">sec</span>`}
     </div>`;
 
   // Question text
@@ -4138,7 +4094,7 @@ function setupProfileCharts(){
 }
 
 function attach(){
-  // Click sounds
+  // Click sounds on interactive elements
   document.querySelectorAll('.btn,.key-card,.auth-tab,.home-tab').forEach(el=>
     el.addEventListener('click',playClick,{capture:true,once:true})
   );
@@ -4614,17 +4570,6 @@ function attach(){
 
   // Timer input (live)
   document.getElementById('timer-sec-live')?.addEventListener('change',e=>{ hostTimerSeconds=Math.max(0,parseInt(e.target.value)||0); });
-
-  // 🔔 Tick mute toggle
-  on('btn-tick-mute',()=>{ tickMuted=!tickMuted; render(); });
-
-  // Tick-start input — works for both locations (generate panel + live timer row)
-  document.querySelectorAll('#tick-start-input').forEach(el=>{
-    el.addEventListener('change',e=>{
-      tickStartAt=Math.max(1,Math.min(30,parseInt(e.target.value)||5));
-    });
-  });
-
   // Host open session — re-authenticate if needed, then open
   on('btn-open-session',()=>{
     if(ws?.readyState===1){
