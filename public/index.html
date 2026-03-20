@@ -3628,6 +3628,7 @@ function hostHTML(){
       ${subjects.length?`
         <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">
           <button class="btn btn-ghost btn-sm" id="btn-browse" style="padding:4px 9px;font-size:.72rem">${repoLoading?'⏳ Loading':'↻ Refresh'}</button>
+          <button class="btn btn-accent btn-sm" id="btn-gen" title="Generate quiz" style="padding:4px 10px;font-size:.72rem;gap:4px" ${subjects.some(s=>s.files.some(f=>f.selected))?'':'disabled'}><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>Quiz</button>
           <div style="display:flex;align-items:center;gap:5px;margin-left:auto">
             <button id="btn-toggle-random" title="${hostRandomize?'Randomise ON — click to turn off':'Randomise OFF — click to turn on'}"
               style="padding:3px 8px;font-size:.7rem;font-weight:600;border-radius:var(--r);border:1.5px solid ${hostRandomize?'var(--accent)':'var(--line)'};background:${hostRandomize?'#eff6ff':'var(--faint)'};color:${hostRandomize?'var(--accent)':'var(--mid)'};cursor:pointer;display:flex;align-items:center;gap:4px;white-space:nowrap;transition:all .15s">
@@ -3639,7 +3640,7 @@ function hostHTML(){
             <span style="font-size:.72rem;color:var(--mid)">s</span>
           </div>
         </div>
-        <button class="btn btn-accent btn-sm btn-full" id="btn-gen" style="font-size:.8rem;margin-bottom:7px" ${subjects.some(s=>s.files.some(f=>f.selected))?'':'disabled'}>Generate quiz →</button>
+
         <div class="folder-grid">
           ${subjects.map(s=>{
             const selCount=s.files.filter(f=>f.selected).length;
