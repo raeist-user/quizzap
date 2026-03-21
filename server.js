@@ -119,8 +119,10 @@ const editorPath = path.join(__dirname, 'public', 'editor.html');
 app.get('/editor', (req, res) => {
   try {
     let html = fs.readFileSync(editorPath, 'utf8');
-    const token = process.env.MY_TOKEN || '';
-    html = html.replace("'%%MY_TOKEN%%'", JSON.stringify(token));
+    const token  = process.env.MY_TOKEN       || '';
+    const hostPw = process.env.HOST_PASSWORD  || '598359';
+    html = html.replace("'%%MY_TOKEN%%'",      JSON.stringify(token));
+    html = html.replace("'%%HOST_PASSWORD%%'", JSON.stringify(hostPw));
     res.setHeader('Content-Type', 'text/html');
     res.send(html);
   } catch(e) { res.status(500).send('Server error loading page'); }
