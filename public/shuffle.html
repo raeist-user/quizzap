@@ -1,0 +1,564 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>Shuffler — Shadab</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    :root{
+      --bg:#f5f4ef;--white:#fff;--ink:#0e0e12;--mid:#6e6e7a;
+      --line:#e2e0da;--faint:#f0efe9;
+      --good:#0e7a5a;--bad:#d92b3a;--good-bg:#d4f5e8;--bad-bg:#fde8ea;
+      --accent:#1a56db;--accent-bg:#eff6ff;
+      --warn:#c47d00;--warn-bg:#fef3d0;
+      --sans:'Plus Jakarta Sans',system-ui,sans-serif;
+      --serif:'Fraunces',Georgia,serif;
+      --r:10px;--r-sm:7px;
+      --sh:0 2px 8px rgba(14,14,18,.08);
+    }
+    @keyframes up{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+    @keyframes in{from{opacity:0}to{opacity:1}}
+    @keyframes spin{to{transform:rotate(360deg)}}
+
+    html,body{height:100%;font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:14px;-webkit-font-smoothing:antialiased}
+
+    /* NAV */
+    nav{display:flex;align-items:center;justify-content:space-between;padding:0 14px;height:52px;background:rgba(255,255,255,.94);backdrop-filter:blur(12px);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:100}
+    .brand{font-family:var(--serif);font-size:1rem;letter-spacing:-.01em;line-height:1.2}
+    .brand small{display:block;font-family:var(--sans);font-size:.55rem;font-weight:700;color:var(--mid);letter-spacing:.1em;text-transform:uppercase}
+    .nav-back{font-size:.75rem;font-weight:600;color:var(--mid);padding:5px 10px;border:1.5px solid var(--line);border-radius:var(--r-sm);background:var(--white);cursor:pointer;text-decoration:none}
+    .nav-back:active{background:var(--faint)}
+
+    /* PAGE */
+    .page{padding:14px 12px 80px;max-width:600px;margin:0 auto}
+
+    /* TEXTAREA */
+    textarea{width:100%;padding:11px 12px;font-family:'Courier New',monospace;font-size:.77rem;line-height:1.72;background:var(--white);color:var(--ink);border:1.5px solid var(--line);border-radius:var(--r);outline:none;resize:vertical;min-height:150px;transition:border-color .14s;-webkit-appearance:none;display:block}
+    textarea:focus{border-color:var(--accent)}
+    textarea.out{background:#0e0e12;color:#e8e6df;border-color:#2a2a35;min-height:130px}
+    textarea::placeholder{color:#c0bfbb}
+
+    /* LABELS */
+    .lrow{display:flex;align-items:center;justify-content:space-between;margin-bottom:5px;margin-top:16px}
+    .lbl{font-size:.63rem;font-weight:700;color:var(--mid);letter-spacing:.09em;text-transform:uppercase}
+
+    /* BUTTONS */
+    .btn{display:inline-flex;align-items:center;justify-content:center;gap:5px;padding:10px 14px;font-family:var(--sans);font-size:.82rem;font-weight:700;border-radius:var(--r-sm);border:none;cursor:pointer;transition:all .14s;-webkit-tap-highlight-color:transparent;white-space:nowrap}
+    .btn:active{transform:scale(.96)}
+    .btn-primary{background:var(--ink);color:#fff}
+    .btn-accent{background:var(--accent);color:#fff}
+    .btn-ghost{background:var(--white);color:var(--mid);border:1.5px solid var(--line)}
+    .btn-good{background:var(--good);color:#fff}
+    .btn-sm{padding:6px 11px;font-size:.74rem}
+    .btn:disabled{opacity:.4;pointer-events:none}
+    .arow{display:flex;gap:7px;margin-top:9px}
+    .arow .btn-primary{flex:1}
+
+    /* FILE UPLOAD */
+    .file-btn{display:flex;align-items:center;justify-content:center;gap:6px;padding:9px 12px;border:1.5px dashed var(--line);border-radius:var(--r-sm);background:var(--white);color:var(--mid);font-size:.77rem;font-weight:600;cursor:pointer;margin-top:8px;-webkit-tap-highlight-color:transparent}
+    .file-btn:active{background:var(--faint)}
+    .file-btn input{display:none}
+
+    /* ─── GITHUB PANEL ─── */
+    .gh-panel{background:var(--white);border:1px solid var(--line);border-radius:var(--r);margin-top:8px;overflow:hidden}
+    .gh-header{display:flex;align-items:center;justify-content:space-between;padding:10px 13px;cursor:pointer;-webkit-tap-highlight-color:transparent;user-select:none}
+    .gh-header:active{background:var(--faint)}
+    .gh-title{display:flex;align-items:center;gap:7px;font-size:.8rem;font-weight:700;color:var(--ink)}
+    .gh-chevron{font-size:.7rem;color:var(--mid);transition:transform .2s;display:inline-block}
+    .gh-chevron.open{transform:rotate(90deg)}
+    .gh-body{border-top:1px solid var(--line);padding:12px 13px;display:flex;flex-direction:column;gap:10px}
+    .gh-body.hidden{display:none}
+
+    /* Subject list */
+    .subj-list{display:flex;flex-direction:column;gap:4px}
+    .subj-row{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:var(--r-sm);border:1.5px solid var(--line);background:var(--faint);cursor:pointer;transition:all .14s;-webkit-tap-highlight-color:transparent}
+    .subj-row:active,.subj-row.active{background:var(--accent-bg);border-color:var(--accent)}
+    .subj-name{font-size:.83rem;font-weight:600;flex:1}
+    .subj-arrow{font-size:.7rem;color:var(--mid)}
+
+    /* File list */
+    .file-list{display:flex;flex-direction:column;gap:4px}
+    .file-row{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:var(--r-sm);border:1.5px solid var(--line);background:var(--faint);cursor:pointer;transition:all .14s;-webkit-tap-highlight-color:transparent}
+    .file-row:active{background:var(--good-bg);border-color:var(--good)}
+    .file-row-name{font-size:.8rem;font-weight:600;flex:1}
+    .file-row-meta{font-size:.65rem;color:var(--mid)}
+
+    /* Back link inside gh panel */
+    .gh-back{font-size:.72rem;font-weight:600;color:var(--accent);cursor:pointer;display:inline-flex;align-items:center;gap:4px;margin-bottom:2px}
+    .gh-back:active{opacity:.7}
+
+    /* Spinner */
+    .spin{width:14px;height:14px;border:2px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite;flex-shrink:0}
+
+    /* STATS */
+    .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--line);border:1px solid var(--line);border-radius:var(--r);overflow:hidden;margin-top:16px;animation:up .3s ease both}
+    .stat{background:var(--white);padding:10px 4px;text-align:center}
+    .stat .v{font-family:var(--serif);font-size:1.3rem;font-weight:700;line-height:1}
+    .stat .k{font-size:.58rem;font-weight:700;color:var(--mid);letter-spacing:.07em;text-transform:uppercase;margin-top:2px}
+
+    /* DISTRIBUTION */
+    .dist{background:var(--white);border:1px solid var(--line);border-radius:var(--r);padding:12px 13px;margin-top:12px;animation:up .3s .05s ease both}
+    .dist-title{font-size:.62rem;font-weight:800;color:var(--mid);letter-spacing:.09em;text-transform:uppercase;margin-bottom:10px}
+    .dist-rows{display:flex;flex-direction:column;gap:7px}
+    .dist-row{display:flex;align-items:center;gap:8px}
+    .dist-lbl{font-size:.75rem;font-weight:800;color:var(--ink);min-width:14px;text-align:center}
+    .dist-bar-wrap{flex:1;height:18px;background:var(--faint);border-radius:20px;overflow:hidden}
+    .dist-bar{height:100%;border-radius:20px;transition:width .45s cubic-bezier(.34,1.2,.64,1);min-width:0}
+    .bar-a{background:#3b82f6}.bar-b{background:#f59e0b}.bar-c{background:#10b981}.bar-d{background:#f43f5e}
+    .dist-meta{display:flex;align-items:center;gap:5px;min-width:54px;justify-content:flex-end}
+    .dist-count{font-size:.76rem;font-weight:700;color:var(--ink)}
+    .dist-pct{font-size:.67rem;font-weight:600;color:var(--mid)}
+    .dist-warn{font-size:.67rem;color:var(--warn);font-weight:600;margin-top:7px;padding:5px 8px;background:var(--warn-bg);border-radius:var(--r-sm);display:none}
+    .dist-warn.show{display:block}
+
+    /* CARDS */
+    .cards{display:flex;flex-direction:column;gap:9px;margin-top:16px}
+    .card{background:var(--white);border:1px solid var(--line);border-radius:var(--r);overflow:hidden;animation:up .26s ease both;box-shadow:var(--sh)}
+    .card-head{padding:11px 12px 9px;border-bottom:1px solid var(--faint)}
+    .q-row{display:flex;align-items:flex-start;gap:7px}
+    .q-num{font-size:.6rem;font-weight:800;color:var(--mid);letter-spacing:.06em;text-transform:uppercase;flex-shrink:0;padding-top:2px;min-width:22px}
+    .q-txt{font-size:.85rem;font-weight:600;line-height:1.5;flex:1}
+    .card-body{padding:9px 12px}
+    .opts{display:flex;flex-direction:column;gap:5px}
+    .opt{display:flex;align-items:flex-start;gap:7px;padding:7px 9px;border-radius:var(--r-sm);border:1.5px solid var(--line);background:var(--faint);font-size:.81rem;line-height:1.45}
+    .opt.correct{border-color:var(--good);background:var(--good-bg);font-weight:600}
+    .opt-lbl{font-size:.63rem;font-weight:800;color:var(--mid);text-transform:uppercase;flex-shrink:0;padding-top:1px;min-width:13px}
+    .opt.correct .opt-lbl{color:var(--good)}
+    .card-foot{display:flex;align-items:center;justify-content:space-between;padding:7px 12px;border-top:1px solid var(--faint);background:var(--faint)}
+    .pill{display:inline-flex;align-items:center;gap:3px;font-size:.62rem;font-weight:700;padding:2px 7px;border-radius:20px}
+    .p-good{background:var(--good-bg);color:var(--good)}
+    .p-warn{background:var(--warn-bg);color:var(--warn)}
+    .p-faint{background:var(--line);color:var(--mid)}
+
+    /* ERROR / NOTICE */
+    .err{background:var(--bad-bg);border:1px solid #f5b8bc;border-radius:var(--r-sm);padding:9px 11px;font-size:.77rem;color:var(--bad);margin-top:7px;animation:in .2s ease both;white-space:pre-line}
+    .notice{padding:9px 11px;border-radius:var(--r-sm);font-size:.77rem;line-height:1.45;border-left:3px solid currentColor;margin-top:4px}
+    .n-neutral{background:var(--faint);color:var(--ink);border-color:var(--line)}
+    .n-good{background:var(--good-bg);color:var(--good);border-color:var(--good)}
+    .n-bad{background:var(--bad-bg);color:var(--bad);border-color:var(--bad)}
+
+    /* SECTION */
+    .sec{display:flex;align-items:center;margin-top:20px;margin-bottom:7px;gap:9px}
+    .sec-lbl{font-size:.63rem;font-weight:800;color:var(--mid);letter-spacing:.1em;text-transform:uppercase;flex-shrink:0}
+    .sec-line{flex:1;height:1px;background:var(--line)}
+
+    /* TOAST */
+    .toast-wrap{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);z-index:999;pointer-events:none;display:flex;flex-direction:column;align-items:center;gap:5px}
+    .toast{padding:8px 15px;background:var(--ink);color:#fff;border-radius:var(--r);font-size:.78rem;font-weight:600;box-shadow:var(--sh);animation:up .2s ease both;white-space:nowrap}
+    .toast.good{background:var(--good)}
+    .toast.warn{background:var(--warn)}
+    .toast.out{opacity:0;transition:opacity .3s}
+  </style>
+</head>
+<body>
+
+<nav>
+  <div class="brand">Shadab Coaching Centre<small>Shuffler</small></div>
+  <a class="nav-back" href="index.html">← Back</a>
+</nav>
+
+<div id="toast-wrap" class="toast-wrap"></div>
+
+<div class="page">
+
+  <!-- ── PASTE INPUT ── -->
+  <div class="lrow">
+    <span class="lbl">Questions</span>
+    <span class="lbl" id="char-lbl">0 chars</span>
+  </div>
+  <textarea id="raw" placeholder="What is the speed of light?
+(A) 300,000 km/s @, (B) 150,000 km/s, (C) 1000 km/s, (D) 3000 km/s
+
+Who wrote Hamlet?
+(A) Keats, (B) Dickens, (C) Shakespeare @, (D) Chaucer"></textarea>
+
+  <!-- ── FILE UPLOAD ── -->
+  <label class="file-btn">
+    📄 Upload .txt file
+    <input type="file" id="file-in" accept=".txt" onchange="loadFile(this)"/>
+  </label>
+
+  <!-- ── GITHUB PANEL ── -->
+  <div class="gh-panel">
+    <div class="gh-header" onclick="toggleGhPanel()">
+      <span class="gh-title">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.3 3.44 9.8 8.2 11.37.6.11.82-.26.82-.58v-2.03c-3.34.73-4.04-1.61-4.04-1.61-.55-1.39-1.34-1.76-1.34-1.76-1.09-.74.08-.73.08-.73 1.2.08 1.84 1.24 1.84 1.24 1.07 1.83 2.8 1.3 3.49 1 .11-.78.42-1.3.76-1.6-2.67-.3-5.47-1.33-5.47-5.93 0-1.31.47-2.38 1.24-3.22-.13-.3-.54-1.52.12-3.18 0 0 1.01-.32 3.3 1.23a11.5 11.5 0 0 1 3-.4c1.02 0 2.04.13 3 .4 2.28-1.55 3.29-1.23 3.29-1.23.66 1.66.25 2.88.12 3.18.77.84 1.24 1.91 1.24 3.22 0 4.61-2.81 5.63-5.48 5.92.43.37.81 1.1.81 2.22v3.29c0 .32.22.7.83.58C20.57 21.8 24 17.3 24 12c0-6.63-5.37-12-12-12z"/></svg>
+        Load from GitHub
+      </span>
+      <span class="gh-chevron" id="gh-chevron">▶</span>
+    </div>
+    <div class="gh-body hidden" id="gh-body">
+
+      <!-- Step: browse subjects -->
+      <div id="gh-step-subjects" style="display:none">
+        <div id="gh-subj-msg"></div>
+        <div class="subj-list" id="gh-subj-list"></div>
+      </div>
+
+      <!-- Step: browse files -->
+      <div id="gh-step-files" style="display:none">
+        <span class="gh-back" onclick="ghBackToSubjects()">← Subjects</span>
+        <div class="lbl" style="margin:6px 0 6px" id="gh-folder-name"></div>
+        <div id="gh-files-msg"></div>
+        <div class="file-list" id="gh-file-list"></div>
+      </div>
+
+      <!-- Browse button -->
+      <button class="btn btn-accent btn-sm" id="gh-browse-btn" onclick="ghBrowse()" style="align-self:flex-start">Browse Repository</button>
+
+    </div>
+  </div>
+
+  <!-- ── ACTIONS ── -->
+  <div class="arow">
+    <button class="btn btn-primary" onclick="doShuffle()">🔀 Shuffle Options</button>
+    <button class="btn btn-ghost btn-sm" onclick="doClear()">✕</button>
+  </div>
+
+  <div id="err" class="err" style="display:none"></div>
+
+  <!-- ── STATS ── -->
+  <div class="stats" id="stats" style="display:none">
+    <div class="stat"><div class="v" id="s-q">0</div><div class="k">Questions</div></div>
+    <div class="stat"><div class="v" id="s-m">0</div><div class="k">Ans. Moved</div></div>
+    <div class="stat"><div class="v" id="s-r">0</div><div class="k">Reshuffles</div></div>
+  </div>
+
+  <!-- ── DISTRIBUTION ── -->
+  <div class="dist" id="dist" style="display:none">
+    <div class="dist-title">Answer Distribution</div>
+    <div class="dist-rows" id="dist-rows"></div>
+    <div class="dist-warn" id="dist-warn">⚠ Uneven — one option dominates (&gt;50% of answers).</div>
+  </div>
+
+  <!-- ── CARDS ── -->
+  <div class="cards" id="cards"></div>
+
+  <!-- ── OUTPUT ── -->
+  <div id="out-sec" style="display:none">
+    <div class="sec"><span class="sec-lbl">Output</span><div class="sec-line"></div></div>
+    <textarea class="out" id="out" readonly></textarea>
+    <div class="arow" style="margin-top:7px">
+      <button class="btn btn-good btn-sm" onclick="doCopy()">⎘ Copy</button>
+      <button class="btn btn-ghost btn-sm" onclick="doDownload()">↓ .txt</button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+/* ══════════════════════════════════════
+   GITHUB CONFIG  — same as index.html
+══════════════════════════════════════ */
+const MY_TOKEN      = '%%MY_TOKEN%%';
+const GITHUB_REPO   = 'raeist-user/quizzap';
+const GITHUB_BRANCH = 'main';
+
+function isValidToken(){ return MY_TOKEN && !MY_TOKEN.startsWith('%%') && MY_TOKEN.length > 0; }
+// GET — no Content-Type (avoids CORS preflight GitHub rejects)
+function ghReadHeaders(){
+  const h = {'Accept':'application/vnd.github+json'};
+  if(isValidToken()) h['Authorization'] = 'Bearer ' + MY_TOKEN;
+  return h;
+}
+
+/* ══════════════════════════════════════
+   GITHUB PANEL UI
+══════════════════════════════════════ */
+let ghOpen = false;
+let ghSubjects = [];
+let ghCurrentSubj = null;
+
+function toggleGhPanel(){
+  ghOpen = !ghOpen;
+  document.getElementById('gh-body').classList.toggle('hidden', !ghOpen);
+  document.getElementById('gh-chevron').classList.toggle('open', ghOpen);
+}
+
+/* Browse: list subject folders */
+async function ghBrowse(){
+  setGhSubjMsg('<div class="notice n-neutral"><span class="spin" style="display:inline-block;vertical-align:middle;margin-right:6px"></span>Loading subjects…</div>');
+  document.getElementById('gh-step-subjects').style.display = '';
+  document.getElementById('gh-step-files').style.display = 'none';
+  document.getElementById('gh-browse-btn').style.display = 'none';
+  try{
+    const res = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/contents/resources?ref=${GITHUB_BRANCH}`, {headers:ghReadHeaders()});
+    if(!res.ok) throw new Error(`GitHub API ${res.status} — check token and repo.`);
+    const items = await res.json();
+    const dirs = items.filter(i => i.type === 'dir');
+    if(!dirs.length) throw new Error('No subject folders found inside "resources".');
+    ghSubjects = dirs.map(d => ({name:d.name, path:d.path}));
+    setGhSubjMsg('');
+    renderSubjects();
+  }catch(e){
+    setGhSubjMsg(`<div class="notice n-bad">${esc(e.message)}</div>`);
+    document.getElementById('gh-browse-btn').style.display = '';
+  }
+}
+
+function renderSubjects(){
+  document.getElementById('gh-subj-list').innerHTML = ghSubjects.map(s =>
+    `<div class="subj-row" onclick="ghSelectSubject('${esc(s.name)}')">
+      <span class="subj-name">📁 ${esc(s.name)}</span>
+      <span class="subj-arrow">›</span>
+    </div>`
+  ).join('');
+}
+
+/* Select subject → list .txt files */
+async function ghSelectSubject(name){
+  ghCurrentSubj = ghSubjects.find(s => s.name === name);
+  if(!ghCurrentSubj) return;
+  document.getElementById('gh-step-subjects').style.display = 'none';
+  document.getElementById('gh-step-files').style.display = '';
+  document.getElementById('gh-folder-name').textContent = name;
+  setGhFilesMsg('<div class="notice n-neutral"><span class="spin" style="display:inline-block;vertical-align:middle;margin-right:6px"></span>Loading files…</div>');
+  document.getElementById('gh-file-list').innerHTML = '';
+  try{
+    const encodedPath = ghCurrentSubj.path.split('/').map(encodeURIComponent).join('/');
+    const res = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/contents/${encodedPath}?ref=${GITHUB_BRANCH}`, {headers:ghReadHeaders()});
+    if(!res.ok) throw new Error(`GitHub API ${res.status}`);
+    const items = await res.json();
+    const files = items.filter(i => i.type==='file' && i.name.endsWith('.txt') && i.name!=='.gitkeep');
+    if(!files.length){ setGhFilesMsg('<div class="notice n-neutral">No .txt files in this folder.</div>'); return; }
+    setGhFilesMsg('');
+    document.getElementById('gh-file-list').innerHTML = files.map(f =>
+      `<div class="file-row" onclick="ghLoadFile('${esc(f.path)}','${esc(f.name)}')">
+        <span class="file-row-name">📄 ${esc(f.name.replace(/\.txt$/i,''))}</span>
+        <span class="file-row-meta">.txt</span>
+      </div>`
+    ).join('');
+  }catch(e){
+    setGhFilesMsg(`<div class="notice n-bad">${esc(e.message)}</div>`);
+  }
+}
+
+function ghBackToSubjects(){
+  document.getElementById('gh-step-files').style.display = 'none';
+  document.getElementById('gh-step-subjects').style.display = '';
+}
+
+/* Fetch file content — base64 decode, then parse & shuffle */
+async function ghLoadFile(filePath, fileName){
+  setGhFilesMsg(`<div class="notice n-neutral"><span class="spin" style="display:inline-block;vertical-align:middle;margin-right:6px"></span>Loading ${esc(fileName)}…</div>`);
+  try{
+    const encodedPath = filePath.split('/').map(encodeURIComponent).join('/');
+    const apiUrl = `https://api.github.com/repos/${GITHUB_REPO}/contents/${encodedPath}?ref=${GITHUB_BRANCH}`;
+    const res = await fetch(apiUrl, {headers:ghReadHeaders()});
+    if(!res.ok) throw new Error(`Could not fetch ${fileName} (HTTP ${res.status})`);
+    const data = await res.json();
+    // Decode base64 — handles UTF-8, Hindi, Urdu etc. (same as index.html)
+    const bytes = Uint8Array.from(atob(data.content.replace(/\n/g,'')), c => c.charCodeAt(0));
+    const text = new TextDecoder('utf-8').decode(bytes);
+    // Load into textarea
+    document.getElementById('raw').value = text;
+    updateChars();
+    setGhFilesMsg(`<div class="notice n-good">✓ Loaded ${esc(fileName)}</div>`);
+    toast(`Loaded ${fileName}`, 'good');
+    // Auto-shuffle
+    doShuffle();
+    // Collapse panel after load
+    setTimeout(()=>{ toggleGhPanel(); }, 400);
+  }catch(e){
+    setGhFilesMsg(`<div class="notice n-bad">${esc(e.message)}</div>`);
+  }
+}
+
+function setGhSubjMsg(html){ document.getElementById('gh-subj-msg').innerHTML = html; }
+function setGhFilesMsg(html){ document.getElementById('gh-files-msg').innerHTML = html; }
+
+/* ══════════════════════════════════════
+   PARSER — exact format from index.html
+══════════════════════════════════════ */
+function parseQuestions(text){
+  const out=[],lines=text.split('\n').map(l=>l.trim()).filter(Boolean);
+  for(let i=0;i<lines.length;i++){
+    const qLine=lines[i],oLine=lines[i+1]||'';
+    const m=oLine.match(/\(A\)([^,(]+)[,，]\s*\(B\)([^,(]+)[,，]\s*\(C\)([^,(]+)[,，]\s*\(D\)([^,(]+)/i);
+    if(m){
+      const rawOpts=[m[1],m[2],m[3],m[4]];
+      let preCorrect=-1;
+      const cleanOpts=rawOpts.map((o,idx)=>{
+        if(o.includes('@')){ preCorrect=idx; return o.replace(/@/g,'').trim(); }
+        return o.trim();
+      });
+      const entry={text:qLine.replace(/^\d+[.)]\s*/,'').trim(),options:cleanOpts};
+      if(preCorrect>=0) entry.correct=preCorrect;
+      out.push(entry);
+      i++;
+    }
+  }
+  return out;
+}
+
+const LABELS=['A','B','C','D'];
+let questions=[];
+let reshuffles=0;
+
+function initState(parsed){
+  questions=parsed.map(p=>({
+    text:p.text,
+    options:[...p.options],
+    correctIndex:p.correct??-1,
+    origCorrect:p.correct??-1
+  }));
+}
+
+/* ── SHUFFLE ── */
+function fisher(a){ for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];} return a; }
+function shuffleOne(q){
+  const ct=q.correctIndex>=0?q.options[q.correctIndex]:null;
+  q.options=fisher([...q.options]);
+  q.correctIndex=ct!=null?q.options.indexOf(ct):-1;
+}
+
+function doShuffle(){
+  const raw=document.getElementById('raw').value.trim();
+  if(!raw){ showErr('Paste or load questions first.'); return; }
+  hideErr();
+  const parsed=parseQuestions(raw);
+  if(!parsed.length){
+    showErr('No questions found.\n\nExpected format:\nQuestion text?\n(A) opt @, (B) opt, (C) opt, (D) opt\n\n@ marks the correct answer.');
+    return;
+  }
+  initState(parsed);
+  questions.forEach(q=>shuffleOne(q));
+  reshuffles++;
+  render();
+}
+
+function reshuffleOne(idx){
+  shuffleOne(questions[idx]);
+  reshuffles++;
+  render();
+}
+
+/* ── RENDER ── */
+function render(){
+  const moved=questions.filter(q=>q.correctIndex!==q.origCorrect&&q.correctIndex>=0).length;
+  document.getElementById('s-q').textContent=questions.length;
+  document.getElementById('s-m').textContent=moved;
+  document.getElementById('s-r').textContent=reshuffles;
+  document.getElementById('stats').style.display='';
+
+  document.getElementById('cards').innerHTML=questions.map((q,qi)=>{
+    const hasAns=q.correctIndex>=0;
+    const newL=hasAns?LABELS[q.correctIndex]:'?';
+    const origL=q.origCorrect>=0?LABELS[q.origCorrect]:'?';
+    const hasMoved=hasAns&&q.correctIndex!==q.origCorrect;
+    const opts=q.options.map((o,oi)=>{
+      const cor=oi===q.correctIndex;
+      return `<div class="opt${cor?' correct':''}"><span class="opt-lbl">${LABELS[oi]}</span><span>${esc(o)}</span></div>`;
+    }).join('');
+    const movePill=hasAns?(hasMoved?`<span class="pill p-warn">${origL}→${newL}</span>`:`<span class="pill p-faint">${newL} same</span>`):'';
+    return `<div class="card" style="animation-delay:${qi*22}ms">
+      <div class="card-head"><div class="q-row">
+        <span class="q-num">Q${qi+1}</span>
+        <span class="q-txt">${esc(q.text)}</span>
+      </div></div>
+      <div class="card-body"><div class="opts">${opts}</div></div>
+      <div class="card-foot">
+        ${hasAns?`<span class="pill p-good">✓ ${newL}</span>`:`<span class="pill p-faint">No key</span>`}
+        <div style="display:flex;align-items:center;gap:5px">
+          ${movePill}
+          <button class="btn btn-ghost btn-sm" onclick="reshuffleOne(${qi})">↺</button>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+
+  renderDist();
+  renderOutput();
+  document.getElementById('out-sec').style.display='';
+}
+
+/* ── DISTRIBUTION ── */
+function renderDist(){
+  const counts=[0,0,0,0];
+  let withKey=0;
+  questions.forEach(q=>{ if(q.correctIndex>=0&&q.correctIndex<4){ counts[q.correctIndex]++; withKey++; } });
+  if(!withKey){ document.getElementById('dist').style.display='none'; return; }
+  document.getElementById('dist').style.display='';
+  const max=Math.max(...counts,1);
+  const barCls=['bar-a','bar-b','bar-c','bar-d'];
+  document.getElementById('dist-rows').innerHTML=LABELS.map((lbl,i)=>{
+    const c=counts[i], pct=Math.round(c/withKey*100), barW=Math.round(c/max*100);
+    return `<div class="dist-row">
+      <span class="dist-lbl">${lbl}</span>
+      <div class="dist-bar-wrap"><div class="dist-bar ${barCls[i]}" style="width:${barW}%"></div></div>
+      <div class="dist-meta"><span class="dist-count">${c}</span><span class="dist-pct">${pct}%</span></div>
+    </div>`;
+  }).join('');
+  const dominated=counts.some(c=>c/withKey>0.5);
+  document.getElementById('dist-warn').classList.toggle('show', dominated&&withKey>3);
+}
+
+/* ── OUTPUT ── */
+function renderOutput(){
+  const lines=questions.map(q=>{
+    const opts=q.options.map((o,i)=>`(${LABELS[i]}) ${o}${i===q.correctIndex?' @':''}`).join(', ');
+    return `${q.text}\n${opts}`;
+  });
+  document.getElementById('out').value=lines.join('\n\n');
+}
+
+/* ── FILE UPLOAD ── */
+function loadFile(input){
+  const file=input.files[0];
+  if(!file) return;
+  if(!file.name.endsWith('.txt')){ toast('Need a .txt file','warn'); return; }
+  const r=new FileReader();
+  r.onload=e=>{ document.getElementById('raw').value=e.target.result; updateChars(); doShuffle(); };
+  r.readAsText(file);
+  input.value='';
+}
+
+/* ── COPY / DOWNLOAD ── */
+function doCopy(){
+  const t=document.getElementById('out').value;
+  if(!t){ toast('Nothing yet','warn'); return; }
+  navigator.clipboard.writeText(t).then(()=>toast('Copied ✓','good'));
+}
+function doDownload(){
+  const t=document.getElementById('out').value;
+  if(!t){ toast('Nothing yet','warn'); return; }
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([t],{type:'text/plain'}));
+  a.download='shuffled.txt';
+  a.click();
+  toast('Downloaded ↓','good');
+}
+
+/* ── CLEAR ── */
+function doClear(){
+  document.getElementById('raw').value='';
+  document.getElementById('char-lbl').textContent='0 chars';
+  questions=[];reshuffles=0;
+  document.getElementById('cards').innerHTML='';
+  document.getElementById('stats').style.display='none';
+  document.getElementById('dist').style.display='none';
+  document.getElementById('out-sec').style.display='none';
+  hideErr();
+}
+
+/* ── HELPERS ── */
+document.getElementById('raw').addEventListener('input',updateChars);
+function updateChars(){ document.getElementById('char-lbl').textContent=document.getElementById('raw').value.length.toLocaleString()+' chars'; }
+function showErr(msg){ const e=document.getElementById('err'); e.textContent='⚠ '+msg; e.style.display=''; }
+function hideErr(){ document.getElementById('err').style.display='none'; }
+function esc(s){ return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function toast(msg,type=''){
+  const w=document.getElementById('toast-wrap');
+  const el=document.createElement('div');
+  el.className='toast'+(type?' '+type:'');
+  el.textContent=msg;
+  w.appendChild(el);
+  setTimeout(()=>{ el.classList.add('out'); setTimeout(()=>el.remove(),320); },2200);
+}
+</script>
+</body>
+</html>
