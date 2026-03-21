@@ -3521,7 +3521,7 @@ function hostHTML(){
         ?`<button class="btn btn-sm" style="flex:1;justify-content:center;background:#f0fdf4;color:#15803d;border-color:#bbf7d0;gap:5px;font-weight:600" id="btn-open-session">${iconPlay} Start</button>`
         :`<button class="btn btn-sm" style="flex:1;justify-content:center;background:#dcfce7;color:#15803d;border-color:#86efac;gap:5px;opacity:.6;cursor:default" disabled>${iconPlay} Open ✓</button>`}
       <button class="btn btn-sm" style="flex:1;justify-content:center;background:#fff1f2;color:#be123c;border-color:#fecdd3;gap:5px" id="btn-halt">${iconStop} Halt</button>
-      <button class="btn btn-sm" style="flex:1;justify-content:center;background:#f5f3ff;color:#6d28d9;border-color:#ddd6fe;gap:5px" onclick="location.href='/shuffle'">✏️ Editor</button>
+      <button class="btn btn-sm" style="flex:1;justify-content:center;background:#f5f3ff;color:#6d28d9;border-color:#ddd6fe;gap:5px" onclick="location.href='/editor'">✏️ Editor</button>
     </div>
     ${sessionBanner}`;
 
@@ -4345,50 +4345,12 @@ function attach(){
   // Resource browser / upload panel
   on('btn-browse', browseRepo);
 
-  // Folder cards — single tap = chapter overlay, long press (400ms) = manage overlay
+  // Folder cards — single tap = chapter overlay only (editing moved to /editor page)
   document.querySelectorAll('.folder-card[data-folder-name]').forEach(el=>{
     const name=el.dataset.folderName;
-    let pressTimer=null, didLongPress=false;
-
-    // Single tap: natural click opens chapter overlay
-    el.addEventListener('click', ()=>{ if(!didLongPress) openFolderOverlay(name); });
-
-    // 1.2s hold opens manage overlay — does NOT interfere with click
-    let pressStartX=0, pressStartY=0;
-    el.addEventListener('pointerdown', e=>{
-      didLongPress=false;
-      pressStartX=e.clientX; pressStartY=e.clientY;
-      pressTimer=setTimeout(()=>{
-        didLongPress=true;
-        navigator.vibrate&&navigator.vibrate(40);
-        el.style.transform='scale(.93)';
-        setTimeout(()=>{ el.style.transform=''; },150);
-        folderManageSubject=name; manageFolder=name;
-        manageEditMode=null; manageFile=null; manageFolderFiles=[]; editingContent=''; editingSha=null; uploadMsg='';
-        loadFolderFiles(name);
-        render();
-      }, 1200);
-    });
-    el.addEventListener('pointerup',     ()=>{ clearTimeout(pressTimer); pressTimer=null; setTimeout(()=>{ didLongPress=false; },50); });
-    el.addEventListener('pointercancel', ()=>{ clearTimeout(pressTimer); pressTimer=null; didLongPress=false; });
-    el.addEventListener('pointermove', e=>{
-      const dx=e.clientX-pressStartX, dy=e.clientY-pressStartY;
-      if(dx*dx+dy*dy>100){ clearTimeout(pressTimer); pressTimer=null; }
-    });
-
-    // Keyboard: Enter/Space = open selection, Shift+Enter = manage
+    el.addEventListener('click', ()=>{ openFolderOverlay(name); });
     el.addEventListener('keydown', e=>{
-      if(e.key==='Enter'||e.key===' '){
-        e.preventDefault();
-        if(e.shiftKey){
-          folderManageSubject=name; manageFolder=name;
-          manageEditMode=null; manageFile=null; manageFolderFiles=[]; editingContent=''; editingSha=null; uploadMsg='';
-          loadFolderFiles(name); render();
-        } else {
-          openFolderOverlay(name);
-        }
-        return;
-      }
+      if(e.key==='Enter'||e.key===' '){ e.preventDefault(); openFolderOverlay(name); return; }
       const all=[...document.querySelectorAll('.folder-card[data-folder-name]')];
       const i=all.indexOf(el);
       if(e.key==='ArrowRight'||e.key==='ArrowDown'){ e.preventDefault(); all[(i+1)%all.length]?.focus(); }
@@ -4408,59 +4370,7 @@ function attach(){
     browseRepo();
   });
 
-  // Manage overlay — close
-  on('btn-manage-close', ()=>{ folderManageSubject=null; manageFolder=null; manageEditMode=null; manageFile=null; manageFolderFiles=[]; editingContent=''; editingSha=null; uploadMsg=''; editorFullscreen=false; render(); });
-  document.getElementById('manage-overlay-backdrop')?.addEventListener('click', e=>{
-    if(e.target.id==='manage-overlay-backdrop'){ folderManageSubject=null; manageFolder=null; manageEditMode=null; manageFile=null; manageFolderFiles=[]; editingContent=''; editingSha=null; uploadMsg=''; editorFullscreen=false; render(); }
-  });
-
-  // Manage overlay — file edit button
-  document.querySelectorAll('[data-file-edit]').forEach(el=>{
-    el.addEventListener('click', ()=>{
-      const fn=el.dataset.fileEdit;
-      manageEditMode='existing'; manageNewFileName='';
-      openFolderEdit(manageFolder, fn);
-    });
-  });
-
-  // Manage overlay — file delete button
-  document.querySelectorAll('[data-file-del]').forEach(el=>{
-    el.addEventListener('click', ()=>{
-      const fn=el.dataset.fileDel;
-      if(!confirm(`Delete "${fn}" from ${manageFolder}?\nThis cannot be undone.`)) return;
-      deleteFile(manageFolder, fn);
-    });
-  });
-
-  // Manage overlay — create new file
-  on('btn-create-file', ()=>{
-    const inp=document.getElementById('new-file-name');
-    let n=inp?inp.value.trim():'';
-    if(!n){setUploadMsg('Enter a file name first','bad');return;}
-    if(!n.endsWith('.txt')) n+='.txt';
-    manageEditMode='new'; manageFile=n; manageNewFileName=n; editingContent=''; editingSha=null;
-    setUploadMsg('',''); render();
-    setTimeout(()=>document.getElementById('q-editor')?.focus(),50);
-  });
-
-  // Editor fullscreen toggle
-  on('btn-editor-fullscreen', ()=>{
-    const ta=document.getElementById('q-editor');
-    if(ta) editingContent=ta.value;
-    editorFullscreen=!editorFullscreen;
-    render();
-    setTimeout(()=>{ const t=document.getElementById('q-editor'); if(t){ t.value=editingContent; t.focus(); t.setSelectionRange(t.value.length,t.value.length); } },30);
-  });
-
-  on('btn-delete-folder', async ()=>{
-    if(!manageFolder) return;
-    if(!confirm(`Delete folder "${manageFolder}" and all its contents?`)) return;
-    await deleteFolder(manageFolder);
-    folderManageSubject=null; render();
-  });
-  on('btn-save-editor', saveEditorContent);
-  on('btn-close-editor', ()=>{ manageEditMode=null; manageFile=null; manageNewFileName=''; editingContent=''; editingSha=null; uploadMsg=''; editorFullscreen=false; render(); });
-  document.getElementById('file-upload-inp')?.addEventListener('change', uploadQuestionsFile);
+  // Editing has moved to /editor page — no manage overlay bindings needed here
 
   // Host settings overlay
   on('btn-host-settings', ()=>{ hostSettingsOpen=true; render(); setTimeout(()=>document.getElementById('btn-settings-close')?.focus(),50); });

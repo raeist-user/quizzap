@@ -1,0 +1,910 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>Editor — Shadab</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    :root{
+      --bg:#f5f4ef;--white:#fff;--ink:#0e0e12;--mid:#6e6e7a;
+      --line:#e2e0da;--faint:#f0efe9;
+      --good:#0e7a5a;--bad:#d92b3a;--good-bg:#d4f5e8;--bad-bg:#fde8ea;
+      --accent:#1a56db;--accent-bg:#eff6ff;
+      --warn:#c47d00;--warn-bg:#fef3d0;
+      --sans:'Plus Jakarta Sans',system-ui,sans-serif;
+      --serif:'Fraunces',Georgia,serif;
+      --r:10px;--r-sm:7px;--r-lg:16px;
+      --sh:0 2px 8px rgba(14,14,18,.08);
+      --t-fast:140ms cubic-bezier(.4,0,.2,1);
+      --t-spring:320ms cubic-bezier(.34,1.56,.64,1);
+    }
+    @keyframes up{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+    @keyframes fadeIn{from{opacity:0}to{opacity:1}}
+    @keyframes slideUp{from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:translateY(0)}}
+    @keyframes spin{to{transform:rotate(360deg)}}
+
+    html,body{height:100%;font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:14px;-webkit-font-smoothing:antialiased}
+
+    /* ── NAV ── */
+    nav{display:flex;align-items:center;justify-content:space-between;padding:0 14px;height:52px;background:rgba(255,255,255,.94);backdrop-filter:blur(12px);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:100}
+    .brand{font-family:var(--serif);font-size:1rem;letter-spacing:-.01em;line-height:1.2}
+    .brand small{display:block;font-family:var(--sans);font-size:.55rem;font-weight:700;color:var(--mid);letter-spacing:.1em;text-transform:uppercase}
+    .nav-back{font-size:.75rem;font-weight:600;color:var(--mid);padding:5px 10px;border:1.5px solid var(--line);border-radius:var(--r-sm);background:var(--white);cursor:pointer;text-decoration:none}
+    .nav-back:active{background:var(--faint)}
+
+    /* ── PASSWORD GATE ── */
+    .gate-wrap{display:flex;align-items:center;justify-content:center;min-height:calc(100vh - 52px);padding:24px}
+    .gate-box{background:var(--white);border:1px solid var(--line);border-radius:var(--r-lg);padding:36px;width:100%;max-width:360px;text-align:center}
+    .gate-icon{font-size:2.4rem;margin-bottom:12px}
+    .gate-title{font-family:var(--serif);font-size:1.4rem;margin-bottom:6px}
+    .gate-sub{font-size:.8rem;color:var(--mid);margin-bottom:24px}
+    .form-input{width:100%;padding:9px 12px;font-family:var(--sans);font-size:.84rem;background:var(--white);color:var(--ink);border:1.5px solid var(--line);border-radius:var(--r-sm);outline:none;transition:border-color .14s;-webkit-appearance:none}
+    .form-input:focus{border-color:var(--accent)}
+    .gate-err{color:var(--bad);font-size:.78rem;min-height:1.2em;margin-top:6px}
+
+    /* ── TABS ── */
+    .tab-bar{display:flex;gap:0;background:rgba(255,255,255,.94);backdrop-filter:blur(12px);border-bottom:1px solid var(--line);position:sticky;top:52px;z-index:90}
+    .tab{flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:13px 10px;font-size:.8rem;font-weight:700;color:var(--mid);border-bottom:2.5px solid transparent;cursor:pointer;user-select:none;transition:all var(--t-fast);background:none;border-top:none;border-left:none;border-right:none}
+    .tab.active{color:var(--ink);border-bottom-color:var(--ink)}
+    .tab:active{background:var(--faint)}
+
+    /* ── PAGE ── */
+    .page{padding:14px 12px 80px;max-width:600px;margin:0 auto}
+    .section{display:none}.section.active{display:block}
+
+    /* ── SHUFFLE SECTION ── */
+    textarea{width:100%;padding:11px 12px;font-family:'Courier New',monospace;font-size:.77rem;line-height:1.72;background:var(--white);color:var(--ink);border:1.5px solid var(--line);border-radius:var(--r);outline:none;resize:vertical;min-height:150px;transition:border-color .14s;-webkit-appearance:none;display:block}
+    textarea:focus{border-color:var(--accent)}
+    textarea.out{background:#0e0e12;color:#e8e6df;border-color:#2a2a35;min-height:120px}
+    textarea::placeholder{color:#c0bfbb}
+    .lrow{display:flex;align-items:center;justify-content:space-between;margin-bottom:5px;margin-top:16px}
+    .lbl{font-size:.63rem;font-weight:700;color:var(--mid);letter-spacing:.09em;text-transform:uppercase}
+    .btn{display:inline-flex;align-items:center;justify-content:center;gap:5px;padding:10px 14px;font-family:var(--sans);font-size:.82rem;font-weight:700;border-radius:var(--r-sm);border:1.5px solid transparent;cursor:pointer;transition:all .14s;-webkit-tap-highlight-color:transparent;white-space:nowrap}
+    .btn:active{transform:scale(.96)}
+    .btn-dark{background:var(--ink);color:#fff;border-color:var(--ink)}
+    .btn-white{background:var(--white);color:var(--ink);border-color:var(--line)}
+    .btn-white:active{background:var(--faint)}
+    .btn-accent{background:var(--accent);color:#fff;border-color:var(--accent)}
+    .btn-ghost{background:var(--white);color:var(--mid);border-color:var(--line)}
+    .btn-ghost:active{background:var(--faint)}
+    .btn-good{background:var(--good);color:#fff;border-color:var(--good)}
+    .btn-warn{background:#d97706;color:#fff;border-color:#d97706}
+    .btn-bad{background:var(--bad);color:#fff;border-color:var(--bad)}
+    .btn-sm{padding:6px 11px;font-size:.74rem}
+    .btn-full{width:100%;justify-content:center}
+    .btn:disabled{opacity:.4;pointer-events:none}
+    .arow{display:flex;gap:7px;margin-top:9px;flex-wrap:wrap}
+    .arow .btn-dark{flex:1}
+    .file-btn{display:flex;align-items:center;justify-content:center;gap:6px;padding:9px 12px;border:1.5px dashed var(--line);border-radius:var(--r-sm);background:var(--white);color:var(--mid);font-size:.77rem;font-weight:600;cursor:pointer;margin-top:8px}
+    .file-btn:active{background:var(--faint)}
+    .file-btn input{display:none}
+    .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--line);border:1px solid var(--line);border-radius:var(--r);overflow:hidden;margin-top:16px;animation:up .3s ease both}
+    .stat{background:var(--white);padding:10px 4px;text-align:center}
+    .stat .v{font-family:var(--serif);font-size:1.3rem;font-weight:700;line-height:1}
+    .stat .k{font-size:.58rem;font-weight:700;color:var(--mid);letter-spacing:.07em;text-transform:uppercase;margin-top:2px}
+    .out-block{background:var(--white);border:1px solid var(--line);border-radius:var(--r);overflow:hidden;margin-top:12px;animation:up .3s ease both}
+    .out-block-head{display:flex;align-items:center;justify-content:space-between;padding:9px 13px;border-bottom:1px solid var(--line);background:var(--faint)}
+    .out-block-title{font-size:.63rem;font-weight:800;color:var(--mid);letter-spacing:.09em;text-transform:uppercase}
+    .out-block-actions{display:flex;gap:5px}
+    .out-block textarea{border-radius:0;border:none;min-height:110px;resize:vertical}
+    .out-block textarea:focus{box-shadow:none}
+    .dist{background:var(--white);border:1px solid var(--line);border-radius:var(--r);padding:12px 13px;margin-top:12px;animation:up .3s ease both}
+    .dist-title{font-size:.62rem;font-weight:800;color:var(--mid);letter-spacing:.09em;text-transform:uppercase;margin-bottom:10px}
+    .dist-rows{display:flex;flex-direction:column;gap:7px}
+    .dist-row{display:flex;align-items:center;gap:8px}
+    .dist-lbl{font-size:.75rem;font-weight:800;min-width:14px;text-align:center}
+    .dist-bar-wrap{flex:1;height:18px;background:var(--faint);border-radius:20px;overflow:hidden}
+    .dist-bar{height:100%;border-radius:20px;transition:width .45s cubic-bezier(.34,1.2,.64,1)}
+    .bar-a{background:#3b82f6}.bar-b{background:#f59e0b}.bar-c{background:#10b981}.bar-d{background:#f43f5e}
+    .dist-meta{display:flex;align-items:center;gap:5px;min-width:54px;justify-content:flex-end}
+    .dist-count{font-size:.76rem;font-weight:700}
+    .dist-pct{font-size:.67rem;font-weight:600;color:var(--mid)}
+    .dist-warn{font-size:.67rem;color:var(--warn);font-weight:600;margin-top:7px;padding:5px 8px;background:var(--warn-bg);border-radius:var(--r-sm);display:none}
+    .dist-warn.show{display:block}
+    .cards{display:flex;flex-direction:column;gap:9px;margin-top:16px}
+    .card{background:var(--white);border:1px solid var(--line);border-radius:var(--r);overflow:hidden;animation:up .26s ease both;box-shadow:var(--sh)}
+    .card-head{padding:11px 12px 9px;border-bottom:1px solid var(--faint)}
+    .q-row{display:flex;align-items:flex-start;gap:7px}
+    .q-num{font-size:.6rem;font-weight:800;color:var(--mid);letter-spacing:.06em;text-transform:uppercase;flex-shrink:0;padding-top:2px;min-width:22px}
+    .q-txt{font-size:.85rem;font-weight:600;line-height:1.5;flex:1}
+    .card-body{padding:9px 12px}
+    .opts{display:flex;flex-direction:column;gap:5px}
+    .opt{display:flex;align-items:flex-start;gap:7px;padding:7px 9px;border-radius:var(--r-sm);border:1.5px solid var(--line);background:var(--faint);font-size:.81rem;line-height:1.45}
+    .opt.correct{border-color:var(--good);background:var(--good-bg);font-weight:600}
+    .opt-lbl{font-size:.63rem;font-weight:800;color:var(--mid);text-transform:uppercase;flex-shrink:0;padding-top:1px;min-width:13px}
+    .opt.correct .opt-lbl{color:var(--good)}
+    .card-foot{display:flex;align-items:center;justify-content:space-between;padding:7px 12px;border-top:1px solid var(--faint);background:var(--faint)}
+    .pill{display:inline-flex;align-items:center;gap:3px;font-size:.62rem;font-weight:700;padding:2px 7px;border-radius:20px}
+    .p-good{background:var(--good-bg);color:var(--good)}
+    .p-warn{background:var(--warn-bg);color:var(--warn)}
+    .p-faint{background:var(--line);color:var(--mid)}
+    .err{background:var(--bad-bg);border:1px solid #f5b8bc;border-radius:var(--r-sm);padding:9px 11px;font-size:.77rem;color:var(--bad);margin-top:7px;animation:fadeIn .2s ease both;white-space:pre-line}
+    .sec{display:flex;align-items:center;margin-top:18px;margin-bottom:7px;gap:9px}
+    .sec-lbl{font-size:.63rem;font-weight:800;color:var(--mid);letter-spacing:.1em;text-transform:uppercase;flex-shrink:0}
+    .sec-line{flex:1;height:1px;background:var(--line)}
+
+    /* ── EDITOR SECTION ── */
+    .notice{padding:8px 11px;border-radius:var(--r-sm);font-size:.74rem;line-height:1.45;border-left:3px solid currentColor;margin-top:6px}
+    .n-neutral{background:var(--faint);color:var(--ink);border-color:var(--line)}
+    .n-good{background:var(--good-bg);color:var(--good);border-color:var(--good)}
+    .n-bad{background:var(--bad-bg);color:var(--bad);border-color:var(--bad)}
+    .spin{width:14px;height:14px;border:2px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite;flex-shrink:0;display:inline-block;vertical-align:middle;margin-right:5px}
+
+    /* Folder grid */
+    .folder-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(90px,1fr));gap:8px;margin-top:8px}
+    .folder-card{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;aspect-ratio:1/1;border:1.5px solid var(--line);border-radius:var(--r-sm);background:var(--white);cursor:pointer;padding:8px 4px;transition:all var(--t-spring);position:relative;-webkit-tap-highlight-color:transparent}
+    .folder-card:active{transform:scale(.94);border-color:var(--accent);background:var(--accent-bg)}
+    .folder-card .fc-icon{font-size:1.5rem;line-height:1}
+    .folder-card .fc-name{font-size:.64rem;font-weight:700;text-align:center;line-height:1.2;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;word-break:break-word}
+    .folder-card-add{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;aspect-ratio:1/1;border:2px dashed var(--line);border-radius:var(--r-sm);background:var(--faint);cursor:pointer;padding:6px;transition:all var(--t-fast);-webkit-tap-highlight-color:transparent}
+    .folder-card-add:active{border-color:var(--accent);background:var(--accent-bg)}
+    .folder-card-add span{font-size:.6rem;font-weight:700;color:var(--mid);text-align:center}
+
+    /* File list */
+    .file-list-wrap{background:var(--white);border:1px solid var(--line);border-radius:var(--r);overflow:hidden;margin-top:8px}
+    .file-list-head{display:flex;align-items:center;gap:8px;padding:10px 13px;border-bottom:1px solid var(--line);background:var(--faint)}
+    .file-list-head-title{font-size:.85rem;font-weight:700;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .file-list-body{display:flex;flex-direction:column}
+    .file-row{display:flex;align-items:center;gap:8px;padding:10px 13px;border-bottom:1px solid var(--faint);cursor:pointer;transition:background var(--t-fast);-webkit-tap-highlight-color:transparent}
+    .file-row:last-child{border-bottom:none}
+    .file-row:active{background:var(--accent-bg)}
+    .file-row.active-file{background:var(--accent-bg)}
+    .file-row-name{font-size:.82rem;font-weight:600;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .file-row-name.active-name{color:var(--accent)}
+    .file-row-del{background:none;border:none;color:#f87171;font-size:.85rem;cursor:pointer;padding:4px 6px;border-radius:4px;flex-shrink:0;line-height:1}
+    .file-row-del:active{background:#fff1f2}
+    .file-row-edit{font-size:.7rem;font-weight:700;color:var(--accent);background:var(--accent-bg);border:1px solid #bfdbfe;border-radius:4px;padding:3px 8px;flex-shrink:0}
+
+    /* Inline editor */
+    .editor-wrap{background:var(--white);border:1.5px solid var(--ink);border-radius:var(--r);overflow:hidden;margin-top:10px;animation:up .2s ease both}
+    .editor-head{display:flex;align-items:center;gap:6px;padding:8px 11px;background:var(--ink);color:#fff;flex-shrink:0}
+    .editor-path{font-size:.75rem;font-weight:600;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;opacity:.9}
+    .editor-head-btn{background:none;border:1px solid rgba(255,255,255,.3);color:#fff;padding:3px 8px;border-radius:4px;cursor:pointer;font-size:.68rem;flex-shrink:0}
+    .editor-format{padding:4px 11px;background:#fafaf9;border-bottom:1px solid var(--line);font-size:.63rem;color:var(--mid)}
+    .editor-format strong{color:var(--ink)}
+    #q-editor{width:100%;font-family:'Courier New',monospace;font-size:.77rem;line-height:1.7;resize:none;padding:11px 12px;border:none;outline:none;display:block;min-height:220px;box-sizing:border-box;background:var(--white);color:var(--ink)}
+    .editor-footer{display:flex;gap:6px;padding:8px 11px;background:#fafaf9;border-top:1px solid var(--line);align-items:center;flex-wrap:wrap}
+
+    /* New folder form */
+    .new-folder-form{display:flex;gap:6px;margin-top:8px;animation:up .15s ease both}
+    .new-folder-form input{flex:1;padding:7px 10px;font-family:var(--sans);font-size:.8rem;border:1.5px solid var(--line);border-radius:var(--r-sm);outline:none}
+    .new-folder-form input:focus{border-color:var(--accent)}
+
+    /* New file form */
+    .new-file-form{display:flex;gap:5px;padding:9px 13px;border-top:1px solid var(--line);background:var(--faint)}
+    .new-file-form input{flex:1;padding:5px 9px;font-family:var(--sans);font-size:.78rem;border:1.5px solid var(--line);border-radius:var(--r-sm);outline:none;background:var(--white)}
+    .new-file-form input:focus{border-color:var(--accent)}
+
+    /* Editor status bar */
+    .ed-status{font-size:.72rem;color:var(--mid);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .ed-status.good{color:var(--good)}
+    .ed-status.bad{color:var(--bad)}
+    .ed-status.neutral{color:var(--accent)}
+
+    /* Breadcrumb */
+    .breadcrumb{display:flex;align-items:center;gap:5px;margin-top:14px;margin-bottom:2px;font-size:.75rem;color:var(--mid)}
+    .breadcrumb-home{cursor:pointer;color:var(--accent);font-weight:600}
+    .breadcrumb-home:hover{text-decoration:underline}
+    .breadcrumb-sep{opacity:.4}
+    .breadcrumb-current{color:var(--ink);font-weight:600}
+
+    /* Loading state */
+    .loading-row{display:flex;align-items:center;gap:8px;padding:14px 13px;font-size:.8rem;color:var(--mid)}
+
+    /* Toast */
+    .toast-wrap{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);z-index:999;pointer-events:none;display:flex;flex-direction:column;align-items:center;gap:5px}
+    .toast{padding:8px 15px;background:var(--ink);color:#fff;border-radius:var(--r);font-size:.78rem;font-weight:600;box-shadow:var(--sh);animation:up .2s ease both;white-space:nowrap}
+    .toast.good{background:var(--good)}
+    .toast.warn{background:var(--warn)}
+    .toast.out{opacity:0;transition:opacity .3s}
+
+    /* Delete zone */
+    .danger-zone{margin-top:16px;padding:10px 12px;background:#fff1f2;border:1px solid #fecdd3;border-radius:var(--r-sm);display:flex;align-items:center;gap:8px}
+    .danger-zone-label{font-size:.75rem;color:#9f1239;flex:1}
+  </style>
+</head>
+<body>
+
+<nav>
+  <div class="brand">Shadab Coaching Centre<small>Editor</small></div>
+  <a class="nav-back" href="/">← Back</a>
+</nav>
+
+<div id="toast-wrap" class="toast-wrap"></div>
+
+<!-- PASSWORD GATE -->
+<div id="gate" class="gate-wrap" style="display:none">
+  <div class="gate-box">
+    <div class="gate-icon">🔐</div>
+    <div class="gate-title">Editor Access</div>
+    <div class="gate-sub">Enter the host password to continue</div>
+    <input type="password" id="gate-pw" class="form-input" placeholder="Password" maxlength="30" autocomplete="off"/>
+    <p id="gate-err" class="gate-err"></p>
+    <div class="arow" style="margin-top:14px">
+      <button class="btn btn-dark btn-full" id="gate-btn">Enter →</button>
+    </div>
+  </div>
+</div>
+
+<!-- MAIN APP -->
+<div id="app" style="display:none">
+  <!-- TABS -->
+  <div class="tab-bar">
+    <button class="tab active" id="tab-shuffle" onclick="switchTab('shuffle')">🔀 Shuffle</button>
+    <button class="tab" id="tab-editor" onclick="switchTab('editor')">✎ Editor</button>
+  </div>
+
+  <div class="page">
+
+    <!-- ══════════════════════════════
+         SHUFFLE SECTION
+    ══════════════════════════════ -->
+    <div class="section active" id="sec-shuffle">
+
+      <div class="lrow">
+        <span class="lbl">Questions</span>
+        <span class="lbl" id="char-lbl">0 chars</span>
+      </div>
+      <textarea id="raw" placeholder="What is the speed of light?&#10;(A) 300,000 km/s @, (B) 150,000 km/s, (C) 1000 km/s, (D) 3000 km/s&#10;&#10;Who wrote Hamlet?&#10;(A) Keats, (B) Dickens, (C) Shakespeare @, (D) Chaucer"></textarea>
+
+      <label class="file-btn">
+        📄 Upload .txt file
+        <input type="file" id="file-in" accept=".txt" onchange="loadLocalFile(this)"/>
+      </label>
+
+      <div class="arow">
+        <button class="btn btn-dark" onclick="doShuffle()">🔀 Shuffle Options</button>
+        <button class="btn btn-ghost btn-sm" onclick="doClear()">✕</button>
+      </div>
+
+      <div id="shuf-err" class="err" style="display:none"></div>
+
+      <div class="stats" id="stats" style="display:none">
+        <div class="stat"><div class="v" id="s-q">0</div><div class="k">Questions</div></div>
+        <div class="stat"><div class="v" id="s-m">0</div><div class="k">Ans. Moved</div></div>
+        <div class="stat"><div class="v" id="s-r">0</div><div class="k">Reshuffles</div></div>
+      </div>
+
+      <div class="out-block" id="out-sec" style="display:none">
+        <div class="out-block-head">
+          <span class="out-block-title">Shuffled Output</span>
+          <div class="out-block-actions">
+            <button class="btn btn-ghost btn-sm" onclick="doCopy()">⎘ Copy</button>
+            <button class="btn btn-ghost btn-sm" onclick="doDownload()">↓ .txt</button>
+          </div>
+        </div>
+        <textarea class="out" id="out" readonly></textarea>
+      </div>
+
+      <div class="dist" id="dist" style="display:none">
+        <div class="dist-title">Answer Distribution</div>
+        <div class="dist-rows" id="dist-rows"></div>
+        <div class="dist-warn" id="dist-warn">⚠ Uneven — one option dominates (&gt;50%).</div>
+      </div>
+
+      <div class="sec" id="cards-sec" style="display:none">
+        <span class="sec-lbl">Preview</span><div class="sec-line"></div>
+      </div>
+      <div class="cards" id="cards"></div>
+
+    </div><!-- /sec-shuffle -->
+
+    <!-- ══════════════════════════════
+         EDITOR SECTION
+    ══════════════════════════════ -->
+    <div class="section" id="sec-editor">
+
+      <!-- Breadcrumb -->
+      <div class="breadcrumb" id="ed-breadcrumb">
+        <span class="breadcrumb-home" onclick="edGoHome()">📂 Folders</span>
+      </div>
+
+      <!-- FOLDER VIEW -->
+      <div id="ed-folder-view">
+        <div id="ed-folders-msg"></div>
+        <div class="folder-grid" id="ed-folder-grid"></div>
+
+        <!-- New folder form (hidden by default) -->
+        <div class="new-folder-form" id="new-folder-form" style="display:none">
+          <input id="new-folder-input" placeholder="Folder name" maxlength="50"/>
+          <button class="btn btn-accent btn-sm" onclick="createFolder()">Create</button>
+          <button class="btn btn-ghost btn-sm" onclick="document.getElementById('new-folder-form').style.display='none'">✕</button>
+        </div>
+      </div>
+
+      <!-- FILE VIEW (shown when folder selected) -->
+      <div id="ed-file-view" style="display:none">
+        <div class="file-list-wrap" id="ed-file-list-wrap">
+          <div class="file-list-head">
+            <span style="font-size:1rem">📁</span>
+            <span class="file-list-head-title" id="ed-folder-title">—</span>
+            <button class="btn btn-ghost btn-sm" onclick="edGoHome()" style="font-size:.72rem;padding:4px 8px">← Back</button>
+          </div>
+          <div id="ed-file-list-body" class="file-list-body">
+            <div class="loading-row"><span class="spin"></span>Loading…</div>
+          </div>
+          <!-- New file form -->
+          <div class="new-file-form" id="new-file-form">
+            <input id="new-file-input" placeholder="filename.txt" maxlength="60"/>
+            <button class="btn btn-dark btn-sm" onclick="createNewFile()" style="white-space:nowrap">+ New</button>
+            <label class="btn btn-ghost btn-sm" style="cursor:pointer;white-space:nowrap">
+              ↑ Upload<input type="file" id="file-upload-inp" accept=".txt" style="display:none" onchange="uploadFile(this)"/>
+            </label>
+          </div>
+        </div>
+
+        <!-- Inline editor (shown when file selected) -->
+        <div class="editor-wrap" id="ed-editor-wrap" style="display:none">
+          <div class="editor-head">
+            <span class="editor-path" id="ed-editor-path">—</span>
+            <button class="editor-head-btn" onclick="closeEditor()">✕ Close</button>
+          </div>
+          <div class="editor-format">
+            <strong>Format:</strong> Question · <code style="background:#eee;padding:0 3px;border-radius:2px">(A)opt @, (B)opt, (C)opt, (D)opt</code>
+          </div>
+          <textarea id="q-editor" placeholder="What is photosynthesis?&#10;(A)Making food from sunlight @, (B)Breathing, (C)Digestion, (D)Transpiration"></textarea>
+          <div class="editor-footer">
+            <span class="ed-status" id="ed-status"></span>
+            <label class="btn btn-ghost btn-sm" style="cursor:pointer;font-size:.73rem">
+              ↑ Upload .txt<input type="file" id="editor-upload-inp" accept=".txt" style="display:none" onchange="uploadToEditor(this)"/>
+            </label>
+            <button class="btn btn-good btn-sm" id="btn-save" onclick="saveToGitHub()">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17,21 17,13 7,13 7,21"/></svg>
+              Save to GitHub
+            </button>
+          </div>
+        </div>
+
+        <!-- Danger zone for folder -->
+        <div class="danger-zone" id="ed-danger-zone" style="display:none">
+          <span class="danger-zone-label">⚠ Delete this folder and all its files</span>
+          <button class="btn btn-bad btn-sm" onclick="deleteFolder()">Delete Folder</button>
+        </div>
+      </div>
+
+    </div><!-- /sec-editor -->
+  </div><!-- /page -->
+</div><!-- /app -->
+
+<script>
+/* ══════════════════════════════
+   GITHUB CONFIG
+══════════════════════════════ */
+const MY_TOKEN      = '%%MY_TOKEN%%';
+const GITHUB_REPO   = 'raeist-user/quizzap';
+const GITHUB_BRANCH = 'main';
+const HOST_PASSWORD = '%%HOST_PASSWORD%%';
+
+function isValidToken(){ return MY_TOKEN && !MY_TOKEN.startsWith('%%') && MY_TOKEN.length > 0; }
+function ghHeaders(){
+  const h = { 'Accept': 'application/vnd.github+json' };
+  if(isValidToken()) h['Authorization'] = 'Bearer ' + MY_TOKEN;
+  return h;
+}
+function ghWriteHeaders(){
+  const h = { 'Accept': 'application/vnd.github+json', 'Content-Type': 'application/json' };
+  if(isValidToken()) h['Authorization'] = 'Bearer ' + MY_TOKEN;
+  return h;
+}
+
+/* ══════════════════════════════
+   PASSWORD GATE
+══════════════════════════════ */
+const AUTH_KEY = 'scc_editor_authed';
+
+function checkAuth(){
+  const isLocalDev = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+  // If HOST_PASSWORD is injected and session is authenticated
+  if(isLocalDev || sessionStorage.getItem(AUTH_KEY) === 'yes'){
+    showApp();
+  } else {
+    document.getElementById('gate').style.display = 'flex';
+  }
+}
+
+function showApp(){
+  document.getElementById('gate').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+  if(edCurrentFolder) loadFolderFiles(edCurrentFolder);
+  else loadFolders();
+}
+
+document.getElementById('gate-btn').onclick = function(){
+  const pw = document.getElementById('gate-pw').value;
+  const correct = HOST_PASSWORD && !HOST_PASSWORD.startsWith('%%') ? HOST_PASSWORD : '2325';
+  if(pw === correct){
+    sessionStorage.setItem(AUTH_KEY, 'yes');
+    showApp();
+  } else {
+    document.getElementById('gate-err').textContent = 'Incorrect password.';
+    document.getElementById('gate-pw').value = '';
+    document.getElementById('gate-pw').focus();
+  }
+};
+document.getElementById('gate-pw').addEventListener('keydown', e => {
+  if(e.key === 'Enter') document.getElementById('gate-btn').click();
+});
+
+/* ══════════════════════════════
+   TAB SWITCHING
+══════════════════════════════ */
+function switchTab(tab){
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.getElementById('tab-' + tab).classList.add('active');
+  document.getElementById('sec-' + tab).classList.add('active');
+}
+
+/* ══════════════════════════════
+   SHUFFLE LOGIC
+══════════════════════════════ */
+const LABELS = ['A','B','C','D'];
+let questions = [], reshuffles = 0;
+
+function parseQuestions(text){
+  const out = [], lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+  for(let i = 0; i < lines.length; i++){
+    const qLine = lines[i], oLine = lines[i+1] || '';
+    const m = oLine.match(/\(A\)([^,(]+)[,，]\s*\(B\)([^,(]+)[,，]\s*\(C\)([^,(]+)[,，]\s*\(D\)([^,(]+)/i);
+    if(m){
+      const rawOpts = [m[1], m[2], m[3], m[4]];
+      let preCorrect = -1;
+      const cleanOpts = rawOpts.map((o,idx) => { if(o.includes('@')){ preCorrect = idx; return o.replace(/@/g,'').trim(); } return o.trim(); });
+      const entry = { text: qLine.replace(/^\d+[.)]\s*/,'').trim(), options: cleanOpts };
+      if(preCorrect >= 0) entry.correct = preCorrect;
+      out.push(entry);
+      i++;
+    }
+  }
+  return out;
+}
+
+function initState(parsed){ questions = parsed.map(p => ({ text:p.text, options:[...p.options], correctIndex:p.correct??-1, origCorrect:p.correct??-1 })); }
+function fisher(a){ for(let i = a.length-1; i > 0; i--){ const j = Math.floor(Math.random()*(i+1)); [a[i],a[j]] = [a[j],a[i]]; } return a; }
+function shuffleOne(q){ const ct = q.correctIndex >= 0 ? q.options[q.correctIndex] : null; q.options = fisher([...q.options]); q.correctIndex = ct != null ? q.options.indexOf(ct) : -1; }
+
+function doShuffle(){
+  const raw = document.getElementById('raw').value.trim();
+  if(!raw){ showShufErr('Paste or load questions first.'); return; }
+  hideShufErr();
+  const parsed = parseQuestions(raw);
+  if(!parsed.length){ showShufErr('No questions found.\n\nExpected format:\nQuestion?\n(A) opt @, (B) opt, (C) opt, (D) opt'); return; }
+  initState(parsed);
+  questions.forEach(q => shuffleOne(q));
+  reshuffles++;
+  renderShuffle();
+}
+
+function reshuffleOne(idx){ shuffleOne(questions[idx]); reshuffles++; renderShuffle(); }
+
+function renderShuffle(){
+  const moved = questions.filter(q => q.correctIndex !== q.origCorrect && q.correctIndex >= 0).length;
+  document.getElementById('s-q').textContent = questions.length;
+  document.getElementById('s-m').textContent = moved;
+  document.getElementById('s-r').textContent = reshuffles;
+  document.getElementById('stats').style.display = '';
+  renderOutput(); renderDist();
+  document.getElementById('out-sec').style.display = '';
+  document.getElementById('cards-sec').style.display = '';
+  document.getElementById('cards').innerHTML = questions.map((q,qi) => {
+    const hasAns = q.correctIndex >= 0;
+    const newL = hasAns ? LABELS[q.correctIndex] : '?';
+    const origL = q.origCorrect >= 0 ? LABELS[q.origCorrect] : '?';
+    const hasMoved = hasAns && q.correctIndex !== q.origCorrect;
+    const opts = q.options.map((o,oi) => {
+      const cor = oi === q.correctIndex;
+      return `<div class="opt${cor?' correct':''}"><span class="opt-lbl">${LABELS[oi]}</span><span>${esc(o)}</span></div>`;
+    }).join('');
+    const movePill = hasAns ? (hasMoved ? `<span class="pill p-warn">${origL}→${newL}</span>` : `<span class="pill p-faint">${newL} same</span>`) : '';
+    return `<div class="card" style="animation-delay:${qi*22}ms">
+      <div class="card-head"><div class="q-row"><span class="q-num">Q${qi+1}</span><span class="q-txt">${esc(q.text)}</span></div></div>
+      <div class="card-body"><div class="opts">${opts}</div></div>
+      <div class="card-foot">
+        ${hasAns ? `<span class="pill p-good">✓ ${newL}</span>` : `<span class="pill p-faint">No key</span>`}
+        <div style="display:flex;align-items:center;gap:5px">${movePill}<button class="btn btn-ghost btn-sm" onclick="reshuffleOne(${qi})">↺</button></div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderDist(){
+  const counts = [0,0,0,0]; let withKey = 0;
+  questions.forEach(q => { if(q.correctIndex >= 0 && q.correctIndex < 4){ counts[q.correctIndex]++; withKey++; } });
+  if(!withKey){ document.getElementById('dist').style.display = 'none'; return; }
+  document.getElementById('dist').style.display = '';
+  const max = Math.max(...counts, 1);
+  const barCls = ['bar-a','bar-b','bar-c','bar-d'];
+  document.getElementById('dist-rows').innerHTML = LABELS.map((lbl,i) => {
+    const c = counts[i], pct = Math.round(c/withKey*100), barW = Math.round(c/max*100);
+    return `<div class="dist-row"><span class="dist-lbl">${lbl}</span><div class="dist-bar-wrap"><div class="dist-bar ${barCls[i]}" style="width:${barW}%"></div></div><div class="dist-meta"><span class="dist-count">${c}</span><span class="dist-pct">${pct}%</span></div></div>`;
+  }).join('');
+  document.getElementById('dist-warn').classList.toggle('show', counts.some(c => c/withKey > 0.5) && withKey > 3);
+}
+
+function renderOutput(){
+  const lines = questions.map(q => {
+    const opts = q.options.map((o,i) => `(${LABELS[i]}) ${o}${i === q.correctIndex ? ' @' : ''}`).join(', ');
+    return `${q.text}\n${opts}`;
+  });
+  document.getElementById('out').value = lines.join('\n\n');
+}
+
+function loadLocalFile(input){
+  const file = input.files[0]; if(!file) return;
+  if(!file.name.endsWith('.txt')){ toast('Need a .txt file', 'warn'); return; }
+  const r = new FileReader();
+  r.onload = e => { document.getElementById('raw').value = e.target.result; updateChars(); doShuffle(); };
+  r.readAsText(file); input.value = '';
+}
+
+function doCopy(){ const t = document.getElementById('out').value; if(!t){ toast('Nothing yet','warn'); return; } navigator.clipboard.writeText(t).then(() => toast('Copied ✓','good')); }
+function doDownload(){ const t = document.getElementById('out').value; if(!t){ toast('Nothing yet','warn'); return; } const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([t],{type:'text/plain'})); a.download = 'shuffled.txt'; a.click(); toast('Downloaded ↓','good'); }
+
+function doClear(){
+  document.getElementById('raw').value = ''; document.getElementById('char-lbl').textContent = '0 chars';
+  questions = []; reshuffles = 0;
+  document.getElementById('cards').innerHTML = '';
+  document.getElementById('stats').style.display = 'none';
+  document.getElementById('dist').style.display = 'none';
+  document.getElementById('out-sec').style.display = 'none';
+  document.getElementById('cards-sec').style.display = 'none';
+  hideShufErr();
+}
+
+document.getElementById('raw').addEventListener('input', updateChars);
+function updateChars(){ document.getElementById('char-lbl').textContent = document.getElementById('raw').value.length.toLocaleString() + ' chars'; }
+function showShufErr(msg){ const e = document.getElementById('shuf-err'); e.textContent = '⚠ ' + msg; e.style.display = ''; }
+function hideShufErr(){ document.getElementById('shuf-err').style.display = 'none'; }
+
+/* ══════════════════════════════
+   EDITOR STATE
+══════════════════════════════ */
+let edCurrentFolder = null;  // currently open folder name
+let edCurrentFile   = null;  // currently open file name
+let edCurrentSha    = null;  // SHA of file being edited
+let edFolders       = [];    // [{name, path}]
+let edFiles         = [];    // [{name, path, sha}]
+let edSaving        = false;
+
+/* ══════════════════════════════
+   EDITOR — FOLDER NAVIGATION
+══════════════════════════════ */
+function edGoHome(){
+  edCurrentFolder = null;
+  edCurrentFile   = null;
+  edCurrentSha    = null;
+  edFiles         = [];
+  document.getElementById('ed-file-view').style.display   = 'none';
+  document.getElementById('ed-folder-view').style.display = '';
+  updateBreadcrumb();
+  loadFolders();
+}
+
+function updateBreadcrumb(){
+  const bc = document.getElementById('ed-breadcrumb');
+  if(!edCurrentFolder){
+    bc.innerHTML = `<span class="breadcrumb-home">📂 Folders</span>`;
+  } else {
+    bc.innerHTML = `
+      <span class="breadcrumb-home" onclick="edGoHome()">📂 Folders</span>
+      <span class="breadcrumb-sep">›</span>
+      <span class="breadcrumb-current">${esc(edCurrentFolder)}</span>`;
+  }
+}
+
+async function loadFolders(){
+  const grid = document.getElementById('ed-folder-grid');
+  const msg  = document.getElementById('ed-folders-msg');
+  grid.innerHTML = '';
+  msg.innerHTML = `<div class="loading-row"><span class="spin"></span>Loading folders…</div>`;
+  try {
+    const res = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/contents/resources?ref=${GITHUB_BRANCH}`, { headers: ghHeaders() });
+    if(!res.ok) throw new Error(`GitHub API ${res.status}`);
+    const items = await res.json();
+    edFolders = items.filter(i => i.type === 'dir').map(d => ({ name: d.name, path: d.path }));
+    msg.innerHTML = '';
+    if(!edFolders.length){
+      msg.innerHTML = '<div class="notice n-neutral" style="margin-top:8px">No folders yet — create one below</div>';
+    }
+    const cards = edFolders.map(f =>
+      `<div class="folder-card" onclick="openFolder('${esc(f.name)}')">
+        <span class="fc-icon">📁</span>
+        <span class="fc-name">${esc(f.name)}</span>
+      </div>`
+    ).join('');
+    const addCard = `<div class="folder-card-add" onclick="showNewFolderForm()">
+      <span style="font-size:1.6rem;color:var(--mid)">＋</span>
+      <span>New Folder</span>
+    </div>`;
+    grid.innerHTML = cards + addCard;
+  } catch(e){
+    msg.innerHTML = `<div class="notice n-bad" style="margin-top:8px">✗ ${esc(e.message)}</div>`;
+    grid.innerHTML = '';
+  }
+}
+
+function showNewFolderForm(){
+  const form = document.getElementById('new-folder-form');
+  form.style.display = 'flex';
+  document.getElementById('new-folder-input').focus();
+}
+
+document.getElementById('new-folder-input').addEventListener('keydown', e => { if(e.key === 'Enter') createFolder(); });
+
+async function createFolder(){
+  let name = document.getElementById('new-folder-input').value.trim().replace(/[^\w\- ]/g,'');
+  if(!name){ toast('Folder name required','warn'); return; }
+  if(!isValidToken()){ toast('GitHub token not set','warn'); return; }
+  toast('Creating folder…');
+  try {
+    const res = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/contents/resources/${encodeURIComponent(name)}/.gitkeep`, {
+      method: 'PUT', headers: ghWriteHeaders(),
+      body: JSON.stringify({ message: `Create ${name} folder`, content: btoa(''), branch: GITHUB_BRANCH })
+    });
+    if(!res.ok) throw new Error(`GitHub API ${res.status}`);
+    document.getElementById('new-folder-input').value = '';
+    document.getElementById('new-folder-form').style.display = 'none';
+    toast(`Folder "${name}" created!`, 'good');
+    loadFolders();
+  } catch(e){ toast('Error: ' + e.message, 'warn'); }
+}
+
+/* ══════════════════════════════
+   EDITOR — FILE LIST
+══════════════════════════════ */
+async function openFolder(name){
+  edCurrentFolder = name;
+  edCurrentFile   = null;
+  edCurrentSha    = null;
+  updateBreadcrumb();
+  document.getElementById('ed-folder-view').style.display = 'none';
+  document.getElementById('ed-file-view').style.display   = '';
+  document.getElementById('ed-folder-title').textContent  = name;
+  document.getElementById('ed-editor-wrap').style.display  = 'none';
+  document.getElementById('ed-danger-zone').style.display  = '';
+  document.getElementById('new-file-input').value = '';
+  setEdStatus('');
+  loadFolderFiles(name);
+}
+
+async function loadFolderFiles(folderName){
+  const body = document.getElementById('ed-file-list-body');
+  body.innerHTML = `<div class="loading-row"><span class="spin"></span>Loading files…</div>`;
+  try {
+    const enc = encodeURIComponent(folderName);
+    const res = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/contents/resources/${enc}?ref=${GITHUB_BRANCH}`, { headers: ghHeaders() });
+    if(!res.ok) throw new Error(`GitHub API ${res.status}`);
+    const items = await res.json();
+    edFiles = items.filter(i => i.type === 'file' && i.name.endsWith('.txt') && i.name !== '.gitkeep')
+                   .map(i => ({ name: i.name, path: i.path, sha: i.sha }));
+    renderFileList();
+  } catch(e){
+    body.innerHTML = `<div class="notice n-bad" style="margin:10px">${esc(e.message)}</div>`;
+  }
+}
+
+function renderFileList(){
+  const body = document.getElementById('ed-file-list-body');
+  if(!edFiles.length){
+    body.innerHTML = `<div style="padding:14px 13px;text-align:center;color:var(--mid);font-size:.78rem">No .txt files yet — create one below</div>`;
+    return;
+  }
+  body.innerHTML = edFiles.map(f => `
+    <div class="file-row${edCurrentFile === f.name ? ' active-file' : ''}" onclick="openFile('${esc(f.name)}','${esc(f.sha)}')">
+      <span style="font-size:.9rem">📄</span>
+      <span class="file-row-name${edCurrentFile === f.name ? ' active-name' : ''}">${esc(f.name.replace(/\.txt$/i,''))}</span>
+      ${edCurrentFile === f.name ? `<span class="file-row-edit">✎ Editing</span>` : ''}
+      <button class="file-row-del" onclick="event.stopPropagation();deleteFile('${esc(f.name)}')" title="Delete">✕</button>
+    </div>`).join('');
+}
+
+/* ══════════════════════════════
+   EDITOR — FILE OPEN & EDIT
+══════════════════════════════ */
+async function openFile(name, sha){
+  edCurrentFile = name;
+  edCurrentSha  = sha;
+  setEdStatus('Loading…','neutral');
+  document.getElementById('ed-editor-path').textContent = `${edCurrentFolder} / ${name}`;
+  document.getElementById('ed-editor-wrap').style.display = '';
+  document.getElementById('q-editor').value = '';
+  renderFileList();
+
+  // Scroll to editor
+  setTimeout(() => document.getElementById('ed-editor-wrap').scrollIntoView({behavior:'smooth',block:'nearest'}), 100);
+
+  try {
+    const encF = encodeURIComponent(edCurrentFolder);
+    const encN = encodeURIComponent(name);
+    const res = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/contents/resources/${encF}/${encN}?ref=${GITHUB_BRANCH}`, { headers: ghHeaders() });
+    if(res.status === 404){ document.getElementById('q-editor').value = ''; setEdStatus('New file — write content and save','neutral'); return; }
+    if(!res.ok) throw new Error(`GitHub API ${res.status}`);
+    const data = await res.json();
+    edCurrentSha = data.sha;
+    const bytes = Uint8Array.from(atob(data.content.replace(/\n/g,'')), c => c.charCodeAt(0));
+    document.getElementById('q-editor').value = new TextDecoder('utf-8').decode(bytes);
+    setEdStatus('Loaded — edit and save','');
+    document.getElementById('q-editor').focus();
+  } catch(e){ setEdStatus('Error: ' + e.message, 'bad'); }
+}
+
+function closeEditor(){
+  edCurrentFile = null;
+  edCurrentSha  = null;
+  document.getElementById('ed-editor-wrap').style.display = 'none';
+  setEdStatus('');
+  renderFileList();
+}
+
+async function saveToGitHub(){
+  if(!edCurrentFolder || !edCurrentFile){ toast('No file open','warn'); return; }
+  if(!isValidToken()){ toast('GitHub token not configured','warn'); return; }
+  const content = document.getElementById('q-editor').value;
+  if(!content.trim()){ toast('Content is empty','warn'); return; }
+  if(edSaving) return;
+  edSaving = true;
+  const btn = document.getElementById('btn-save');
+  btn.disabled = true; btn.textContent = 'Saving…';
+  setEdStatus('Pushing to GitHub…','neutral');
+  try {
+    const encF = encodeURIComponent(edCurrentFolder);
+    const encN = encodeURIComponent(edCurrentFile);
+    const apiUrl = `https://api.github.com/repos/${GITHUB_REPO}/contents/resources/${encF}/${encN}`;
+    let sha = edCurrentSha;
+    if(!sha){
+      const chk = await fetch(`${apiUrl}?ref=${GITHUB_BRANCH}`, { headers: ghHeaders() });
+      if(chk.ok){ const d = await chk.json(); sha = d.sha; }
+    }
+    const body = { message: `Update resources/${edCurrentFolder}/${edCurrentFile}`, content: btoa(unescape(encodeURIComponent(content))), branch: GITHUB_BRANCH };
+    if(sha) body.sha = sha;
+    const res = await fetch(apiUrl, { method: 'PUT', headers: ghWriteHeaders(), body: JSON.stringify(body) });
+    if(!res.ok){ const err = await res.json().catch(() => ({})); throw new Error(err.message || `GitHub API ${res.status}`); }
+    const data = await res.json();
+    edCurrentSha = data.content?.sha || sha;
+    setEdStatus('✓ Saved successfully', 'good');
+    toast('Saved to GitHub ✓', 'good');
+    await loadFolderFiles(edCurrentFolder);
+    renderFileList();
+  } catch(e){ setEdStatus('✗ ' + e.message, 'bad'); toast('Save failed', 'warn'); }
+  finally {
+    edSaving = false;
+    btn.disabled = false;
+    btn.innerHTML = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17,21 17,13 7,13 7,21"/></svg> Save to GitHub`;
+  }
+}
+
+/* ── Upload to editor ── */
+function uploadToEditor(input){
+  const file = input.files[0]; if(!file) return;
+  if(!file.name.endsWith('.txt')){ toast('Need a .txt file','warn'); return; }
+  const r = new FileReader();
+  r.onload = e => {
+    document.getElementById('q-editor').value = e.target.result;
+    setEdStatus('File loaded — save to push to GitHub','neutral');
+    toast('File loaded into editor');
+  };
+  r.readAsText(file); input.value = '';
+}
+
+/* ── Upload as new file to folder ── */
+function uploadFile(input){
+  const file = input.files[0]; if(!file) return;
+  if(!file.name.endsWith('.txt')){ toast('Need a .txt file','warn'); return; }
+  const r = new FileReader();
+  r.onload = async e => {
+    const content = e.target.result;
+    await pushFileContent(file.name, content, `Upload ${file.name}`);
+    input.value = '';
+  };
+  r.readAsText(file);
+}
+
+async function pushFileContent(fileName, content, commitMsg){
+  if(!isValidToken()){ toast('GitHub token not configured','warn'); return; }
+  toast('Uploading…');
+  try {
+    const encF = encodeURIComponent(edCurrentFolder);
+    const encN = encodeURIComponent(fileName);
+    const apiUrl = `https://api.github.com/repos/${GITHUB_REPO}/contents/resources/${encF}/${encN}`;
+    let sha = null;
+    const chk = await fetch(`${apiUrl}?ref=${GITHUB_BRANCH}`, { headers: ghHeaders() });
+    if(chk.ok){ const d = await chk.json(); sha = d.sha; }
+    const body = { message: commitMsg || `Upload resources/${edCurrentFolder}/${fileName}`, content: btoa(unescape(encodeURIComponent(content))), branch: GITHUB_BRANCH };
+    if(sha) body.sha = sha;
+    const res = await fetch(apiUrl, { method: 'PUT', headers: ghWriteHeaders(), body: JSON.stringify(body) });
+    if(!res.ok) throw new Error(`GitHub API ${res.status}`);
+    toast(`Uploaded ${fileName}!`, 'good');
+    await loadFolderFiles(edCurrentFolder);
+    renderFileList();
+  } catch(e){ toast('Upload error: ' + e.message, 'warn'); }
+}
+
+/* ── Create new empty file ── */
+async function createNewFile(){
+  let name = document.getElementById('new-file-input').value.trim();
+  if(!name){ toast('Enter a file name','warn'); return; }
+  if(!name.endsWith('.txt')) name += '.txt';
+  edCurrentFile = name;
+  edCurrentSha  = null;
+  document.getElementById('ed-editor-path').textContent = `${edCurrentFolder} / ${name}`;
+  document.getElementById('q-editor').value = '';
+  document.getElementById('ed-editor-wrap').style.display = '';
+  document.getElementById('new-file-input').value = '';
+  setEdStatus('New file — write content and save to GitHub','neutral');
+  renderFileList();
+  document.getElementById('q-editor').focus();
+  setTimeout(() => document.getElementById('ed-editor-wrap').scrollIntoView({behavior:'smooth',block:'nearest'}), 100);
+}
+
+/* ── Delete file ── */
+async function deleteFile(fileName){
+  if(!confirm(`Delete "${fileName}"?`)) return;
+  if(!isValidToken()){ toast('GitHub token not configured','warn'); return; }
+  toast('Deleting…');
+  try {
+    const encF = encodeURIComponent(edCurrentFolder);
+    const encN = encodeURIComponent(fileName);
+    const apiUrl = `https://api.github.com/repos/${GITHUB_REPO}/contents/resources/${encF}/${encN}`;
+    const chk = await fetch(`${apiUrl}?ref=${GITHUB_BRANCH}`, { headers: ghHeaders() });
+    if(!chk.ok) throw new Error(`File not found: ${chk.status}`);
+    const d = await chk.json();
+    const res = await fetch(apiUrl, { method:'DELETE', headers: ghWriteHeaders(), body: JSON.stringify({ message:`Delete resources/${edCurrentFolder}/${fileName}`, sha: d.sha, branch: GITHUB_BRANCH }) });
+    if(!res.ok) throw new Error(`GitHub API ${res.status}`);
+    if(edCurrentFile === fileName){ edCurrentFile = null; edCurrentSha = null; document.getElementById('ed-editor-wrap').style.display = 'none'; setEdStatus(''); }
+    toast(`"${fileName}" deleted.`, 'good');
+    await loadFolderFiles(edCurrentFolder);
+    renderFileList();
+  } catch(e){ toast('Delete error: ' + e.message, 'warn'); }
+}
+
+/* ── Delete folder ── */
+async function deleteFolder(){
+  if(!edCurrentFolder) return;
+  if(!confirm(`Delete folder "${edCurrentFolder}" and ALL its files? This cannot be undone.`)) return;
+  if(!isValidToken()){ toast('GitHub token not configured','warn'); return; }
+  toast('Deleting folder…');
+  try {
+    const enc = encodeURIComponent(edCurrentFolder);
+    const res = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/contents/resources/${enc}?ref=${GITHUB_BRANCH}`, { headers: ghHeaders() });
+    if(!res.ok) throw new Error(`GitHub API ${res.status}`);
+    const items = await res.json();
+    for(const item of items){
+      const dr = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/contents/${item.path}`, {
+        method: 'DELETE', headers: ghWriteHeaders(),
+        body: JSON.stringify({ message:`Delete ${item.path}`, sha: item.sha, branch: GITHUB_BRANCH })
+      });
+      if(!dr.ok) throw new Error(`Failed to delete ${item.name}`);
+    }
+    toast(`Folder "${edCurrentFolder}" deleted.`, 'good');
+    edGoHome();
+  } catch(e){ toast('Error: ' + e.message, 'warn'); }
+}
+
+function setEdStatus(msg, type=''){
+  const el = document.getElementById('ed-status');
+  el.textContent = msg;
+  el.className = 'ed-status' + (type ? ' '+type : '');
+}
+
+/* ══════════════════════════════
+   UTILS
+══════════════════════════════ */
+function esc(s){ return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function toast(msg, type=''){
+  const w = document.getElementById('toast-wrap');
+  const el = document.createElement('div'); el.className = 'toast' + (type ? ' '+type : ''); el.textContent = msg;
+  w.appendChild(el);
+  setTimeout(() => { el.classList.add('out'); setTimeout(() => el.remove(), 320); }, 2400);
+}
+
+/* ══════════════════════════════
+   INIT
+══════════════════════════════ */
+checkAuth();
+</script>
+</body>
+</html>
