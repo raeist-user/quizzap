@@ -19,9 +19,12 @@
       --serif:'Fraunces',Georgia,serif;
       --r:10px;--r-sm:7px;
       --sh:0 2px 8px rgba(14,14,18,.08);
+      --t-fast:140ms cubic-bezier(.4,0,.2,1);
+      --t-spring:320ms cubic-bezier(.34,1.56,.64,1);
     }
     @keyframes up{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
-    @keyframes in{from{opacity:0}to{opacity:1}}
+    @keyframes fadeIn{from{opacity:0}to{opacity:1}}
+    @keyframes slideUp{from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:translateY(0)}}
     @keyframes spin{to{transform:rotate(360deg)}}
 
     html,body{height:100%;font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:14px;-webkit-font-smoothing:antialiased}
@@ -39,7 +42,7 @@
     /* TEXTAREA */
     textarea{width:100%;padding:11px 12px;font-family:'Courier New',monospace;font-size:.77rem;line-height:1.72;background:var(--white);color:var(--ink);border:1.5px solid var(--line);border-radius:var(--r);outline:none;resize:vertical;min-height:150px;transition:border-color .14s;-webkit-appearance:none;display:block}
     textarea:focus{border-color:var(--accent)}
-    textarea.out{background:#0e0e12;color:#e8e6df;border-color:#2a2a35;min-height:130px}
+    textarea.out{background:#0e0e12;color:#e8e6df;border-color:#2a2a35;min-height:120px}
     textarea::placeholder{color:#c0bfbb}
 
     /* LABELS */
@@ -47,52 +50,79 @@
     .lbl{font-size:.63rem;font-weight:700;color:var(--mid);letter-spacing:.09em;text-transform:uppercase}
 
     /* BUTTONS */
-    .btn{display:inline-flex;align-items:center;justify-content:center;gap:5px;padding:10px 14px;font-family:var(--sans);font-size:.82rem;font-weight:700;border-radius:var(--r-sm);border:none;cursor:pointer;transition:all .14s;-webkit-tap-highlight-color:transparent;white-space:nowrap}
+    .btn{display:inline-flex;align-items:center;justify-content:center;gap:5px;padding:10px 14px;font-family:var(--sans);font-size:.82rem;font-weight:700;border-radius:var(--r-sm);border:1.5px solid transparent;cursor:pointer;transition:all .14s;-webkit-tap-highlight-color:transparent;white-space:nowrap}
     .btn:active{transform:scale(.96)}
-    .btn-primary{background:var(--ink);color:#fff}
-    .btn-accent{background:var(--accent);color:#fff}
-    .btn-ghost{background:var(--white);color:var(--mid);border:1.5px solid var(--line)}
-    .btn-good{background:var(--good);color:#fff}
+    .btn-dark{background:var(--ink);color:#fff;border-color:var(--ink)}
+    .btn-white{background:var(--white);color:var(--ink);border-color:var(--line)}
+    .btn-white:active{background:var(--faint)}
+    .btn-accent{background:var(--accent);color:#fff;border-color:var(--accent)}
+    .btn-ghost{background:var(--white);color:var(--mid);border-color:var(--line)}
+    .btn-ghost:active{background:var(--faint)}
+    .btn-good{background:var(--good);color:#fff;border-color:var(--good)}
+    .btn-warn{background:#d97706;color:#fff;border-color:#d97706}
     .btn-sm{padding:6px 11px;font-size:.74rem}
+    .btn-full{width:100%;justify-content:center}
     .btn:disabled{opacity:.4;pointer-events:none}
-    .arow{display:flex;gap:7px;margin-top:9px}
-    .arow .btn-primary{flex:1}
+    .arow{display:flex;gap:7px;margin-top:9px;flex-wrap:wrap}
+    .arow .btn-dark{flex:1}
 
     /* FILE UPLOAD */
-    .file-btn{display:flex;align-items:center;justify-content:center;gap:6px;padding:9px 12px;border:1.5px dashed var(--line);border-radius:var(--r-sm);background:var(--white);color:var(--mid);font-size:.77rem;font-weight:600;cursor:pointer;margin-top:8px;-webkit-tap-highlight-color:transparent}
+    .file-btn{display:flex;align-items:center;justify-content:center;gap:6px;padding:9px 12px;border:1.5px dashed var(--line);border-radius:var(--r-sm);background:var(--white);color:var(--mid);font-size:.77rem;font-weight:600;cursor:pointer;margin-top:8px}
     .file-btn:active{background:var(--faint)}
     .file-btn input{display:none}
 
-    /* ─── GITHUB PANEL ─── */
+    /* ─── GITHUB PANEL (browse/load) ─── */
     .gh-panel{background:var(--white);border:1px solid var(--line);border-radius:var(--r);margin-top:8px;overflow:hidden}
-    .gh-header{display:flex;align-items:center;justify-content:space-between;padding:10px 13px;cursor:pointer;-webkit-tap-highlight-color:transparent;user-select:none}
+    .gh-header{display:flex;align-items:center;justify-content:space-between;padding:10px 13px;cursor:pointer;user-select:none}
     .gh-header:active{background:var(--faint)}
     .gh-title{display:flex;align-items:center;gap:7px;font-size:.8rem;font-weight:700;color:var(--ink)}
-    .gh-chevron{font-size:.7rem;color:var(--mid);transition:transform .2s;display:inline-block}
+    .gh-chevron{font-size:.7rem;color:var(--mid);transition:transform .2s}
     .gh-chevron.open{transform:rotate(90deg)}
     .gh-body{border-top:1px solid var(--line);padding:12px 13px;display:flex;flex-direction:column;gap:10px}
     .gh-body.hidden{display:none}
-
-    /* Subject list */
-    .subj-list{display:flex;flex-direction:column;gap:4px}
-    .subj-row{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:var(--r-sm);border:1.5px solid var(--line);background:var(--faint);cursor:pointer;transition:all .14s;-webkit-tap-highlight-color:transparent}
-    .subj-row:active,.subj-row.active{background:var(--accent-bg);border-color:var(--accent)}
-    .subj-name{font-size:.83rem;font-weight:600;flex:1}
-    .subj-arrow{font-size:.7rem;color:var(--mid)}
-
-    /* File list */
-    .file-list{display:flex;flex-direction:column;gap:4px}
-    .file-row{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:var(--r-sm);border:1.5px solid var(--line);background:var(--faint);cursor:pointer;transition:all .14s;-webkit-tap-highlight-color:transparent}
+    .subj-list,.file-list{display:flex;flex-direction:column;gap:4px}
+    .subj-row,.file-row{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:var(--r-sm);border:1.5px solid var(--line);background:var(--faint);cursor:pointer;transition:all .14s}
+    .subj-row:active{background:var(--accent-bg);border-color:var(--accent)}
     .file-row:active{background:var(--good-bg);border-color:var(--good)}
-    .file-row-name{font-size:.8rem;font-weight:600;flex:1}
-    .file-row-meta{font-size:.65rem;color:var(--mid)}
-
-    /* Back link inside gh panel */
-    .gh-back{font-size:.72rem;font-weight:600;color:var(--accent);cursor:pointer;display:inline-flex;align-items:center;gap:4px;margin-bottom:2px}
+    .subj-name,.file-row-name{font-size:.8rem;font-weight:600;flex:1}
+    .subj-arrow,.file-row-meta{font-size:.65rem;color:var(--mid)}
+    .gh-back{font-size:.72rem;font-weight:600;color:var(--accent);cursor:pointer;display:inline-flex;align-items:center;gap:4px}
     .gh-back:active{opacity:.7}
+    .gh-btn-row{display:flex;gap:6px}
 
-    /* Spinner */
-    .spin{width:14px;height:14px;border:2px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite;flex-shrink:0}
+    /* LOADED BADGE */
+    .loaded-badge{display:flex;align-items:center;gap:7px;padding:8px 11px;background:var(--good-bg);border:1px solid #a8ddb9;border-radius:var(--r-sm);font-size:.77rem;font-weight:600;color:var(--good);margin-top:8px;animation:fadeIn .2s ease both}
+    .loaded-badge span{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+    /* SPINNER */
+    .spin{width:14px;height:14px;border:2px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite;flex-shrink:0;display:inline-block;vertical-align:middle;margin-right:5px}
+
+    /* ─── MANAGE OVERLAY (exact from index.html) ─── */
+    .manage-overlay-backdrop{position:fixed;inset:0;z-index:860;background:rgba(10,10,18,.55);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);display:flex;align-items:flex-end;justify-content:center;animation:fadeIn .12s ease}
+    .manage-overlay-panel{background:var(--white);border-radius:24px 24px 0 0;width:100%;max-width:480px;max-height:88vh;display:flex;flex-direction:column;animation:slideUp .18s cubic-bezier(.34,1.2,.64,1);overflow:hidden}
+    .manage-overlay-head{display:flex;align-items:center;padding:16px 18px 12px;flex-shrink:0;border-bottom:1px solid var(--line);gap:10px}
+    .manage-overlay-body{overflow-y:auto;flex:1;padding:10px 14px;display:flex;flex-direction:column;gap:6px}
+    .mfile-row{display:flex;align-items:center;gap:7px;padding:9px 11px;border:1.5px solid var(--line);border-radius:var(--r-sm);background:var(--white);transition:all var(--t-fast)}
+    .mfile-row:hover{background:var(--faint)}
+    .mfile-row.editing{border-color:var(--accent);background:var(--accent-bg)}
+
+    /* folder grid for creating folders */
+    .folder-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(80px,1fr));gap:8px;margin-top:2px}
+    .folder-card{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;aspect-ratio:1/1;border:1.5px solid var(--line);border-radius:var(--r-sm);background:var(--white);cursor:pointer;padding:8px 4px;transition:all var(--t-spring);position:relative}
+    .folder-card:active{transform:scale(.95)}
+    .folder-card .fc-icon{font-size:1.3rem;line-height:1}
+    .folder-card .fc-name{font-size:.62rem;font-weight:700;text-align:center;line-height:1.2;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;word-break:break-word}
+    .folder-card-add{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;aspect-ratio:1/1;border:2px dashed var(--line);border-radius:var(--r-sm);background:var(--faint);cursor:pointer;padding:6px;transition:all var(--t-fast)}
+    .folder-card-add:active{border-color:var(--accent);background:var(--accent-bg)}
+    .folder-card-add span{font-size:.6rem;font-weight:700;color:var(--mid);text-align:center}
+
+    /* notice */
+    .notice{padding:8px 11px;border-radius:var(--r-sm);font-size:.74rem;line-height:1.45;border-left:3px solid currentColor}
+    .n-neutral{background:var(--faint);color:var(--ink);border-color:var(--line)}
+    .n-good{background:var(--good-bg);color:var(--good);border-color:var(--good)}
+    .n-bad{background:var(--bad-bg);color:var(--bad);border-color:var(--bad)}
+    .form-input{width:100%;padding:8px 10px;font-family:var(--sans);font-size:.8rem;background:var(--white);color:var(--ink);border:1.5px solid var(--line);border-radius:var(--r-sm);outline:none;transition:border-color .14s}
+    .form-input:focus{border-color:var(--accent)}
 
     /* STATS */
     .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--line);border:1px solid var(--line);border-radius:var(--r);overflow:hidden;margin-top:16px;animation:up .3s ease both}
@@ -100,17 +130,29 @@
     .stat .v{font-family:var(--serif);font-size:1.3rem;font-weight:700;line-height:1}
     .stat .k{font-size:.58rem;font-weight:700;color:var(--mid);letter-spacing:.07em;text-transform:uppercase;margin-top:2px}
 
+    /* OUTPUT BLOCK */
+    .out-block{background:var(--white);border:1px solid var(--line);border-radius:var(--r);overflow:hidden;margin-top:12px;animation:up .3s ease both}
+    .out-block-head{display:flex;align-items:center;justify-content:space-between;padding:9px 13px;border-bottom:1px solid var(--line);background:var(--faint)}
+    .out-block-title{font-size:.63rem;font-weight:800;color:var(--mid);letter-spacing:.09em;text-transform:uppercase}
+    .out-block-actions{display:flex;gap:5px}
+    .out-block textarea{border-radius:0;border:none;min-height:110px;resize:vertical}
+    .out-block textarea:focus{box-shadow:none}
+    .push-row{display:flex;align-items:center;gap:7px;padding:9px 13px;border-top:1px solid var(--line);background:var(--faint);flex-wrap:wrap}
+    .push-file-name{font-size:.74rem;font-weight:600;color:var(--mid);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+    .push-file-name.loaded{color:var(--ink)}
+    #push-msg{font-size:.72rem;width:100%;margin-top:2px}
+
     /* DISTRIBUTION */
-    .dist{background:var(--white);border:1px solid var(--line);border-radius:var(--r);padding:12px 13px;margin-top:12px;animation:up .3s .05s ease both}
+    .dist{background:var(--white);border:1px solid var(--line);border-radius:var(--r);padding:12px 13px;margin-top:12px;animation:up .3s ease both}
     .dist-title{font-size:.62rem;font-weight:800;color:var(--mid);letter-spacing:.09em;text-transform:uppercase;margin-bottom:10px}
     .dist-rows{display:flex;flex-direction:column;gap:7px}
     .dist-row{display:flex;align-items:center;gap:8px}
-    .dist-lbl{font-size:.75rem;font-weight:800;color:var(--ink);min-width:14px;text-align:center}
+    .dist-lbl{font-size:.75rem;font-weight:800;min-width:14px;text-align:center}
     .dist-bar-wrap{flex:1;height:18px;background:var(--faint);border-radius:20px;overflow:hidden}
-    .dist-bar{height:100%;border-radius:20px;transition:width .45s cubic-bezier(.34,1.2,.64,1);min-width:0}
+    .dist-bar{height:100%;border-radius:20px;transition:width .45s cubic-bezier(.34,1.2,.64,1)}
     .bar-a{background:#3b82f6}.bar-b{background:#f59e0b}.bar-c{background:#10b981}.bar-d{background:#f43f5e}
     .dist-meta{display:flex;align-items:center;gap:5px;min-width:54px;justify-content:flex-end}
-    .dist-count{font-size:.76rem;font-weight:700;color:var(--ink)}
+    .dist-count{font-size:.76rem;font-weight:700}
     .dist-pct{font-size:.67rem;font-weight:600;color:var(--mid)}
     .dist-warn{font-size:.67rem;color:var(--warn);font-weight:600;margin-top:7px;padding:5px 8px;background:var(--warn-bg);border-radius:var(--r-sm);display:none}
     .dist-warn.show{display:block}
@@ -134,15 +176,11 @@
     .p-warn{background:var(--warn-bg);color:var(--warn)}
     .p-faint{background:var(--line);color:var(--mid)}
 
-    /* ERROR / NOTICE */
-    .err{background:var(--bad-bg);border:1px solid #f5b8bc;border-radius:var(--r-sm);padding:9px 11px;font-size:.77rem;color:var(--bad);margin-top:7px;animation:in .2s ease both;white-space:pre-line}
-    .notice{padding:9px 11px;border-radius:var(--r-sm);font-size:.77rem;line-height:1.45;border-left:3px solid currentColor;margin-top:4px}
-    .n-neutral{background:var(--faint);color:var(--ink);border-color:var(--line)}
-    .n-good{background:var(--good-bg);color:var(--good);border-color:var(--good)}
-    .n-bad{background:var(--bad-bg);color:var(--bad);border-color:var(--bad)}
+    /* ERROR */
+    .err{background:var(--bad-bg);border:1px solid #f5b8bc;border-radius:var(--r-sm);padding:9px 11px;font-size:.77rem;color:var(--bad);margin-top:7px;animation:fadeIn .2s ease both;white-space:pre-line}
 
     /* SECTION */
-    .sec{display:flex;align-items:center;margin-top:20px;margin-bottom:7px;gap:9px}
+    .sec{display:flex;align-items:center;margin-top:18px;margin-bottom:7px;gap:9px}
     .sec-lbl{font-size:.63rem;font-weight:800;color:var(--mid);letter-spacing:.1em;text-transform:uppercase;flex-shrink:0}
     .sec-line{flex:1;height:1px;background:var(--line)}
 
@@ -162,10 +200,12 @@
 </nav>
 
 <div id="toast-wrap" class="toast-wrap"></div>
+<!-- Manage overlay injected here by JS -->
+<div id="manage-mount"></div>
 
 <div class="page">
 
-  <!-- ── PASTE INPUT ── -->
+  <!-- INPUT -->
   <div class="lrow">
     <span class="lbl">Questions</span>
     <span class="lbl" id="char-lbl">0 chars</span>
@@ -176,30 +216,28 @@
 Who wrote Hamlet?
 (A) Keats, (B) Dickens, (C) Shakespeare @, (D) Chaucer"></textarea>
 
-  <!-- ── FILE UPLOAD ── -->
+  <!-- FILE UPLOAD -->
   <label class="file-btn">
     📄 Upload .txt file
     <input type="file" id="file-in" accept=".txt" onchange="loadFile(this)"/>
   </label>
 
-  <!-- ── GITHUB PANEL ── -->
+  <!-- GITHUB PANEL -->
   <div class="gh-panel">
     <div class="gh-header" onclick="toggleGhPanel()">
       <span class="gh-title">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.3 3.44 9.8 8.2 11.37.6.11.82-.26.82-.58v-2.03c-3.34.73-4.04-1.61-4.04-1.61-.55-1.39-1.34-1.76-1.34-1.76-1.09-.74.08-.73.08-.73 1.2.08 1.84 1.24 1.84 1.24 1.07 1.83 2.8 1.3 3.49 1 .11-.78.42-1.3.76-1.6-2.67-.3-5.47-1.33-5.47-5.93 0-1.31.47-2.38 1.24-3.22-.13-.3-.54-1.52.12-3.18 0 0 1.01-.32 3.3 1.23a11.5 11.5 0 0 1 3-.4c1.02 0 2.04.13 3 .4 2.28-1.55 3.29-1.23 3.29-1.23.66 1.66.25 2.88.12 3.18.77.84 1.24 1.91 1.24 3.22 0 4.61-2.81 5.63-5.48 5.92.43.37.81 1.1.81 2.22v3.29c0 .32.22.7.83.58C20.57 21.8 24 17.3 24 12c0-6.63-5.37-12-12-12z"/></svg>
-        Load from GitHub
+        GitHub
       </span>
       <span class="gh-chevron" id="gh-chevron">▶</span>
     </div>
     <div class="gh-body hidden" id="gh-body">
 
-      <!-- Step: browse subjects -->
       <div id="gh-step-subjects" style="display:none">
         <div id="gh-subj-msg"></div>
         <div class="subj-list" id="gh-subj-list"></div>
       </div>
 
-      <!-- Step: browse files -->
       <div id="gh-step-files" style="display:none">
         <span class="gh-back" onclick="ghBackToSubjects()">← Subjects</span>
         <div class="lbl" style="margin:6px 0 6px" id="gh-folder-name"></div>
@@ -207,173 +245,621 @@ Who wrote Hamlet?
         <div class="file-list" id="gh-file-list"></div>
       </div>
 
-      <!-- Browse button -->
-      <button class="btn btn-accent btn-sm" id="gh-browse-btn" onclick="ghBrowse()" style="align-self:flex-start">Browse Repository</button>
-
+      <div class="gh-btn-row">
+        <button class="btn btn-accent btn-sm" id="gh-browse-btn" onclick="ghBrowse()">Browse & Load</button>
+        <button class="btn btn-white btn-sm" onclick="openManage()">✎ Manage Files</button>
+      </div>
     </div>
   </div>
 
-  <!-- ── ACTIONS ── -->
+  <!-- LOADED BADGE -->
+  <div class="loaded-badge" id="loaded-badge" style="display:none">
+    <span>📄</span><span id="loaded-name">—</span>
+  </div>
+
+  <!-- ACTIONS -->
   <div class="arow">
-    <button class="btn btn-primary" onclick="doShuffle()">🔀 Shuffle Options</button>
+    <button class="btn btn-dark" onclick="doShuffle()">🔀 Shuffle Options</button>
     <button class="btn btn-ghost btn-sm" onclick="doClear()">✕</button>
   </div>
 
   <div id="err" class="err" style="display:none"></div>
 
-  <!-- ── STATS ── -->
+  <!-- STATS -->
   <div class="stats" id="stats" style="display:none">
     <div class="stat"><div class="v" id="s-q">0</div><div class="k">Questions</div></div>
     <div class="stat"><div class="v" id="s-m">0</div><div class="k">Ans. Moved</div></div>
     <div class="stat"><div class="v" id="s-r">0</div><div class="k">Reshuffles</div></div>
   </div>
 
-  <!-- ── DISTRIBUTION ── -->
+  <!-- OUTPUT -->
+  <div class="out-block" id="out-sec" style="display:none">
+    <div class="out-block-head">
+      <span class="out-block-title">Shuffled Output</span>
+      <div class="out-block-actions">
+        <button class="btn btn-ghost btn-sm" onclick="doCopy()">⎘ Copy</button>
+        <button class="btn btn-ghost btn-sm" onclick="doDownload()">↓ .txt</button>
+      </div>
+    </div>
+    <textarea class="out" id="out" readonly></textarea>
+    <div class="push-row">
+      <span class="push-file-name" id="push-file-name">No file loaded from GitHub</span>
+      <button class="btn btn-warn btn-sm" id="btn-push" onclick="ghPush()" disabled>↑ Push</button>
+      <div id="push-msg"></div>
+    </div>
+  </div>
+
+  <!-- DISTRIBUTION -->
   <div class="dist" id="dist" style="display:none">
     <div class="dist-title">Answer Distribution</div>
     <div class="dist-rows" id="dist-rows"></div>
-    <div class="dist-warn" id="dist-warn">⚠ Uneven — one option dominates (&gt;50% of answers).</div>
+    <div class="dist-warn" id="dist-warn">⚠ Uneven — one option dominates (&gt;50%).</div>
   </div>
 
-  <!-- ── CARDS ── -->
+  <!-- CARDS -->
+  <div class="sec" id="cards-sec" style="display:none">
+    <span class="sec-lbl">Preview</span><div class="sec-line"></div>
+  </div>
   <div class="cards" id="cards"></div>
-
-  <!-- ── OUTPUT ── -->
-  <div id="out-sec" style="display:none">
-    <div class="sec"><span class="sec-lbl">Output</span><div class="sec-line"></div></div>
-    <textarea class="out" id="out" readonly></textarea>
-    <div class="arow" style="margin-top:7px">
-      <button class="btn btn-good btn-sm" onclick="doCopy()">⎘ Copy</button>
-      <button class="btn btn-ghost btn-sm" onclick="doDownload()">↓ .txt</button>
-    </div>
-  </div>
 
 </div>
 
 <script>
-/* ══════════════════════════════════════
-   GITHUB CONFIG  — same as index.html
-══════════════════════════════════════ */
+/* ══════════════════════════════
+   GITHUB CONFIG — same as index.html
+══════════════════════════════ */
 const MY_TOKEN      = '%%MY_TOKEN%%';
 const GITHUB_REPO   = 'raeist-user/quizzap';
 const GITHUB_BRANCH = 'main';
 
-function isValidToken(){ return MY_TOKEN && !MY_TOKEN.startsWith('%%') && MY_TOKEN.length > 0; }
-// GET — no Content-Type (avoids CORS preflight GitHub rejects)
-function ghReadHeaders(){
-  const h = {'Accept':'application/vnd.github+json'};
-  if(isValidToken()) h['Authorization'] = 'Bearer ' + MY_TOKEN;
+function isValidToken(){ return MY_TOKEN && !MY_TOKEN.startsWith('%%') && MY_TOKEN.length>0; }
+function ghHeaders(){
+  const h={'Accept':'application/vnd.github+json'};
+  if(isValidToken()) h['Authorization']='Bearer '+MY_TOKEN;
+  return h;
+}
+function ghWriteHeaders(){
+  const h={'Accept':'application/vnd.github+json','Content-Type':'application/json'};
+  if(isValidToken()) h['Authorization']='Bearer '+MY_TOKEN;
   return h;
 }
 
-/* ══════════════════════════════════════
-   GITHUB PANEL UI
-══════════════════════════════════════ */
-let ghOpen = false;
-let ghSubjects = [];
-let ghCurrentSubj = null;
+/* ══════════════════════════════
+   MANAGE STATE — exact from index.html
+══════════════════════════════ */
+let manageOpen       = false;
+let manageFolder     = null;   // currently open folder in overlay
+let manageFile       = null;   // file being edited
+let manageFolderFiles= [];     // [{name, path, sha}]
+let manageEditMode   = null;   // null | 'edit' | 'new'
+let manageNewFileName= '';
+let editingContent   = '';
+let editingSha       = null;
+let uploadMsg        = '';
+let editorFullscreen = false;
+let uploadSubjects   = [];     // folders list for manage
+
+function setUploadMsg(msg, type){
+  uploadMsg = msg ? `<div class="notice n-${type}">${esc(msg)}</div>` : '';
+  const el = document.getElementById('upload-msg');
+  if(el) el.innerHTML = uploadMsg;
+}
+
+async function loadUploadFolders(){
+  try{
+    const res=await fetch(`https://api.github.com/repos/${GITHUB_REPO}/contents/resources?ref=${GITHUB_BRANCH}`,{headers:ghHeaders()});
+    if(!res.ok) throw new Error(`GitHub API ${res.status}`);
+    const items=await res.json();
+    uploadSubjects=items.filter(i=>i.type==='dir').map(d=>({name:d.name,path:d.path}));
+  }catch(e){ uploadSubjects=[]; }
+  renderManage();
+}
+
+async function loadFolderFiles(folderName){
+  try{
+    const enc=encodeURIComponent(folderName);
+    const res=await fetch(`https://api.github.com/repos/${GITHUB_REPO}/contents/resources/${enc}?ref=${GITHUB_BRANCH}`,{headers:ghHeaders()});
+    if(!res.ok) throw new Error(`GitHub API ${res.status}`);
+    const items=await res.json();
+    manageFolderFiles=items.filter(i=>i.type==='file'&&i.name.endsWith('.txt')&&i.name!=='.gitkeep').map(i=>({name:i.name,path:i.path,sha:i.sha}));
+  }catch(e){ manageFolderFiles=[]; }
+  renderManage();
+}
+
+async function createFolder(){
+  const inp=document.getElementById('new-folder-name');
+  if(!inp) return;
+  const name=inp.value.trim().replace(/[^a-zA-Z0-9_\- ]/g,'');
+  if(!name){ setUploadMsg('Folder name required','bad'); return; }
+  if(!isValidToken()){ setUploadMsg('MY_TOKEN not set — cannot create folder','bad'); return; }
+  setUploadMsg('Creating folder…','neutral');
+  try{
+    const path=`resources/${name}/.gitkeep`;
+    const res=await fetch(`https://api.github.com/repos/${GITHUB_REPO}/contents/${path}`,{
+      method:'PUT', headers:ghWriteHeaders(),
+      body:JSON.stringify({message:`Create ${name} folder`,content:btoa(''),branch:GITHUB_BRANCH})
+    });
+    if(!res.ok) throw new Error(`GitHub API ${res.status}`);
+    setUploadMsg(`Folder "${name}" created!`,'good');
+    inp.value='';
+    await loadUploadFolders();
+  }catch(e){ setUploadMsg(e.message,'bad'); }
+}
+
+async function deleteFolder(folderName){
+  if(!isValidToken()){ setUploadMsg('MY_TOKEN not set','bad'); return; }
+  if(!confirm(`Delete folder "${folderName}" and all its files?`)) return;
+  setUploadMsg('Deleting…','neutral');
+  try{
+    const enc=encodeURIComponent(folderName);
+    const res=await fetch(`https://api.github.com/repos/${GITHUB_REPO}/contents/resources/${enc}?ref=${GITHUB_BRANCH}`,{headers:ghHeaders()});
+    if(!res.ok) throw new Error(`GitHub API ${res.status}`);
+    const items=await res.json();
+    for(const item of items){
+      const dr=await fetch(`https://api.github.com/repos/${GITHUB_REPO}/contents/${item.path}`,{
+        method:'DELETE', headers:ghWriteHeaders(),
+        body:JSON.stringify({message:`Delete ${item.path}`,sha:item.sha,branch:GITHUB_BRANCH})
+      });
+      if(!dr.ok) throw new Error(`Failed to delete ${item.name}`);
+    }
+    manageFolder=null; manageFile=null; manageEditMode=null;
+    manageFolderFiles=[]; editingContent=''; editingSha=null;
+    setUploadMsg(`Folder "${folderName}" deleted.`,'good');
+    await loadUploadFolders();
+  }catch(e){ setUploadMsg(e.message,'bad'); }
+}
+
+async function deleteFile(folderName, fileName){
+  if(!isValidToken()){ setUploadMsg('MY_TOKEN not set','bad'); return; }
+  setUploadMsg(`Deleting ${fileName}…`,'neutral');
+  try{
+    const encF=encodeURIComponent(folderName), encN=encodeURIComponent(fileName);
+    const apiUrl=`https://api.github.com/repos/${GITHUB_REPO}/contents/resources/${encF}/${encN}`;
+    const chk=await fetch(`${apiUrl}?ref=${GITHUB_BRANCH}`,{headers:ghHeaders()});
+    if(!chk.ok) throw new Error(`Could not find file: ${chk.status}`);
+    const d=await chk.json();
+    const res=await fetch(apiUrl,{
+      method:'DELETE', headers:ghWriteHeaders(),
+      body:JSON.stringify({message:`Delete resources/${folderName}/${fileName}`,sha:d.sha,branch:GITHUB_BRANCH})
+    });
+    if(!res.ok) throw new Error(`GitHub API ${res.status}`);
+    if(manageFile===fileName){ manageFile=null; manageEditMode=null; editingContent=''; editingSha=null; }
+    setUploadMsg(`"${fileName}" deleted.`,'good');
+    await loadFolderFiles(folderName);
+  }catch(e){ setUploadMsg(e.message,'bad'); }
+}
+
+async function openFolderEdit(folderName, fileName){
+  manageFolder=folderName; manageFile=fileName;
+  manageEditMode='edit'; editingContent=''; editingSha=null;
+  setUploadMsg(`Loading ${fileName}…`,'neutral');
+  renderManage();
+  try{
+    const encF=encodeURIComponent(folderName), encN=encodeURIComponent(fileName);
+    const res=await fetch(`https://api.github.com/repos/${GITHUB_REPO}/contents/resources/${encF}/${encN}?ref=${GITHUB_BRANCH}`,{headers:ghHeaders()});
+    if(res.status===404){ editingContent=''; editingSha=null; setUploadMsg('File empty — write content below to create it.','neutral'); renderManage(); return; }
+    if(!res.ok) throw new Error(`GitHub API ${res.status}`);
+    const data=await res.json();
+    editingSha=data.sha;
+    const bytes=Uint8Array.from(atob(data.content.replace(/\n/g,'')),c=>c.charCodeAt(0));
+    editingContent=new TextDecoder('utf-8').decode(bytes);
+    setUploadMsg('','');
+    renderManage();
+    setTimeout(()=>{ const ta=document.getElementById('q-editor'); if(ta){ ta.value=editingContent; ta.focus(); } },50);
+  }catch(e){ setUploadMsg(e.message,'bad'); }
+}
+
+async function saveEditorContent(){
+  if(!manageFolder){ setUploadMsg('No folder selected','bad'); return; }
+  let fileName=manageFile;
+  if(manageEditMode==='new'){
+    const inp=document.getElementById('new-file-name-editor');
+    let n=inp?inp.value.trim():manageNewFileName;
+    if(!n){ setUploadMsg('Enter a file name','bad'); return; }
+    if(!n.endsWith('.txt')) n+='.txt';
+    fileName=n;
+  }
+  if(!fileName){ setUploadMsg('No file selected','bad'); return; }
+  if(!isValidToken()){ setUploadMsg('MY_TOKEN not set — cannot save','bad'); return; }
+  const ta=document.getElementById('q-editor');
+  const content=ta?ta.value:'';
+  if(!content.trim()){ setUploadMsg('Content is empty','bad'); return; }
+  setUploadMsg('Saving…','neutral');
+  try{
+    const encF=encodeURIComponent(manageFolder), encN=encodeURIComponent(fileName);
+    const apiUrl=`https://api.github.com/repos/${GITHUB_REPO}/contents/resources/${encF}/${encN}`;
+    let sha=editingSha;
+    if(!sha){
+      const chk=await fetch(`${apiUrl}?ref=${GITHUB_BRANCH}`,{headers:ghHeaders()});
+      if(chk.ok){ const d=await chk.json(); sha=d.sha; }
+    }
+    const body={message:`Update resources/${manageFolder}/${fileName}`,content:btoa(unescape(encodeURIComponent(content))),branch:GITHUB_BRANCH};
+    if(sha) body.sha=sha;
+    const res=await fetch(apiUrl,{method:'PUT',headers:ghWriteHeaders(),body:JSON.stringify(body)});
+    if(!res.ok) throw new Error(`GitHub API ${res.status}`);
+    const data=await res.json();
+    editingSha=data.content?.sha||sha;
+    manageFile=fileName;
+    setUploadMsg('Saved successfully!','good');
+    await loadFolderFiles(manageFolder);
+  }catch(e){ setUploadMsg(e.message,'bad'); }
+}
+
+async function uploadQuestionsFile(){
+  if(!manageFolder){ setUploadMsg('Select a folder first','bad'); return; }
+  if(!isValidToken()){ setUploadMsg('MY_TOKEN not set','bad'); return; }
+  const inp=document.getElementById('file-upload-inp');
+  if(!inp||!inp.files.length){ setUploadMsg('Choose a .txt file first','bad'); return; }
+  const file=inp.files[0];
+  if(!file.name.endsWith('.txt')){ setUploadMsg('Only .txt files allowed','bad'); return; }
+  const targetFile=file.name;
+  setUploadMsg('Reading file…','neutral');
+  const reader=new FileReader();
+  reader.onload=async(ev)=>{
+    const content=ev.target.result;
+    try{
+      setUploadMsg('Uploading…','neutral');
+      const encF=encodeURIComponent(manageFolder), encN=encodeURIComponent(targetFile);
+      const apiUrl=`https://api.github.com/repos/${GITHUB_REPO}/contents/resources/${encF}/${encN}`;
+      let sha=null;
+      const chk=await fetch(`${apiUrl}?ref=${GITHUB_BRANCH}`,{headers:ghHeaders()});
+      if(chk.ok){ const d=await chk.json(); sha=d.sha; }
+      const body={message:`Upload resources/${manageFolder}/${targetFile}`,content:btoa(unescape(encodeURIComponent(content))),branch:GITHUB_BRANCH};
+      if(sha) body.sha=sha;
+      const res=await fetch(apiUrl,{method:'PUT',headers:ghWriteHeaders(),body:JSON.stringify(body)});
+      if(!res.ok) throw new Error(`GitHub API ${res.status}`);
+      setUploadMsg(`Uploaded as ${targetFile}!`,'good');
+      await loadFolderFiles(manageFolder);
+    }catch(err){ setUploadMsg(err.message,'bad'); }
+  };
+  reader.readAsText(file);
+}
+
+/* ── Manage overlay open/close ── */
+function openManage(){
+  manageOpen=true;
+  manageFolder=null; manageFile=null; manageEditMode=null;
+  manageFolderFiles=[]; editingContent=''; editingSha=null;
+  uploadMsg=''; editorFullscreen=false;
+  renderManage();
+  loadUploadFolders();
+}
+function closeManage(){
+  manageOpen=false;
+  manageFolder=null; manageFile=null; manageEditMode=null;
+  manageFolderFiles=[]; editingContent=''; editingSha=null;
+  uploadMsg=''; editorFullscreen=false;
+  renderManage();
+}
+
+/* ── Render manage overlay (mirrors index.html manageOverlayHTML) ── */
+function renderManage(){
+  const mount=document.getElementById('manage-mount');
+  if(!manageOpen){ mount.innerHTML=''; return; }
+
+  // ── Folder grid (when no folder selected) ──
+  if(!manageFolder){
+    const folderCards=uploadSubjects.map(s=>
+      `<div class="folder-card" data-manage-folder="${esc(s.name)}">
+        <span class="fc-icon">📁</span>
+        <span class="fc-name">${esc(s.name)}</span>
+      </div>`
+    ).join('');
+
+    mount.innerHTML=`<div class="manage-overlay-backdrop" id="manage-overlay-backdrop">
+      <div class="manage-overlay-panel">
+        <div class="manage-overlay-head">
+          <span style="font-size:1.2rem">📂</span>
+          <div style="flex:1"><div style="font-size:.9rem;font-weight:700">Manage Files</div><div style="font-size:.68rem;color:var(--mid)">${uploadSubjects.length} subject${uploadSubjects.length!==1?'s':''}</div></div>
+          <button class="btn btn-ghost btn-sm" id="btn-manage-close">✕ Close</button>
+        </div>
+        <div class="manage-overlay-body">
+          <div class="folder-grid">
+            ${folderCards}
+            <div class="folder-card-add" id="btn-new-folder-card">
+              <span style="font-size:1.4rem">＋</span>
+              <span>New Folder</span>
+            </div>
+          </div>
+          <div id="new-folder-form" style="display:none;display:flex;gap:6px;margin-top:4px" class="hidden-form">
+            <input class="form-input" id="new-folder-name" placeholder="Folder name" maxlength="40" style="flex:1;font-size:.78rem;padding:7px 9px"/>
+            <button class="btn btn-accent btn-sm" id="btn-create-folder">Create</button>
+            <button class="btn btn-ghost btn-sm" id="btn-cancel-new-folder">✕</button>
+          </div>
+          <div id="upload-msg" style="font-size:.75rem;margin-top:2px">${uploadMsg}</div>
+        </div>
+      </div>
+    </div>`;
+    bindManageEvents();
+    return;
+  }
+
+  // ── File list for selected folder ──
+  const fileRows=manageFolderFiles.length
+    ? manageFolderFiles.map(f=>`
+        <div class="mfile-row${manageFile===f.name?' editing':''}">
+          <span style="flex:1;font-size:.8rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:${manageFile===f.name?'var(--accent)':'var(--ink)'};font-weight:${manageFile===f.name?'600':'400'}">${esc(f.name)}</span>
+          <button class="btn btn-ghost btn-sm" style="padding:2px 9px;font-size:.7rem;flex-shrink:0;${manageFile===f.name?'background:#e0edff;border-color:var(--accent);color:var(--accent)':''}" data-file-edit="${esc(f.name)}">${manageFile===f.name?'✎ Editing':'Edit'}</button>
+          <button class="btn btn-sm" style="padding:2px 7px;flex-shrink:0;background:#fff1f2;border-color:#fecdd3;color:#be123c;font-size:.68rem" data-file-del="${esc(f.name)}">✕</button>
+        </div>`).join('')
+    : `<div style="padding:12px;text-align:center;color:var(--mid);font-size:.78rem;background:var(--faint);border-radius:7px">No .txt files yet — create one below</div>`;
+
+  // ── Inline editor ──
+  const editorBlock=manageEditMode?`
+    <div style="border:1.5px solid var(--ink);border-radius:9px;overflow:hidden;display:flex;flex-direction:column;">
+      <div style="display:flex;align-items:center;gap:6px;padding:7px 10px;background:var(--ink);color:#fff;flex-shrink:0">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+        <span style="font-size:.75rem;font-weight:600;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+          ${esc(manageFolder)} / ${manageEditMode==='new'
+            ?`<input id="new-file-name-editor" placeholder="chapter1.txt" maxlength="60"
+                style="background:rgba(255,255,255,.18);border:none;border-bottom:1px solid rgba(255,255,255,.5);color:#fff;font-size:.75rem;font-weight:600;padding:1px 5px;outline:none;width:120px;border-radius:3px"
+                value="${esc(manageNewFileName)}"/>`
+            :`<span style="opacity:.85">${esc(manageFile||'')}</span>`}
+        </span>
+        <button id="btn-close-editor" style="background:none;border:1px solid rgba(255,255,255,.3);color:#fff;padding:2px 7px;border-radius:4px;cursor:pointer;font-size:.68rem">✕</button>
+      </div>
+      <div style="padding:3px 10px;background:#fafaf9;border-bottom:1px solid var(--line);font-size:.63rem;color:var(--mid);flex-shrink:0">
+        <strong style="color:var(--ink)">Format:</strong> Question · <code style="background:#eee;padding:0 3px;border-radius:2px">(A)opt @, (B)opt, (C)opt, (D)opt</code>
+      </div>
+      <textarea id="q-editor" style="width:100%;font-family:monospace;font-size:.76rem;resize:none;padding:10px 12px;border:none;outline:none;display:block;min-height:180px;box-sizing:border-box"
+        placeholder="What is photosynthesis?&#10;(A)Making food from sunlight @, (B)Breathing, (C)Digestion, (D)Transpiration">${esc(editingContent)}</textarea>
+      <div style="display:flex;gap:6px;padding:6px 10px;background:#fafaf9;border-top:1px solid var(--line);align-items:center;flex-shrink:0">
+        <button class="btn btn-good btn-sm" style="gap:4px;font-size:.75rem" id="btn-save-editor">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17,21 17,13 7,13 7,21"/></svg>Save to GitHub
+        </button>
+        <label class="btn btn-white btn-sm" style="cursor:pointer;gap:4px;font-size:.75rem">
+          ↑ Upload .txt<input type="file" id="file-upload-inp" accept=".txt" style="display:none"/>
+        </label>
+      </div>
+    </div>` : '';
+
+  const newFileRow=!manageEditMode?`
+    <div style="display:flex;gap:5px;margin-top:2px">
+      <input class="form-input" id="new-file-name" placeholder="chapter.txt" maxlength="60" style="flex:1;font-size:.76rem;padding:5px 8px"/>
+      <button class="btn btn-dark btn-sm" id="btn-create-file" style="font-size:.73rem;white-space:nowrap">+ New</button>
+      <label class="btn btn-white btn-sm" style="cursor:pointer;font-size:.73rem;white-space:nowrap">
+        ↑ Upload<input type="file" id="file-upload-inp" accept=".txt" style="display:none"/>
+      </label>
+    </div>`:'';
+
+  mount.innerHTML=`<div class="manage-overlay-backdrop" id="manage-overlay-backdrop">
+    <div class="manage-overlay-panel">
+      <div class="manage-overlay-head">
+        <span style="font-size:1.2rem">📁</span>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:.9rem;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(manageFolder)}</div>
+          <div style="font-size:.68rem;color:var(--mid)">${manageFolderFiles.length} file${manageFolderFiles.length!==1?'s':''}</div>
+        </div>
+        <button class="btn btn-ghost btn-sm" style="font-size:.75rem;flex-shrink:0" id="btn-manage-close">✕ Close</button>
+      </div>
+      <div class="manage-overlay-body">
+        ${fileRows}
+        ${editorBlock}
+        ${newFileRow}
+        <div id="upload-msg" style="font-size:.75rem">${uploadMsg}</div>
+      </div>
+      <div style="padding:8px 14px 22px;border-top:1px solid var(--line);flex-shrink:0;display:flex;gap:6px">
+        <button class="btn btn-white btn-sm" id="btn-back-folders" style="font-size:.73rem">← Folders</button>
+        <button class="btn btn-sm btn-full" style="background:#fff1f2;color:#be123c;border-color:#fecdd3;font-size:.73rem" id="btn-delete-folder">✕ Delete folder</button>
+      </div>
+    </div>
+  </div>`;
+  bindManageEvents();
+}
+
+function bindManageEvents(){
+  // Close overlay
+  const closeBtn=document.getElementById('btn-manage-close');
+  if(closeBtn) closeBtn.onclick=closeManage;
+
+  // Backdrop click closes
+  const backdrop=document.getElementById('manage-overlay-backdrop');
+  if(backdrop) backdrop.addEventListener('click', e=>{ if(e.target.id==='manage-overlay-backdrop') closeManage(); });
+
+  // Escape key
+  const onKey=e=>{ if(e.key==='Escape'){ closeManage(); document.removeEventListener('keydown',onKey); } };
+  document.addEventListener('keydown',onKey);
+
+  // ── Folder grid ──
+  document.querySelectorAll('[data-manage-folder]').forEach(el=>{
+    el.onclick=()=>{
+      manageFolder=el.dataset.manageFolder;
+      manageFile=null; manageEditMode=null;
+      manageFolderFiles=[]; editingContent=''; editingSha=null; uploadMsg='';
+      renderManage();
+      loadFolderFiles(manageFolder);
+    };
+  });
+
+  // New folder card toggle
+  const newFolderCard=document.getElementById('btn-new-folder-card');
+  const newFolderForm=document.getElementById('new-folder-form') || document.querySelector('.hidden-form');
+  if(newFolderCard && newFolderForm){
+    newFolderCard.onclick=()=>{ newFolderForm.style.display='flex'; setTimeout(()=>document.getElementById('new-folder-name')?.focus(),30); };
+  }
+  const cancelNew=document.getElementById('btn-cancel-new-folder');
+  if(cancelNew && newFolderForm) cancelNew.onclick=()=>{ newFolderForm.style.display='none'; };
+
+  // Create folder
+  const createBtn=document.getElementById('btn-create-folder');
+  if(createBtn) createBtn.onclick=createFolder;
+  const folderInput=document.getElementById('new-folder-name');
+  if(folderInput) folderInput.onkeydown=e=>{ if(e.key==='Enter') createFolder(); };
+
+  // Back to folders
+  const backBtn=document.getElementById('btn-back-folders');
+  if(backBtn) backBtn.onclick=()=>{ manageFolder=null; manageFile=null; manageEditMode=null; manageFolderFiles=[]; editingContent=''; editingSha=null; uploadMsg=''; renderManage(); };
+
+  // Delete folder
+  const delFolder=document.getElementById('btn-delete-folder');
+  if(delFolder) delFolder.onclick=()=>deleteFolder(manageFolder);
+
+  // File edit / delete
+  document.querySelectorAll('[data-file-edit]').forEach(el=>{
+    el.onclick=()=>openFolderEdit(manageFolder, el.dataset.fileEdit);
+  });
+  document.querySelectorAll('[data-file-del]').forEach(el=>{
+    el.onclick=()=>deleteFile(manageFolder, el.dataset.fileDel);
+  });
+
+  // Create new file
+  const createFileBtn=document.getElementById('btn-create-file');
+  if(createFileBtn) createFileBtn.onclick=()=>{
+    const inp=document.getElementById('new-file-name');
+    let n=inp?inp.value.trim():'';
+    if(!n){ setUploadMsg('Enter a file name','bad'); return; }
+    if(!n.endsWith('.txt')) n+='.txt';
+    manageFile=n; manageEditMode='new'; editingContent=''; editingSha=null; manageNewFileName=n;
+    renderManage();
+    setTimeout(()=>{ const ta=document.getElementById('q-editor'); if(ta) ta.focus(); },50);
+  };
+
+  // Save editor
+  const saveBtn=document.getElementById('btn-save-editor');
+  if(saveBtn) saveBtn.onclick=saveEditorContent;
+
+  // Close editor
+  const closeEditor=document.getElementById('btn-close-editor');
+  if(closeEditor) closeEditor.onclick=()=>{ manageEditMode=null; manageFile=null; manageNewFileName=''; editingContent=''; editingSha=null; renderManage(); };
+
+  // File upload input
+  const uploadInp=document.getElementById('file-upload-inp');
+  if(uploadInp) uploadInp.onchange=uploadQuestionsFile;
+}
+
+/* ══════════════════════════════
+   GITHUB BROWSE / LOAD
+══════════════════════════════ */
+let ghOpen=false;
+let ghSubjects=[];
+let ghCurrentSubj=null;
+let ghLoadedFile=null;
 
 function toggleGhPanel(){
-  ghOpen = !ghOpen;
-  document.getElementById('gh-body').classList.toggle('hidden', !ghOpen);
-  document.getElementById('gh-chevron').classList.toggle('open', ghOpen);
+  ghOpen=!ghOpen;
+  document.getElementById('gh-body').classList.toggle('hidden',!ghOpen);
+  document.getElementById('gh-chevron').classList.toggle('open',ghOpen);
 }
 
-/* Browse: list subject folders */
 async function ghBrowse(){
-  setGhSubjMsg('<div class="notice n-neutral"><span class="spin" style="display:inline-block;vertical-align:middle;margin-right:6px"></span>Loading subjects…</div>');
-  document.getElementById('gh-step-subjects').style.display = '';
-  document.getElementById('gh-step-files').style.display = 'none';
-  document.getElementById('gh-browse-btn').style.display = 'none';
+  setGhSubjMsg('<div class="notice n-neutral"><span class="spin"></span>Loading subjects…</div>');
+  document.getElementById('gh-step-subjects').style.display='';
+  document.getElementById('gh-step-files').style.display='none';
+  document.getElementById('gh-browse-btn').disabled=true;
   try{
-    const res = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/contents/resources?ref=${GITHUB_BRANCH}`, {headers:ghReadHeaders()});
-    if(!res.ok) throw new Error(`GitHub API ${res.status} — check token and repo.`);
-    const items = await res.json();
-    const dirs = items.filter(i => i.type === 'dir');
-    if(!dirs.length) throw new Error('No subject folders found inside "resources".');
-    ghSubjects = dirs.map(d => ({name:d.name, path:d.path}));
+    const res=await fetch(`https://api.github.com/repos/${GITHUB_REPO}/contents/resources?ref=${GITHUB_BRANCH}`,{headers:ghHeaders()});
+    if(!res.ok) throw new Error(`GitHub API ${res.status}`);
+    const items=await res.json();
+    const dirs=items.filter(i=>i.type==='dir');
+    if(!dirs.length) throw new Error('No subject folders in "resources".');
+    ghSubjects=dirs.map(d=>({name:d.name,path:d.path}));
     setGhSubjMsg('');
-    renderSubjects();
+    document.getElementById('gh-subj-list').innerHTML=ghSubjects.map(s=>
+      `<div class="subj-row" onclick="ghSelectSubject('${esc(s.name)}')">
+        <span class="subj-name">📁 ${esc(s.name)}</span>
+        <span class="subj-arrow">›</span>
+      </div>`
+    ).join('');
   }catch(e){
     setGhSubjMsg(`<div class="notice n-bad">${esc(e.message)}</div>`);
-    document.getElementById('gh-browse-btn').style.display = '';
-  }
+  }finally{ document.getElementById('gh-browse-btn').disabled=false; }
 }
 
-function renderSubjects(){
-  document.getElementById('gh-subj-list').innerHTML = ghSubjects.map(s =>
-    `<div class="subj-row" onclick="ghSelectSubject('${esc(s.name)}')">
-      <span class="subj-name">📁 ${esc(s.name)}</span>
-      <span class="subj-arrow">›</span>
-    </div>`
-  ).join('');
-}
-
-/* Select subject → list .txt files */
 async function ghSelectSubject(name){
-  ghCurrentSubj = ghSubjects.find(s => s.name === name);
+  ghCurrentSubj=ghSubjects.find(s=>s.name===name);
   if(!ghCurrentSubj) return;
-  document.getElementById('gh-step-subjects').style.display = 'none';
-  document.getElementById('gh-step-files').style.display = '';
-  document.getElementById('gh-folder-name').textContent = name;
-  setGhFilesMsg('<div class="notice n-neutral"><span class="spin" style="display:inline-block;vertical-align:middle;margin-right:6px"></span>Loading files…</div>');
-  document.getElementById('gh-file-list').innerHTML = '';
+  document.getElementById('gh-step-subjects').style.display='none';
+  document.getElementById('gh-step-files').style.display='';
+  document.getElementById('gh-folder-name').textContent=name;
+  setGhFilesMsg('<div class="notice n-neutral"><span class="spin"></span>Loading files…</div>');
+  document.getElementById('gh-file-list').innerHTML='';
   try{
-    const encodedPath = ghCurrentSubj.path.split('/').map(encodeURIComponent).join('/');
-    const res = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/contents/${encodedPath}?ref=${GITHUB_BRANCH}`, {headers:ghReadHeaders()});
+    const enc=ghCurrentSubj.path.split('/').map(encodeURIComponent).join('/');
+    const res=await fetch(`https://api.github.com/repos/${GITHUB_REPO}/contents/${enc}?ref=${GITHUB_BRANCH}`,{headers:ghHeaders()});
     if(!res.ok) throw new Error(`GitHub API ${res.status}`);
-    const items = await res.json();
-    const files = items.filter(i => i.type==='file' && i.name.endsWith('.txt') && i.name!=='.gitkeep');
-    if(!files.length){ setGhFilesMsg('<div class="notice n-neutral">No .txt files in this folder.</div>'); return; }
+    const items=await res.json();
+    const files=items.filter(i=>i.type==='file'&&i.name.endsWith('.txt')&&i.name!=='.gitkeep');
+    if(!files.length){ setGhFilesMsg('<div class="notice n-neutral">No .txt files.</div>'); return; }
     setGhFilesMsg('');
-    document.getElementById('gh-file-list').innerHTML = files.map(f =>
-      `<div class="file-row" onclick="ghLoadFile('${esc(f.path)}','${esc(f.name)}')">
+    document.getElementById('gh-file-list').innerHTML=files.map(f=>
+      `<div class="file-row" onclick="ghLoadFile('${esc(f.path)}','${esc(f.name)}','${esc(f.sha)}')">
         <span class="file-row-name">📄 ${esc(f.name.replace(/\.txt$/i,''))}</span>
         <span class="file-row-meta">.txt</span>
       </div>`
     ).join('');
-  }catch(e){
-    setGhFilesMsg(`<div class="notice n-bad">${esc(e.message)}</div>`);
-  }
+  }catch(e){ setGhFilesMsg(`<div class="notice n-bad">${esc(e.message)}</div>`); }
 }
 
 function ghBackToSubjects(){
-  document.getElementById('gh-step-files').style.display = 'none';
-  document.getElementById('gh-step-subjects').style.display = '';
+  document.getElementById('gh-step-files').style.display='none';
+  document.getElementById('gh-step-subjects').style.display='';
 }
 
-/* Fetch file content — base64 decode, then parse & shuffle */
-async function ghLoadFile(filePath, fileName){
-  setGhFilesMsg(`<div class="notice n-neutral"><span class="spin" style="display:inline-block;vertical-align:middle;margin-right:6px"></span>Loading ${esc(fileName)}…</div>`);
+async function ghLoadFile(filePath, fileName, fileSha){
+  setGhFilesMsg(`<div class="notice n-neutral"><span class="spin"></span>Loading ${esc(fileName)}…</div>`);
   try{
-    const encodedPath = filePath.split('/').map(encodeURIComponent).join('/');
-    const apiUrl = `https://api.github.com/repos/${GITHUB_REPO}/contents/${encodedPath}?ref=${GITHUB_BRANCH}`;
-    const res = await fetch(apiUrl, {headers:ghReadHeaders()});
-    if(!res.ok) throw new Error(`Could not fetch ${fileName} (HTTP ${res.status})`);
-    const data = await res.json();
-    // Decode base64 — handles UTF-8, Hindi, Urdu etc. (same as index.html)
-    const bytes = Uint8Array.from(atob(data.content.replace(/\n/g,'')), c => c.charCodeAt(0));
-    const text = new TextDecoder('utf-8').decode(bytes);
-    // Load into textarea
-    document.getElementById('raw').value = text;
+    const enc=filePath.split('/').map(encodeURIComponent).join('/');
+    const res=await fetch(`https://api.github.com/repos/${GITHUB_REPO}/contents/${enc}?ref=${GITHUB_BRANCH}`,{headers:ghHeaders()});
+    if(!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data=await res.json();
+    const bytes=Uint8Array.from(atob(data.content.replace(/\n/g,'')),c=>c.charCodeAt(0));
+    const text=new TextDecoder('utf-8').decode(bytes);
+    ghLoadedFile={path:data.path, name:fileName, sha:data.sha};
+    updatePushUI();
+    document.getElementById('raw').value=text;
     updateChars();
+    document.getElementById('loaded-name').textContent=fileName;
+    document.getElementById('loaded-badge').style.display='';
     setGhFilesMsg(`<div class="notice n-good">✓ Loaded ${esc(fileName)}</div>`);
-    toast(`Loaded ${fileName}`, 'good');
-    // Auto-shuffle
+    toast(`Loaded ${fileName}`,'good');
     doShuffle();
-    // Collapse panel after load
-    setTimeout(()=>{ toggleGhPanel(); }, 400);
-  }catch(e){
-    setGhFilesMsg(`<div class="notice n-bad">${esc(e.message)}</div>`);
-  }
+    setTimeout(()=>toggleGhPanel(),400);
+  }catch(e){ setGhFilesMsg(`<div class="notice n-bad">${esc(e.message)}</div>`); }
 }
 
-function setGhSubjMsg(html){ document.getElementById('gh-subj-msg').innerHTML = html; }
-function setGhFilesMsg(html){ document.getElementById('gh-files-msg').innerHTML = html; }
+function setGhSubjMsg(h){ document.getElementById('gh-subj-msg').innerHTML=h; }
+function setGhFilesMsg(h){ document.getElementById('gh-files-msg').innerHTML=h; }
 
-/* ══════════════════════════════════════
-   PARSER — exact format from index.html
-══════════════════════════════════════ */
+/* ══════════════════════════════
+   PUSH
+══════════════════════════════ */
+function updatePushUI(){
+  const nameEl=document.getElementById('push-file-name');
+  const btn=document.getElementById('btn-push');
+  if(ghLoadedFile){ nameEl.textContent='Push to: '+ghLoadedFile.name; nameEl.classList.add('loaded'); btn.disabled=false; }
+  else { nameEl.textContent='No file loaded from GitHub'; nameEl.classList.remove('loaded'); btn.disabled=true; }
+}
+
+async function ghPush(){
+  if(!ghLoadedFile){ toast('No GitHub file loaded','warn'); return; }
+  const content=document.getElementById('out').value;
+  if(!content){ toast('Nothing to push','warn'); return; }
+  if(!isValidToken()){ setPushMsg('<div class="notice n-bad">MY_TOKEN not set.</div>'); return; }
+  const btn=document.getElementById('btn-push');
+  btn.disabled=true; btn.textContent='Pushing…';
+  setPushMsg('<div class="notice n-neutral"><span class="spin"></span>Pushing…</div>');
+  try{
+    const enc=ghLoadedFile.path.split('/').map(encodeURIComponent).join('/');
+    const chk=await fetch(`https://api.github.com/repos/${GITHUB_REPO}/contents/${enc}?ref=${GITHUB_BRANCH}`,{headers:ghHeaders()});
+    if(chk.ok){ const d=await chk.json(); ghLoadedFile.sha=d.sha; }
+    const res=await fetch(`https://api.github.com/repos/${GITHUB_REPO}/contents/${enc}`,{
+      method:'PUT', headers:ghWriteHeaders(),
+      body:JSON.stringify({message:`Shuffle: update ${ghLoadedFile.name}`,content:btoa(unescape(encodeURIComponent(content))),sha:ghLoadedFile.sha,branch:GITHUB_BRANCH})
+    });
+    if(!res.ok){ const err=await res.json().catch(()=>({})); throw new Error(err.message||`GitHub API ${res.status}`); }
+    const result=await res.json();
+    ghLoadedFile.sha=result.content?.sha||ghLoadedFile.sha;
+    setPushMsg('<div class="notice n-good">✓ Pushed successfully</div>');
+    toast('Pushed to GitHub ✓','good');
+  }catch(e){ setPushMsg(`<div class="notice n-bad">✗ ${esc(e.message)}</div>`); toast('Push failed','warn'); }
+  finally{ btn.disabled=false; btn.textContent='↑ Push'; }
+}
+
+function setPushMsg(html){ document.getElementById('push-msg').innerHTML=html; setTimeout(()=>{ document.getElementById('push-msg').innerHTML=''; },5000); }
+
+/* ══════════════════════════════
+   PARSER — exact from index.html
+══════════════════════════════ */
 function parseQuestions(text){
   const out=[],lines=text.split('\n').map(l=>l.trim()).filter(Boolean);
   for(let i=0;i<lines.length;i++){
@@ -382,10 +868,7 @@ function parseQuestions(text){
     if(m){
       const rawOpts=[m[1],m[2],m[3],m[4]];
       let preCorrect=-1;
-      const cleanOpts=rawOpts.map((o,idx)=>{
-        if(o.includes('@')){ preCorrect=idx; return o.replace(/@/g,'').trim(); }
-        return o.trim();
-      });
+      const cleanOpts=rawOpts.map((o,idx)=>{ if(o.includes('@')){ preCorrect=idx; return o.replace(/@/g,'').trim(); } return o.trim(); });
       const entry={text:qLine.replace(/^\d+[.)]\s*/,'').trim(),options:cleanOpts};
       if(preCorrect>=0) entry.correct=preCorrect;
       out.push(entry);
@@ -396,55 +879,35 @@ function parseQuestions(text){
 }
 
 const LABELS=['A','B','C','D'];
-let questions=[];
-let reshuffles=0;
+let questions=[],reshuffles=0;
 
-function initState(parsed){
-  questions=parsed.map(p=>({
-    text:p.text,
-    options:[...p.options],
-    correctIndex:p.correct??-1,
-    origCorrect:p.correct??-1
-  }));
-}
-
-/* ── SHUFFLE ── */
+function initState(parsed){ questions=parsed.map(p=>({text:p.text,options:[...p.options],correctIndex:p.correct??-1,origCorrect:p.correct??-1})); }
 function fisher(a){ for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];} return a; }
-function shuffleOne(q){
-  const ct=q.correctIndex>=0?q.options[q.correctIndex]:null;
-  q.options=fisher([...q.options]);
-  q.correctIndex=ct!=null?q.options.indexOf(ct):-1;
-}
+function shuffleOne(q){ const ct=q.correctIndex>=0?q.options[q.correctIndex]:null; q.options=fisher([...q.options]); q.correctIndex=ct!=null?q.options.indexOf(ct):-1; }
 
 function doShuffle(){
   const raw=document.getElementById('raw').value.trim();
   if(!raw){ showErr('Paste or load questions first.'); return; }
   hideErr();
   const parsed=parseQuestions(raw);
-  if(!parsed.length){
-    showErr('No questions found.\n\nExpected format:\nQuestion text?\n(A) opt @, (B) opt, (C) opt, (D) opt\n\n@ marks the correct answer.');
-    return;
-  }
+  if(!parsed.length){ showErr('No questions found.\n\nExpected format:\nQuestion?\n(A) opt @, (B) opt, (C) opt, (D) opt'); return; }
   initState(parsed);
   questions.forEach(q=>shuffleOne(q));
   reshuffles++;
   render();
 }
 
-function reshuffleOne(idx){
-  shuffleOne(questions[idx]);
-  reshuffles++;
-  render();
-}
+function reshuffleOne(idx){ shuffleOne(questions[idx]); reshuffles++; render(); }
 
-/* ── RENDER ── */
 function render(){
   const moved=questions.filter(q=>q.correctIndex!==q.origCorrect&&q.correctIndex>=0).length;
   document.getElementById('s-q').textContent=questions.length;
   document.getElementById('s-m').textContent=moved;
   document.getElementById('s-r').textContent=reshuffles;
   document.getElementById('stats').style.display='';
-
+  renderOutput(); renderDist();
+  document.getElementById('out-sec').style.display='';
+  document.getElementById('cards-sec').style.display='';
   document.getElementById('cards').innerHTML=questions.map((q,qi)=>{
     const hasAns=q.correctIndex>=0;
     const newL=hasAns?LABELS[q.correctIndex]:'?';
@@ -456,108 +919,68 @@ function render(){
     }).join('');
     const movePill=hasAns?(hasMoved?`<span class="pill p-warn">${origL}→${newL}</span>`:`<span class="pill p-faint">${newL} same</span>`):'';
     return `<div class="card" style="animation-delay:${qi*22}ms">
-      <div class="card-head"><div class="q-row">
-        <span class="q-num">Q${qi+1}</span>
-        <span class="q-txt">${esc(q.text)}</span>
-      </div></div>
+      <div class="card-head"><div class="q-row"><span class="q-num">Q${qi+1}</span><span class="q-txt">${esc(q.text)}</span></div></div>
       <div class="card-body"><div class="opts">${opts}</div></div>
       <div class="card-foot">
         ${hasAns?`<span class="pill p-good">✓ ${newL}</span>`:`<span class="pill p-faint">No key</span>`}
-        <div style="display:flex;align-items:center;gap:5px">
-          ${movePill}
-          <button class="btn btn-ghost btn-sm" onclick="reshuffleOne(${qi})">↺</button>
-        </div>
+        <div style="display:flex;align-items:center;gap:5px">${movePill}<button class="btn btn-ghost btn-sm" onclick="reshuffleOne(${qi})">↺</button></div>
       </div>
     </div>`;
   }).join('');
-
-  renderDist();
-  renderOutput();
-  document.getElementById('out-sec').style.display='';
 }
 
-/* ── DISTRIBUTION ── */
 function renderDist(){
-  const counts=[0,0,0,0];
-  let withKey=0;
+  const counts=[0,0,0,0]; let withKey=0;
   questions.forEach(q=>{ if(q.correctIndex>=0&&q.correctIndex<4){ counts[q.correctIndex]++; withKey++; } });
   if(!withKey){ document.getElementById('dist').style.display='none'; return; }
   document.getElementById('dist').style.display='';
   const max=Math.max(...counts,1);
   const barCls=['bar-a','bar-b','bar-c','bar-d'];
   document.getElementById('dist-rows').innerHTML=LABELS.map((lbl,i)=>{
-    const c=counts[i], pct=Math.round(c/withKey*100), barW=Math.round(c/max*100);
-    return `<div class="dist-row">
-      <span class="dist-lbl">${lbl}</span>
-      <div class="dist-bar-wrap"><div class="dist-bar ${barCls[i]}" style="width:${barW}%"></div></div>
-      <div class="dist-meta"><span class="dist-count">${c}</span><span class="dist-pct">${pct}%</span></div>
-    </div>`;
+    const c=counts[i],pct=Math.round(c/withKey*100),barW=Math.round(c/max*100);
+    return `<div class="dist-row"><span class="dist-lbl">${lbl}</span><div class="dist-bar-wrap"><div class="dist-bar ${barCls[i]}" style="width:${barW}%"></div></div><div class="dist-meta"><span class="dist-count">${c}</span><span class="dist-pct">${pct}%</span></div></div>`;
   }).join('');
-  const dominated=counts.some(c=>c/withKey>0.5);
-  document.getElementById('dist-warn').classList.toggle('show', dominated&&withKey>3);
+  document.getElementById('dist-warn').classList.toggle('show',counts.some(c=>c/withKey>0.5)&&withKey>3);
 }
 
-/* ── OUTPUT ── */
 function renderOutput(){
-  const lines=questions.map(q=>{
-    const opts=q.options.map((o,i)=>`(${LABELS[i]}) ${o}${i===q.correctIndex?' @':''}`).join(', ');
-    return `${q.text}\n${opts}`;
-  });
+  const lines=questions.map(q=>{ const opts=q.options.map((o,i)=>`(${LABELS[i]}) ${o}${i===q.correctIndex?' @':''}`).join(', '); return `${q.text}\n${opts}`; });
   document.getElementById('out').value=lines.join('\n\n');
 }
 
-/* ── FILE UPLOAD ── */
 function loadFile(input){
-  const file=input.files[0];
-  if(!file) return;
+  const file=input.files[0]; if(!file) return;
   if(!file.name.endsWith('.txt')){ toast('Need a .txt file','warn'); return; }
   const r=new FileReader();
   r.onload=e=>{ document.getElementById('raw').value=e.target.result; updateChars(); doShuffle(); };
-  r.readAsText(file);
-  input.value='';
+  r.readAsText(file); input.value='';
 }
 
-/* ── COPY / DOWNLOAD ── */
-function doCopy(){
-  const t=document.getElementById('out').value;
-  if(!t){ toast('Nothing yet','warn'); return; }
-  navigator.clipboard.writeText(t).then(()=>toast('Copied ✓','good'));
-}
-function doDownload(){
-  const t=document.getElementById('out').value;
-  if(!t){ toast('Nothing yet','warn'); return; }
-  const a=document.createElement('a');
-  a.href=URL.createObjectURL(new Blob([t],{type:'text/plain'}));
-  a.download='shuffled.txt';
-  a.click();
-  toast('Downloaded ↓','good');
-}
+function doCopy(){ const t=document.getElementById('out').value; if(!t){ toast('Nothing yet','warn'); return; } navigator.clipboard.writeText(t).then(()=>toast('Copied ✓','good')); }
+function doDownload(){ const t=document.getElementById('out').value; if(!t){ toast('Nothing yet','warn'); return; } const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([t],{type:'text/plain'})); a.download='shuffled.txt'; a.click(); toast('Downloaded ↓','good'); }
 
-/* ── CLEAR ── */
 function doClear(){
-  document.getElementById('raw').value='';
-  document.getElementById('char-lbl').textContent='0 chars';
-  questions=[];reshuffles=0;
+  document.getElementById('raw').value=''; document.getElementById('char-lbl').textContent='0 chars';
+  document.getElementById('loaded-badge').style.display='none';
+  questions=[];reshuffles=0; ghLoadedFile=null; updatePushUI();
   document.getElementById('cards').innerHTML='';
   document.getElementById('stats').style.display='none';
   document.getElementById('dist').style.display='none';
   document.getElementById('out-sec').style.display='none';
+  document.getElementById('cards-sec').style.display='none';
   hideErr();
 }
 
-/* ── HELPERS ── */
 document.getElementById('raw').addEventListener('input',updateChars);
 function updateChars(){ document.getElementById('char-lbl').textContent=document.getElementById('raw').value.length.toLocaleString()+' chars'; }
 function showErr(msg){ const e=document.getElementById('err'); e.textContent='⚠ '+msg; e.style.display=''; }
 function hideErr(){ document.getElementById('err').style.display='none'; }
-function esc(s){ return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function esc(s){ return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function toast(msg,type=''){
   const w=document.getElementById('toast-wrap');
-  const el=document.createElement('div');
-  el.className='toast'+(type?' '+type:'');
-  el.textContent=msg;
+  const el=document.createElement('div'); el.className='toast'+(type?' '+type:''); el.textContent=msg;
   w.appendChild(el);
-  setTimeout(()=>{ el.classList.add('out'); setTimeout(()=>el.remove(),320); },2200);
+  setTimeout(()=>{ el.classList.add('out'); setTimeout(()=>el.remove(),320); },2400);
 }
 </script>
 </body>
