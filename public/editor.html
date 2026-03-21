@@ -157,6 +157,8 @@
     .file-row-name.active-name{color:var(--accent)}
     .file-row-del{background:none;border:none;color:#f87171;font-size:.85rem;cursor:pointer;padding:4px 6px;border-radius:4px;flex-shrink:0;line-height:1}
     .file-row-del:active{background:#fff1f2}
+    .file-row-rename{background:none;border:none;color:var(--accent);font-size:.85rem;cursor:pointer;padding:4px 6px;border-radius:4px;flex-shrink:0;line-height:1}
+    .file-row-rename:active{background:var(--accent-bg)}
     .file-row-edit{font-size:.7rem;font-weight:700;color:var(--accent);background:var(--accent-bg);border:1px solid #bfdbfe;border-radius:4px;padding:3px 8px;flex-shrink:0}
 
     /* Inline editor */
@@ -684,24 +686,103 @@ async function loadFolderFiles(folderName){
   }
 }
 
+let edRenamingFile = null; // file name currently being renamed
+
 function renderFileList(){
   const body = document.getElementById('ed-file-list-body');
   if(!edFiles.length){
     body.innerHTML = `<div style="padding:14px 13px;text-align:center;color:var(--mid);font-size:.78rem">No .txt files yet — create one below</div>`;
     return;
   }
-  body.innerHTML = edFiles.map(f => `
-    <div class="file-row${edCurrentFile === f.name ? ' active-file' : ''}" onclick="openFile('${esc(f.name)}','${esc(f.sha)}')">
+  body.innerHTML = edFiles.map(f => {
+    const isEditing  = edCurrentFile === f.name;
+    const isRenaming = edRenamingFile === f.name;
+    if(isRenaming){
+      return `
+      <div class="file-row active-file" style="flex-wrap:wrap;gap:6px">
+        <span style="font-size:.9rem">📄</span>
+        <input id="rename-input-${esc(f.name)}" class="form-input" style="flex:1;min-width:100px;padding:4px 8px;font-size:.78rem"
+          value="${esc(f.name.replace(/\.txt$/i,''))}" onkeydown="handleRenameKey(event,'${esc(f.name)}')"/>
+        <button class="btn btn-good btn-sm" style="padding:4px 10px;font-size:.72rem" onclick="confirmRename('${esc(f.name)}')">✓</button>
+        <button class="btn btn-ghost btn-sm" style="padding:4px 8px;font-size:.72rem" onclick="cancelRename()">✕</button>
+      </div>`;
+    }
+    return `
+    <div class="file-row${isEditing ? ' active-file' : ''}" onclick="openFile('${esc(f.name)}','${esc(f.sha)}')">
       <span style="font-size:.9rem">📄</span>
-      <span class="file-row-name${edCurrentFile === f.name ? ' active-name' : ''}">${esc(f.name.replace(/\.txt$/i,''))}</span>
-      ${edCurrentFile === f.name ? `<span class="file-row-edit">✎ Editing</span>` : ''}
+      <span class="file-row-name${isEditing ? ' active-name' : ''}">${esc(f.name.replace(/\.txt$/i,''))}</span>
+      ${isEditing ? `<span class="file-row-edit">✎ Editing</span>` : ''}
+      <button class="file-row-rename" onclick="event.stopPropagation();startRename('${esc(f.name)}')" title="Rename">✎</button>
       <button class="file-row-del" onclick="event.stopPropagation();deleteFile('${esc(f.name)}')" title="Delete">✕</button>
-    </div>`).join('');
+    </div>`;
+  }).join('');
+
+  // Focus rename input if active
+  if(edRenamingFile){
+    const inp = document.getElementById(`rename-input-${edRenamingFile}`);
+    if(inp){ inp.focus(); inp.select(); }
+  }
 }
 
-/* ══════════════════════════════
-   EDITOR — FILE OPEN & EDIT
-══════════════════════════════ */
+function startRename(name){
+  edRenamingFile = name;
+  renderFileList();
+}
+function cancelRename(){
+  edRenamingFile = null;
+  renderFileList();
+}
+function handleRenameKey(e, name){
+  if(e.key === 'Enter')  confirmRename(name);
+  if(e.key === 'Escape') cancelRename();
+}
+async function confirmRename(oldName){
+  const inp = document.getElementById(`rename-input-${oldName}`);
+  if(!inp) return;
+  let newName = inp.value.trim();
+  if(!newName){ toast('Name cannot be empty','warn'); return; }
+  if(!newName.endsWith('.txt')) newName += '.txt';
+  if(newName === oldName){ cancelRename(); return; }
+  if(!isValidToken()){ toast('GitHub token not configured','warn'); return; }
+
+  toast('Renaming…');
+  try {
+    // 1. Fetch content of old file
+    const encF   = encodeURIComponent(edCurrentFolder);
+    const encOld = encodeURIComponent(oldName);
+    const getRes = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/contents/resources/${encF}/${encOld}?ref=${GITHUB_BRANCH}`, { headers: ghHeaders() });
+    if(!getRes.ok) throw new Error(`Could not read file: ${getRes.status}`);
+    const getData = await getRes.json();
+    const content = getData.content; // already base64
+
+    // 2. Create file with new name
+    const encNew = encodeURIComponent(newName);
+    const putRes = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/contents/resources/${encF}/${encNew}`, {
+      method: 'PUT', headers: ghWriteHeaders(),
+      body: JSON.stringify({ message: `Rename ${oldName} → ${newName}`, content: content.replace(/\n/g,''), branch: GITHUB_BRANCH })
+    });
+    if(!putRes.ok) throw new Error(`Could not create ${newName}: ${putRes.status}`);
+
+    // 3. Delete old file
+    const delRes = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/contents/resources/${encF}/${encOld}`, {
+      method: 'DELETE', headers: ghWriteHeaders(),
+      body: JSON.stringify({ message: `Rename: remove ${oldName}`, sha: getData.sha, branch: GITHUB_BRANCH })
+    });
+    if(!delRes.ok) throw new Error(`Could not delete old file: ${delRes.status}`);
+
+    // 4. If the renamed file was open in editor, update state
+    if(edCurrentFile === oldName){
+      edCurrentFile = newName;
+      const newData = await (await fetch(`https://api.github.com/repos/${GITHUB_REPO}/contents/resources/${encF}/${encNew}?ref=${GITHUB_BRANCH}`, { headers: ghHeaders() })).json();
+      edCurrentSha  = newData.sha;
+      document.getElementById('ed-editor-path').textContent = `${edCurrentFolder} / ${newName}`;
+    }
+
+    edRenamingFile = null;
+    toast(`Renamed to "${newName}"`, 'good');
+    await loadFolderFiles(edCurrentFolder);
+  } catch(e){ toast('Rename failed: ' + e.message, 'warn'); }
+}
 async function openFile(name, sha){
   edCurrentFile = name;
   edCurrentSha  = sha;
