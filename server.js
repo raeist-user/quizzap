@@ -115,16 +115,18 @@ app.get('/', (req, res) => {
     res.send(html);
   } catch(e) { res.status(500).send('Server error loading page'); }
 });
-const shufflePath = path.join(__dirname, 'public', 'shuffle.html');
-app.get('/shuffle', (req, res) => {
+const editorPath = path.join(__dirname, 'public', 'editor.html');
+app.get('/editor', (req, res) => {
   try {
-    let html = fs.readFileSync(shufflePath, 'utf8');
+    let html = fs.readFileSync(editorPath, 'utf8');
     const token = process.env.MY_TOKEN || '';
     html = html.replace("'%%MY_TOKEN%%'", JSON.stringify(token));
     res.setHeader('Content-Type', 'text/html');
     res.send(html);
   } catch(e) { res.status(500).send('Server error loading page'); }
 });
+// Legacy /shuffle redirect → /editor
+app.get('/shuffle', (req, res) => res.redirect(301, '/editor'));
 app.use(express.static(path.join(__dirname, 'public')));
 const server = http.createServer(app);
 
