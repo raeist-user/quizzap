@@ -308,7 +308,7 @@ Who wrote Hamlet?
 /* ══════════════════════════════
    GITHUB CONFIG — same as index.html
 ══════════════════════════════ */
-const MY_TOKEN = '%%MY_TOKEN%%';
+const MY_TOKEN      = '%%MY_TOKEN%%';
 const GITHUB_REPO   = 'raeist-user/quizzap';
 const GITHUB_BRANCH = 'main';
 
@@ -834,7 +834,13 @@ async function ghPush(){
   if(!ghLoadedFile){ toast('No GitHub file loaded','warn'); return; }
   const content=document.getElementById('out').value;
   if(!content){ toast('Nothing to push','warn'); return; }
-  if(!isValidToken()){ setPushMsg('<div class="notice n-bad">MY_TOKEN not set.</div>'); return; }
+  if(!isValidToken()){
+    const why=MY_TOKEN.startsWith('%%')
+      ?'Page must be opened via <b>/shuffle</b> route (not /shuffle.html) so the server injects the token.'
+      :'MY_TOKEN env variable is not set on the server.';
+    setPushMsg(`<div class="notice n-bad">${why}</div>`);
+    return;
+  }
   const btn=document.getElementById('btn-push');
   btn.disabled=true; btn.textContent='Pushing…';
   setPushMsg('<div class="notice n-neutral"><span class="spin"></span>Pushing…</div>');
