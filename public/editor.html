@@ -397,9 +397,7 @@ function ghWriteHeaders(){
 const AUTH_KEY = 'scc_editor_authed';
 
 function checkAuth(){
-  const isLocalDev = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
-  // If HOST_PASSWORD is injected and session is authenticated
-  if(isLocalDev || sessionStorage.getItem(AUTH_KEY) === 'yes'){
+  if(localStorage.getItem(AUTH_KEY) === 'yes'){
     showApp();
   } else {
     document.getElementById('gate').style.display = 'flex';
@@ -415,9 +413,8 @@ function showApp(){
 
 document.getElementById('gate-btn').onclick = function(){
   const pw = document.getElementById('gate-pw').value;
-  const correct = HOST_PASSWORD && !HOST_PASSWORD.startsWith('%%') ? HOST_PASSWORD : '2325';
-  if(pw === correct){
-    sessionStorage.setItem(AUTH_KEY, 'yes');
+  if(pw === HOST_PASSWORD){
+    localStorage.setItem(AUTH_KEY, 'yes');
     showApp();
   } else {
     document.getElementById('gate-err').textContent = 'Incorrect password.';
