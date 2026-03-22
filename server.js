@@ -127,6 +127,20 @@ app.get('/editor', (req, res) => {
     res.send(html);
   } catch(e) { res.status(500).send('Server error loading page'); }
 });
+// Self Quiz — standalone host practice mode
+const selfquizPath = path.join(__dirname, 'public', 'selfquiz.html');
+app.get('/selfquiz', (req, res) => {
+  try {
+    let html = fs.readFileSync(selfquizPath, 'utf8');
+    const token  = process.env.MY_TOKEN      || '';
+    const hostPw = process.env.HOST_PASSWORD || '598359';
+    html = html.replace("'%%MY_TOKEN%%'",      JSON.stringify(token));
+    html = html.replace("'%%HOST_PASSWORD%%'", JSON.stringify(hostPw));
+    res.setHeader('Content-Type', 'text/html');
+    res.send(html);
+  } catch(e) { res.status(500).send('Server error loading self quiz page'); }
+});
+
 // Legacy /shuffle redirect → /editor
 app.get('/shuffle', (req, res) => res.redirect(301, '/editor'));
 app.use(express.static(path.join(__dirname, 'public')));
@@ -699,6 +713,48 @@ app.post('/api/sessions', requireAuth, async (req, res) => {
     console.error('/api/sessions POST error:', e.message);
     res.status(500).json({ error: 'Failed to save session' });
   }
+});
+
+// ── SELF QUIZ REPORT API ──────────────────────────────────────────────────────
+// POST /api/selfquiz/report — host self-quiz sends flagged questions to the shared report list
+app.post('/api/selfquiz/report', (req, res) => {
+  try {
+    const { question, correct, reporterName, note } = req.body;
+    if (!question?.text) return res.status(400).json({ error: 'question.text required' });
+
+    // De-duplicate by question text — only one report per question
+    const existing = questionReports.find(r => r.question.text === question.text);
+    if (existing) {
+      existing.count   += 1;
+      existing.note     = note || existing.note;
+      existing.ts       = Date.now();
+    } else {
+      questionReports.push({
+        rid:            ++reportCounter,
+        question,
+        correct:        correct ?? null,
+        reportedAnswer: null,
+        reporterName:   (reporterName || 'Host (Self Quiz)').slice(0, 40),
+        reporterPids:   ['selfquiz'],
+        note:           note || '',
+        ts:             Date.now(),
+        count:          1,
+        source:         'selfquiz',
+      });
+    }
+
+    // Notify the host via WebSocket if connected
+    txHost({ type: 'report_received', reports: questionReports });
+    res.json({ ok: true });
+  } catch(e) {
+    console.error('/api/selfquiz/report error:', e.message);
+    res.status(500).json({ error: 'Failed to save report' });
+  }
+});
+
+// GET /api/selfquiz/reports — fetch all current reports (host only)
+app.get('/api/selfquiz/reports', requireHost, (req, res) => {
+  res.json({ reports: questionReports });
 });
 
 // ── QUIZ STATE ────────────────────────────────────────────────────────────────
