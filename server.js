@@ -143,6 +143,8 @@ app.get('/selfquiz', (req, res) => {
 
 // Legacy /shuffle redirect → /editor
 app.get('/shuffle', (req, res) => res.redirect(301, '/editor'));
+// Prevent express.static from serving index.html without token injection
+app.get('/index.html', (req, res) => res.redirect(301, '/'));
 app.use(express.static(path.join(__dirname, 'public')));
 const server = http.createServer(app);
 
