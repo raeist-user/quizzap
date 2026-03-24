@@ -56,4 +56,4 @@ Ayan ka gussa thanda karne ke liye agli baar Junaid ko kya karna chahiye?
 (A) Seat de deni chahiye @, (B) Car nahi lani chahiye, (C) Ayan ko ghar chhod dena chahiye, (D) Cycle chalani chahiye
 
 Is puri ghatna ka mukhya karan kya hai?
-(A) Raste ki bheed, (B) Junaid ki driving, (C) Seat ka jhagda @, (D) Car ka rang
+(A) Raste ki bheed., (B) Junaid ki driving., (C) Seat ka jhagda. @, (D) Car ka rang.
