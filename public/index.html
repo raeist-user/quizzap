@@ -2475,7 +2475,8 @@ function landingHTML(){
 
   // Buttons differ by role
   const actionButtons = isHost
-    ? `<button class="btn btn-dark btn-lg" id="go-host">🖥 Host Interface</button>`
+    ? `<button class="btn btn-dark btn-lg" id="go-host">🖥 Host Interface</button>
+       <button class="btn btn-ghost btn-lg" id="go-selfquiz" style="margin-top:2px">📝 Self Quiz</button>`
     : `<button class="btn btn-dark btn-lg" id="go-join">🎓 Join Session</button>`;
 
   return `<div class="lb-full-screen">
@@ -4323,6 +4324,7 @@ function attach(){
 
   // Landing nav — role-based
   on('go-host', ()=>{ role='host'; hostAuthed=false; navPush(); render(); });
+  on('go-selfquiz', ()=>{ location.href='/selfquiz'; });
   on('go-join',  ()=>{
     role='participant';
     fetchSchedules();
