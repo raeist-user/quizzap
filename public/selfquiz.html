@@ -7,6 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,600;0,9..144,700;1,9..144,400&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Nastaliq+Urdu:wght@400;600;700&display=swap" rel="stylesheet"/>
   <script>
     window.MathJax = {
       tex: { inlineMath: [['$','$']], displayMath: [['$$','$$']], processEscapes: true },
@@ -26,6 +27,7 @@
       --warn:#c47d00;--warn-bg:#fef3d0;
       --serif:'Fraunces',Georgia,serif;
       --sans:'Plus Jakarta Sans',system-ui,sans-serif;
+      --urdu:'Noto Nastaliq Urdu','Jameel Noori Nastaleeq','Jameel Noori Nastaliq',serif;
       --r:12px;--r-sm:8px;--r-lg:16px;--r-xl:20px;
       --sh-xs:0 1px 3px rgba(14,14,18,.06),0 1px 2px rgba(14,14,18,.04);
       --sh-sm:0 2px 8px rgba(14,14,18,.08),0 1px 3px rgba(14,14,18,.05);
@@ -35,6 +37,23 @@
       --t-med:220ms cubic-bezier(.4,0,.2,1);
       --t-spring:320ms cubic-bezier(.34,1.56,.64,1);
     }
+
+    /* ── URDU / NASTALIQ SUPPORT ───────────────────────────────────────── */
+    :lang(ur),[lang="ur"],.urdu,.nastaliq{
+      font-family:var(--urdu)!important;
+      direction:rtl;text-align:right;line-height:2.4;letter-spacing:0
+    }
+    /* Utility class for inline Urdu spans inside mixed-language content */
+    .urdu-text{
+      font-family:var(--urdu);
+      direction:rtl;unicode-bidi:embed;
+      line-height:2.2;font-size:1.1em;display:inline-block
+    }
+    /* When a full question or option is in Urdu, flip card layout */
+    .q-text[dir="rtl"],.opt-card[dir="rtl"]{
+      direction:rtl;text-align:right
+    }
+    .opt-card[dir="rtl"]{flex-direction:row-reverse}
 
     @keyframes fadeIn{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}
     @keyframes up{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
@@ -1046,6 +1065,27 @@ async function submitReport(){
 document.getElementById('report-modal').addEventListener('click',function(e){
   if(e.target===this) closeReportModal();
 });
+
+// ── URDU AUTO-DETECTION ───────────────────────────────────────────────────────
+// Detects Urdu/Arabic script (U+0600–U+06FF) and applies Nastaliq font + RTL
+const URDU_RE = /[\u0600-\u06FF]/;
+function applyUrduFont(root){
+  root = root || document.body;
+  root.querySelectorAll('.q-text,.opt-card,.review-item-q,.review-opt,.answer-notice').forEach(el=>{
+    if(URDU_RE.test(el.textContent)){
+      el.style.fontFamily = "var(--urdu, 'Noto Nastaliq Urdu', serif)";
+      el.style.direction  = 'rtl';
+      el.style.textAlign  = 'right';
+      el.style.lineHeight = '2.4';
+      if(el.classList.contains('opt-card')) el.style.flexDirection='row-reverse';
+    }
+  });
+}
+// Hook into renderQuestion and finishQuiz render cycles
+const _origRenderQ = typeof renderQuestion==='function'?renderQuestion:null;
+document.addEventListener('DOMContentLoaded',()=>{ applyUrduFont(); });
+const _urduObserver = new MutationObserver(()=>applyUrduFont());
+_urduObserver.observe(document.body,{childList:true,subtree:true});
 </script>
 </body>
 </html>
