@@ -7,6 +7,14 @@
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,600;0,9..144,700;1,9..144,400&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
+  <script>
+    window.MathJax = {
+      tex: { inlineMath: [['$','$']], displayMath: [['$$','$$']], processEscapes: true },
+      options: { skipHtmlTags: ['script','noscript','style','textarea','pre'] },
+      startup: { typeset: false }
+    };
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
   <style>
     *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 
@@ -435,6 +443,28 @@ function ghHeaders(){
 }
 function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
+// Escapes HTML but preserves $...$ and $$...$$ so MathJax can render them
+function escLatex(s){
+  s = String(s);
+  const parts = [];
+  // Split on $$...$$ first, then $...$
+  const re = /(\$\$[\s\S]*?\$\$|\$[^$\n]+?\$)/g;
+  let last = 0, m;
+  while((m = re.exec(s)) !== null){
+    parts.push(esc(s.slice(last, m.index)));
+    parts.push(m[0]); // raw LaTeX — don't escape
+    last = re.lastIndex;
+  }
+  parts.push(esc(s.slice(last)));
+  return parts.join('');
+}
+
+function renderMath(el){
+  if(window.MathJax&&MathJax.typesetPromise){
+    MathJax.typesetPromise([el]).catch(err=>console.warn('MathJax error',err));
+  }
+}
+
 function showView(id){
   document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
   document.getElementById(id).classList.add('active');
@@ -791,7 +821,7 @@ function renderQuestion(){
   document.getElementById('quiz-score').textContent=`✓ ${score}`;
   document.getElementById('quiz-progress').style.width=((currentIdx+1)/quizQuestions.length*100).toFixed(1)+'%';
   document.getElementById('q-num').textContent=`Q${currentIdx+1}`;
-  document.getElementById('q-text').textContent=q.text;
+  document.getElementById('q-text').innerHTML=escLatex(q.text);
 
   const rBtn=document.getElementById('report-btn');
   if(reported.has(currentIdx)){ rBtn.classList.add('reported');rBtn.textContent='✓ Reported'; }
@@ -821,15 +851,18 @@ function renderQuestion(){
     } else {
       if(i===myAnswer) btn.classList.add('chosen');
     }
-    btn.innerHTML=`<div class="opt-key">${labels[i]}</div><span>${esc(opt)}</span>`;
+    btn.innerHTML=`<div class="opt-key">${labels[i]}</div><span>${escLatex(opt)}</span>`;
     if(!isRevealed) btn.addEventListener('click',()=>selectOption(i),{once:true});
     optWrap.appendChild(btn);
   });
 
+  // Render LaTeX in question card
+  renderMath(document.getElementById('quiz-card'));
+
   const noticeEl=document.getElementById('answer-notice');
   if(isRevealed&&myAnswer!==undefined){
     const ok=myAnswer===correctIdx;
-    noticeEl.innerHTML=`<div class="answer-notice ${ok?'n-good':'n-bad'}">${ok?'✓ Correct!':'✗ Wrong — Correct answer: <strong>'+esc(q.options[correctIdx])+'</strong>'}</div>`;
+    noticeEl.innerHTML=`<div class="answer-notice ${ok?'n-good':'n-bad'}">${ok?'✓ Correct!':'✗ Wrong — Correct answer: <strong>'+escLatex(q.options[correctIdx])+'</strong>'}</div>`;
   } else {
     noticeEl.innerHTML='';
   }
@@ -958,7 +991,7 @@ function finishQuiz(){
       let cls='ro-neutral';
       if(oi===q.correct) cls='ro-correct';
       else if(oi===ans&&oi!==q.correct) cls='ro-wrong';
-      optsHtml+=`<div class="review-opt ${cls}"><strong>${labels[oi]}.</strong> ${esc(opt)}</div>`;
+      optsHtml+=`<div class="review-opt ${cls}"><strong>${labels[oi]}.</strong> ${escLatex(opt)}</div>`;
     });
     const item=document.createElement('div');
     item.className='review-item';
@@ -966,12 +999,13 @@ function finishQuiz(){
     item.innerHTML=`
       <div class="review-item-head">
         <span class="review-item-num">Q${i+1}</span>
-        <span class="review-item-q">${esc(q.text)}</span>
+        <span class="review-item-q">${escLatex(q.text)}</span>
         <div style="display:flex;flex-direction:column;gap:3px;align-items:flex-end">${badge}</div>
       </div>
       <div class="review-item-body">${optsHtml}</div>`;
     list.appendChild(item);
   });
+  renderMath(list);
 
   showView('view-results');
 }
@@ -980,7 +1014,8 @@ function finishQuiz(){
 function openReportModal(){
   if(reported.has(currentIdx)){ toast('Already reported'); return; }
   const q=quizQuestions[currentIdx];
-  document.getElementById('report-q-preview').textContent=q.text;
+  document.getElementById('report-q-preview').innerHTML=escLatex(q.text);
+  renderMath(document.getElementById('report-q-preview'));
   document.getElementById('report-note').value='';
   document.getElementById('report-modal').classList.add('open');
 }
