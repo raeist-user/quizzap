@@ -4669,13 +4669,25 @@ function attach(){
     if(haltBombTimer){ clearTimeout(haltBombTimer); }
     haltBombTimer=setTimeout(()=>{
       showingHaltBomb=false; haltBombTimer=null;
-      const gcores=S.gameScores||[], parts=S.participants||[], merged={};
-      gcores.forEach(g=>{ merged[g.id]={name:g.name,score:g.total}; });
-      parts.forEach(p=>{
-        if(merged[p.id]){ merged[p.id].score+=(p.score||0); merged[p.id].name=p.name; }
-        else merged[p.id]={name:p.name,score:p.score||0};
+      // Deduplicate by userId so leave/rejoin after reset doesn't double-count scores
+      const gcores=S.gameScores||[], parts=S.participants||[];
+      const mergedByKey={}, pidToKey={};
+      gcores.forEach(g=>{
+        const key=g.userId?'u_'+g.userId:'p_'+g.id;
+        if(!mergedByKey[key]) mergedByKey[key]={name:g.name,score:g.total};
+        pidToKey[g.id]=key;
       });
-      const finalList=Object.entries(merged).map(([id,g])=>({id,name:g.name,score:g.score})).sort((a,b)=>b.score-a.score);
+      parts.forEach(p=>{
+        const key=p.userId?'u_'+p.userId:'p_'+p.id;
+        if(mergedByKey[key]){
+          // Only add live score for this pid if it's the canonical key (not a stale banked pid)
+          if(!pidToKey[p.id]||pidToKey[p.id]===key) mergedByKey[key].score+=(p.score||0);
+          mergedByKey[key].name=p.name;
+        } else {
+          mergedByKey[key]={name:p.name,score:p.score||0};
+        }
+      });
+      const finalList=Object.values(mergedByKey).map(g=>({name:g.name,score:g.score})).sort((a,b)=>b.score-a.score);
       finalList._totalQ=S.pushedCount||0;
       hostShutdownLeaderboard=finalList;
       send({type:'shutdown'}); render();
