@@ -804,25 +804,50 @@ function getBackupWindow() {
 async function saveSessionBackup() {
   try {
     const { windowStart, windowEnd } = getBackupWindow();
-    const participantList = Object.values(state.participants).map(p => {
-      const banked  = gameScores[p.id]?.total || 0;
-      const current = p.score || 0;
-      return {
-        userId:       p.userId || null,
-        pid:          p.id,
-        name:         p.name,
-        currentScore: current,
-        bankedScore:  banked,
-        totalScore:   banked + current,
-        updatedAt:    new Date(),
-      };
+
+    // Build a userId-keyed map of true totals from gameScores (the authoritative store).
+    // gameScores keys are pids but each entry has a userId — we sum by userId to avoid
+    // double-counting when the same user got a new pid after a reset.
+    const byUserId = {};
+    Object.values(gameScores).forEach(g => {
+      if (!g.userId) return;
+      const uid = String(g.userId);
+      if (!byUserId[uid]) byUserId[uid] = { userId: uid, name: g.name, bankedScore: 0 };
+      byUserId[uid].bankedScore += (g.total || 0);
     });
+
+    // Add current (live, not-yet-banked) scores from state.participants.
+    // Only count participants whose userId is not already represented via a gameScores entry
+    // with the same pid — i.e. their score hasn't been banked yet this session.
+    Object.values(state.participants).forEach(p => {
+      if (!p.userId) return;
+      const uid = String(p.userId);
+      const bankedForThisPid = gameScores[p.id]?.total || 0;
+      const current = p.score || 0;
+      if (!byUserId[uid]) byUserId[uid] = { userId: uid, name: p.name, bankedScore: 0 };
+      // bankedScore already accumulated above from gameScores; current is what's live now
+      byUserId[uid].name = p.name; // keep name fresh
+      byUserId[uid].currentScore = current;
+    });
+
+    const participantList = Object.values(byUserId).map(entry => ({
+      userId:       entry.userId,
+      pid:          null,  // pid is volatile; we key by userId
+      name:         entry.name,
+      currentScore: entry.currentScore || 0,
+      bankedScore:  entry.bankedScore  || 0,
+      totalScore:   (entry.bankedScore || 0) + (entry.currentScore || 0),
+      updatedAt:    new Date(),
+    }));
+
     if (!participantList.length) return;
     const existing = await SessionBackup.findOne({ windowStart }).lean();
     if (existing) {
+      // Merge: keep entries for users not currently in session (they left earlier today)
       const existingMap = {};
-      existing.participants.forEach(ep => { if (ep.userId) existingMap[ep.userId] = ep; });
-      participantList.forEach(np => { if (np.userId) existingMap[np.userId] = np; });
+      existing.participants.forEach(ep => { if (ep.userId) existingMap[String(ep.userId)] = ep; });
+      // Overwrite with fresh computed values
+      participantList.forEach(np => { existingMap[np.userId] = np; });
       await SessionBackup.findOneAndUpdate(
         { windowStart },
         { $set: { participants: Object.values(existingMap), updatedAt: new Date() } }
@@ -882,29 +907,35 @@ app.post('/api/session-backup/restore', requireHost, async (req, res) => {
 
     let restored = 0;
     backup.participants.forEach(bp => {
-      // Match to existing participant in state by userId
+      if (!bp.userId) return;
+      const uid = String(bp.userId);
+
+      // Find if this user already has live state entry
       const existing = Object.values(state.participants).find(
-        p => p.userId && String(p.userId) === String(bp.userId)
+        p => p.userId && String(p.userId) === uid
       );
+
+      // Check current total for this userId across ALL gameScores entries (by userId key)
+      const gKey = `user_${uid}`;
+      const bankedTotal = gameScores[gKey]?.total || 0;
+      const liveScore   = existing?.score || 0;
+      const currentTotal = bankedTotal + liveScore;
+      const backupTotal  = bp.totalScore || 0;
+
+      if (backupTotal <= currentTotal) return; // already at or above backup — skip
+      const extra = backupTotal - currentTotal;
+
       if (existing) {
-        // Only restore if backup has a higher total (don't downgrade)
-        const backupTotal = bp.totalScore || 0;
-        const currentTotal = (gameScores[existing.id]?.total || 0) + (existing.score || 0);
-        if (backupTotal > currentTotal) {
-          // Split: put the delta as current score so it's visible on the live board
-          const extra = backupTotal - currentTotal;
-          existing.score = (existing.score || 0) + extra;
-          if (!gameScores[existing.id]) {
-            gameScores[existing.id] = { name: existing.name, userId: existing.userId, total: 0 };
-          }
-          restored++;
+        existing.score = (existing.score || 0) + extra;
+        // Ensure userId-keyed gameScores slot exists
+        if (!gameScores[gKey]) {
+          gameScores[gKey] = { name: existing.name, userId: existing.userId, total: 0 };
         }
-      } else if (bp.userId && bp.totalScore > 0) {
-        // Student not currently in session — add them as an offline entry so their
-        // score appears on the leaderboard when they rejoin
-        const gid = `restored_${bp.userId}`;
-        if (!gameScores[gid]) {
-          gameScores[gid] = { name: bp.name, userId: bp.userId, total: bp.totalScore };
+        restored++;
+      } else {
+        // Student not currently in session — add to gameScores so they appear at shutdown
+        if (!gameScores[gKey]) {
+          gameScores[gKey] = { name: bp.name, userId: bp.userId, total: bp.totalScore };
           restored++;
         }
       }
@@ -935,13 +966,17 @@ let reportCounter = 0;
 function bankGameScores() {
   const snap = [];
   Object.values(state.participants).forEach(p => {
-    if (!gameScores[p.id]) {
-      gameScores[p.id] = { name: p.name, userId: p.userId || null, total: 0 };
+    // Use userId as the canonical key if available, fall back to pid.
+    // This prevents the same user from accumulating two separate gameScores entries
+    // when they get a new pid after a reset (the root cause of score doubling).
+    const key = p.userId ? `user_${p.userId}` : p.id;
+    if (!gameScores[key]) {
+      gameScores[key] = { name: p.name, userId: p.userId || null, total: 0 };
     }
     const pts = p.score || 0;
-    gameScores[p.id].total  += pts;
-    gameScores[p.id].name    = p.name;
-    gameScores[p.id].userId  = p.userId || gameScores[p.id].userId;
+    gameScores[key].total  += pts;
+    gameScores[key].name    = p.name;
+    gameScores[key].userId  = p.userId || gameScores[key].userId;
     snap.push({ id: p.id, name: p.name, score: pts });
   });
   if (snap.length) {
@@ -1103,13 +1138,20 @@ wss.on('connection', ws => {
               score:  restoredCurrent,
               userId: msg.userId || null,
             };
-            // Restore banked score so gameScores totals stay accurate
+            // Restore banked score using the userId-keyed gameScores convention.
+            // This ensures bankGameScores() will find and merge into the same slot
+            // rather than creating a new duplicate entry.
             if (restoredBanked > 0 || restoredCurrent > 0) {
-              gameScores[pid] = {
-                name:   msg.name.trim().slice(0, 32),
-                userId: msg.userId || null,
-                total:  restoredBanked,
-              };
+              const gKey = `user_${msg.userId}`;
+              if (!gameScores[gKey]) {
+                gameScores[gKey] = {
+                  name:   msg.name.trim().slice(0, 32),
+                  userId: msg.userId || null,
+                  total:  restoredBanked,
+                };
+              }
+              // Also map the pid so project() / shutdown can find it
+              gameScores[pid] = gameScores[gKey];
             }
           }
 
@@ -1251,8 +1293,16 @@ wss.on('connection', ws => {
         // Keep session open — "New Session" shouldn't close the room
         state.sessionOpen = true;
         clients.forEach((c) => {
-          if (c.role === 'participant' && c.pid && c.name)
+          if (c.role === 'participant' && c.pid && c.name) {
             state.participants[c.pid] = { id: c.pid, name: c.name, score: 0, userId: c.userId || null };
+            // Ensure the pid entry points to the userId-keyed slot so no new duplicate is created
+            if (c.userId) {
+              const gKey = `user_${c.userId}`;
+              if (gameScores[gKey] && !gameScores[c.pid]) {
+                gameScores[c.pid] = gameScores[gKey]; // alias pid → same object
+              }
+            }
+          }
         });
         broadcast();
         // Re-send any persisted reports so host sees them after new session starts
@@ -1280,7 +1330,18 @@ wss.on('connection', ws => {
         if (client.role !== 'host') break;
         bankGameScores();
         {
+          // De-duplicate gameScores by userId before computing final leaderboard.
+          // Multiple pid-keyed entries may point to the same userId-keyed entry (by reference)
+          // after a reset+rejoin. Deduplicate so each user appears once.
+          const seenUserIds = new Set();
           const finalLeaderboard = Object.entries(gameScores)
+            .filter(([pid, g]) => {
+              if (!g.userId) return true; // guests always included
+              const uid = String(g.userId);
+              if (seenUserIds.has(uid)) return false;
+              seenUserIds.add(uid);
+              return true;
+            })
             .map(([pid, g]) => ({ id: pid, name: g.name, userId: g.userId, score: g.total }))
             .sort((a, b) => b.score - a.score);
           persistLeaderboard(finalLeaderboard);
@@ -1290,6 +1351,15 @@ wss.on('connection', ws => {
               c.role = null; c.pid = null;
             }
           });
+          // ── Clear the session backup NOW — host manually ended the session ──
+          // This is the ONLY place backup resets, so restore is always clean next session.
+          (async () => {
+            try {
+              const { windowStart } = getBackupWindow();
+              await SessionBackup.deleteOne({ windowStart });
+              console.log('[SessionBackup] Cleared on shutdown (manual halt).');
+            } catch (e) { console.warn('[SessionBackup] clear on shutdown failed:', e.message); }
+          })();
         }
         gameScores = {};
         sessionSnapshots = [];
@@ -1394,20 +1464,29 @@ wss.on('connection', ws => {
 
             let restored = 0;
             backup.participants.forEach(bp => {
+              if (!bp.userId) return;
+              const uid   = String(bp.userId);
+              const gKey  = `user_${uid}`;
               const existing = Object.values(state.participants).find(
-                p => p.userId && String(p.userId) === String(bp.userId)
+                p => p.userId && String(p.userId) === uid
               );
+              const bankedTotal  = gameScores[gKey]?.total || 0;
+              const liveScore    = existing?.score || 0;
+              const currentTotal = bankedTotal + liveScore;
+              const backupTotal  = bp.totalScore || 0;
+
+              if (backupTotal <= currentTotal) return; // nothing to restore
+              const extra = backupTotal - currentTotal;
+
               if (existing) {
-                const backupTotal = bp.totalScore || 0;
-                const currentTotal = (gameScores[existing.id]?.total || 0) + (existing.score || 0);
-                if (backupTotal > currentTotal) {
-                  existing.score = (existing.score || 0) + (backupTotal - currentTotal);
-                  restored++;
+                existing.score = (existing.score || 0) + extra;
+                if (!gameScores[gKey]) {
+                  gameScores[gKey] = { name: existing.name, userId: existing.userId, total: 0 };
                 }
-              } else if (bp.userId && (bp.totalScore || 0) > 0) {
-                const gid = `restored_${bp.userId}`;
-                if (!gameScores[gid]) {
-                  gameScores[gid] = { name: bp.name, userId: bp.userId, total: bp.totalScore };
+                restored++;
+              } else {
+                if (!gameScores[gKey]) {
+                  gameScores[gKey] = { name: bp.name, userId: bp.userId, total: bp.totalScore };
                   restored++;
                 }
               }
