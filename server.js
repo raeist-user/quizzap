@@ -87,6 +87,26 @@ const leaderboardSchema = new mongoose.Schema({
 });
 const LeaderboardEntry = mongoose.model('LeaderboardEntry', leaderboardSchema);
 
+// ── SESSION BACKUP MODEL (sessionbackup collection) ──────────────────────────
+// Persists live scores per participant for the current 5am-to-5am IST window.
+// Updated on every 'reveal'. Survives host reconnects, new-session resets, and
+// server glitches. Used to restore student scores on rejoin and for host recovery.
+const sessionBackupSchema = new mongoose.Schema({
+  windowStart:  { type: Date, required: true, unique: true, index: true },
+  windowEnd:    { type: Date, required: true },
+  participants: [{
+    userId:      { type: String, default: null },
+    pid:         { type: String },
+    name:        { type: String },
+    currentScore:{ type: Number, default: 0 },  // score in the most-recent mini-session
+    bankedScore: { type: Number, default: 0 },  // scores from previous mini-sessions today
+    totalScore:  { type: Number, default: 0 },  // currentScore + bankedScore
+    updatedAt:   { type: Date,   default: Date.now },
+  }],
+  updatedAt:    { type: Date, default: Date.now },
+});
+const SessionBackup = mongoose.model('SessionBackup', sessionBackupSchema);
+
 // ── SESSION HISTORY MODEL ─────────────────────────────────────────────────────
 const sessionSchema = new mongoose.Schema({
   userId:      { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
@@ -759,6 +779,146 @@ app.get('/api/selfquiz/reports', requireHost, (req, res) => {
   res.json({ reports: questionReports });
 });
 
+// ── SESSION BACKUP HELPERS ────────────────────────────────────────────────────
+
+/**
+ * Returns the start/end of the current 5am-to-5am IST window.
+ * IST = UTC+5:30, so 5:00 IST = 23:30 UTC the *previous* calendar day.
+ */
+function getBackupWindow() {
+  const now = Date.now();
+  const d   = new Date(now);
+  const todayBoundary = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), 23, 30, 0, 0);
+  const windowStart = now >= todayBoundary
+    ? new Date(todayBoundary)
+    : new Date(todayBoundary - 24 * 60 * 60 * 1000);
+  const windowEnd = new Date(windowStart.getTime() + 24 * 60 * 60 * 1000);
+  return { windowStart, windowEnd };
+}
+
+/**
+ * Persist current in-memory scores to the sessionbackup collection.
+ * Called after every 'reveal' and after bankGameScores().
+ * Cumulative — new_session/reset does NOT erase backup data.
+ */
+async function saveSessionBackup() {
+  try {
+    const { windowStart, windowEnd } = getBackupWindow();
+    const participantList = Object.values(state.participants).map(p => {
+      const banked  = gameScores[p.id]?.total || 0;
+      const current = p.score || 0;
+      return {
+        userId:       p.userId || null,
+        pid:          p.id,
+        name:         p.name,
+        currentScore: current,
+        bankedScore:  banked,
+        totalScore:   banked + current,
+        updatedAt:    new Date(),
+      };
+    });
+    if (!participantList.length) return;
+    const existing = await SessionBackup.findOne({ windowStart }).lean();
+    if (existing) {
+      const existingMap = {};
+      existing.participants.forEach(ep => { if (ep.userId) existingMap[ep.userId] = ep; });
+      participantList.forEach(np => { if (np.userId) existingMap[np.userId] = np; });
+      await SessionBackup.findOneAndUpdate(
+        { windowStart },
+        { $set: { participants: Object.values(existingMap), updatedAt: new Date() } }
+      );
+    } else {
+      await SessionBackup.create({ windowStart, windowEnd, participants: participantList });
+    }
+  } catch (e) {
+    console.warn('[SessionBackup] save error:', e.message);
+  }
+}
+
+/**
+ * Look up a student's backed-up score for today's window by userId.
+ */
+async function getBackupEntry(userId) {
+  if (!userId) return null;
+  try {
+    const { windowStart } = getBackupWindow();
+    const backup = await SessionBackup.findOne({ windowStart }).lean();
+    if (!backup) return null;
+    return backup.participants.find(p => p.userId && p.userId === String(userId)) || null;
+  } catch (e) {
+    console.warn('[SessionBackup] lookup error:', e.message);
+    return null;
+  }
+}
+
+// ── SESSION BACKUP REST API ───────────────────────────────────────────────────
+
+// GET /api/session-backup — returns the current window's backup, sorted by totalScore desc.
+// Host uses this to preview and/or import scores into a recovering session.
+app.get('/api/session-backup', requireHost, async (req, res) => {
+  try {
+    const { windowStart, windowEnd } = getBackupWindow();
+    // getBackupWindow is defined later in the file; mongoose query is lazy so it's fine.
+    const backup = await SessionBackup.findOne({ windowStart }).lean();
+    if (!backup) return res.json({ ok: true, found: false, participants: [], windowStart, windowEnd });
+    const participants = backup.participants
+      .slice()
+      .sort((a, b) => (b.totalScore || 0) - (a.totalScore || 0));
+    res.json({ ok: true, found: true, participants, windowStart: backup.windowStart, windowEnd: backup.windowEnd, updatedAt: backup.updatedAt });
+  } catch (e) {
+    console.error('/api/session-backup GET error:', e.message);
+    res.status(500).json({ error: 'Failed to fetch backup' });
+  }
+});
+
+// POST /api/session-backup/restore — host imports backup scores into the live session.
+// This merges backed-up totalScore into state.participants + gameScores so the
+// restored scores show up on the leaderboard immediately and accumulate correctly.
+app.post('/api/session-backup/restore', requireHost, async (req, res) => {
+  try {
+    const { windowStart } = getBackupWindow();
+    const backup = await SessionBackup.findOne({ windowStart }).lean();
+    if (!backup) return res.status(404).json({ error: 'No backup found for today\'s window' });
+
+    let restored = 0;
+    backup.participants.forEach(bp => {
+      // Match to existing participant in state by userId
+      const existing = Object.values(state.participants).find(
+        p => p.userId && String(p.userId) === String(bp.userId)
+      );
+      if (existing) {
+        // Only restore if backup has a higher total (don't downgrade)
+        const backupTotal = bp.totalScore || 0;
+        const currentTotal = (gameScores[existing.id]?.total || 0) + (existing.score || 0);
+        if (backupTotal > currentTotal) {
+          // Split: put the delta as current score so it's visible on the live board
+          const extra = backupTotal - currentTotal;
+          existing.score = (existing.score || 0) + extra;
+          if (!gameScores[existing.id]) {
+            gameScores[existing.id] = { name: existing.name, userId: existing.userId, total: 0 };
+          }
+          restored++;
+        }
+      } else if (bp.userId && bp.totalScore > 0) {
+        // Student not currently in session — add them as an offline entry so their
+        // score appears on the leaderboard when they rejoin
+        const gid = `restored_${bp.userId}`;
+        if (!gameScores[gid]) {
+          gameScores[gid] = { name: bp.name, userId: bp.userId, total: bp.totalScore };
+          restored++;
+        }
+      }
+    });
+
+    broadcast();
+    console.log(`[SessionBackup] Restored ${restored} participant(s) from backup`);
+    res.json({ ok: true, restored, message: `${restored} participant score(s) restored from today's backup` });
+  } catch (e) {
+    console.error('/api/session-backup/restore error:', e.message);
+    res.status(500).json({ error: 'Failed to restore backup' });
+  }
+});
+
 // ── QUIZ STATE ────────────────────────────────────────────────────────────────
 let state = fresh();
 // gameScores: pid → { name, userId, total } — accumulates across resets within one game day
@@ -788,6 +948,8 @@ function bankGameScores() {
     sessionCounter += 1;
     sessionSnapshots.push({ sessionNum: sessionCounter, scores: snap });
   }
+  // Persist to backup so banked scores survive a server glitch / new-session
+  saveSessionBackup().catch(e => console.warn('[SessionBackup] bankGameScores save failed:', e.message));
 }
 function fresh() {
   return {
@@ -806,6 +968,13 @@ function fresh() {
     pushedCount:      0,        // how many questions have actually been pushed this session
   };
 }
+
+// ── SESSION BACKUP HELPERS ────────────────────────────────────────────────────
+
+/**
+ * Returns the start/end of the current 5am-to-5am IST window.
+ * IST = UTC+5:30, so 5:00 IST = 23:30 UTC the *previous* calendar day.
+ */
 
 // ── WS CLIENT REGISTRY ───────────────────────────────────────────────────────
 let seq = 0, hostCid = null;
@@ -884,7 +1053,7 @@ wss.on('connection', ws => {
   tx(ws, { type: 'hello', cid });
   tx(ws, { type: 'state', payload: project(null, null) });
 
-  ws.on('message', raw => {
+  ws.on('message', async raw => {
     let msg; try { msg = JSON.parse(raw); } catch { return; }
     const client = clients.get(cid); if (!client) return;
 
@@ -902,20 +1071,63 @@ wss.on('connection', ws => {
       case 'join': {
         if (!msg.name?.trim()) break;
         let pid = msg.pid;
-        // Reconnect path: participant already exists in state (disconnected but not removed)
+
+        // ── Reconnect path 1: same pid still alive in state ─────────────────
         if (pid && state.participants[pid]) {
-          // Restore their session — keep score and userId intact
-          state.participants[pid].name = msg.name.trim().slice(0, 32); // refresh name in case of display name change
-          if (!state.participants[pid].userId && msg.userId) state.participants[pid].userId = msg.userId;
+          state.participants[pid].name = msg.name.trim().slice(0, 32);
+          if (!state.participants[pid].userId && msg.userId)
+            state.participants[pid].userId = msg.userId;
+
+        // ── Reconnect path 2: same userId, different pid (page-refresh) ──────
+        } else if (msg.userId) {
+          const existingByUser = Object.values(state.participants)
+            .find(p => p.userId && String(p.userId) === String(msg.userId));
+
+          if (existingByUser) {
+            // Reuse the existing participant entry — no duplicate created
+            pid = existingByUser.id;
+            existingByUser.name = msg.name.trim().slice(0, 32);
+          } else {
+            // ── Brand-new join: check backup to restore score ────────────────
+            pid = `p${cid}_${Date.now()}`;
+            let restoredCurrent = 0;
+            let restoredBanked  = 0;
+            const backupEntry = await getBackupEntry(msg.userId);
+            if (backupEntry) {
+              restoredCurrent = backupEntry.currentScore || 0;
+              restoredBanked  = backupEntry.bankedScore  || 0;
+            }
+            state.participants[pid] = {
+              id:     pid,
+              name:   msg.name.trim().slice(0, 32),
+              score:  restoredCurrent,
+              userId: msg.userId || null,
+            };
+            // Restore banked score so gameScores totals stay accurate
+            if (restoredBanked > 0 || restoredCurrent > 0) {
+              gameScores[pid] = {
+                name:   msg.name.trim().slice(0, 32),
+                userId: msg.userId || null,
+                total:  restoredBanked,
+              };
+            }
+          }
+
         } else {
-          // New join — assign a fresh pid
-          pid = `p${cid}_${Date.now()}`;
-          // FIX #10: store userId on participant so leaderboard can attribute scores
-          state.participants[pid] = { id: pid, name: msg.name.trim().slice(0, 32), score: 0, userId: msg.userId || null };
+          // ── Guest (no userId): reconnect by pid or create fresh entry ───────
+          if (!pid || !state.participants[pid]) {
+            pid = `p${cid}_${Date.now()}`;
+            state.participants[pid] = {
+              id: pid, name: msg.name.trim().slice(0, 32), score: 0, userId: null,
+            };
+          } else {
+            state.participants[pid].name = msg.name.trim().slice(0, 32);
+          }
         }
+
         client.role = 'participant'; client.pid = pid;
-        client.name = state.participants[pid].name;
-        client.userId = msg.userId || null;  // FIX #10: save on client too for end_session
+        client.name   = state.participants[pid].name;
+        client.userId = msg.userId || null;
         tx(ws, { type: 'joined', pid });
         broadcast();
         txHost({ type: 'rtc_new_peer', cid });
@@ -933,6 +1145,12 @@ wss.on('connection', ws => {
       case 'open_session':
         if (client.role !== 'host') {
           tx(ws, { type: 'open_session_result', ok: false, reason: 'Not authenticated as host' });
+          break;
+        }
+        // ── Idempotent: if session is already open, just confirm without touching state ──
+        // This prevents a host WS reconnect from re-triggering open_session effects.
+        if (state.sessionOpen) {
+          tx(ws, { type: 'open_session_result', ok: true });
           break;
         }
         state.sessionOpen = true;
@@ -971,6 +1189,8 @@ wss.on('connection', ws => {
         state.history.push({ question: state.question, correct: state.correct, answers: { ...state.answers } });
         state.status = 'revealed'; state.timerSeconds = 0;
         broadcast();
+        // ── Persist to sessionbackup after every reveal ──────────────────────
+        saveSessionBackup().catch(e => console.warn('[SessionBackup] reveal save failed:', e.message));
         break;
 
       case 'clear':
@@ -1025,9 +1245,11 @@ wss.on('connection', ws => {
 
       case 'reset':
         if (client.role !== 'host') break;
-        // Bank current session scores before wiping
+        // Bank current session scores before wiping (also saves to backup)
         bankGameScores();
         state = fresh();
+        // Keep session open — "New Session" shouldn't close the room
+        state.sessionOpen = true;
         clients.forEach((c) => {
           if (c.role === 'participant' && c.pid && c.name)
             state.participants[c.pid] = { id: c.pid, name: c.name, score: 0, userId: c.userId || null };
@@ -1153,6 +1375,49 @@ wss.on('connection', ws => {
         if (client.role !== 'host') break;
         questionReports = questionReports.filter(r => r.rid !== msg.rid);
         txHost({ type: 'report_received', reports: questionReports });
+        break;
+      }
+
+      // ── RESTORE BACKUP (host only — load today's backup into live scores) ───────
+      case 'restore_backup': {
+        if (client.role !== 'host') break;
+        (async () => {
+          try {
+            const { windowStart } = getBackupWindow();
+            const backup = await SessionBackup.findOne({ windowStart }).lean();
+            if (!backup) { txHost({ type: 'backup_restore_result', ok: false, message: 'No backup found for today\'s window.' }); return; }
+
+            // Build imported leaderboard for host overlay display
+            const importedRanked = backup.participants
+              .slice()
+              .sort((a, b) => (b.totalScore || 0) - (a.totalScore || 0));
+
+            let restored = 0;
+            backup.participants.forEach(bp => {
+              const existing = Object.values(state.participants).find(
+                p => p.userId && String(p.userId) === String(bp.userId)
+              );
+              if (existing) {
+                const backupTotal = bp.totalScore || 0;
+                const currentTotal = (gameScores[existing.id]?.total || 0) + (existing.score || 0);
+                if (backupTotal > currentTotal) {
+                  existing.score = (existing.score || 0) + (backupTotal - currentTotal);
+                  restored++;
+                }
+              } else if (bp.userId && (bp.totalScore || 0) > 0) {
+                const gid = `restored_${bp.userId}`;
+                if (!gameScores[gid]) {
+                  gameScores[gid] = { name: bp.name, userId: bp.userId, total: bp.totalScore };
+                  restored++;
+                }
+              }
+            });
+            broadcast();
+            txHost({ type: 'backup_restore_result', ok: true, restored, importedRanked, message: `${restored} score(s) restored from today's backup.` });
+          } catch (e) {
+            txHost({ type: 'backup_restore_result', ok: false, message: 'Restore failed: ' + e.message });
+          }
+        })();
         break;
       }
 
