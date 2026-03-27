@@ -672,6 +672,10 @@ let showingHaltMenu=false;
 let showingHaltBomb=false, haltBombTimer=null; // bomb drop animation before halt menu
 let showingDismissBomb=false, dismissBombTimer=null; // bomb before stop & dismiss fires
 
+// Session backup / restore overlay (host only)
+let showingBackupOverlay=false;
+let backupOverlayState={ list:[], loading:false, error:null, restoredMsg:null };
+
 // Host settings/shortcuts overlay
 let hostSettingsOpen=false;
 
@@ -1530,6 +1534,20 @@ function connect(){
         if(role==='host'&&peerConns[m.fromCid]) peerConns[m.fromCid].addIceCandidate(new RTCIceCandidate(m.signal)).catch(()=>{});
         if(role==='participant'&&remoteConn)     remoteConn.addIceCandidate(new RTCIceCandidate(m.signal)).catch(()=>{});
         break;
+      case 'backup_restore_result': {
+        if (m.ok) {
+          backupOverlayState.restoredMsg = m.message || `${m.restored||0} score(s) restored.`;
+          backupOverlayState.loading = false;
+          if (m.importedRanked) backupOverlayState.list = m.importedRanked;
+          showToast('✅ ' + (m.message||'Backup restored!'), 'good');
+        } else {
+          backupOverlayState.error = m.message || 'Restore failed.';
+          backupOverlayState.loading = false;
+          showToast('❌ ' + (m.message||'Restore failed'), 'bad');
+        }
+        render();
+        break;
+      }
     }
   };
   ws.onclose=()=>{ setConn(false); setTimeout(connect,2000); };
@@ -2894,6 +2912,7 @@ function dismissBombOverlayHTML(){
   </div>`;
 }
 
+
 function haltMenuOverlayHTML(){
   if(!showingHaltMenu) return '';
   return `<div style="position:absolute;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:flex-end;justify-content:center;z-index:500;backdrop-filter:blur(2px)">
@@ -2908,6 +2927,9 @@ function haltMenuOverlayHTML(){
         <button class="btn btn-lg" id="btn-new-session" style="justify-content:center;gap:8px;background:#1a56db;color:#fff;border-color:#1a56db">
           🔄 New Session <span style="opacity:.75;font-weight:400;font-size:.78rem">· resets scores to 0</span>
         </button>
+        <button class="btn btn-lg" id="btn-restore-backup" style="justify-content:center;gap:8px;background:#0e7a5a;color:#fff;border-color:#0e7a5a">
+          📥 Restore Today's Scores <span style="opacity:.75;font-weight:400;font-size:.78rem">· recover after glitch</span>
+        </button>
         <button class="btn btn-lg" id="btn-stop-dismiss" style="justify-content:center;gap:8px;background:#be123c;color:#fff;border-color:#be123c">
           ⏹ Stop &amp; Dismiss Students
         </button>
@@ -2916,6 +2938,46 @@ function haltMenuOverlayHTML(){
     </div>
   </div>`;
 }
+
+function backupRestoreOverlayHTML(){
+  if(!showingBackupOverlay) return '';
+  const { list, loading, error, restoredMsg } = backupOverlayState;
+  const medals = ['🥇','🥈','🥉'];
+  const rows = loading
+    ? `<div style="padding:28px;text-align:center;color:var(--mid)"><div style="width:22px;height:22px;border:2.5px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;display:inline-block"></div><div style="margin-top:8px;font-size:.8rem">Loading backup…</div></div>`
+    : error
+      ? `<div style="padding:20px;text-align:center;color:var(--bad);font-size:.85rem">${esc(error)}</div>`
+      : !list.length
+        ? `<div style="padding:20px;text-align:center;color:var(--mid);font-size:.85rem">No backup found for today's window (5 AM–5 AM IST).</div>`
+        : list.map((p,i)=>`
+          <div style="display:flex;align-items:center;gap:10px;padding:9px 14px;border-bottom:1px solid var(--line)">
+            <div style="min-width:26px;text-align:center;font-size:${i<3?'1rem':'.78rem'};color:var(--mid)">${medals[i]||('#'+(i+1))}</div>
+            <div style="flex:1;font-weight:${i<3?'700':'500'};font-size:.87rem;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">${esc(p.name)}</div>
+            <div style="text-align:right;min-width:64px">
+              <span style="font-weight:700;font-size:.9rem">${p.totalScore||0}</span>
+              <span style="font-size:.67rem;color:var(--mid);display:block">total</span>
+            </div>
+          </div>`).join('');
+  const actionBtn = restoredMsg
+    ? `<div style="padding:12px 16px;background:#d4f5e8;color:#0e7a5a;border-radius:8px;font-size:.84rem;font-weight:600;text-align:center">${esc(restoredMsg)}</div>`
+    : `<button class="btn btn-good btn-lg" id="btn-confirm-restore" style="justify-content:center" ${loading||error||!list.length?'disabled':''}>📥 Import & Restore These Scores</button>`;
+  return `<div style="position:fixed;inset:0;background:rgba(0,0,0,.62);display:flex;align-items:flex-end;justify-content:center;z-index:700;backdrop-filter:blur(3px)">
+    <div style="background:var(--white);border-radius:20px 20px 0 0;width:100%;max-width:500px;max-height:86vh;display:flex;flex-direction:column;animation:slideUp .22s ease">
+      <div style="padding:16px 20px 12px;border-bottom:1px solid var(--line);flex-shrink:0;text-align:center">
+        <div style="width:36px;height:4px;background:var(--line);border-radius:2px;margin:0 auto 12px"></div>
+        <div style="font-size:1.5rem;margin-bottom:4px">📥</div>
+        <div style="font-size:1rem;font-weight:700">Restore Today's Session Backup</div>
+        <p style="font-size:.76rem;color:var(--mid);margin-top:3px">Scores saved up to the last revealed question · 5 AM–5 AM IST window</p>
+      </div>
+      <div style="overflow-y:auto;flex:1">${rows}</div>
+      <div style="padding:14px 16px 28px;display:flex;flex-direction:column;gap:8px;flex-shrink:0;border-top:1px solid var(--line)">
+        ${actionBtn}
+        <button class="btn btn-ghost btn-sm" id="btn-close-backup-overlay" style="justify-content:center">Close</button>
+      </div>
+    </div>
+  </div>`;
+}
+
 
 function hostFinalLeaderboardHTML(){
   if(!hostShutdownLeaderboard) return '';
@@ -2940,7 +3002,10 @@ function hostFinalLeaderboardHTML(){
         <p style="font-size:.78rem;color:var(--mid)">${entries.length} student${entries.length!==1?'s':''} &nbsp;·&nbsp; ${totalQStr} question${totalQ!==1?'s':''}</p>
       </div>
       <div style="overflow-y:auto;flex:1">${rows}</div>
-      <div style="padding:14px 16px 24px;flex-shrink:0;border-top:1px solid var(--line)">
+      <div style="padding:14px 16px 24px;flex-shrink:0;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:8px">
+        <button class="btn btn-good" id="btn-host-lb-export" style="width:100%;justify-content:center;gap:8px">
+          📤 Export as CSV
+        </button>
         <button class="btn btn-dark" id="btn-host-lb-close" style="width:100%;justify-content:center;gap:8px">
           ← Back to Host Menu
         </button>
@@ -3688,6 +3753,7 @@ function hostHTML(){
       ${schedOverlayHTML()}
       ${haltBombOverlayHTML()}
       ${haltMenuOverlayHTML()}
+      ${backupRestoreOverlayHTML()}
       ${standingsOverlayHTML()}
       ${reportsOverlayHTML()}
       ${hostSettingsOverlayHTML()}
@@ -3792,6 +3858,7 @@ function hostHTML(){
     ${schedOverlayHTML()}
     ${haltBombOverlayHTML()}
     ${haltMenuOverlayHTML()}
+    ${backupRestoreOverlayHTML()}
     ${standingsOverlayHTML()}
     ${reportsOverlayHTML()}
     ${hostSettingsOverlayHTML()}
@@ -3839,6 +3906,7 @@ function hostEndedHTML(){
     <p class="muted small mb2">Tap any row to inspect answers.</p>${table}${detail}
     ${haltBombOverlayHTML()}
     ${haltMenuOverlayHTML()}
+    ${backupRestoreOverlayHTML()}
     ${hostFinalLeaderboardHTML()}
     ${dismissBombOverlayHTML()}
   </div>`;
@@ -4618,7 +4686,66 @@ function attach(){
     if(haltBombTimer){ clearTimeout(haltBombTimer); haltBombTimer=null; }
     showingHaltBomb=false; showingHaltMenu=false; render();
   });
+
+  // ── BACKUP RESTORE ────────────────────────────────────────────────────────
+  // "Restore Today's Scores" in halt menu → open overlay and load backup list
+  on('btn-restore-backup', async ()=>{
+    showingHaltMenu=false;
+    showingBackupOverlay=true;
+    backupOverlayState={ list:[], loading:true, error:null, restoredMsg:null };
+    render();
+    try {
+      const r = await fetch('/api/session-backup', { headers:{ Authorization:'Bearer '+authToken } });
+      const d = await r.json();
+      if(!r.ok) throw new Error(d.error||'Failed to fetch backup');
+      backupOverlayState.loading=false;
+      backupOverlayState.list=d.participants||[];
+      if(!d.found) backupOverlayState.error='No backup found for today\'s window (5 AM–5 AM IST).';
+    } catch(e){
+      backupOverlayState.loading=false;
+      backupOverlayState.error=e.message||'Failed to load backup.';
+    }
+    render();
+  });
+
+  // "Import & Restore These Scores" — fire the WS restore command
+  on('btn-confirm-restore', ()=>{
+    backupOverlayState.loading=true;
+    backupOverlayState.error=null;
+    render();
+    send({ type:'restore_backup' });
+    // Result comes back via backup_restore_result WS message
+  });
+
+  // Close backup overlay
+  on('btn-close-backup-overlay', ()=>{
+    showingBackupOverlay=false;
+    backupOverlayState={ list:[], loading:false, error:null, restoredMsg:null };
+    render();
+  });
+
   on('btn-host-lb-close',()=>{ hostShutdownLeaderboard=null; render(); });
+
+  // Export final leaderboard as a CSV file
+  on('btn-host-lb-export',()=>{
+    const entries = hostShutdownLeaderboard;
+    if(!entries||!entries.length){ showToast('No leaderboard data to export.','bad'); return; }
+    const totalQ = entries._totalQ || S.pushedCount || 0;
+    const dateStr = new Date().toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}).replace(/ /g,'-');
+    const header = 'Rank,Name,Score,Total Questions,Percentage\n';
+    const csvRows = entries.map((e,i)=>{
+      const pct = totalQ>0 ? ((e.score||0)/totalQ*100).toFixed(1)+'%' : 'N/A';
+      return `${i+1},"${(e.name||'').replace(/"/g,'""')}",${e.score||0},${totalQ},${pct}`;
+    }).join('\n');
+    const csv = header + csvRows;
+    const blob = new Blob([csv], { type:'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = `SCC-Session-${dateStr}.csv`;
+    document.body.appendChild(a); a.click();
+    setTimeout(()=>{ URL.revokeObjectURL(url); a.remove(); }, 500);
+    showToast('✅ CSV downloaded!','good');
+  });
   on('btn-shutdown',()=>{ if(confirm('Shut down session?')) send({type:'shutdown'}); });
 
   document.querySelectorAll('.itbl tbody tr[data-pid]').forEach(row=>
