@@ -53,6 +53,10 @@ const peerConns={};
 // Voice (student)
 let remoteConn=null;
 
+// Speak-request flow (see voice.js)
+// speakRequestPending, isSpeakingNow, participantMicStream, participantPeerConn
+// activeSpeakerName, activeSpeakerCid  — all declared in voice.js
+
 // Timer
 let timerInterval=null;
 

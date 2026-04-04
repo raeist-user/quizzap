@@ -931,11 +931,15 @@ function attach(){
     if(btn){ btn.disabled=true; btn.innerHTML='&#10003; Reported — thanks!'; btn.style.color='var(--good)'; btn.style.borderColor='var(--good)'; }
   });
 
-  // ── STUDENT: Raise hand button ───────────────────────────────────────────
+  // ── STUDENT: Request to speak button ────────────────────────────────────
   on('btn-raise-hand', ()=>{
-    send({type:'raise_hand', name:myName||currentUser?.name||'Student'});
-    const btn=document.getElementById('btn-raise-hand');
-    if(btn){ btn.disabled=true; btn.style.opacity='.5'; setTimeout(()=>{ btn.disabled=false; btn.style.opacity=''; },10000); }
+    // Send speak_request; voice.js will manage pending/allowed/dismissed states
+    requestToSpeak();
+  });
+  // Student done speaking — voluntarily stop mic
+  on('btn-end-speak', ()=>{
+    stopParticipantMic(false);
+    send({ type: 'speak_end_self' }); // notify host the student finished
   });
 
   updateMicDot();

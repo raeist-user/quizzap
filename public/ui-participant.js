@@ -127,10 +127,24 @@ function waitHTML(){
       '<div id="mic-dot" class="mic-dot"></div>'+
       '<span style="flex:1;color:var(--mid);font-size:.8rem">Host voice</span>'+
     '</div>'+
-    '<div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">'+
-      '<button class="btn btn-ghost btn-sm" id="btn-leave">Leave session</button>'+
-      '<button class="btn btn-ghost btn-sm" id="btn-raise-hand" style="gap:5px;font-size:.8rem">\u270b Raise Hand</button>'+
-    '</div>'+
+    (isSpeakingNow
+      ? '<div style="display:flex;align-items:center;gap:6px;margin-bottom:14px;max-width:480px;width:100%">'+
+          '<div style="display:flex;align-items:center;gap:7px;padding:7px 14px;background:#ede9fe;border:1.5px solid #6366f1;border-radius:40px;font-size:.82rem;font-weight:600;color:#4338ca;flex:1">'+
+            '<span style="animation:pulse 1.2s ease-in-out infinite;display:inline-block">🎙️</span>'+
+            'You\'re speaking — mic is live'+
+          '</div>'+
+          '<button class="btn btn-sm" style="background:#fee2e2;color:#be123c;border-color:#fecdd3;font-size:.76rem" id="btn-end-speak">Done</button>'+
+        '</div>'
+      : speakRequestPending
+        ? '<div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;padding:8px 14px;background:#f5f3ff;border:1.5px solid #a5b4fc;border-radius:40px;font-size:.82rem;color:#4338ca;max-width:480px;width:100%">'+
+            '<div style="width:14px;height:14px;border:2px solid #a5b4fc;border-top-color:#6366f1;border-radius:50%;animation:spin .8s linear infinite;flex-shrink:0"></div>'+
+            'Waiting for host to allow…'+
+          '</div>'
+        : '<div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">'+
+            '<button class="btn btn-ghost btn-sm" id="btn-leave">Leave session</button>'+
+            '<button class="btn btn-ghost btn-sm" id="btn-raise-hand" style="gap:5px;font-size:.8rem">✋ Request to Speak</button>'+
+          '</div>'
+    )+
     lbHTML+
     '</div>';
 }
@@ -158,7 +172,12 @@ function questionViewHTML(){
     <div class="row between mb2">
       <div class="row gap2"><div id="mic-dot" class="mic-dot"></div><span class="small muted">Score: <strong>${S.myScore||0}</strong> pts</span></div>
       <div class="row gap2">
-        <button class="btn btn-ghost btn-sm" id="btn-raise-hand" style="gap:4px;font-size:.78rem" title="Raise hand — notify host">✋</button>
+        ${isSpeakingNow
+          ? `<button class="btn btn-sm" id="btn-end-speak" style="gap:4px;font-size:.78rem;background:#ede9fe;color:#4338ca;border-color:#a5b4fc">🎙️ Done Speaking</button>`
+          : speakRequestPending
+            ? `<button class="btn btn-ghost btn-sm" disabled style="gap:4px;font-size:.78rem;opacity:.6"><span style="display:inline-block;width:10px;height:10px;border:2px solid #a5b4fc;border-top-color:#6366f1;border-radius:50%;animation:spin .8s linear infinite"></span> Waiting…</button>`
+            : `<button class="btn btn-ghost btn-sm" id="btn-raise-hand" style="gap:4px;font-size:.78rem" title="Request to speak">✋ Speak</button>`
+        }
         <button class="btn btn-ghost btn-sm" id="btn-leave">Leave</button>
       </div>
     </div>
