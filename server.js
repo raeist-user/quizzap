@@ -1389,11 +1389,32 @@ wss.on('connection', ws => {
         broadcast();
         break;
 
-      // ── RAISE HAND ──────────────────────────────────────────────────────────
+      // ── RAISE HAND (legacy) / SPEAK REQUEST ─────────────────────────────────
       case 'raise_hand': {
         if (client.role !== 'participant' || !client.pid) break;
         const raiseName = (msg.name || client.name || 'A student').slice(0, 40);
-        txHost({ type: 'hand_raised', name: raiseName, pid: client.pid });
+        txHost({ type: 'hand_raised', name: raiseName, pid: client.pid, fromCid: cid });
+        break;
+      }
+      case 'speak_request': {
+        if (client.role !== 'participant' || !client.pid) break;
+        const speakName = (client.name || 'A student').slice(0, 40);
+        txHost({ type: 'speak_request', name: speakName, pid: client.pid, fromCid: cid });
+        break;
+      }
+
+      // ── SPEAK FLOW: host → participant signals ───────────────────────────────
+      case 'speak_allowed':
+      case 'speak_dismissed':
+      case 'speak_end': {
+        if (client.role !== 'host') break;
+        txCid(msg.toCid, { type: msg.type });
+        break;
+      }
+      // Participant voluntarily finishes speaking — notify host
+      case 'speak_end_self': {
+        if (client.role !== 'participant') break;
+        txHost({ type: 'speak_end_self', fromCid: cid, pid: client.pid });
         break;
       }
 
@@ -1500,7 +1521,7 @@ wss.on('connection', ws => {
         break;
       }
 
-      // WebRTC relay
+      // WebRTC relay — host broadcasts to students
       case 'rtc_offer':
       case 'rtc_ice_to_peer':
         if (client.role !== 'host') break;
@@ -1510,6 +1531,24 @@ wss.on('connection', ws => {
       case 'rtc_ice_to_host':
         if (client.role !== 'participant') break;
         txHost({ type: msg.type === 'rtc_answer' ? 'rtc_answer' : 'rtc_ice', fromCid: cid, signal: msg.signal });
+        break;
+
+      // WebRTC relay — participant mic streams to host (speak flow)
+      case 'rtc_speaker_offer':
+        if (client.role !== 'participant') break;
+        txHost({ type: 'rtc_speaker_offer', fromCid: cid, signal: msg.signal });
+        break;
+      case 'rtc_speaker_answer':
+        if (client.role !== 'host') break;
+        txCid(msg.toCid, { type: 'rtc_speaker_answer', signal: msg.signal });
+        break;
+      case 'rtc_ice_to_host_from_speaker':
+        if (client.role !== 'participant') break;
+        txHost({ type: 'rtc_ice_speaker', fromCid: cid, signal: msg.signal });
+        break;
+      case 'rtc_ice_to_speaker':
+        if (client.role !== 'host') break;
+        txCid(msg.toCid, { type: 'rtc_ice_speaker', signal: msg.signal });
         break;
     }
   });
