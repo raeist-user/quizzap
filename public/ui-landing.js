@@ -153,15 +153,25 @@ function haltedHTML(){
         <div class="score-pts"><span style="font-weight:700">${p.score||0}</span><span style="font-size:.7rem;color:var(--mid);font-weight:400">/${totalStr}</span></div>
       </div>`).join('')
     :`<div style="padding:20px;text-align:center;color:var(--mid)">No scores yet.</div>`;
+
+  // Two modes: paused (real halt) vs new-session preview
+  const icon    = haltedIsPreview ? '🚀' : '⏸';
+  const title   = haltedIsPreview ? 'Session complete!' : 'Session paused';
+  const subtitle= haltedIsPreview
+    ? 'The host will push new questions soon.<br>Scores below are from the previous session.'
+    : 'The host has paused the quiz.<br>Please wait patiently — they may continue<br>or start a new session shortly.';
+  const lbTitle = haltedIsPreview ? '📋 Previous Session Results' : '🏆 Current Standings';
+  const iconAnim= haltedIsPreview ? '' : 'animation:blink 1.4s ease-in-out infinite';
+
   return `<div style="display:flex;flex-direction:column;height:calc(100vh - 54px);overflow:hidden;padding:16px 20px;max-width:520px;margin:0 auto">
     <div style="text-align:center;padding:20px 0 16px;flex-shrink:0">
-      <div style="font-size:2.4rem;margin-bottom:10px;animation:blink 1.4s ease-in-out infinite">⏸</div>
-      <h2 style="margin-bottom:6px">Session paused</h2>
-      <p class="muted small">The host has paused the quiz.<br>Please wait patiently — they may continue<br>or start a new session shortly.</p>
+      <div style="font-size:2.4rem;margin-bottom:10px;${iconAnim}">${icon}</div>
+      <h2 style="margin-bottom:6px">${title}</h2>
+      <p class="muted small">${subtitle}</p>
       ${myP?`<div style="margin-top:10px;display:inline-flex;align-items:center;gap:7px;padding:5px 13px;background:#e8f5ee;border:1px solid #b7dfc7;border-radius:20px;font-size:.77rem;font-weight:600;color:#166534">Score: ${myP.score||0}/${totalStr} &nbsp;·&nbsp; Rank #${myRank}</div>`:''}
     </div>
     <div class="lb-panel" style="flex:1;overflow:hidden;display:flex;flex-direction:column">
-      <div class="lb-head"><span style="font-size:.82rem;font-weight:600">🏆 Current Standings</span><span class="small muted">${sorted.length} student${sorted.length!==1?'s':''}</span></div>
+      <div class="lb-head"><span style="font-size:.82rem;font-weight:600">${lbTitle}</span><span class="small muted">${sorted.length} student${sorted.length!==1?'s':''}</span></div>
       <div style="overflow-y:auto;flex:1">${rows}</div>
     </div>
   </div>`;

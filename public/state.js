@@ -64,7 +64,7 @@ let timerInterval=null;
 let pushing=false, pushTimeout=null;
 
 // Halt flow
-let showingHalted=false, haltedCountdown=0, haltedTimer=null, haltedSnapshot=[];
+let showingHalted=false, haltedIsPreview=false, haltedCountdown=0, haltedTimer=null, haltedSnapshot=[];
 let haltedTotalQuestions=0;   // total questions asked in the session (for score/total display)
 let haltedTotalLabel='';      // denominator label for final leaderboard: 'all' or specific count string
 let hostShutdownLeaderboard=null; // captured final leaderboard shown to host after Stop & Dismiss

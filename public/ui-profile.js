@@ -931,15 +931,11 @@ function attach(){
     if(btn){ btn.disabled=true; btn.innerHTML='&#10003; Reported — thanks!'; btn.style.color='var(--good)'; btn.style.borderColor='var(--good)'; }
   });
 
-  // ── STUDENT: Request to speak button ────────────────────────────────────
+  // ── STUDENT: Raise hand button ───────────────────────────────────────────
   on('btn-raise-hand', ()=>{
-    // Send speak_request; voice.js will manage pending/allowed/dismissed states
-    requestToSpeak();
-  });
-  // Student done speaking — voluntarily stop mic
-  on('btn-end-speak', ()=>{
-    stopParticipantMic(false);
-    send({ type: 'speak_end_self' }); // notify host the student finished
+    send({type:'raise_hand', name:myName||currentUser?.name||'Student'});
+    const btn=document.getElementById('btn-raise-hand');
+    if(btn){ btn.disabled=true; btn.style.opacity='.5'; setTimeout(()=>{ btn.disabled=false; btn.style.opacity=''; },10000); }
   });
 
   updateMicDot();
@@ -1170,29 +1166,23 @@ async function doLogin(){
 }
 async function doRegister(){
   const name=document.getElementById('auth-name')?.value?.trim();
-  const email=document.getElementById('auth-email')?.value?.trim();
   const username=document.getElementById('auth-username')?.value?.trim()||'';
   const pw=document.getElementById('auth-pw')?.value;
   const err=document.getElementById('auth-err'); if(err)err.textContent='';
   if(!name){if(err)err.textContent='Full name is required';return;}
-  if(!email){if(err)err.textContent='Email is required';return;}
-  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){if(err)err.textContent='Enter a valid email address';return;}
-  if(username){
-    if(!/^[a-zA-Z0-9_]+$/.test(username)){if(err)err.textContent='Username may only contain letters, numbers and underscores';return;}
-    if(username.length<3){if(err)err.textContent='Username must be at least 3 characters';return;}
-    const unHint=document.getElementById('un-hint');
-    if(unHint&&unHint.textContent==='Username is already taken'){if(err)err.textContent='That username is already taken — please choose another';return;}
-  }
+  if(!username){if(err)err.textContent='Username is required';return;}
+  if(!/^[a-zA-Z0-9_]+$/.test(username)){if(err)err.textContent='Username may only contain letters, numbers and underscores';return;}
+  if(username.length<3){if(err)err.textContent='Username must be at least 3 characters';return;}
+  const unHint=document.getElementById('un-hint');
+  if(unHint&&unHint.textContent==='Username is already taken'){if(err)err.textContent='That username is already taken — please choose another';return;}
   try{
-    const d=await apiPost('/api/register',{name,email,username:username||undefined,password:pw});
+    const d=await apiPost('/api/register',{name,username,password:pw});
     if(d.pending){
-      // Show pending message — do NOT log in
       if(err){
         err.style.color='var(--good)';
         err.textContent='✅ '+d.message;
       }
-      // Clear the form fields
-      ['auth-name','auth-email','auth-username','auth-pw'].forEach(id=>{
+      ['auth-name','auth-username','auth-pw'].forEach(id=>{
         const el=document.getElementById(id); if(el) el.value='';
       });
     } else {

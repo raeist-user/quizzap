@@ -60,12 +60,21 @@ function connect(){
           haltedTotalQuestions = m.payload?.totalQuestions || S.pushedCount || 0;
           haltedTotalLabel = haltedTotalQuestions > 0 ? String(haltedTotalQuestions) : '?';
         }
-        showingHalted=true; haltedCountdown=0; // no auto-dismiss — wait for host
+        showingHalted=true; haltedIsPreview=false; haltedCountdown=0;
+        render();
+        break;
+      case 'session_preview':
+        // New session started — show last session's scores while waiting for first question
+        { const prevParts=m.payload?.participants||[];
+          haltedSnapshot=prevParts;
+          haltedTotalQuestions = m.payload?.totalQuestions || S.pushedCount || 0;
+          haltedTotalLabel = haltedTotalQuestions > 0 ? String(haltedTotalQuestions) : '?';
+        }
+        showingHalted=true; haltedIsPreview=true;
         render();
         break;
       case 'session_resumed':
-        // Host chose Continue — return students to the session
-        showingHalted=false; haltedSnapshot=[];
+        showingHalted=false; haltedIsPreview=false; haltedSnapshot=[];
         render(); break;
       case 'state': {
         const ns=m.payload.status, inc=m.payload.myScore||0;
@@ -154,8 +163,10 @@ function connect(){
         prevStatus=ns; S=m.payload;
         // Invalidate streak cache when history length changes
         if((S.history||[]).length !== _streakCache.histLen) _streakCache = { histLen: -1, map: {} };
-        // Exit halted screen when new session state arrives
-        if(ns==='idle'&&showingHalted){ showingHalted=false; haltedSnapshot=[]; }
+        // Exit halted screen on idle (but NOT if it's a new-session preview — that waits for question)
+        if(ns==='idle'&&showingHalted&&!haltedIsPreview){ showingHalted=false; haltedSnapshot=[]; }
+        // Exit new-session preview when the first question of the new session is pushed
+        if(ns==='question'&&showingHalted&&haltedIsPreview){ showingHalted=false; haltedIsPreview=false; haltedSnapshot=[]; }
         render(); break;
       }
       case 'joined':    myPid=m.pid; sessionStorage.setItem('qz_pid',m.pid); break;
@@ -163,45 +174,7 @@ function connect(){
       case 'auth_fail': { const el=document.getElementById('pw-err'); if(el)el.textContent='Incorrect password.'; break; }
       case 'left':      doLeave(); break;
       case 'hand_raised': {
-        // Legacy — superseded by speak_request, kept for server compat
-        if(role==='host') showSpeakRequestToast(m.name, m.fromCid||null);
-        break;
-      }
-      // ── Speak-request flow ─────────────────────────────────────────────
-      case 'speak_request': {
-        if(role==='host') showSpeakRequestToast(m.name, m.fromCid);
-        break;
-      }
-      case 'speak_allowed': {
-        if(role==='participant'){ speakRequestPending=false; startParticipantMic(); }
-        break;
-      }
-      case 'speak_dismissed': {
-        if(role==='participant'){
-          speakRequestPending=false;
-          showToast('✋ Host dismissed your speak request.','neutral');
-          render();
-        }
-        break;
-      }
-      case 'speak_end': {
-        if(role==='participant') stopParticipantMic(true);
-        break;
-      }
-      // ── Speaker WebRTC signalling ──────────────────────────────────────
-      case 'rtc_speaker_offer': {
-        if(role==='host') hostHandleSpeakerOffer(m.fromCid, m.signal);
-        break;
-      }
-      case 'rtc_speaker_answer': {
-        if(role==='participant') participantHandleSpeakerAnswer(m.signal);
-        break;
-      }
-      case 'rtc_ice_speaker': {
-        if(role==='host'&&peerConns['__speaker__'])
-          peerConns['__speaker__'].addIceCandidate(new RTCIceCandidate(m.signal)).catch(()=>{});
-        if(role==='participant'&&participantPeerConn)
-          participantPeerConn.addIceCandidate(new RTCIceCandidate(m.signal)).catch(()=>{});
+        if(role==='host') showHandRaiseToast(m.name);
         break;
       }
       case 'report_received': {
@@ -272,7 +245,45 @@ function showToast(msg, type='neutral'){
   setTimeout(()=>{ t.style.opacity='0'; setTimeout(()=>t.remove(),220); },4000);
 }
 
-// Hand-raise / speak-request toast for host is now handled by showSpeakRequestToast() in voice.js
+// Hand-raise notification for host — rich card, auto-vanishes in 5s, swipeable
+function showHandRaiseToast(studentName){
+  let container=document.getElementById('hand-raise-container');
+  if(!container){
+    container=document.createElement('div');
+    container.id='hand-raise-container';
+    container.style.cssText='position:fixed;top:58px;right:12px;z-index:9998;display:flex;flex-direction:column;gap:8px;pointer-events:none;max-width:300px;min-width:240px';
+    document.body.appendChild(container);
+  }
+  const card=document.createElement('div');
+  card.style.cssText='background:#fff;border:1.5px solid #fbbf24;border-radius:12px;padding:11px 14px;display:flex;align-items:flex-start;gap:10px;pointer-events:auto;cursor:default;opacity:0;transform:translateX(30px);transition:opacity .22s,transform .22s;position:relative;overflow:hidden';
+  const bar=document.createElement('div');
+  bar.style.cssText='position:absolute;bottom:0;left:0;height:3px;background:#fbbf24;width:100%;border-radius:0 0 10px 10px;transition:width 5s linear';
+  const inner=document.createElement('div');
+  inner.style.cssText='display:flex;align-items:flex-start;gap:10px;width:100%';
+  inner.innerHTML='<div style="font-size:1.4rem;flex-shrink:0;line-height:1.1">\u270B</div>'
+    +'<div style="flex:1;min-width:0"><div style="font-size:.83rem;font-weight:700;color:#92400e;line-height:1.3">'+esc(studentName)+' raised their hand</div>'
+    +'<div style="font-size:.73rem;color:#b45309;margin-top:2px">Waiting on WhatsApp for queries</div></div>'
+    +'<div class="hr-x" style="font-size:.75rem;color:#d97706;font-weight:600;flex-shrink:0;padding:1px 7px;background:#fef3c7;border-radius:6px;cursor:pointer;line-height:1.6">&#x2715;</div>';
+  card.appendChild(bar);
+  card.appendChild(inner);
+  container.appendChild(card);
+  requestAnimationFrame(()=>{
+    card.style.opacity='1'; card.style.transform='translateX(0)';
+    setTimeout(()=>{ bar.style.width='0'; },30);
+  });
+  let startX=0, dragging=false;
+  card.addEventListener('pointerdown',e=>{ startX=e.clientX; dragging=true; });
+  card.addEventListener('pointermove',e=>{ if(!dragging) return; const dx=e.clientX-startX; if(dx>10) card.style.transform='translateX('+dx+'px)'; });
+  card.addEventListener('pointerup',e=>{ dragging=false; if(e.clientX-startX>60) dismiss(); else card.style.transform='translateX(0)'; });
+  card.addEventListener('pointercancel',()=>{ dragging=false; card.style.transform='translateX(0)'; });
+  inner.querySelector('.hr-x').addEventListener('click', dismiss);
+  const timer=setTimeout(dismiss, 5000);
+  function dismiss(){
+    clearTimeout(timer);
+    card.style.opacity='0'; card.style.transform='translateX(30px)';
+    setTimeout(()=>card.remove(), 230);
+  }
+}
 
 // Store host password input for reconnection — persisted in sessionStorage to survive refresh
 let HOST_PASSWORD_INPUT = sessionStorage.getItem('scc_hpw') || '';
