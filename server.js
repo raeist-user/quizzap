@@ -22,7 +22,8 @@ mongoose.connect(MONGODB_URI)
 
 const userSchema = new mongoose.Schema({
   name:        { type: String, required: true, trim: true, maxlength: 50 },
-  email:       { type: String, required: true, trim: true, lowercase: true, unique: true },
+  // email is optional for new registrations; existing users keep their email for login
+  email:       { type: String, required: false, trim: true, lowercase: true, unique: true, sparse: true, default: null },
   username:    {
     type: String, lowercase: true, trim: true, sparse: true, unique: true, default: null,
     validate: {
@@ -40,7 +41,7 @@ const User = mongoose.model('User', userSchema);
 // Pending registrations — new users awaiting host approval
 const pendingRegSchema = new mongoose.Schema({
   name:      { type: String, required: true, trim: true, maxlength: 50 },
-  email:     { type: String, required: true, trim: true, lowercase: true, unique: true },
+  email:     { type: String, required: false, trim: true, lowercase: true, unique: true, sparse: true, default: null },
   username:  { type: String, lowercase: true, trim: true, sparse: true, unique: true, default: null },
   password:  { type: String, required: true },
   createdAt: { type: Date, default: Date.now },
@@ -117,6 +118,7 @@ const sessionSchema = new mongoose.Schema({
   rank:        { type: Number, default: 0 },   // rank in that session
   participants:{ type: Number, default: 0 },   // how many players were in session
   fastestMs:   { type: Number, default: null }, // fastest correct answer in ms
+  source:      { type: String, enum: ['server','client'], default: 'client' }, // server = written on shutdown, client = written by participant
 });
 const SessionEntry = mongoose.model('SessionEntry', sessionSchema);
 
@@ -188,44 +190,35 @@ function requireHost(req, res, next) {
 
 // ── USER ROUTES ───────────────────────────────────────────────────────────────
 
-// Register — creates a PendingReg entry; host must approve before account is active
+// Register — username + name + password only (no email for new users)
+// Existing users who registered with email can still log in with it.
 app.post('/api/register', async (req, res) => {
   try {
-    const { name, email, username, password } = req.body;
-    if (!name?.trim())  return res.status(400).json({ error: 'Full name is required' });
-    if (!email?.trim()) return res.status(400).json({ error: 'Email is required' });
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()))
-      return res.status(400).json({ error: 'Enter a valid email address' });
-    if (!password)      return res.status(400).json({ error: 'Password is required' });
+    const { name, username, password } = req.body;
+    if (!name?.trim())     return res.status(400).json({ error: 'Full name is required' });
+    if (!username?.trim()) return res.status(400).json({ error: 'Username is required' });
+    if (!password)         return res.status(400).json({ error: 'Password is required' });
     if (password.length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters' });
 
-    const uname = username?.trim() || null;
-    if (uname) {
-      if (!/^[a-zA-Z0-9_]{3,30}$/.test(uname))
-        return res.status(400).json({ error: 'Username must be 3–30 characters: letters, numbers, underscores only' });
-      if (await User.findOne({ username: uname.toLowerCase() }))
-        return res.status(400).json({ error: 'Username already taken' });
-      if (await PendingReg.findOne({ username: uname.toLowerCase() }))
-        return res.status(400).json({ error: 'Username already taken' });
-    }
-
-    if (await User.findOne({ email: email.trim().toLowerCase() }))
-      return res.status(400).json({ error: 'An account with this email already exists' });
-    if (await PendingReg.findOne({ email: email.trim().toLowerCase() }))
-      return res.status(400).json({ error: 'A registration request with this email is already pending' });
+    const uname = username.trim().toLowerCase();
+    if (!/^[a-zA-Z0-9_]{3,30}$/.test(uname))
+      return res.status(400).json({ error: 'Username must be 3–30 characters: letters, numbers, underscores only' });
+    if (await User.findOne({ username: uname }))
+      return res.status(400).json({ error: 'Username already taken' });
+    if (await PendingReg.findOne({ username: uname }))
+      return res.status(400).json({ error: 'Username already taken' });
 
     const hashed = await bcrypt.hash(password, 10);
     await PendingReg.create({
-      name: name.trim(),
-      email: email.trim().toLowerCase(),
-      username: uname ? uname.toLowerCase() : null,
+      name:     name.trim(),
+      email:    null,
+      username: uname,
       password: hashed,
     });
     res.json({ pending: true, message: 'Registration submitted! Your account is pending approval by the host.' });
   } catch (e) {
     if (e.code === 11000) {
       const field = Object.keys(e.keyPattern || {})[0] || '';
-      if (field === 'email') return res.status(400).json({ error: 'An account with this email already exists' });
       if (field === 'username') return res.status(400).json({ error: 'Username already taken' });
       return res.status(500).json({ error: 'Registration failed — please try again' });
     }
@@ -391,12 +384,13 @@ app.post('/api/admin/join-requests/:id/approve', requireHost, async (req, res) =
     console.log('[approve] DB:', mongoose.connection.db.databaseName);
     const pr = await PendingReg.findById(req.params.id);
     if (!pr) return res.status(404).json({ error: 'Request not found' });
-    if (await User.findOne({ email: pr.email })) {
+    // Email uniqueness check only needed if this pending user has an email
+    if (pr.email && await User.findOne({ email: pr.email })) {
       await PendingReg.findByIdAndDelete(pr._id);
       return res.status(400).json({ error: 'Email already registered' });
     }
-    const newUser = await User.create({ name: pr.name, email: pr.email, username: pr.username || null, password: pr.password, role: 'student', status: 'approved' });
-    console.log('[approve] User created:', newUser._id, newUser.email);
+    const newUser = await User.create({ name: pr.name, email: pr.email || null, username: pr.username || null, password: pr.password, role: 'student', status: 'approved' });
+    console.log('[approve] User created:', newUser._id, newUser.username || newUser.email);
     await PendingReg.findByIdAndDelete(pr._id);
     res.json({ ok: true });
   } catch (e) {
@@ -720,6 +714,16 @@ app.get('/api/sessions', requireAuth, async (req, res) => {
 app.post('/api/sessions', requireAuth, async (req, res) => {
   try {
     const { date, score, total, correct, rank, participants, fastestMs } = req.body;
+
+    // Skip if server already wrote an authoritative SessionEntry on shutdown (within last 3 min)
+    // This prevents double-counting on the today/week leaderboard aggregation.
+    const recentServer = await SessionEntry.findOne({
+      userId: req.user.id,
+      source: 'server',
+      date:   { $gte: new Date(Date.now() - 3 * 60 * 1000) },
+    }).lean();
+    if (recentServer) return res.json({ ok: true });
+
     await SessionEntry.create({
       userId:       req.user.id,
       date:         date ? new Date(date) : new Date(),
@@ -729,6 +733,7 @@ app.post('/api/sessions', requireAuth, async (req, res) => {
       rank:         Number(rank)         || 0,
       participants: Number(participants) || 0,
       fastestMs:    fastestMs != null ? Number(fastestMs) : null,
+      source:       'client',
     });
     res.json({ ok: true });
   } catch (e) {
@@ -797,64 +802,37 @@ function getBackupWindow() {
 }
 
 /**
- * Persist current in-memory scores to the sessionbackup collection.
- * Called after every 'reveal' and after bankGameScores().
- * Cumulative — new_session/reset does NOT erase backup data.
+ * Persist CURRENT SESSION scores only to the sessionbackup collection.
+ * Only tracks state.participants (live session) — NOT gameScores (banked previous sessions).
+ * This ensures the backup reflects exactly one session: if restored, students get this
+ * session's scores, not an accumulation of all sessions today.
+ * Called after every 'reveal'. Cleared on reset (new session) and shutdown.
  */
 async function saveSessionBackup() {
   try {
     const { windowStart, windowEnd } = getBackupWindow();
 
-    // Build a userId-keyed map of true totals from gameScores (the authoritative store).
-    // gameScores keys are pids but each entry has a userId — we sum by userId to avoid
-    // double-counting when the same user got a new pid after a reset.
-    const byUserId = {};
-    Object.values(gameScores).forEach(g => {
-      if (!g.userId) return;
-      const uid = String(g.userId);
-      if (!byUserId[uid]) byUserId[uid] = { userId: uid, name: g.name, bankedScore: 0 };
-      byUserId[uid].bankedScore += (g.total || 0);
-    });
-
-    // Add current (live, not-yet-banked) scores from state.participants.
-    // Only count participants whose userId is not already represented via a gameScores entry
-    // with the same pid — i.e. their score hasn't been banked yet this session.
-    Object.values(state.participants).forEach(p => {
-      if (!p.userId) return;
-      const uid = String(p.userId);
-      const bankedForThisPid = gameScores[p.id]?.total || 0;
-      const current = p.score || 0;
-      if (!byUserId[uid]) byUserId[uid] = { userId: uid, name: p.name, bankedScore: 0 };
-      // bankedScore already accumulated above from gameScores; current is what's live now
-      byUserId[uid].name = p.name; // keep name fresh
-      byUserId[uid].currentScore = current;
-    });
-
-    const participantList = Object.values(byUserId).map(entry => ({
-      userId:       entry.userId,
-      pid:          null,  // pid is volatile; we key by userId
-      name:         entry.name,
-      currentScore: entry.currentScore || 0,
-      bankedScore:  entry.bankedScore  || 0,
-      totalScore:   (entry.bankedScore || 0) + (entry.currentScore || 0),
-      updatedAt:    new Date(),
-    }));
+    // Only save participants from the current live session
+    const participantList = Object.values(state.participants)
+      .filter(p => p.userId)
+      .map(p => ({
+        userId:       String(p.userId),
+        pid:          p.id,
+        name:         p.name,
+        currentScore: p.score || 0,
+        bankedScore:  0,          // always 0 — backup is per-session only
+        totalScore:   p.score || 0,
+        updatedAt:    new Date(),
+      }));
 
     if (!participantList.length) return;
-    const existing = await SessionBackup.findOne({ windowStart }).lean();
-    if (existing) {
-      // Merge: keep entries for users not currently in session (they left earlier today)
-      const existingMap = {};
-      existing.participants.forEach(ep => { if (ep.userId) existingMap[String(ep.userId)] = ep; });
-      // Overwrite with fresh computed values
-      participantList.forEach(np => { existingMap[np.userId] = np; });
-      await SessionBackup.findOneAndUpdate(
-        { windowStart },
-        { $set: { participants: Object.values(existingMap), updatedAt: new Date() } }
-      );
-    } else {
-      await SessionBackup.create({ windowStart, windowEnd, participants: participantList });
-    }
+
+    // Always overwrite completely — do not merge with previous session data
+    await SessionBackup.findOneAndUpdate(
+      { windowStart },
+      { $set: { participants: participantList, updatedAt: new Date() } },
+      { upsert: true, setDefaultsOnInsert: true }
+    );
   } catch (e) {
     console.warn('[SessionBackup] save error:', e.message);
   }
@@ -1287,26 +1265,49 @@ wss.on('connection', ws => {
 
       case 'reset':
         if (client.role !== 'host') break;
-        // Bank current session scores before wiping (also saves to backup)
-        bankGameScores();
-        state = fresh();
-        // Keep session open — "New Session" shouldn't close the room
-        state.sessionOpen = true;
-        clients.forEach((c) => {
-          if (c.role === 'participant' && c.pid && c.name) {
-            state.participants[c.pid] = { id: c.pid, name: c.name, score: 0, userId: c.userId || null };
-            // Ensure the pid entry points to the userId-keyed slot so no new duplicate is created
-            if (c.userId) {
-              const gKey = `user_${c.userId}`;
-              if (gameScores[gKey] && !gameScores[c.pid]) {
-                gameScores[c.pid] = gameScores[gKey]; // alias pid → same object
+        {
+          // 1. Capture current leaderboard BEFORE banking — this becomes the preview snapshot
+          const previewParticipants = Object.values(state.participants)
+            .slice()
+            .sort((a, b) => b.score - a.score);
+          const previewTotal = state.pushedCount || 0;
+
+          // 2. Bank current session scores into gameScores
+          bankGameScores();
+
+          // 3. Clear backup so new session starts fresh (single-session backup contract)
+          (async () => {
+            try {
+              const { windowStart } = getBackupWindow();
+              await SessionBackup.deleteOne({ windowStart });
+              console.log('[SessionBackup] Cleared on new session (reset).');
+            } catch (e) { console.warn('[SessionBackup] clear on reset failed:', e.message); }
+          })();
+
+          // 4. Send session_preview to participants — they see the last session's scores
+          //    and wait on that screen until the host pushes the first question of the new session.
+          clients.forEach((c) => {
+            if (c.role === 'participant')
+              tx(c.ws, { type: 'session_preview', payload: { participants: previewParticipants, totalQuestions: previewTotal } });
+          });
+
+          // 5. Reset state to fresh (0 scores) and re-add currently connected participants
+          state = fresh();
+          state.sessionOpen = true;
+          clients.forEach((c) => {
+            if (c.role === 'participant' && c.pid && c.name) {
+              state.participants[c.pid] = { id: c.pid, name: c.name, score: 0, userId: c.userId || null };
+              if (c.userId) {
+                const gKey = `user_${c.userId}`;
+                if (gameScores[gKey] && !gameScores[c.pid]) {
+                  gameScores[c.pid] = gameScores[gKey];
+                }
               }
             }
-          }
-        });
-        broadcast();
-        // Re-send any persisted reports so host sees them after new session starts
-        if (questionReports.length) txHost({ type: 'report_received', reports: questionReports });
+          });
+          broadcast();
+          if (questionReports.length) txHost({ type: 'report_received', reports: questionReports });
+        }
         break;
 
       // halt: sends halted message to students, host sees the halt menu
@@ -1328,15 +1329,41 @@ wss.on('connection', ws => {
       // shutdown: bank scores, persist to DB, dismiss all students, reset state
       case 'shutdown':
         if (client.role !== 'host') break;
-        bankGameScores();
         {
+          // Write SessionEntry for every participant BEFORE banking so we have per-session scores
+          // This makes today/week leaderboard data reliable regardless of client connectivity
+          const sdParts   = Object.values(state.participants);
+          const sdTotal   = state.pushedCount || state.history.length || 0;
+          const sdSorted  = sdParts.slice().sort((a, b) => b.score - a.score);
+          const sdParticipantCount = sdParts.length;
+          const sdNow     = new Date();
+          (async () => {
+            for (const p of sdParts) {
+              if (!p.userId || String(p.userId).startsWith('p')) continue;
+              const rank    = sdSorted.findIndex(s => s.id === p.id) + 1;
+              const correct = state.history.reduce((n, h) => (h.answers[p.id] === h.correct ? n + 1 : n), 0);
+              try {
+                await SessionEntry.create({
+                  userId:       p.userId,
+                  date:         sdNow,
+                  score:        p.score || 0,
+                  total:        sdTotal,
+                  correct,
+                  rank:         rank || 0,
+                  participants: sdParticipantCount,
+                  fastestMs:    null,
+                  source:       'server',
+                });
+              } catch (e) { console.warn('[SessionEntry] server write error:', e.message); }
+            }
+          })();
+
+          bankGameScores();
           // De-duplicate gameScores by userId before computing final leaderboard.
-          // Multiple pid-keyed entries may point to the same userId-keyed entry (by reference)
-          // after a reset+rejoin. Deduplicate so each user appears once.
           const seenUserIds = new Set();
           const finalLeaderboard = Object.entries(gameScores)
             .filter(([pid, g]) => {
-              if (!g.userId) return true; // guests always included
+              if (!g.userId) return true;
               const uid = String(g.userId);
               if (seenUserIds.has(uid)) return false;
               seenUserIds.add(uid);
@@ -1351,13 +1378,12 @@ wss.on('connection', ws => {
               c.role = null; c.pid = null;
             }
           });
-          // ── Clear the session backup NOW — host manually ended the session ──
-          // This is the ONLY place backup resets, so restore is always clean next session.
+          // Clear the session backup on shutdown
           (async () => {
             try {
               const { windowStart } = getBackupWindow();
               await SessionBackup.deleteOne({ windowStart });
-              console.log('[SessionBackup] Cleared on shutdown (manual halt).');
+              console.log('[SessionBackup] Cleared on shutdown.');
             } catch (e) { console.warn('[SessionBackup] clear on shutdown failed:', e.message); }
           })();
         }
@@ -1389,32 +1415,11 @@ wss.on('connection', ws => {
         broadcast();
         break;
 
-      // ── RAISE HAND (legacy) / SPEAK REQUEST ─────────────────────────────────
+      // ── RAISE HAND ──────────────────────────────────────────────────────────
       case 'raise_hand': {
         if (client.role !== 'participant' || !client.pid) break;
         const raiseName = (msg.name || client.name || 'A student').slice(0, 40);
-        txHost({ type: 'hand_raised', name: raiseName, pid: client.pid, fromCid: cid });
-        break;
-      }
-      case 'speak_request': {
-        if (client.role !== 'participant' || !client.pid) break;
-        const speakName = (client.name || 'A student').slice(0, 40);
-        txHost({ type: 'speak_request', name: speakName, pid: client.pid, fromCid: cid });
-        break;
-      }
-
-      // ── SPEAK FLOW: host → participant signals ───────────────────────────────
-      case 'speak_allowed':
-      case 'speak_dismissed':
-      case 'speak_end': {
-        if (client.role !== 'host') break;
-        txCid(msg.toCid, { type: msg.type });
-        break;
-      }
-      // Participant voluntarily finishes speaking — notify host
-      case 'speak_end_self': {
-        if (client.role !== 'participant') break;
-        txHost({ type: 'speak_end_self', fromCid: cid, pid: client.pid });
+        txHost({ type: 'hand_raised', name: raiseName, pid: client.pid });
         break;
       }
 
@@ -1521,7 +1526,7 @@ wss.on('connection', ws => {
         break;
       }
 
-      // WebRTC relay — host broadcasts to students
+      // WebRTC relay
       case 'rtc_offer':
       case 'rtc_ice_to_peer':
         if (client.role !== 'host') break;
@@ -1531,24 +1536,6 @@ wss.on('connection', ws => {
       case 'rtc_ice_to_host':
         if (client.role !== 'participant') break;
         txHost({ type: msg.type === 'rtc_answer' ? 'rtc_answer' : 'rtc_ice', fromCid: cid, signal: msg.signal });
-        break;
-
-      // WebRTC relay — participant mic streams to host (speak flow)
-      case 'rtc_speaker_offer':
-        if (client.role !== 'participant') break;
-        txHost({ type: 'rtc_speaker_offer', fromCid: cid, signal: msg.signal });
-        break;
-      case 'rtc_speaker_answer':
-        if (client.role !== 'host') break;
-        txCid(msg.toCid, { type: 'rtc_speaker_answer', signal: msg.signal });
-        break;
-      case 'rtc_ice_to_host_from_speaker':
-        if (client.role !== 'participant') break;
-        txHost({ type: 'rtc_ice_speaker', fromCid: cid, signal: msg.signal });
-        break;
-      case 'rtc_ice_to_speaker':
-        if (client.role !== 'host') break;
-        txCid(msg.toCid, { type: 'rtc_ice_speaker', signal: msg.signal });
         break;
     }
   });
