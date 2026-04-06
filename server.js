@@ -17,7 +17,17 @@ const HOST_PASSWORD = process.env.HOST_PASSWORD || '2325';
 
 // ── MONGODB ───────────────────────────────────────────────────────────────────
 mongoose.connect(MONGODB_URI)
-  .then(() => console.log('MongoDB connected — db:', mongoose.connection.db.databaseName))
+  .then(async () => {
+    console.log('MongoDB connected — db:', mongoose.connection.db.databaseName);
+    // Load persisted reports into memory so host sees them immediately on connect
+    try {
+      const savedReports = await ReportDB.find().sort({ ts: 1 }).lean();
+      questionReports = savedReports.map(r => ({ ...r, _id: undefined }));
+      reportCounter   = questionReports.reduce((m, r) => Math.max(m, r.rid || 0), 0);
+      console.log(`[Reports] Loaded ${questionReports.length} report(s) from DB`);
+    } catch(e) { console.warn('[Reports] load error:', e.message); }
+    scheduleAutoResets();
+  })
   .catch(e  => console.error('MongoDB connection FAILED:', e.message));
 
 const userSchema = new mongoose.Schema({
@@ -87,6 +97,41 @@ const leaderboardSchema = new mongoose.Schema({
   updatedAt:      { type: Date, default: Date.now },
 });
 const LeaderboardEntry = mongoose.model('LeaderboardEntry', leaderboardSchema);
+
+// ── TODAY / WEEK LEADERBOARD MODELS ──────────────────────────────────────────
+// Separate collections for today and week — cleared on schedule.
+// AllTime uses the existing LeaderboardEntry collection.
+const todayLBSchema = new mongoose.Schema({
+  userId:    { type: mongoose.Schema.Types.ObjectId, ref: 'User', unique: true },
+  userName:  { type: String },
+  score:     { type: Number, default: 0 },
+  updatedAt: { type: Date, default: Date.now },
+});
+const TodayLBEntry = mongoose.model('TodayLBEntry', todayLBSchema);
+
+const weekLBSchema = new mongoose.Schema({
+  userId:    { type: mongoose.Schema.Types.ObjectId, ref: 'User', unique: true },
+  userName:  { type: String },
+  score:     { type: Number, default: 0 },
+  updatedAt: { type: Date, default: Date.now },
+});
+const WeekLBEntry = mongoose.model('WeekLBEntry', weekLBSchema);
+
+// ── QUESTION REPORTS DB MODEL ─────────────────────────────────────────────────
+// Persists reports across server restarts so the host never loses them.
+const reportDBSchema = new mongoose.Schema({
+  rid:            { type: Number, required: true, unique: true },
+  question:       { type: Object },
+  correct:        { type: Number, default: null },
+  reportedAnswer: { type: Number, default: null },
+  reporterName:   { type: String },
+  reporterPids:   [{ type: String }],
+  ts:             { type: Number, default: Date.now },
+  count:          { type: Number, default: 1 },
+  source:         { type: String, default: 'student' },
+  note:           { type: String, default: '' },
+});
+const ReportDB = mongoose.model('ReportDB', reportDBSchema);
 
 // ── SESSION BACKUP MODEL (sessionbackup collection) ──────────────────────────
 // Persists live scores per participant for the current 5am-to-5am IST window.
@@ -537,6 +582,63 @@ app.delete('/api/schedules/:id', requireAuth, async (req, res) => {
   } catch (e) { res.status(500).json({ error: 'Failed to delete schedule' }); }
 });
 
+// ── AUTO-RESET LEADERBOARD SCHEDULER ─────────────────────────────────────────
+// Checked every minute. Resets fire once per window using a simple last-reset tracker.
+let _lastTodayReset = '';   // YYYY-MM-DD string of last today reset
+let _lastWeekReset  = '';   // ISO date string of last week reset
+let _lastAllReset   = '';   // YYYY string of last all-time reset
+
+function scheduleAutoResets() {
+  setInterval(async () => {
+    const now     = new Date();
+    const utcH    = now.getUTCHours();
+    const utcM    = now.getUTCMinutes();
+    const utcDay  = now.getUTCDay();    // 0=Sun
+    const utcDate = now.getUTCDate();
+    const utcMon  = now.getUTCMonth(); // 0=Jan
+    const utcYear = now.getUTCFullYear();
+    const todayKey = `${utcYear}-${utcMon}-${utcDate}`;
+    const weekKey  = `${utcYear}-W${Math.floor(utcDate/7)}`;
+    const yearKey  = `${utcYear}`;
+
+    // ── Today: reset at 23:30 UTC (= 5:00 AM IST next day) ─────────────────
+    if (utcH === 23 && utcM === 30 && _lastTodayReset !== todayKey) {
+      _lastTodayReset = todayKey;
+      try { await TodayLBEntry.deleteMany({}); console.log('[AutoReset] Today LB cleared (5am IST)'); }
+      catch(e) { console.warn('[AutoReset] today clear error:', e.message); }
+    }
+
+    // ── Week: reset every Sunday at 23:30 UTC ────────────────────────────────
+    if (utcDay === 0 && utcH === 23 && utcM === 30 && _lastWeekReset !== weekKey) {
+      _lastWeekReset = weekKey;
+      try { await WeekLBEntry.deleteMany({}); console.log('[AutoReset] Week LB cleared'); }
+      catch(e) { console.warn('[AutoReset] week clear error:', e.message); }
+    }
+
+    // ── All-time: reset on Feb 18 at 00:00 UTC ───────────────────────────────
+    if (utcMon === 1 && utcDate === 18 && utcH === 0 && utcM === 0 && _lastAllReset !== yearKey) {
+      _lastAllReset = yearKey;
+      try {
+        await LeaderboardEntry.deleteMany({});
+        console.log('[AutoReset] All-time LB cleared on Feb 18');
+      } catch(e) { console.warn('[AutoReset] all-time clear error:', e.message); }
+    }
+  }, 60 * 1000);
+}
+
+// ── REST: reports ──────────────────────────────────────────────────────────────
+app.get('/api/reports', requireHost, (req, res) => {
+  res.json({ reports: questionReports });
+});
+
+app.delete('/api/reports/:rid', requireHost, async (req, res) => {
+  const rid = parseInt(req.params.rid);
+  questionReports = questionReports.filter(r => r.rid !== rid);
+  try { await ReportDB.deleteOne({ rid }); } catch(e) {}
+  txHost({ type: 'report_received', reports: questionReports });
+  res.json({ ok: true });
+});
+
 // ── LEADERBOARD ROUTES ────────────────────────────────────────────────────────
 // GET /api/leaderboard?period=today|week|all
 //
@@ -552,82 +654,31 @@ app.get('/api/leaderboard', async (req, res) => {
   try {
     const period = req.query.period || 'all';
 
-    // ── ALL-TIME ───────────────────────────────────────────────────────────────
     if (period === 'all') {
-      const raw = await LeaderboardEntry.find()
-        .sort({ totalScore: -1 })
-        .lean();
-      const leaderboard = raw.map(e => ({
-        userId:       String(e.userId),          // ObjectId → string
-        userName:     e.userName || 'Unknown',
-        totalScore:   e.totalScore   || 0,
-        sessions:     e.sessionsPlayed || 0,
-      }));
-      return res.json({ leaderboard });
+      const raw = await LeaderboardEntry.find().sort({ totalScore: -1 }).lean();
+      return res.json({ leaderboard: raw.map(e => ({
+        userId: String(e.userId), userName: e.userName || 'Unknown',
+        totalScore: e.totalScore || 0, sessions: e.sessionsPlayed || 0,
+      }))});
     }
 
-    // ── TODAY / WEEK (aggregate from SessionEntry) ─────────────────────────────
-    // "today"  = from 05:00 IST today  (IST = UTC+5:30, so 05:00 IST = 23:30 UTC previous day)
-    // "week"   = rolling 7-day window from exactly 7*24h ago
-    let since;
-    if (period === 'today') {
-      // Find the most recent 23:30 UTC (= 05:00 IST next calendar day)
-      const now = new Date();
-      // Build candidate: 23:30 UTC on the current UTC date
-      const candidate = new Date(Date.UTC(
-        now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(),
-        23, 30, 0, 0
-      ));
-      // If we haven't reached 23:30 UTC today yet, roll back to yesterday's 23:30 UTC
-      since = candidate > now
-        ? new Date(candidate.getTime() - 24 * 60 * 60 * 1000)
-        : candidate;
-    } else {
-      since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-    }
+    // today and week: read from dedicated collections
+    const Model = period === 'today' ? TodayLBEntry : WeekLBEntry;
+    const raw = await Model.find().sort({ score: -1 }).lean();
 
-    const entries = await SessionEntry.aggregate([
-      // Step 1: only sessions within the requested window
-      { $match: { date: { $gte: since } } },
+    // Look up fresh display names from users collection
+    const userIds = raw.map(e => e.userId).filter(Boolean);
+    const users   = await mongoose.model('User').find({ _id: { $in: userIds } }).select('name').lean();
+    const nameMap = {};
+    users.forEach(u => { nameMap[String(u._id)] = u.name; });
 
-      // Step 2: sum score per user
-      {
-        $group: {
-          _id:        '$userId',
-          totalScore: { $sum: '$score' },
-          sessions:   { $sum:  1      },
-        },
-      },
-
-      // Step 3: sort highest first
-      { $sort: { totalScore: -1 } },
-
-      // Step 4: pull display name from users collection
-      {
-        $lookup: {
-          from:         'users',
-          localField:   '_id',
-          foreignField: '_id',
-          as:           'userDoc',
-        },
-      },
-
-      // Step 5: flatten the joined array (preserveNull handles deleted accounts)
-      { $unwind: { path: '$userDoc', preserveNullAndEmptyArrays: true } },
-
-      // Step 6: project clean fields only — suppress _id, stringify userId
-      {
-        $project: {
-          _id:        0,
-          userId:     { $toString: '$_id' },
-          userName:   { $ifNull: ['$userDoc.name', 'Unknown'] },
-          totalScore: 1,
-          sessions:   1,
-        },
-      },
-    ]);
-
-    res.json({ leaderboard: entries });
+    const leaderboard = raw.map(e => ({
+      userId:     String(e.userId),
+      userName:   nameMap[String(e.userId)] || e.userName || 'Unknown',
+      totalScore: e.score || 0,
+      sessions:   1,
+    }));
+    res.json({ leaderboard });
   } catch (e) {
     console.error('/api/leaderboard error:', e.message);
     res.status(500).json({ error: 'Failed to fetch leaderboard' });
@@ -1314,7 +1365,6 @@ wss.on('connection', ws => {
       case 'halt':
         if (client.role !== 'host') break;
         {
-          // Final halt leaderboard: score only — no time tie-breaker
           const haltParticipants = Object.values(state.participants)
             .slice()
             .sort((a, b) => b.score - a.score);
@@ -1322,6 +1372,24 @@ wss.on('connection', ws => {
             if (c.role === 'participant')
               tx(c.ws, { type: 'halted', payload: { participants: haltParticipants, totalQuestions: state.pushedCount } });
           });
+          // Write current session scores to today + week leaderboards
+          (async () => {
+            for (const p of haltParticipants) {
+              if (!p.userId || String(p.userId).startsWith('p')) continue;
+              try {
+                await TodayLBEntry.findOneAndUpdate(
+                  { userId: p.userId },
+                  { $inc: { score: p.score || 0 }, $set: { userName: p.name, updatedAt: new Date() } },
+                  { upsert: true }
+                );
+                await WeekLBEntry.findOneAndUpdate(
+                  { userId: p.userId },
+                  { $inc: { score: p.score || 0 }, $set: { userName: p.name, updatedAt: new Date() } },
+                  { upsert: true }
+                );
+              } catch(e) { console.warn('[LB] halt write error:', e.message); }
+            }
+          })();
         }
         broadcast();
         break;
@@ -1435,33 +1503,32 @@ wss.on('connection', ws => {
         }
         break;
       }
-      // Student flags a question they believe has an incorrect answer key
       case 'report_question': {
         if (client.role !== 'participant' || !client.pid) break;
         if (!msg.question?.text) break;
-        // De-duplicate: one report per student per question text
         const existingRep = questionReports.find(r =>
           r.question.text === msg.question.text && r.reporterPids.includes(client.pid)
         );
         if (existingRep) break;
         const dupRep = questionReports.find(r => r.question.text === msg.question.text);
         if (dupRep) {
-          // Already reported — just add this student to it
           dupRep.count += 1;
           dupRep.reporterPids.push(client.pid);
+          ReportDB.findOneAndUpdate({ rid: dupRep.rid }, { count: dupRep.count, reporterPids: dupRep.reporterPids }).catch(()=>{});
         } else {
-          questionReports.push({
-            rid:           ++reportCounter,
-            question:      msg.question,
-            correct:       msg.correct ?? null,
+          const newRep = {
+            rid:            ++reportCounter,
+            question:       msg.question,
+            correct:        msg.correct ?? null,
             reportedAnswer: msg.reportedAnswer ?? null,
-            reporterName:  client.name || 'Unknown',
-            reporterPids:  [client.pid],
-            ts:            Date.now(),
-            count:         1,
-          });
+            reporterName:   client.name || 'Unknown',
+            reporterPids:   [client.pid],
+            ts:             Date.now(),
+            count:          1,
+          };
+          questionReports.push(newRep);
+          ReportDB.create(newRep).catch(()=>{});
         }
-        // Notify host immediately
         txHost({ type: 'report_received', reports: questionReports });
         break;
       }
@@ -1470,6 +1537,7 @@ wss.on('connection', ws => {
       case 'dismiss_report': {
         if (client.role !== 'host') break;
         questionReports = questionReports.filter(r => r.rid !== msg.rid);
+        ReportDB.deleteOne({ rid: msg.rid }).catch(()=>{});
         txHost({ type: 'report_received', reports: questionReports });
         break;
       }
@@ -1560,13 +1628,23 @@ async function persistLeaderboard(entries) {
   try {
     for (const p of entries) {
       const uid = p.userId || p.id;
-      if (!uid || uid.startsWith('p')) continue; // skip non-ObjectId pids (guests)
+      if (!uid || uid.toString().startsWith('p')) continue; // skip guests
+      // All-time
       await LeaderboardEntry.findOneAndUpdate(
         { userId: uid },
-        {
-          $inc: { totalScore: p.score || 0, sessionsPlayed: 1 },
-          $set: { userName: p.name, updatedAt: new Date() },
-        },
+        { $inc: { totalScore: p.score || 0, sessionsPlayed: 1 }, $set: { userName: p.name, updatedAt: new Date() } },
+        { upsert: true }
+      );
+      // Today
+      await TodayLBEntry.findOneAndUpdate(
+        { userId: uid },
+        { $inc: { score: p.score || 0 }, $set: { userName: p.name, updatedAt: new Date() } },
+        { upsert: true }
+      );
+      // Week
+      await WeekLBEntry.findOneAndUpdate(
+        { userId: uid },
+        { $inc: { score: p.score || 0 }, $set: { userName: p.name, updatedAt: new Date() } },
         { upsert: true }
       );
     }
