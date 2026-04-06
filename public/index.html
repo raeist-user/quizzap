@@ -1,1 +1,56 @@
-uhd
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>Shadab Coaching Centre</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,600;0,9..144,700;1,9..144,400&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Nastaliq+Urdu:wght@400..700&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css"/>
+  <link rel="stylesheet" href="styles.css"/>
+</head>
+<body>
+<div id="app">
+  <nav id="main-nav" style="display:none">
+    <div style="display:flex;align-items:center;gap:10px;min-width:0;flex:1">
+      <div id="nav-back-wrap" style="display:none">
+        <div class="nav-back" id="btn-nav-back">← Home</div>
+      </div>
+      <div class="brand" id="nav-brand">Shadab Coaching Centre<small>Live Quiz</small></div>
+    </div>
+    <div class="nav-right">
+      <div id="ci"></div>
+      <span id="conn-lbl">connecting</span>
+      <div class="profile-wrap" id="profile-wrap">
+        <div class="profile-btn" id="profile-btn">
+          <div class="p-avatar" id="p-avatar">?</div>
+          <span id="p-name-lbl"></span>
+          <span style="font-size:.7rem;color:var(--mid)">▾</span>
+        </div>
+        <div class="p-dropdown hidden" id="p-dropdown">
+          <div class="pd-info">
+            <div class="pd-name" id="pd-full-name"></div>
+            <div class="pd-email" id="pd-email"></div>
+          </div>
+          <div class="pd-item" id="btn-profile">📊 My Profile</div>
+          <div class="pd-item danger" id="btn-logout">🚪 Sign out</div>
+        </div>
+      </div>
+    </div>
+  </nav>
+  <main><div id="view"></div></main>
+</div>
+
+<audio id="remote-audio" autoplay playsinline style="display:none"></audio>
+<canvas id="confetti-canvas"></canvas>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"></script>
+
+<!-- Load order: score → function → ui → backend (backend has boot code, must be last) -->
+<script defer src="score.js"></script>
+<script defer src="function.js"></script>
+<script defer src="ui.js"></script>
+<script defer src="backend.js"></script>
+</body>
+</html>
