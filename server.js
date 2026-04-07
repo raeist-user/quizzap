@@ -1483,11 +1483,49 @@ wss.on('connection', ws => {
         broadcast();
         break;
 
-      // ── RAISE HAND ──────────────────────────────────────────────────────────
+      // ── RAISE HAND / SPEAK REQUEST ────────────────────────────────────────────
       case 'raise_hand': {
+        // Legacy alias — treat as speak_request so old clients still work
         if (client.role !== 'participant' || !client.pid) break;
         const raiseName = (msg.name || client.name || 'A student').slice(0, 40);
-        txHost({ type: 'hand_raised', name: raiseName, pid: client.pid });
+        txHost({ type: 'speak_request', name: raiseName, pid: client.pid, fromCid: cid });
+        break;
+      }
+      case 'speak_request': {
+        if (client.role !== 'participant' || !client.pid) break;
+        txHost({ type: 'speak_request', name: (client.name||'A student').slice(0,40), pid: client.pid, fromCid: cid });
+        break;
+      }
+      case 'speak_allowed':
+      case 'speak_dismissed':
+      case 'speak_end': {
+        if (client.role !== 'host') break;
+        txCid(msg.toCid, { type: msg.type });
+        break;
+      }
+      case 'speak_end_self': {
+        if (client.role !== 'participant') break;
+        txHost({ type: 'speak_end_self', fromCid: cid, pid: client.pid });
+        break;
+      }
+      case 'rtc_speaker_offer': {
+        if (client.role !== 'participant') break;
+        txHost({ type: 'rtc_speaker_offer', fromCid: cid, signal: msg.signal });
+        break;
+      }
+      case 'rtc_speaker_answer': {
+        if (client.role !== 'host') break;
+        txCid(msg.toCid, { type: 'rtc_speaker_answer', signal: msg.signal });
+        break;
+      }
+      case 'rtc_ice_to_host_from_speaker': {
+        if (client.role !== 'participant') break;
+        txHost({ type: 'rtc_ice_speaker', fromCid: cid, signal: msg.signal });
+        break;
+      }
+      case 'rtc_ice_to_speaker': {
+        if (client.role !== 'host') break;
+        txCid(msg.toCid, { type: 'rtc_ice_speaker', signal: msg.signal });
         break;
       }
 
