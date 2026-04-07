@@ -26,8 +26,7 @@ function loginFormHTML(){
 function registerFormHTML(){
   return `<div>
     <div class="form-group"><label class="form-label">Full name</label><input class="form-input" type="text" id="auth-name" placeholder="Your name" autocomplete="name"/></div>
-    <div class="form-group"><label class="form-label">Email</label><input class="form-input" type="email" id="auth-email" placeholder="you@example.com" autocomplete="email" autocapitalize="none" spellcheck="false"/></div>
-    <div class="form-group"><label class="form-label">Username <span style="font-weight:400;color:var(--mid);font-size:.8rem">(optional)</span></label><div style="position:relative"><input class="form-input" type="text" id="auth-username" placeholder="your_username" autocomplete="off" autocapitalize="none" spellcheck="false" style="padding-right:36px"/><span id="un-status" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);font-size:.85rem;line-height:1;pointer-events:none"></span></div><small id="un-hint" style="font-size:.72rem;margin-top:3px;display:block;color:var(--mid)">Letters, numbers, underscores only · 3–30 characters · used to sign in</small></div>
+    <div class="form-group"><label class="form-label">Username <span style="font-weight:400;color:var(--bad);font-size:.8rem">*required</span></label><div style="position:relative"><input class="form-input" type="text" id="auth-username" placeholder="your_username" autocomplete="off" autocapitalize="none" spellcheck="false" style="padding-right:36px"/><span id="un-status" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);font-size:.85rem;line-height:1;pointer-events:none"></span></div><small id="un-hint" style="font-size:.72rem;margin-top:3px;display:block;color:var(--mid)">Letters, numbers, underscores only · 3–30 characters · used to sign in</small></div>
     <div class="form-group"><label class="form-label">Password <span style="font-weight:400;text-transform:none;letter-spacing:0">(min 6 chars)</span></label><input class="form-input" type="password" id="auth-pw" placeholder="••••••••" autocomplete="new-password"/></div>
     <div id="auth-err" class="form-error"></div>
     <button class="btn btn-dark btn-full mt2" id="btn-register">Create account →</button>
@@ -189,33 +188,24 @@ function haltedHTML(){
       </div>`).join('')
     :`<div style="padding:20px;text-align:center;color:var(--mid)">No scores yet.</div>`;
 
-  if(haltedIsPreview){
-    // New session — show previous session results while waiting for next question
-    return `<div style="display:flex;flex-direction:column;height:calc(100vh - 54px);overflow:hidden;padding:16px 20px;max-width:520px;margin:0 auto">
-      <div style="text-align:center;padding:20px 0 16px;flex-shrink:0">
-        <div style="font-size:2.4rem;margin-bottom:10px">🏁</div>
-        <h2 style="margin-bottom:6px">Session complete!</h2>
-        <p class="muted small">The host will push new questions soon.<br>Your score resets to 0 for the new session.</p>
-        ${myP?`<div style="margin-top:10px;display:inline-flex;align-items:center;gap:7px;padding:5px 13px;background:#e8f5ee;border:1px solid #b7dfc7;border-radius:20px;font-size:.77rem;font-weight:600;color:#166534">Previous: ${myP.score||0}/${totalStr} &nbsp;·&nbsp; Rank #${myRank}</div>`:''}
-      </div>
-      <div style="font-size:.67rem;text-align:center;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--mid);margin-bottom:6px;flex-shrink:0">📋 Previous Session Results</div>
-      <div class="lb-panel" style="flex:1;overflow:hidden;display:flex;flex-direction:column">
-        <div class="lb-head"><span style="font-size:.82rem;font-weight:600">Final Standings</span><span class="small muted">${sorted.length} student${sorted.length!==1?'s':''}</span></div>
-        <div style="overflow-y:auto;flex:1">${rows}</div>
-      </div>
-    </div>`;
-  }
+  // Two modes: paused (real halt) vs new-session preview
+  const icon    = haltedIsPreview ? '🚀' : '⏸';
+  const title   = haltedIsPreview ? 'Session complete!' : 'Session paused';
+  const subtitle= haltedIsPreview
+    ? 'The host will push new questions soon.<br>Scores below are from the previous session.'
+    : 'The host has paused the quiz.<br>Please wait patiently — they may continue<br>or start a new session shortly.';
+  const lbTitle = haltedIsPreview ? '📋 Previous Session Results' : '🏆 Current Standings';
+  const iconAnim= haltedIsPreview ? '' : 'animation:blink 1.4s ease-in-out infinite';
 
-  // Normal halt — session paused
   return `<div style="display:flex;flex-direction:column;height:calc(100vh - 54px);overflow:hidden;padding:16px 20px;max-width:520px;margin:0 auto">
     <div style="text-align:center;padding:20px 0 16px;flex-shrink:0">
-      <div style="font-size:2.4rem;margin-bottom:10px;animation:blink 1.4s ease-in-out infinite">⏸</div>
-      <h2 style="margin-bottom:6px">Session paused</h2>
-      <p class="muted small">The host has paused the quiz.<br>Please wait patiently — they may continue<br>or start a new session shortly.</p>
+      <div style="font-size:2.4rem;margin-bottom:10px;${iconAnim}">${icon}</div>
+      <h2 style="margin-bottom:6px">${title}</h2>
+      <p class="muted small">${subtitle}</p>
       ${myP?`<div style="margin-top:10px;display:inline-flex;align-items:center;gap:7px;padding:5px 13px;background:#e8f5ee;border:1px solid #b7dfc7;border-radius:20px;font-size:.77rem;font-weight:600;color:#166534">Score: ${myP.score||0}/${totalStr} &nbsp;·&nbsp; Rank #${myRank}</div>`:''}
     </div>
     <div class="lb-panel" style="flex:1;overflow:hidden;display:flex;flex-direction:column">
-      <div class="lb-head"><span style="font-size:.82rem;font-weight:600">🏆 Current Standings</span><span class="small muted">${sorted.length} student${sorted.length!==1?'s':''}</span></div>
+      <div class="lb-head"><span style="font-size:.82rem;font-weight:600">${lbTitle}</span><span class="small muted">${sorted.length} student${sorted.length!==1?'s':''}</span></div>
       <div style="overflow-y:auto;flex:1">${rows}</div>
     </div>
   </div>`;
@@ -530,7 +520,7 @@ function waitHTML(){
     (isSpeakingNow
       ? '<div style="display:flex;align-items:center;gap:6px;margin-bottom:14px;max-width:480px;width:100%">'+
           '<div style="display:flex;align-items:center;gap:7px;padding:7px 14px;background:#ede9fe;border:1.5px solid #6366f1;border-radius:40px;font-size:.82rem;font-weight:600;color:#4338ca;flex:1">'+
-            '<span>🎙️</span>'+
+            '<span style="animation:pulse 1.2s ease-in-out infinite;display:inline-block">🎙️</span>'+
             'You\'re speaking — mic is live'+
           '</div>'+
           '<button class="btn btn-sm" style="background:#fee2e2;color:#be123c;border-color:#fecdd3;font-size:.76rem" id="btn-end-speak">Done</button>'+
@@ -2535,12 +2525,9 @@ function attach(){
     if(btn){ btn.disabled=true; btn.innerHTML='&#10003; Reported — thanks!'; btn.style.color='var(--good)'; btn.style.borderColor='var(--good)'; }
   });
 
-  // ── STUDENT: Raise hand button ───────────────────────────────────────────
-  on('btn-raise-hand', ()=>{
-    send({type:'raise_hand', name:myName||currentUser?.name||'Student'});
-    const btn=document.getElementById('btn-raise-hand');
-    if(btn){ btn.disabled=true; btn.style.opacity='.5'; setTimeout(()=>{ btn.disabled=false; btn.style.opacity=''; },10000); }
-  });
+  // ── STUDENT: Speak request button ────────────────────────────────────────────
+  on('btn-raise-hand', ()=>{ requestToSpeak(); });
+  on('btn-end-speak',  ()=>{ stopParticipantMic(false); send({type:'speak_end_self'}); });
 
   updateMicDot();
 
@@ -2606,48 +2593,37 @@ function attach(){
   // Cancel edit mode
   on('btn-cancel-report-edit',()=>{ editingReportRid=null; editReportDraft={}; render(); });
 
-  // Save & Fix — write to GitHub and dismiss the report
+  // Save & Fix — GitHub write is optional (skipped if no token); report always dismissed
   on('btn-save-report-edit', async ()=>{
     const msg=document.getElementById('report-edit-msg');
     if(msg){ msg.textContent='Saving…'; msg.style.color='var(--mid)'; }
-    // Read live textarea / input values into draft
     const ta=document.getElementById('r-edit-qtext');
     if(ta) editReportDraft.text=ta.value;
     document.querySelectorAll('[data-r-opt]').forEach(inp=>{ editReportDraft.options[+inp.dataset.rOpt]=inp.value; });
     if(!editReportDraft.text?.trim()){ if(msg){msg.textContent='Question text cannot be empty';msg.style.color='var(--bad)';}return; }
     const rep=receivedReports.find(r=>r.rid===editReportDraft.rid);
     if(!rep){ if(msg){msg.textContent='Report not found';msg.style.color='var(--bad)';}return; }
-    const result=await updateReportedQuestionInGitHub(
-      rep.question,
-      editReportDraft.text,
-      editReportDraft.options,
-      editReportDraft.correct
-    );
-    if(result.ok){
-      // ── Update the live questions array instantly ──────────────────────────
-      const fixedQ={
-        ...rep.question,
-        text: editReportDraft.text.trim(),
-        options: editReportDraft.options.slice(),
-        correct: editReportDraft.correct,
-      };
-      // Update in host's local questions array
-      const qi=questions.findIndex(q=>q.text===rep.question.text);
-      if(qi>=0){
-        questions[qi]=fixedQ;
-        // If this is the currently selected question, update answerKey too
-        if(selIdx===qi) answerKey=editReportDraft.correct;
-      }
-      // Tell server to update the live state question if it's currently pushed
-      send({type:'update_question', question:fixedQ, correct:editReportDraft.correct});
-      // Dismiss the report
-      send({type:'dismiss_report', rid:rep.rid});
-      editingReportRid=null; editReportDraft={}; expandedReportRid=null;
-      showToast('✅ Question fixed, saved to GitHub, and pushed live!','good');
-      render();
-    } else {
-      if(msg){ msg.textContent='Error: '+result.error; msg.style.color='var(--bad)'; }
+    const fixedQ={
+      ...rep.question,
+      text: editReportDraft.text.trim(),
+      options: editReportDraft.options.slice(),
+      correct: editReportDraft.correct,
+    };
+    // Try GitHub write only if token is configured — skip silently otherwise
+    let ghOk=false;
+    if(isValidToken()){
+      const result=await updateReportedQuestionInGitHub(rep.question,editReportDraft.text,editReportDraft.options,editReportDraft.correct);
+      ghOk=result.ok;
+      if(!result.ok&&msg){ msg.textContent='GitHub skipped: '+result.error; msg.style.color='var(--mid)'; }
     }
+    // Always update live question + dismiss report regardless of GitHub result
+    const qi=questions.findIndex(q=>q.text===rep.question.text);
+    if(qi>=0){ questions[qi]=fixedQ; if(selIdx===qi) answerKey=editReportDraft.correct; }
+    send({type:'update_question', question:fixedQ, correct:editReportDraft.correct});
+    send({type:'dismiss_report', rid:rep.rid});
+    editingReportRid=null; editReportDraft={}; expandedReportRid=null;
+    showToast(ghOk?'✅ Question fixed and saved to GitHub!':'✅ Question fixed! (No GitHub token — edit the file manually)','good');
+    render();
   });
 }
 
@@ -2770,29 +2746,23 @@ async function doLogin(){
 }
 async function doRegister(){
   const name=document.getElementById('auth-name')?.value?.trim();
-  const email=document.getElementById('auth-email')?.value?.trim();
   const username=document.getElementById('auth-username')?.value?.trim()||'';
   const pw=document.getElementById('auth-pw')?.value;
   const err=document.getElementById('auth-err'); if(err)err.textContent='';
   if(!name){if(err)err.textContent='Full name is required';return;}
-  if(!email){if(err)err.textContent='Email is required';return;}
-  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){if(err)err.textContent='Enter a valid email address';return;}
-  if(username){
-    if(!/^[a-zA-Z0-9_]+$/.test(username)){if(err)err.textContent='Username may only contain letters, numbers and underscores';return;}
-    if(username.length<3){if(err)err.textContent='Username must be at least 3 characters';return;}
-    const unHint=document.getElementById('un-hint');
-    if(unHint&&unHint.textContent==='Username is already taken'){if(err)err.textContent='That username is already taken — please choose another';return;}
-  }
+  if(!username){if(err)err.textContent='Username is required';return;}
+  if(!/^[a-zA-Z0-9_]+$/.test(username)){if(err)err.textContent='Username may only contain letters, numbers and underscores';return;}
+  if(username.length<3){if(err)err.textContent='Username must be at least 3 characters';return;}
+  const unHint=document.getElementById('un-hint');
+  if(unHint&&unHint.textContent==='Username is already taken'){if(err)err.textContent='That username is already taken — please choose another';return;}
   try{
-    const d=await apiPost('/api/register',{name,email,username:username||undefined,password:pw});
+    const d=await apiPost('/api/register',{name,username,password:pw});
     if(d.pending){
-      // Show pending message — do NOT log in
       if(err){
         err.style.color='var(--good)';
         err.textContent='✅ '+d.message;
       }
-      // Clear the form fields
-      ['auth-name','auth-email','auth-username','auth-pw'].forEach(id=>{
+      ['auth-name','auth-username','auth-pw'].forEach(id=>{
         const el=document.getElementById(id); if(el) el.value='';
       });
     } else {

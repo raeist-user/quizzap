@@ -3,7 +3,15 @@
    Leaderboard state · Streaks · Score Banner · Leaderboard Fetch
 ══════════════════════════════════════ */
 
-// ── LEADERBOARD STATE (now declared in backend.js STATE block) ────────────
+// ── LEADERBOARD STATE (declared here so score.js loads before backend.js) ────
+let allTimeLB  = null;
+let todayLB    = null;
+let weekLB     = null;
+let homeLbTab  = 'today'; // 'today' | 'week' | 'all'
+// Per-tab fetch tracking: null=not started, false=in-flight, true=settled
+let lbFetched  = { today: null, week: null, all: null };
+// Per-tab error messages
+let lbErrors   = { today: null, week: null, all: null };
 
 /* ══════════════════════════════════════
    🔥 STREAK HELPER
