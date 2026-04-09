@@ -11,10 +11,30 @@ try { require('dotenv').config(); } catch(_){}
 
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/shadabcoaching';
 
-const { ReportDB }    = require('./models');
+const { ReportDB, TodayLBEntry } = require('./models');
 const { shared }      = require('./ws');
 const { initRoutes }  = require('./routes');
 const { initWS }      = require('./ws');
+
+// ── TODAY LEADERBOARD AUTO-RESET ──────────────────────────────────────────────
+// Clears TodayLBEntry every day at 5:30 AM IST (00:00 UTC).
+function scheduleTodayLBReset() {
+  const now  = new Date();
+  // Next midnight UTC = 5:30 AM IST
+  const next = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1, 0, 0, 0));
+  const msUntil = next - now;
+  setTimeout(async () => {
+    try {
+      await TodayLBEntry.deleteMany({});
+      console.log('[TodayLB] Cleared at 5:30 AM IST —', new Date().toISOString());
+    } catch (e) {
+      console.warn('[TodayLB] Auto-reset failed:', e.message);
+    }
+    scheduleTodayLBReset(); // re-schedule for next day
+  }, msUntil);
+  const h = Math.round(msUntil / 36000) / 100;
+  console.log(`[TodayLB] Next reset in ${h}h (at 5:30 AM IST)`);
+}
 
 // ── MONGODB ───────────────────────────────────────────────────────────────────
 mongoose.connect(MONGODB_URI)
@@ -52,6 +72,7 @@ app.get('/', (req, res) => {
     let html = fs.readFileSync(indexPath, 'utf8');
     const token = process.env.MY_TOKEN || '';
     html = html.replace("'%%MY_TOKEN%%'", JSON.stringify(token));
+    html = html.replace("window.MY_TOKEN = '%%MY_TOKEN%%'", `window.MY_TOKEN = ${JSON.stringify(token)}`);
     res.setHeader('Content-Type', 'text/html');
     res.send(html);
   } catch(e) { res.status(500).send('Server error loading page'); }
@@ -98,4 +119,7 @@ initRoutes(app);
 initWS(server);
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log(`Shadab Coaching Centre → http://localhost:${PORT}`));
+server.listen(PORT, () => {
+  console.log(`Shadab Coaching Centre → http://localhost:${PORT}`);
+  scheduleTodayLBReset();
+});
