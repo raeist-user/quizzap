@@ -721,32 +721,32 @@ function hostFinalLeaderboardHTML(){
   const entries=hostShutdownLeaderboard;
   const medals=['🥇','🥈','🥉'];
   const totalQ=hostShutdownLeaderboard._totalQ||0;
-  const totalQStr=totalQ>0?String(totalQ):'?';
+  const totalStr=totalQ>0?String(totalQ):'?';
   const rows=entries.length
-    ?entries.map((e,i)=>`
-      <div style="display:flex;align-items:center;gap:10px;padding:9px 14px;border-bottom:1px solid var(--line);animation:rowIn .18s ease both;animation-delay:${i*30}ms">
-        <div style="min-width:28px;text-align:center;font-size:${i<3?'1.1rem':'.78rem'};color:var(--mid)">${medals[i]||('#'+(i+1))}</div>
-        <div style="flex:1;font-weight:${i<3?'700':'500'};font-size:.88rem;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">${esc(e.name)}</div>
-        <div style="font-weight:700;font-size:.9rem">${e.score||0}<span style="font-size:.68rem;color:var(--mid);font-weight:400"> /${totalQStr}</span></div>
+    ?entries.map((p,i)=>`
+      <div class="lb-row">
+        <div class="score-rank">${medals[i]||('#'+(i+1))}</div>
+        <div style="flex:1;font-weight:${i<3?'600':'400'}">${esc(p.name)}</div>
+        <div class="score-pts"><span style="font-weight:700">${p.score||0}</span><span style="font-size:.7rem;color:var(--mid);font-weight:400">/${totalStr}</span></div>
       </div>`).join('')
-    :`<div style="padding:24px;text-align:center;color:var(--mid)">No scores to display.</div>`;
-  return `<div style="position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:flex-end;justify-content:center;z-index:600;backdrop-filter:blur(3px)">
-    <div style="background:var(--white);border-radius:20px 20px 0 0;width:100%;max-width:520px;max-height:88vh;display:flex;flex-direction:column;animation:slideUp .25s ease">
-      <div style="padding:16px 20px 14px;border-bottom:1px solid var(--line);flex-shrink:0;text-align:center">
-        <div style="width:36px;height:4px;background:var(--line);border-radius:2px;margin:0 auto 14px"></div>
-        <div style="font-size:2rem;margin-bottom:6px">🏆</div>
-        <div style="font-size:1.05rem;font-weight:700;margin-bottom:3px">Final Leaderboard</div>
-        <p style="font-size:.78rem;color:var(--mid)">${entries.length} student${entries.length!==1?'s':''} &nbsp;·&nbsp; ${totalQStr} question${totalQ!==1?'s':''}</p>
-      </div>
+    :`<div style="padding:20px;text-align:center;color:var(--mid)">No scores to display.</div>`;
+  return `<div style="display:flex;flex-direction:column;height:calc(100vh - 54px);overflow:hidden;padding:16px 20px;max-width:520px;margin:0 auto">
+    <div style="text-align:center;padding:20px 0 16px;flex-shrink:0">
+      <div style="font-size:2.4rem;margin-bottom:10px">🏆</div>
+      <h2 style="margin-bottom:6px">Final Leaderboard</h2>
+      <p class="muted small">${entries.length} student${entries.length!==1?'s':''} &nbsp;·&nbsp; ${totalStr} question${totalQ!==1?'s':''}</p>
+    </div>
+    <div class="lb-panel" style="flex:1;overflow:hidden;display:flex;flex-direction:column">
+      <div class="lb-head"><span style="font-size:.82rem;font-weight:600">🏁 Final Standings</span><span class="small muted">${entries.length} student${entries.length!==1?'s':''}</span></div>
       <div style="overflow-y:auto;flex:1">${rows}</div>
-      <div style="padding:14px 16px 24px;flex-shrink:0;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:8px">
-        <button class="btn btn-good" id="btn-host-lb-export" style="width:100%;justify-content:center;gap:8px">
-          📤 Export as CSV
-        </button>
-        <button class="btn btn-dark" id="btn-host-lb-close" style="width:100%;justify-content:center;gap:8px">
-          ← Back to Host Menu
-        </button>
-      </div>
+    </div>
+    <div style="padding:14px 0 8px;flex-shrink:0;display:flex;flex-direction:column;gap:8px">
+      <button class="btn btn-good" id="btn-host-lb-export" style="width:100%;justify-content:center;gap:8px">
+        📤 Export as CSV
+      </button>
+      <button class="btn btn-dark" id="btn-host-lb-close" style="width:100%;justify-content:center;gap:8px">
+        ← Back to Host Menu
+      </button>
     </div>
   </div>`;
 }
@@ -1449,7 +1449,6 @@ function hostHTML(){
       ${standingsOverlayHTML()}
       ${reportsOverlayHTML()}
       ${hostSettingsOverlayHTML()}
-      ${hostFinalLeaderboardHTML()}
     ${dismissBombOverlayHTML()}
     </div>`;
   }
@@ -1554,7 +1553,6 @@ function hostHTML(){
     ${standingsOverlayHTML()}
     ${reportsOverlayHTML()}
     ${hostSettingsOverlayHTML()}
-    ${hostFinalLeaderboardHTML()}
   </div>`;
 }
 
@@ -1598,7 +1596,6 @@ function hostEndedHTML(){
     ${haltBombOverlayHTML()}
     ${haltMenuOverlayHTML()}
     ${backupRestoreOverlayHTML()}
-    ${hostFinalLeaderboardHTML()}
     ${dismissBombOverlayHTML()}
   </div>`;
 }

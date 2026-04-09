@@ -47,6 +47,8 @@
 <canvas id="confetti-canvas"></canvas>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"></script>
 
+<!-- Token injected server-side so backend.js can use it without being served through a template -->
+<script>window.MY_TOKEN = '%%MY_TOKEN%%';</script>
 <!-- Load order: score → function → ui → backend (backend has boot code, must be last) -->
 <script defer src="score.js"></script>
 <script defer src="function.js"></script>

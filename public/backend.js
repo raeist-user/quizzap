@@ -128,7 +128,8 @@ let hostSchedules=[]; // schedules shown in host panel
 const STUN={iceServers:[{urls:'stun:stun.l.google.com:19302'},{urls:'stun:stun1.l.google.com:19302'}]};
 
 // ── GITHUB CONFIG ─────────────────────────────────────────────────────────
-const MY_TOKEN = '%%MY_TOKEN%%';
+// MY_TOKEN is injected into window.MY_TOKEN by index.html (server-side template replacement).
+const MY_TOKEN = (typeof window !== 'undefined' && window.MY_TOKEN) ? window.MY_TOKEN : '';
 
 const GITHUB_REPO  = 'raeist-user/quizzap';
 const GITHUB_BRANCH = 'main';
@@ -499,6 +500,7 @@ function _getScreenKey(){
   if(showingProfile)                  return 'profile:'+profileTab;
   if(!role)                           return 'landing:'+homeSection+(homeSection==='leaderboard'?':'+homeLbTab:'');
   if(role==='host'&&!hostAuthed)      return 'host-pass';
+  if(role==='host'&&hostShutdownLeaderboard) return 'host-final-lb';
   if(role==='host')                   return 'host:'+S.status;
   if(role==='participant'&&myName)    return 'participant:'+S.status;
   return 'join';
@@ -545,6 +547,7 @@ function render(){
     if(profileTab==='overview'||profileTab==='history') needProfile=true; }
   else if(!role)                { html=landingHTML(); }
   else if(role==='host'&&!hostAuthed){ html=hostPassHTML(); }
+  else if(role==='host'&&hostShutdownLeaderboard){ html=hostFinalLeaderboardHTML(); }
   else if(role==='host')        { html=hostHTML(); }
   else                          { html=participantHTML(); }
   if(S.status==='question') needTimer=true;
@@ -1074,7 +1077,7 @@ let uploadMsg='';
 let uploadSubjects=[];    // folders list for manage tab
 
 function isValidToken() { 
-  return MY_TOKEN && !MY_TOKEN.startsWith('%%') && MY_TOKEN.length > 0;
+  return MY_TOKEN && MY_TOKEN.length > 0;
 }
 // GET requests must NOT include Content-Type — triggers CORS preflight that GitHub rejects
 function ghReadHeaders(){
