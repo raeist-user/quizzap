@@ -213,6 +213,7 @@
     }
     #view-quiz .q-card{
       flex:1;overflow-y:auto;
+      max-height:calc(100dvh - 320px);
     }
     /* Shrink page bottom-padding when quiz is visible so no scroll needed */
     .page:has(#view-quiz.active){padding-bottom:20px}
@@ -875,9 +876,8 @@ function renderQuestion(){
     btn.className='opt-card';
     if(isRevealed){
       btn.classList.add('locked');
-      if(i===correctIdx)                        btn.classList.add('correct');
-      else if(i===myAnswer&&i!==correctIdx)     btn.classList.add('wrong-chosen');
-      else                                       btn.classList.add('wrong');
+      if(i===myAnswer&&i!==correctIdx) btn.classList.add('wrong-chosen');
+      else if(i===myAnswer)            btn.classList.add('chosen');
     } else {
       if(i===myAnswer) btn.classList.add('chosen');
     }
@@ -890,12 +890,7 @@ function renderQuestion(){
   renderMath(document.getElementById('quiz-card'));
 
   const noticeEl=document.getElementById('answer-notice');
-  if(isRevealed&&myAnswer!==undefined){
-    const ok=myAnswer===correctIdx;
-    noticeEl.innerHTML=`<div class="answer-notice ${ok?'n-good':'n-bad'}">${ok?'✓ Correct!':'✗ Wrong — Correct answer: <strong>'+escLatex(q.options[correctIdx])+'</strong>'}</div>`;
-  } else {
-    noticeEl.innerHTML='';
-  }
+  noticeEl.innerHTML='';
 
   // Streak display
   const streakWrap=document.getElementById('streak-notice-wrap');
