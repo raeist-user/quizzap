@@ -172,13 +172,13 @@
     /* QUESTION CARD */
     .q-card{background:var(--white);border:1px solid var(--line);border-radius:var(--r-lg);padding:22px 18px 20px;box-shadow:var(--sh-sm);margin-bottom:12px}
     .q-num{font-size:.62rem;font-weight:800;color:var(--mid);letter-spacing:.08em;text-transform:uppercase;margin-bottom:8px}
-    .q-text{font-size:1rem;font-weight:600;line-height:1.6;margin-bottom:18px}
+    .q-text{font-size:.88rem;font-weight:600;line-height:1.6;margin-bottom:18px}
 
     /* OPTIONS */
     .opt-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
     @media(max-width:480px){.opt-grid{grid-template-columns:1fr}}
 
-    .opt-card{display:flex;align-items:center;gap:11px;padding:15px 14px;border:1.5px solid var(--line);border-radius:var(--r-lg);cursor:pointer;background:var(--white);transition:all var(--t-fast);font-size:.86rem;position:relative;overflow:hidden;text-align:left;font-family:var(--sans);font-weight:500;line-height:1.4;width:100%}
+    .opt-card{display:flex;align-items:center;gap:11px;padding:15px 14px;border:1.5px solid var(--line);border-radius:var(--r-lg);cursor:pointer;background:var(--white);transition:all var(--t-fast);font-size:.78rem;position:relative;overflow:hidden;text-align:left;font-family:var(--sans);font-weight:500;line-height:1.4;width:100%}
     .opt-card:not(.locked):hover{border-color:var(--ink);transform:translateY(-2px);box-shadow:var(--sh-sm)}
     .opt-card:not(.locked):active{transform:scale(.97) translateY(0)}
     .opt-card.chosen{border-color:var(--ink);background:var(--faint)}
@@ -210,11 +210,9 @@
     #view-quiz.active{
       display:flex;flex-direction:column;
       min-height:calc(100dvh - 58px - 40px);
-      font-size:10px;
     }
     #view-quiz .q-card{
       flex:1;overflow-y:auto;
-      font-size:10px;
       max-height:calc(100dvh - 320px);
     }
     /* Shrink page bottom-padding when quiz is visible so no scroll needed */
