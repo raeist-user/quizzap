@@ -718,35 +718,33 @@ function backupRestoreOverlayHTML(){
 
 function hostFinalLeaderboardHTML(){
   if(!hostShutdownLeaderboard) return '';
-  const entries=hostShutdownLeaderboard;
-  const medals=['🥇','🥈','🥉'];
-  const totalQ=hostShutdownLeaderboard._totalQ||0;
-  const totalStr=totalQ>0?String(totalQ):'?';
-  const rows=entries.length
-    ?entries.map((p,i)=>`
+  const sorted = hostShutdownLeaderboard;
+  const medals = ['🥇','🥈','🥉'];
+  const total  = hostShutdownLeaderboard._totalQ || 0;
+  const totalStr = total > 0 ? String(total) : '?';
+  const rows = sorted.length
+    ? sorted.map((p,i) => `
       <div class="lb-row">
         <div class="score-rank">${medals[i]||('#'+(i+1))}</div>
         <div style="flex:1;font-weight:${i<3?'600':'400'}">${esc(p.name)}</div>
         <div class="score-pts"><span style="font-weight:700">${p.score||0}</span><span style="font-size:.7rem;color:var(--mid);font-weight:400">/${totalStr}</span></div>
       </div>`).join('')
-    :`<div style="padding:20px;text-align:center;color:var(--mid)">No scores to display.</div>`;
+    : `<div style="padding:20px;text-align:center;color:var(--mid)">No scores to display.</div>`;
+
   return `<div style="display:flex;flex-direction:column;height:calc(100vh - 54px);overflow:hidden;padding:16px 20px;max-width:520px;margin:0 auto">
-    <div style="text-align:center;padding:20px 0 16px;flex-shrink:0">
-      <div style="font-size:2.4rem;margin-bottom:10px">🏆</div>
-      <h2 style="margin-bottom:6px">Final Leaderboard</h2>
-      <p class="muted small">${entries.length} student${entries.length!==1?'s':''} &nbsp;·&nbsp; ${totalStr} question${totalQ!==1?'s':''}</p>
+    <div style="text-align:center;padding:18px 0 12px;flex-shrink:0">
+      <div style="font-size:2rem;margin-bottom:8px">🏆</div>
+      <h2 style="margin-bottom:5px">Session Complete</h2>
+      <p class="muted small">${sorted.length} student${sorted.length!==1?'s':''} &nbsp;·&nbsp; ${totalStr} question${total!==1?'s':''}</p>
+      <div style="margin-top:14px;display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
+        <button class="btn btn-good" id="btn-host-lb-export" style="gap:7px;padding:9px 22px">📤 Export CSV</button>
+        <button class="btn btn-dark" id="btn-host-lb-close" style="gap:7px;padding:9px 22px">← Host Menu</button>
+      </div>
     </div>
-    <div class="lb-panel" style="flex:1;overflow:hidden;display:flex;flex-direction:column">
-      <div class="lb-head"><span style="font-size:.82rem;font-weight:600">🏁 Final Standings</span><span class="small muted">${entries.length} student${entries.length!==1?'s':''}</span></div>
+    <div style="font-size:.67rem;text-align:center;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--mid);margin-bottom:6px;flex-shrink:0">🏆 Final Leaderboard</div>
+    <div class="lb-panel" style="flex:1;overflow:hidden;display:flex;flex-direction:column;margin-top:0">
+      <div class="lb-head"><span style="font-size:.82rem;font-weight:600">Final Standings</span><span class="small muted">${sorted.length} student${sorted.length!==1?'s':''}</span></div>
       <div style="overflow-y:auto;flex:1">${rows}</div>
-    </div>
-    <div style="padding:14px 0 8px;flex-shrink:0;display:flex;flex-direction:column;gap:8px">
-      <button class="btn btn-good" id="btn-host-lb-export" style="width:100%;justify-content:center;gap:8px">
-        📤 Export as CSV
-      </button>
-      <button class="btn btn-dark" id="btn-host-lb-close" style="width:100%;justify-content:center;gap:8px">
-        ← Back to Host Menu
-      </button>
     </div>
   </div>`;
 }
@@ -2497,6 +2495,8 @@ function attach(){
     setTimeout(()=>{ URL.revokeObjectURL(url); a.remove(); }, 500);
     showToast('✅ CSV downloaded!','good');
   });
+  // Return to host panel (clears the final leaderboard overlay)
+  on('btn-host-lb-close',()=>{ hostShutdownLeaderboard=null; render(); });
   on('btn-shutdown',()=>{ if(confirm('Shut down session?')) send({type:'shutdown'}); });
 
   document.querySelectorAll('.itbl tbody tr[data-pid]').forEach(row=>

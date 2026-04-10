@@ -260,7 +260,9 @@ async function saveSession(e){
   }catch(err){ console.warn('saveSession failed:',err.message); }
 }
 function computeStats(){
-  const h=loadHistory(); if(!h.length) return null;
+  // _sessionCache is populated by loadHistory() before the profile tab renders,
+  // so we read it synchronously here instead of calling the async loadHistory().
+  const h=_sessionCache||[]; if(!h.length) return null;
   const totalCorrect=h.reduce((s,e)=>s+(e.correct||0),0);
   const totalQs=h.reduce((s,e)=>s+(e.total||0),0);
   const accuracy=totalQs?Math.round(totalCorrect/totalQs*100):0;
