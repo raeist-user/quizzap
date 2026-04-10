@@ -67,23 +67,16 @@ const leaderboardSchema = new mongoose.Schema({
 });
 const LeaderboardEntry = mongoose.model('LeaderboardEntry', leaderboardSchema);
 
-// ── TODAY LEADERBOARD ─────────────────────────────────────────────────────────
-const todayLBSchema = new mongoose.Schema({
-  userId:    { type: mongoose.Schema.Types.ObjectId, ref: 'User', unique: true },
-  userName:  { type: String },
-  score:     { type: Number, default: 0 },
-  updatedAt: { type: Date, default: Date.now },
+// ── SCORE LOG (one doc per user per shutdown — drives today/week leaderboard) ─
+// Replaces the old TodayLBEntry + WeekLBEntry collections.
+// The leaderboard API aggregates this by date range; no manual resets needed.
+const scoreLogSchema = new mongoose.Schema({
+  userId:   { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
+  userName: { type: String },
+  score:    { type: Number, default: 0 },
+  date:     { type: Date,   default: Date.now, index: true },
 });
-const TodayLBEntry = mongoose.model('TodayLBEntry', todayLBSchema);
-
-// ── WEEK LEADERBOARD ──────────────────────────────────────────────────────────
-const weekLBSchema = new mongoose.Schema({
-  userId:    { type: mongoose.Schema.Types.ObjectId, ref: 'User', unique: true },
-  userName:  { type: String },
-  score:     { type: Number, default: 0 },
-  updatedAt: { type: Date, default: Date.now },
-});
-const WeekLBEntry = mongoose.model('WeekLBEntry', weekLBSchema);
+const ScoreLog = mongoose.model('ScoreLog', scoreLogSchema);
 
 // ── SESSION BACKUP ────────────────────────────────────────────────────────────
 const sessionBackupSchema = new mongoose.Schema({
@@ -132,6 +125,6 @@ const ReportDB = mongoose.model('ReportDB', reportDBSchema);
 
 module.exports = {
   User, PendingReg, UpdateReq, Notice, Schedule,
-  LeaderboardEntry, TodayLBEntry, WeekLBEntry,
+  LeaderboardEntry, ScoreLog,
   SessionBackup, SessionEntry, ReportDB,
 };

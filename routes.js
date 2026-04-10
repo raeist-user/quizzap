@@ -5,7 +5,7 @@ const bcrypt   = require('bcryptjs');
 const mongoose = require('mongoose');
 const {
   User, PendingReg, UpdateReq, Notice, Schedule,
-  LeaderboardEntry, TodayLBEntry, WeekLBEntry, SessionEntry,
+  LeaderboardEntry, ScoreLog, SessionEntry,
 } = require('./models');
 const { shared, txHost, getBackupWindow } = require('./ws');
 const { SessionBackup } = require('./models');
@@ -358,24 +358,45 @@ function initRoutes(app) {
   app.get('/api/leaderboard', async (req, res) => {
     try {
       const period = req.query.period || 'all';
+
+      // ── All-time: read from the cumulative LeaderboardEntry table ─────────
       if (period === 'all') {
         const raw = await LeaderboardEntry.find().sort({ totalScore: -1 }).lean();
         return res.json({ leaderboard: raw.map(e => ({
-          userId: String(e.userId), userName: e.userName || 'Unknown',
-          totalScore: e.totalScore || 0, sessions: e.sessionsPlayed || 0,
+          userId:     String(e.userId),
+          userName:   e.userName || 'Unknown',
+          totalScore: e.totalScore || 0,
+          sessions:   e.sessionsPlayed || 0,
         }))});
       }
-      const Model = period === 'today' ? TodayLBEntry : WeekLBEntry;
-      const raw = await Model.find().sort({ score: -1 }).lean();
-      const userIds = raw.map(e => e.userId).filter(Boolean);
-      const users   = await User.find({ _id: { $in: userIds } }).select('name').lean();
-      const nameMap = {};
-      users.forEach(u => { nameMap[String(u._id)] = u.name; });
-      return res.json({ leaderboard: raw.map(e => ({
-        userId:     String(e.userId),
-        userName:   nameMap[String(e.userId)] || e.userName || 'Unknown',
-        totalScore: e.score || 0,
-        sessions:   1,
+
+      // ── Today / Week: aggregate ScoreLog entries within the date window ───
+      const now = new Date();
+      let since;
+      if (period === 'today') {
+        // Midnight of the current UTC day
+        since = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+      } else {
+        // Rolling 7-day window
+        since = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+      }
+
+      const agg = await ScoreLog.aggregate([
+        { $match: { date: { $gte: since } } },
+        { $group: {
+            _id:        '$userId',
+            totalScore: { $sum: '$score' },
+            userName:   { $last: '$userName' },
+            sessions:   { $sum: 1 },
+        }},
+        { $sort: { totalScore: -1 } },
+      ]);
+
+      return res.json({ leaderboard: agg.map(e => ({
+        userId:     String(e._id),
+        userName:   e.userName || 'Unknown',
+        totalScore: e.totalScore || 0,
+        sessions:   e.sessions  || 1,
       }))});
     } catch (e) {
       console.error('/api/leaderboard error:', e.message);
