@@ -206,6 +206,17 @@
     .streak-notice.s8{background:linear-gradient(135deg,#fdf4ff,#e9d5ff);color:#3b0764;border:1px solid #d8b4fe}
     .streak-notice.s10{background:linear-gradient(135deg,#fdf4ff,#f0abfc);color:#1e1b4b;border:1px solid #e879f9;box-shadow:0 0 12px rgba(168,85,247,.25)}
 
+    /* ── QUIZ VIEWPORT FIX: fill screen, lock buttons to bottom ── */
+    #view-quiz.active{
+      display:flex;flex-direction:column;
+      min-height:calc(100dvh - 58px - 40px);
+    }
+    #view-quiz .q-card{
+      flex:1;overflow-y:auto;
+    }
+    /* Shrink page bottom-padding when quiz is visible so no scroll needed */
+    .page:has(#view-quiz.active){padding-bottom:20px}
+
     /* NAV ROW */
     .nav-row{display:flex;gap:8px}
     .nav-row .btn{flex:1}
