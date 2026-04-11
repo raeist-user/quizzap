@@ -2,7 +2,7 @@
 
 const { WebSocketServer } = require('ws');
 const {
-  SessionBackup, LeaderboardEntry, ScoreLog, ReportDB,
+  SessionBackup, LeaderboardEntry, TodayLBEntry, WeekLBEntry, ReportDB,
 } = require('./models');
 
 const HOST_PASSWORD = process.env.HOST_PASSWORD || '2325';
@@ -132,7 +132,11 @@ function bankGameScores() {
     sessionCounter += 1;
     sessionSnapshots.push({ sessionNum: sessionCounter, scores: snap });
   }
-  saveSessionBackup().catch(e => console.warn('[SessionBackup] bankGameScores save failed:', e.message));
+  // NOTE: saveSessionBackup is NOT called here intentionally.
+  // bankGameScores adds p.score into gameScores.total BEFORE state is reset,
+  // so calling it here would double-count: bankedScore already includes the
+  // just-banked session, and currentScore would add p.score again.
+  // saveSessionBackup is called AFTER state=fresh() in the reset case instead.
 }
 
 // ── SESSION BACKUP ────────────────────────────────────────────────────────────
@@ -210,29 +214,29 @@ async function getBackupEntry(userId) {
 }
 
 // ── LEADERBOARD PERSIST ───────────────────────────────────────────────────────
-// Called once per shutdown. Writes to:
-//   LeaderboardEntry — all-time cumulative (fast all-time queries)
-//   ScoreLog         — one timestamped doc per user per session (drives today/week)
 async function persistLeaderboard(entries) {
-  const now = new Date();
   try {
     for (const p of entries) {
       const uid = p.userId || p.id;
-      if (!uid || String(uid).startsWith('p')) continue; // skip anonymous
-      const score = p.score || 0;
-      // All-time cumulative
+      if (!uid || uid.startsWith('p')) continue;
       await LeaderboardEntry.findOneAndUpdate(
         { userId: uid },
-        { $inc: { totalScore: score, sessionsPlayed: 1 }, $set: { userName: p.name, updatedAt: now } },
+        { $inc: { totalScore: p.score || 0, sessionsPlayed: 1 }, $set: { userName: p.name, updatedAt: new Date() } },
         { upsert: true }
       );
-      // Per-session log (today / week leaderboard is derived from this)
-      if (score > 0) {
-        await ScoreLog.create({ userId: uid, userName: p.name, score, date: now });
-      }
+      await TodayLBEntry.findOneAndUpdate(
+        { userId: uid },
+        { $inc: { score: p.score || 0 }, $set: { userName: p.name, updatedAt: new Date() } },
+        { upsert: true }
+      );
+      await WeekLBEntry.findOneAndUpdate(
+        { userId: uid },
+        { $inc: { score: p.score || 0 }, $set: { userName: p.name, updatedAt: new Date() } },
+        { upsert: true }
+      );
     }
   } catch (e) {
-    console.warn('[persistLeaderboard] error:', e.message);
+    console.warn('Leaderboard persist error:', e.message);
   }
 }
 
@@ -427,9 +431,29 @@ function initWS(server) {
               .slice().sort((a, b) => b.score - a.score);
             const previewTotal = state.pushedCount || 0;
 
-            // Bank scores in memory for cumulative standings overlay.
-            // DB write happens only on shutdown via persistLeaderboard — never here.
-            // (Writing on reset AND shutdown caused every mid-session reset to be double-counted.)
+            (async () => {
+              for (const p of previewParts) {
+                if (!p.userId || String(p.userId).startsWith('p')) continue;
+                try {
+                  await LeaderboardEntry.findOneAndUpdate(
+                    { userId: p.userId },
+                    { $inc: { totalScore: p.score || 0, sessionsPlayed: 1 }, $set: { userName: p.name, updatedAt: new Date() } },
+                    { upsert: true }
+                  );
+                  await TodayLBEntry.findOneAndUpdate(
+                    { userId: p.userId },
+                    { $inc: { score: p.score || 0 }, $set: { userName: p.name, updatedAt: new Date() } },
+                    { upsert: true }
+                  );
+                  await WeekLBEntry.findOneAndUpdate(
+                    { userId: p.userId },
+                    { $inc: { score: p.score || 0 }, $set: { userName: p.name, updatedAt: new Date() } },
+                    { upsert: true }
+                  );
+                } catch(e) { console.warn('[reset] DB write error:', e.message); }
+              }
+            })();
+
             bankGameScores();
 
             clients.forEach(c => {
@@ -448,6 +472,9 @@ function initWS(server) {
                 }
               }
             });
+            // Save backup after fresh state so rejoining students get currentScore=0
+            // and start fresh. bankedScore in gameScores already holds the full total.
+            saveSessionBackup().catch(e => console.warn("[SessionBackup] post-reset save failed:", e.message));
             broadcast();
             if (shared.questionReports.length)
               txHost({ type: 'report_received', reports: shared.questionReports });
