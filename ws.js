@@ -94,7 +94,7 @@ function project(role, pid) {
     answers:          state.answers,
     history:          state.history,
     sessionSnapshots,
-    gameScores:       Object.entries(gameScores).map(([pid, g]) => ({ id: pid, name: g.name, total: g.total })),
+    gameScores:       Object.entries(gameScores).map(([pid, g]) => ({ id: pid, name: g.name, userId: g.userId || null, total: g.total })),
   };
 
   if (role === 'participant') {
@@ -132,11 +132,8 @@ function bankGameScores() {
     sessionCounter += 1;
     sessionSnapshots.push({ sessionNum: sessionCounter, scores: snap });
   }
-  // NOTE: saveSessionBackup is NOT called here intentionally.
-  // bankGameScores adds p.score into gameScores.total BEFORE state is reset,
-  // so calling it here would double-count: bankedScore already includes the
-  // just-banked session, and currentScore would add p.score again.
-  // saveSessionBackup is called AFTER state=fresh() in the reset case instead.
+  // NOTE: saveSessionBackup is NOT called here — bankGameScores already added scores to
+  // gameScores.total; calling it here would double-count bankedScore + currentScore.
 }
 
 // ── SESSION BACKUP ────────────────────────────────────────────────────────────
@@ -472,9 +469,8 @@ function initWS(server) {
                 }
               }
             });
-            // Save backup after fresh state so rejoining students get currentScore=0
-            // and start fresh. bankedScore in gameScores already holds the full total.
-            saveSessionBackup().catch(e => console.warn("[SessionBackup] post-reset save failed:", e.message));
+            // Save backup with score=0 so reconnecting students start fresh after reset
+            saveSessionBackup().catch(e => console.warn('[SessionBackup] post-reset save failed:', e.message));
             broadcast();
             if (shared.questionReports.length)
               txHost({ type: 'report_received', reports: shared.questionReports });
@@ -516,6 +512,8 @@ function initWS(server) {
                 c.role = null; c.pid = null;
               }
             });
+            // Tell host to refresh leaderboard once DB persist is done
+            txHost({ type: 'shutdown_complete' });
             (async () => {
               try {
                 const { windowStart } = getBackupWindow();
