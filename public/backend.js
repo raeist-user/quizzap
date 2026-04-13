@@ -260,9 +260,7 @@ async function saveSession(e){
   }catch(err){ console.warn('saveSession failed:',err.message); }
 }
 function computeStats(){
-  // _sessionCache is populated by loadHistory() before the profile tab renders,
-  // so we read it synchronously here instead of calling the async loadHistory().
-  const h=_sessionCache||[]; if(!h.length) return null;
+  const h=loadHistory(); if(!h.length) return null;
   const totalCorrect=h.reduce((s,e)=>s+(e.correct||0),0);
   const totalQs=h.reduce((s,e)=>s+(e.total||0),0);
   const accuracy=totalQs?Math.round(totalCorrect/totalQs*100):0;
@@ -836,6 +834,10 @@ function connect(){
       case 'rtc_ice':
         if(role==='host'&&peerConns[m.fromCid]) peerConns[m.fromCid].addIceCandidate(new RTCIceCandidate(m.signal)).catch(()=>{});
         if(role==='participant'&&remoteConn)     remoteConn.addIceCandidate(new RTCIceCandidate(m.signal)).catch(()=>{});
+        break;
+      case 'shutdown_complete':
+        // Server has finished persisting leaderboard — refresh today's tab
+        fetchLeaderboard('today');
         break;
       case 'backup_restore_result': {
         if (m.ok) {
