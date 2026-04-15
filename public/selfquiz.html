@@ -1,3 +1,4 @@
+```html
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -43,13 +44,11 @@
       font-family:var(--urdu)!important;
       direction:rtl;text-align:right;line-height:2.4;letter-spacing:0
     }
-    /* Utility class for inline Urdu spans inside mixed-language content */
     .urdu-text{
       font-family:var(--urdu);
       direction:rtl;unicode-bidi:embed;
       line-height:2.2;font-size:1.1em;display:inline-block
     }
-    /* When a full question or option is in Urdu, flip card layout */
     .q-text[dir="rtl"],.opt-card[dir="rtl"]{
       direction:rtl;text-align:right
     }
@@ -182,7 +181,7 @@
     .opt-card:not(.locked):hover{border-color:var(--ink);transform:translateY(-2px);box-shadow:var(--sh-sm)}
     .opt-card:not(.locked):active{transform:scale(.97) translateY(0)}
     .opt-card.chosen{border-color:var(--ink);background:var(--faint)}
-    .opt-card.correct{border-color:var(--good);background:var(--good-bg);animation:popIn .3s var(--t-spring)}
+    .opt-card.correct{border-color:var(--good);background:var(--good-bg)!important;opacity:1!important;animation:popIn .3s var(--t-spring)}
     .opt-card.wrong{opacity:.3}
     .opt-card.wrong-chosen{border-color:var(--bad);background:#fff1f2;opacity:1;animation:shake .38s ease both}
     .opt-card.locked{cursor:default}
@@ -206,7 +205,6 @@
     .streak-notice.s8{background:linear-gradient(135deg,#fdf4ff,#e9d5ff);color:#3b0764;border:1px solid #d8b4fe}
     .streak-notice.s10{background:linear-gradient(135deg,#fdf4ff,#f0abfc);color:#1e1b4b;border:1px solid #e879f9;box-shadow:0 0 12px rgba(168,85,247,.25)}
 
-    /* ── QUIZ VIEWPORT FIX: fill screen, lock buttons to bottom ── */
     #view-quiz.active{
       display:flex;flex-direction:column;
       min-height:calc(100dvh - 58px - 40px);
@@ -215,10 +213,8 @@
       flex:1;overflow-y:auto;
       max-height:calc(100dvh - 320px);
     }
-    /* Shrink page bottom-padding when quiz is visible so no scroll needed */
     .page:has(#view-quiz.active){padding-bottom:20px}
 
-    /* NAV ROW */
     .nav-row{display:flex;gap:8px}
     .nav-row .btn{flex:1}
     .report-row{text-align:center;margin-top:6px}
@@ -227,7 +223,6 @@
     .report-btn:active{opacity:.7}
     .report-btn.reported{color:var(--mid);background:var(--faint);border-color:var(--line)}
 
-    /* RESULT */
     .result-card{background:var(--white);border:1px solid var(--line);border-radius:var(--r-xl);padding:32px 22px;text-align:center;box-shadow:var(--sh-md);animation:popIn .4s var(--t-spring) both}
     .result-emoji{font-size:3.4rem;margin-bottom:12px;display:block;animation:popIn .5s .1s var(--t-spring) both;animation-fill-mode:both}
     .result-title{font-family:var(--serif);font-size:1.65rem;margin-bottom:5px;letter-spacing:-.025em}
@@ -246,7 +241,6 @@
     .result-stat .v.bad{color:var(--bad)}
     .result-btns{display:flex;gap:8px}
 
-    /* REVIEW */
     .sec{display:flex;align-items:center;margin:20px 0 12px;gap:9px}
     .sec-lbl{font-size:.63rem;font-weight:800;color:var(--mid);letter-spacing:.1em;text-transform:uppercase;flex-shrink:0}
     .sec-line{flex:1;height:1px;background:var(--line)}
@@ -266,7 +260,6 @@
     .ro-wrong{background:var(--bad-bg);color:var(--bad);font-weight:600}
     .ro-neutral{color:var(--mid)}
 
-    /* MISC */
     .loading-row{display:flex;align-items:center;gap:8px;padding:14px;font-size:.8rem;color:var(--mid)}
     .spin{width:14px;height:14px;border:2px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite;flex-shrink:0}
     .notice-bad{background:var(--bad-bg);color:var(--bad);border-left:3px solid var(--bad);padding:9px 12px;border-radius:var(--r-sm);font-size:.78rem}
@@ -275,7 +268,6 @@
     .toast{position:fixed;bottom:28px;left:50%;transform:translateX(-50%) translateY(80px);background:var(--ink);color:#fff;font-size:.8rem;font-weight:600;padding:10px 20px;border-radius:var(--r);pointer-events:none;z-index:998;transition:transform .25s cubic-bezier(.34,1.56,.64,1);white-space:nowrap;box-shadow:var(--sh-md)}
     .toast.show{transform:translateX(-50%) translateY(0)}
 
-    /* REPORT MODAL */
     .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:300;display:none;align-items:flex-end;justify-content:center;backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)}
     .modal-overlay.open{display:flex;animation:fadeIn .18s ease both}
     .modal-sheet{background:var(--white);border-radius:var(--r-xl) var(--r-xl) 0 0;padding:24px 18px 40px;width:100%;max-width:480px;animation:up .22s ease both;box-shadow:var(--sh-lg)}
@@ -427,7 +419,7 @@
     </div>
   </div>
 
-</div><!-- /page -->
+</div>
 
 <!-- REPORT MODAL -->
 <div class="modal-overlay" id="report-modal">
@@ -474,16 +466,14 @@ function ghHeaders(){
 }
 function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
-// Escapes HTML but preserves $...$ and $$...$$ so MathJax can render them
 function escLatex(s){
   s = String(s);
   const parts = [];
-  // Split on $$...$$ first, then $...$
   const re = /(\$\$[\s\S]*?\$\$|\$[^$\n]+?\$)/g;
   let last = 0, m;
   while((m = re.exec(s)) !== null){
     parts.push(esc(s.slice(last, m.index)));
-    parts.push(m[0]); // raw LaTeX — don't escape
+    parts.push(m[0]);
     last = re.lastIndex;
   }
   parts.push(esc(s.slice(last)));
@@ -511,7 +501,7 @@ function toast(msg, dur=2400){
 }
 
 /* ══════════════════════════════════════
-   SOUND SYSTEM — identical to index.html
+   SOUND SYSTEM
 ══════════════════════════════════════ */
 let audioCtx=null;
 function getAudio(){
@@ -600,7 +590,7 @@ function playNavClick(){
 }
 
 /* ══════════════════════════════════════
-   CONFETTI ENGINE — matching index.html
+   CONFETTI ENGINE
 ══════════════════════════════════════ */
 (function(){
   const COLORS=['#f87171','#fbbf24','#34d399','#60a5fa','#a78bfa','#f472b6','#fb923c'];
@@ -728,7 +718,7 @@ function checkGate(){
   }catch(e){}
 })();
 
-// ── FOLDER/FILE BROWSER ──────────────────────────────────────────────────────
+// ── BROWSER ──────────────────────────────────────────────────────
 async function loadFolders(){
   const grid=document.getElementById('browse-folder-grid');
   const msg=document.getElementById('browse-folders-msg');
@@ -824,7 +814,7 @@ async function selectFile(name,url,rowEl){
   }
 }
 
-// ── START QUIZ ────────────────────────────────────────────────────────────────
+// ── QUIZ LOGIC ────────────────────────────────────────────────────────────────
 function startQuiz(){
   if(!allQuestions.length) return;
   const fromVal=parseInt(document.getElementById('setup-from').value)||1;
@@ -843,7 +833,6 @@ function startQuiz(){
 
 function restartQuiz(){ startQuiz(); }
 
-// ── RENDER QUESTION ───────────────────────────────────────────────────────────
 function renderQuestion(){
   const q=quizQuestions[currentIdx];
   if(!q) return;
@@ -876,8 +865,14 @@ function renderQuestion(){
     btn.className='opt-card';
     if(isRevealed){
       btn.classList.add('locked');
-      if(i===myAnswer&&i!==correctIdx) btn.classList.add('wrong-chosen');
-      else if(i===myAnswer)            btn.classList.add('chosen');
+      // If correct choice (regardless if user picked it or not)
+      if(i===correctIdx) {
+        btn.classList.add('correct');
+      }
+      // If user picked wrong choice
+      if(i===myAnswer && i!==correctIdx) {
+        btn.classList.add('wrong-chosen');
+      }
     } else {
       if(i===myAnswer) btn.classList.add('chosen');
     }
@@ -886,13 +881,9 @@ function renderQuestion(){
     optWrap.appendChild(btn);
   });
 
-  // Render LaTeX in question card
   renderMath(document.getElementById('quiz-card'));
+  document.getElementById('answer-notice').innerHTML='';
 
-  const noticeEl=document.getElementById('answer-notice');
-  noticeEl.innerHTML='';
-
-  // Streak display
   const streakWrap=document.getElementById('streak-notice-wrap');
   streakWrap.innerHTML='';
   if(isRevealed&&myAnswer===correctIdx){
@@ -1031,7 +1022,6 @@ function finishQuiz(){
     list.appendChild(item);
   });
   renderMath(list);
-
   showView('view-results');
 }
 
@@ -1072,8 +1062,7 @@ document.getElementById('report-modal').addEventListener('click',function(e){
   if(e.target===this) closeReportModal();
 });
 
-// ── URDU AUTO-DETECTION ───────────────────────────────────────────────────────
-// Detects Urdu/Arabic script (U+0600–U+06FF) and applies Nastaliq font + RTL
+// ── URDU ───────────────────────────────────────────────────────
 const URDU_RE = /[\u0600-\u06FF]/;
 function applyUrduFont(root){
   root = root || document.body;
@@ -1087,11 +1076,11 @@ function applyUrduFont(root){
     }
   });
 }
-// Hook into renderQuestion and finishQuiz render cycles
-const _origRenderQ = typeof renderQuestion==='function'?renderQuestion:null;
 document.addEventListener('DOMContentLoaded',()=>{ applyUrduFont(); });
 const _urduObserver = new MutationObserver(()=>applyUrduFont());
 _urduObserver.observe(document.body,{childList:true,subtree:true});
 </script>
 </body>
 </html>
+
+```
