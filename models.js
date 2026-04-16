@@ -5,7 +5,8 @@ const mongoose = require('mongoose');
 // ── USER ──────────────────────────────────────────────────────────────────────
 const userSchema = new mongoose.Schema({
   name:        { type: String, required: true, trim: true, maxlength: 50 },
-  email:       { type: String, required: true, trim: true, lowercase: true, unique: true },
+  // email is optional for new users (legacy users still have it); sparse allows multiple nulls in a unique index
+  email:       { type: String, required: false, trim: true, lowercase: true, unique: true, sparse: true, default: null },
   username:    {
     type: String, lowercase: true, trim: true, sparse: true, unique: true, default: null,
     validate: {
@@ -23,7 +24,8 @@ const User = mongoose.model('User', userSchema);
 // ── PENDING REGISTRATIONS ─────────────────────────────────────────────────────
 const pendingRegSchema = new mongoose.Schema({
   name:      { type: String, required: true, trim: true, maxlength: 50 },
-  email:     { type: String, required: true, trim: true, lowercase: true, unique: true },
+  // email is optional for new registrations; sparse allows multiple nulls in a unique index
+  email:     { type: String, required: false, trim: true, lowercase: true, unique: true, sparse: true, default: null },
   username:  { type: String, lowercase: true, trim: true, sparse: true, unique: true, default: null },
   password:  { type: String, required: true },
   createdAt: { type: Date, default: Date.now },

@@ -2,7 +2,7 @@
 
 const { WebSocketServer } = require('ws');
 const {
-  SessionBackup, LeaderboardEntry, TodayLBEntry, WeekLBEntry, ReportDB,
+  SessionBackup, LeaderboardEntry, ScoreLog, ReportDB,
 } = require('./models');
 
 const HOST_PASSWORD = process.env.HOST_PASSWORD || '2325';
@@ -19,6 +19,7 @@ let state            = fresh();
 let gameScores       = {};          // key → { name, userId, total }
 let sessionSnapshots = [];
 let sessionCounter   = 0;
+let grandTotalPushed = 0;           // cumulative questions pushed across all sub-sessions (survives reset)
 
 // ── WS CLIENT REGISTRY ────────────────────────────────────────────────────────
 let seq     = 0;
@@ -94,6 +95,7 @@ function project(role, pid) {
     answers:          state.answers,
     history:          state.history,
     sessionSnapshots,
+    grandTotalPushed, // cumulative across all sub-sessions (survives reset)
     gameScores:       Object.entries(gameScores).map(([pid, g]) => ({ id: pid, name: g.name, userId: g.userId || null, total: g.total })),
   };
 
@@ -215,22 +217,20 @@ async function persistLeaderboard(entries) {
   try {
     for (const p of entries) {
       const uid = p.userId || p.id;
-      if (!uid || uid.startsWith('p')) continue;
+      if (!uid || String(uid).startsWith('p')) continue;
+      // Update all-time cumulative leaderboard
       await LeaderboardEntry.findOneAndUpdate(
         { userId: uid },
         { $inc: { totalScore: p.score || 0, sessionsPlayed: 1 }, $set: { userName: p.name, updatedAt: new Date() } },
         { upsert: true }
       );
-      await TodayLBEntry.findOneAndUpdate(
-        { userId: uid },
-        { $inc: { score: p.score || 0 }, $set: { userName: p.name, updatedAt: new Date() } },
-        { upsert: true }
-      );
-      await WeekLBEntry.findOneAndUpdate(
-        { userId: uid },
-        { $inc: { score: p.score || 0 }, $set: { userName: p.name, updatedAt: new Date() } },
-        { upsert: true }
-      );
+      // Write a ScoreLog entry so today/week leaderboard aggregation picks it up
+      await ScoreLog.create({
+        userId:   uid,
+        userName: p.name,
+        score:    p.score || 0,
+        date:     new Date(),
+      });
     }
   } catch (e) {
     console.warn('Leaderboard persist error:', e.message);
@@ -437,21 +437,21 @@ function initWS(server) {
                     { $inc: { totalScore: p.score || 0, sessionsPlayed: 1 }, $set: { userName: p.name, updatedAt: new Date() } },
                     { upsert: true }
                   );
-                  await TodayLBEntry.findOneAndUpdate(
-                    { userId: p.userId },
-                    { $inc: { score: p.score || 0 }, $set: { userName: p.name, updatedAt: new Date() } },
-                    { upsert: true }
-                  );
-                  await WeekLBEntry.findOneAndUpdate(
-                    { userId: p.userId },
-                    { $inc: { score: p.score || 0 }, $set: { userName: p.name, updatedAt: new Date() } },
-                    { upsert: true }
-                  );
+                  // Write ScoreLog entry for today/week leaderboard
+                  await ScoreLog.create({
+                    userId:   p.userId,
+                    userName: p.name,
+                    score:    p.score || 0,
+                    date:     new Date(),
+                  });
                 } catch(e) { console.warn('[reset] DB write error:', e.message); }
               }
             })();
 
             bankGameScores();
+
+            // Accumulate grand total of pushed questions across all sub-sessions
+            grandTotalPushed += previewTotal;
 
             clients.forEach(c => {
               if (c.role === 'participant')
@@ -482,9 +482,10 @@ function initWS(server) {
           {
             const haltParticipants = Object.values(state.participants)
               .slice().sort((a, b) => b.score - a.score);
+            const haltTotalQ = grandTotalPushed + (state.pushedCount || 0);
             clients.forEach((c) => {
               if (c.role === 'participant')
-                tx(c.ws, { type: 'halted', payload: { participants: haltParticipants, totalQuestions: state.pushedCount } });
+                tx(c.ws, { type: 'halted', payload: { participants: haltParticipants, totalQuestions: haltTotalQ } });
             });
           }
           broadcast();
@@ -506,9 +507,11 @@ function initWS(server) {
               .map(([pid, g]) => ({ id: pid, name: g.name, userId: g.userId, score: g.total }))
               .sort((a, b) => b.score - a.score);
             persistLeaderboard(finalLeaderboard);
+            // grandTotalPushed includes the current sub-session's pushedCount too
+            const finalTotalQ = grandTotalPushed + (state.pushedCount || 0);
             clients.forEach((c) => {
               if (c.role === 'participant') {
-                tx(c.ws, { type: 'kicked', payload: { finalLeaderboard, totalQuestions: state.pushedCount } });
+                tx(c.ws, { type: 'kicked', payload: { finalLeaderboard, totalQuestions: finalTotalQ } });
                 c.role = null; c.pid = null;
               }
             });
@@ -525,13 +528,15 @@ function initWS(server) {
           gameScores = {};
           sessionSnapshots = [];
           sessionCounter = 0;
+          grandTotalPushed = 0;
           state = fresh();
           broadcast();
           break;
 
         case 'leave':
           if (client.role !== 'participant' || !client.pid) break;
-          delete state.participants[client.pid];
+          // Remove the pending answer so it doesn't get counted, but keep the
+          // participant in state so their score survives until shutdown/reset.
           delete state.answers[client.pid];
           client.role = null; client.pid = null;
           tx(ws, { type: 'left' });

@@ -39,32 +39,39 @@ function initRoutes(app) {
     try {
       const { name, email, username, password } = req.body;
       if (!name?.trim())  return res.status(400).json({ error: 'Full name is required' });
-      if (!email?.trim()) return res.status(400).json({ error: 'Email is required' });
-      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()))
-        return res.status(400).json({ error: 'Enter a valid email address' });
       if (!password)      return res.status(400).json({ error: 'Password is required' });
       if (password.length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters' });
 
-      const uname = username?.trim() || null;
-      if (uname) {
-        if (!/^[a-zA-Z0-9_]{3,30}$/.test(uname))
-          return res.status(400).json({ error: 'Username must be 3–30 characters: letters, numbers, underscores only' });
-        if (await User.findOne({ username: uname.toLowerCase() }))
-          return res.status(400).json({ error: 'Username already taken' });
-        if (await PendingReg.findOne({ username: uname.toLowerCase() }))
-          return res.status(400).json({ error: 'Username already taken' });
+      // Email is optional for new users — validate only if provided
+      const emailVal = email?.trim() || null;
+      if (emailVal) {
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailVal))
+          return res.status(400).json({ error: 'Enter a valid email address' });
       }
 
-      if (await User.findOne({ email: email.trim().toLowerCase() }))
-        return res.status(400).json({ error: 'An account with this email already exists' });
-      if (await PendingReg.findOne({ email: email.trim().toLowerCase() }))
-        return res.status(400).json({ error: 'A registration request with this email is already pending' });
+      // Username is required for new users (replaces email as primary identifier)
+      const uname = username?.trim() || null;
+      if (!uname) return res.status(400).json({ error: 'Username is required' });
+      if (!/^[a-zA-Z0-9_]{3,30}$/.test(uname))
+        return res.status(400).json({ error: 'Username must be 3–30 characters: letters, numbers, underscores only' });
+      if (await User.findOne({ username: uname.toLowerCase() }))
+        return res.status(400).json({ error: 'Username already taken' });
+      if (await PendingReg.findOne({ username: uname.toLowerCase() }))
+        return res.status(400).json({ error: 'Username already taken' });
+
+      // Check email uniqueness only if an email was provided
+      if (emailVal) {
+        if (await User.findOne({ email: emailVal.toLowerCase() }))
+          return res.status(400).json({ error: 'An account with this email already exists' });
+        if (await PendingReg.findOne({ email: emailVal.toLowerCase() }))
+          return res.status(400).json({ error: 'A registration request with this email is already pending' });
+      }
 
       const hashed = await bcrypt.hash(password, 10);
       await PendingReg.create({
         name: name.trim(),
-        email: email.trim().toLowerCase(),
-        username: uname ? uname.toLowerCase() : null,
+        email: emailVal ? emailVal.toLowerCase() : null,
+        username: uname.toLowerCase(),
         password: hashed,
       });
       res.json({ pending: true, message: 'Registration submitted! Your account is pending approval by the host.' });
@@ -217,11 +224,12 @@ function initRoutes(app) {
       console.log('[approve] DB:', mongoose.connection.db.databaseName);
       const pr = await PendingReg.findById(req.params.id);
       if (!pr) return res.status(404).json({ error: 'Request not found' });
-      if (await User.findOne({ email: pr.email })) {
+      // Check email conflict only if email was provided
+      if (pr.email && await User.findOne({ email: pr.email })) {
         await PendingReg.findByIdAndDelete(pr._id);
         return res.status(400).json({ error: 'Email already registered' });
       }
-      const newUser = await User.create({ name: pr.name, email: pr.email, username: pr.username || null, password: pr.password, role: 'student', status: 'approved' });
+      const newUser = await User.create({ name: pr.name, email: pr.email || null, username: pr.username || null, password: pr.password, role: 'student', status: 'approved' });
       console.log('[approve] User created:', newUser._id, newUser.email);
       await PendingReg.findByIdAndDelete(pr._id);
       res.json({ ok: true });

@@ -11,25 +11,22 @@ try { require('dotenv').config(); } catch(_){}
 
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/shadabcoaching';
 
-const { ReportDB, TodayLBEntry } = require('./models');
+const { ReportDB } = require('./models');
 const { shared }      = require('./ws');
 const { initRoutes }  = require('./routes');
 const { initWS }      = require('./ws');
 
 // ── TODAY LEADERBOARD AUTO-RESET ──────────────────────────────────────────────
-// Clears TodayLBEntry every day at 5:30 AM IST (00:00 UTC).
+// Today/week leaderboard is now computed by aggregating ScoreLog by date range —
+// no daily reset is needed. This scheduler is kept as a no-op placeholder in
+// case future cleanup is added (e.g. pruning old ScoreLog entries).
 function scheduleTodayLBReset() {
   const now  = new Date();
-  // Next midnight UTC = 5:30 AM IST
+  // Next midnight UTC
   const next = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1, 0, 0, 0));
   const msUntil = next - now;
-  setTimeout(async () => {
-    try {
-      await TodayLBEntry.deleteMany({});
-      console.log('[TodayLB] Cleared at 5:30 AM IST —', new Date().toISOString());
-    } catch (e) {
-      console.warn('[TodayLB] Auto-reset failed:', e.message);
-    }
+  setTimeout(() => {
+    console.log('[ScoreLog] New day started —', new Date().toISOString());
     scheduleTodayLBReset(); // re-schedule for next day
   }, msUntil);
   const h = Math.round(msUntil / 36000) / 100;
