@@ -26,8 +26,8 @@ function loginFormHTML(){
 function registerFormHTML(){
   return `<div>
     <div class="form-group"><label class="form-label">Full name</label><input class="form-input" type="text" id="auth-name" placeholder="Your name" autocomplete="name"/></div>
-    <div class="form-group"><label class="form-label">Email</label><input class="form-input" type="email" id="auth-email" placeholder="you@example.com" autocomplete="email" autocapitalize="none" spellcheck="false"/></div>
-    <div class="form-group"><label class="form-label">Username <span style="font-weight:400;color:var(--mid);font-size:.8rem">(optional)</span></label><div style="position:relative"><input class="form-input" type="text" id="auth-username" placeholder="your_username" autocomplete="off" autocapitalize="none" spellcheck="false" style="padding-right:36px"/><span id="un-status" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);font-size:.85rem;line-height:1;pointer-events:none"></span></div><small id="un-hint" style="font-size:.72rem;margin-top:3px;display:block;color:var(--mid)">Letters, numbers, underscores only · 3–30 characters · used to sign in</small></div>
+    <div class="form-group"><label class="form-label">Username</label><div style="position:relative"><input class="form-input" type="text" id="auth-username" placeholder="your_username" autocomplete="off" autocapitalize="none" spellcheck="false" style="padding-right:36px"/><span id="un-status" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);font-size:.85rem;line-height:1;pointer-events:none"></span></div><small id="un-hint" style="font-size:.72rem;margin-top:3px;display:block;color:var(--mid)">Letters, numbers, underscores only · 3–30 characters · used to sign in</small></div>
+    <div class="form-group"><label class="form-label">Email <span style="font-weight:400;color:var(--mid);font-size:.8rem">(optional)</span></label><input class="form-input" type="email" id="auth-email" placeholder="you@example.com" autocomplete="email" autocapitalize="none" spellcheck="false"/></div>
     <div class="form-group"><label class="form-label">Password <span style="font-weight:400;text-transform:none;letter-spacing:0">(min 6 chars)</span></label><input class="form-input" type="password" id="auth-pw" placeholder="••••••••" autocomplete="new-password"/></div>
     <div id="auth-err" class="form-error"></div>
     <button class="btn btn-dark btn-full mt2" id="btn-register">Create account →</button>
@@ -739,7 +739,7 @@ function hostFinalLeaderboardHTML(){
     </div>
     <div style="padding:14px 0 8px;flex-shrink:0;display:flex;flex-direction:column;gap:8px">
       <button class="btn btn-good" id="btn-host-lb-export" style="width:100%;justify-content:center;gap:8px">
-        📤 Export as CSV
+        📸 Save as Screenshot
       </button>
       <button class="btn btn-dark" id="btn-host-lb-close" style="width:100%;justify-content:center;gap:8px">
         ← Back to Host Menu
@@ -1918,7 +1918,8 @@ function attach(){
   on('btn-login',   doLogin);
   on('btn-register',doRegister);
   document.getElementById('auth-pw')?.addEventListener('keydown',e=>{ if(e.key==='Enter'){ if(authTab==='login') doLogin(); else doRegister(); }});
-  document.getElementById('auth-username')?.addEventListener('keydown',e=>{ if(e.key==='Enter'){ document.getElementById('auth-pw')?.focus(); }});
+  document.getElementById('auth-username')?.addEventListener('keydown',e=>{ if(e.key==='Enter'){ document.getElementById('auth-email')?.focus()||document.getElementById('auth-pw')?.focus(); }});
+  document.getElementById('auth-email')?.addEventListener('keydown',e=>{ if(e.key==='Enter'){ if(authTab==='login') doLogin(); else document.getElementById('auth-pw')?.focus(); }});
   // Live username availability check (register tab only)
   if(authTab==='register'){
     _unLastChecked=''; // reset cache on each render
@@ -2413,7 +2414,8 @@ function attach(){
         }
       });
       const finalList=Object.values(mergedByKey).map(g=>({name:g.name,score:g.score})).sort((a,b)=>b.score-a.score);
-      finalList._totalQ=S.pushedCount||0;
+      // Use grandTotalPushed (includes sub-sessions) + current pushedCount as the true total
+      finalList._totalQ=(S.grandTotalPushed||0)+(S.pushedCount||0);
       hostShutdownLeaderboard=finalList;
       send({type:'shutdown'}); render();
     }, 2000);
@@ -2463,25 +2465,53 @@ function attach(){
 
   on('btn-host-lb-close',()=>{ hostShutdownLeaderboard=null; render(); });
 
-  // Export final leaderboard as a CSV file
+  // Screenshot: open a long printable HTML page of the final leaderboard in a new tab
   on('btn-host-lb-export',()=>{
     const entries = hostShutdownLeaderboard;
     if(!entries||!entries.length){ showToast('No leaderboard data to export.','bad'); return; }
-    const totalQ = entries._totalQ || S.pushedCount || 0;
-    const dateStr = new Date().toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}).replace(/ /g,'-');
-    const header = 'Rank,Name,Score,Total Questions,Percentage\n';
-    const csvRows = entries.map((e,i)=>{
-      const pct = totalQ>0 ? ((e.score||0)/totalQ*100).toFixed(1)+'%' : 'N/A';
-      return `${i+1},"${(e.name||'').replace(/"/g,'""')}",${e.score||0},${totalQ},${pct}`;
-    }).join('\n');
-    const csv = header + csvRows;
-    const blob = new Blob([csv], { type:'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url; a.download = `SCC-Session-${dateStr}.csv`;
-    document.body.appendChild(a); a.click();
-    setTimeout(()=>{ URL.revokeObjectURL(url); a.remove(); }, 500);
-    showToast('✅ CSV downloaded!','good');
+    const totalQ = (entries._totalQ) || S.grandTotalPushed || S.pushedCount || 0;
+    const totalStr = totalQ>0?String(totalQ):'?';
+    const dateStr = new Date().toLocaleString('en-IN',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
+    const medals = ['🥇','🥈','🥉'];
+    const rows = entries.map((p,i)=>{
+      const pct = totalQ>0 ? ((p.score||0)/totalQ*100).toFixed(1)+'%' : '';
+      return `<tr class="${i<3?'top'+i:''}">
+        <td class="rank">${medals[i]||('#'+(i+1))}</td>
+        <td class="name">${p.name||'—'}</td>
+        <td class="score">${p.score||0}<span class="total">/${totalStr}</span></td>
+        <td class="pct">${pct}</td>
+      </tr>`;
+    }).join('');
+    const html=`<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"/>
+<title>SCC Final Leaderboard</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Segoe UI',Arial,sans-serif;background:#fff;color:#111;padding:32px 24px;max-width:680px;margin:0 auto}
+  h1{font-size:1.7rem;font-weight:800;margin-bottom:4px;text-align:center}
+  .meta{text-align:center;font-size:.85rem;color:#666;margin-bottom:28px}
+  table{width:100%;border-collapse:collapse;margin-top:8px}
+  th{background:#111;color:#fff;padding:10px 14px;text-align:left;font-size:.8rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em}
+  td{padding:9px 14px;border-bottom:1px solid #e5e5e5;font-size:.9rem;vertical-align:middle}
+  tr.top0 td{background:#fffbeb;font-weight:700}
+  tr.top1 td{background:#f8f8f8;font-weight:600}
+  tr.top2 td{background:#f9f5ff;font-weight:600}
+  td.rank{font-size:1.1rem;width:52px}
+  td.score{font-weight:700;white-space:nowrap}
+  span.total{font-weight:400;font-size:.75rem;color:#888;margin-left:2px}
+  td.pct{color:#555;font-size:.8rem}
+  @media print{body{padding:12px}button{display:none!important}}
+</style></head><body>
+<h1>🏆 Final Leaderboard</h1>
+<div class="meta">Shadab Coaching Centre &nbsp;·&nbsp; ${dateStr} &nbsp;·&nbsp; ${entries.length} student${entries.length!==1?'s':''} &nbsp;·&nbsp; ${totalStr} question${totalQ!==1?'s':''}</div>
+<table>
+  <thead><tr><th>Rank</th><th>Student</th><th>Score</th><th>%</th></tr></thead>
+  <tbody>${rows}</tbody>
+</table>
+<div style="margin-top:24px;text-align:center"><button onclick="window.print()" style="padding:10px 28px;background:#111;color:#fff;border:none;border-radius:8px;font-size:.9rem;font-weight:700;cursor:pointer">🖨️ Print / Save as PDF</button></div>
+</body></html>`;
+    const win=window.open('','_blank');
+    if(win){ win.document.write(html); win.document.close(); setTimeout(()=>win.print(),400); }
+    else showToast('Pop-up blocked — please allow pop-ups and try again.','bad');
   });
   on('btn-shutdown',()=>{ if(confirm('Shut down session?')) send({type:'shutdown'}); });
 
@@ -2753,21 +2783,19 @@ async function doLogin(){
 }
 async function doRegister(){
   const name=document.getElementById('auth-name')?.value?.trim();
-  const email=document.getElementById('auth-email')?.value?.trim();
   const username=document.getElementById('auth-username')?.value?.trim()||'';
+  const email=document.getElementById('auth-email')?.value?.trim()||'';
   const pw=document.getElementById('auth-pw')?.value;
   const err=document.getElementById('auth-err'); if(err)err.textContent='';
   if(!name){if(err)err.textContent='Full name is required';return;}
-  if(!email){if(err)err.textContent='Email is required';return;}
-  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){if(err)err.textContent='Enter a valid email address';return;}
-  if(username){
-    if(!/^[a-zA-Z0-9_]+$/.test(username)){if(err)err.textContent='Username may only contain letters, numbers and underscores';return;}
-    if(username.length<3){if(err)err.textContent='Username must be at least 3 characters';return;}
-    const unHint=document.getElementById('un-hint');
-    if(unHint&&unHint.textContent==='Username is already taken'){if(err)err.textContent='That username is already taken — please choose another';return;}
-  }
+  if(!username){if(err)err.textContent='Username is required';return;}
+  if(!/^[a-zA-Z0-9_]+$/.test(username)){if(err)err.textContent='Username may only contain letters, numbers and underscores';return;}
+  if(username.length<3){if(err)err.textContent='Username must be at least 3 characters';return;}
+  const unHint=document.getElementById('un-hint');
+  if(unHint&&unHint.textContent==='Username is already taken'){if(err)err.textContent='That username is already taken — please choose another';return;}
+  if(email&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){if(err)err.textContent='Enter a valid email address';return;}
   try{
-    const d=await apiPost('/api/register',{name,email,username:username||undefined,password:pw});
+    const d=await apiPost('/api/register',{name,username,email:email||undefined,password:pw});
     if(d.pending){
       // Show pending message — do NOT log in
       if(err){
@@ -2775,7 +2803,7 @@ async function doRegister(){
         err.textContent='✅ '+d.message;
       }
       // Clear the form fields
-      ['auth-name','auth-email','auth-username','auth-pw'].forEach(id=>{
+      ['auth-name','auth-username','auth-email','auth-pw'].forEach(id=>{
         const el=document.getElementById(id); if(el) el.value='';
       });
     } else {
