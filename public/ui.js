@@ -27,7 +27,6 @@ function registerFormHTML(){
   return `<div>
     <div class="form-group"><label class="form-label">Full name</label><input class="form-input" type="text" id="auth-name" placeholder="Your name" autocomplete="name"/></div>
     <div class="form-group"><label class="form-label">Username</label><div style="position:relative"><input class="form-input" type="text" id="auth-username" placeholder="your_username" autocomplete="off" autocapitalize="none" spellcheck="false" style="padding-right:36px"/><span id="un-status" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);font-size:.85rem;line-height:1;pointer-events:none"></span></div><small id="un-hint" style="font-size:.72rem;margin-top:3px;display:block;color:var(--mid)">Letters, numbers, underscores only · 3–30 characters · used to sign in</small></div>
-    <div class="form-group"><label class="form-label">Email <span style="font-weight:400;color:var(--mid);font-size:.8rem">(optional)</span></label><input class="form-input" type="email" id="auth-email" placeholder="you@example.com" autocomplete="email" autocapitalize="none" spellcheck="false"/></div>
     <div class="form-group"><label class="form-label">Password <span style="font-weight:400;text-transform:none;letter-spacing:0">(min 6 chars)</span></label><input class="form-input" type="password" id="auth-pw" placeholder="••••••••" autocomplete="new-password"/></div>
     <div id="auth-err" class="form-error"></div>
     <button class="btn btn-dark btn-full mt2" id="btn-register">Create account →</button>
@@ -582,8 +581,8 @@ function questionViewHTML(){
       </div>
     </div>
     ${hasTimer?`<div class="timer-wrap"><div class="timer-bar-track"><div id="timer-bar" class="timer-bar-fill" style="width:100%"></div></div><div id="timer-digits" class="timer-digits">${S.timerSeconds}s</div></div>`:''}
-    <h2 class="mb3${urduCls(q)}">${renderMath(q.text)}</h2>
-    <div class="opt-grid">${opts}</div>
+    <h2 class="mb3${urduCls(q)}" style="user-select:none;-webkit-user-select:none">${renderMath(q.text)}</h2>
+    <div class="opt-grid" style="user-select:none;-webkit-user-select:none">${opts}</div>
     ${notice}
     ${reportRow}
   </div>`;
@@ -626,6 +625,26 @@ function hostPassHTML(){
 /* ══════════════════════════════════════
    HALT CONFIRMATION OVERLAY (host)
 ══════════════════════════════════════ */
+/* ══════════════════════════════════════
+   KICK CONFIRMATION MODAL (host)
+══════════════════════════════════════ */
+function kickConfirmModalHTML(){
+  if(!kickConfirmPid) return '';
+  return `<div id="kick-modal-backdrop" style="position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9000;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(2px)">
+    <div style="background:#fff;border-radius:16px;padding:24px 22px;max-width:320px;width:90%;box-shadow:0 12px 40px rgba(0,0,0,.22);animation:popIn .18s cubic-bezier(.34,1.56,.64,1) both">
+      <div style="font-size:1.5rem;text-align:center;margin-bottom:10px">🚫</div>
+      <div style="font-size:.95rem;font-weight:700;text-align:center;margin-bottom:6px">Kick student?</div>
+      <div style="font-size:.83rem;color:var(--mid);text-align:center;margin-bottom:20px">
+        <strong style="color:var(--ink)">${esc(kickConfirmName)}</strong> will be removed and banned from rejoining this session.
+      </div>
+      <div style="display:flex;gap:10px">
+        <button id="btn-kick-cancel" class="btn btn-ghost" style="flex:1;justify-content:center">Cancel</button>
+        <button id="btn-kick-confirm" class="btn" style="flex:1;justify-content:center;background:#be123c;color:#fff;border-color:#be123c;font-weight:700">Kick</button>
+      </div>
+    </div>
+  </div>`;
+}
+
 function haltBombOverlayHTML(){
   if(!showingHaltBomb) return '';
   return `<div id="halt-bomb-overlay" style="position:fixed;inset:0;background:rgba(0,0,0,.72);display:flex;align-items:center;justify-content:center;z-index:800;backdrop-filter:blur(3px)">
@@ -1323,6 +1342,7 @@ function hostHTML(){
             ${cumTime!=null?`<span style="font-size:.62rem;color:#a0a0ac" title="Cumulative">Σ${parseFloat(cumTime).toFixed(1)}s</span>`:''}
           </div>
           <div style="font-weight:600;min-width:44px;text-align:right">${p.score||0} <span style="font-size:.68rem;color:var(--mid)">pts</span></div>
+          <button class="btn-kick-student" data-kick-pid="${p.id}" data-kick-name="${esc(p.name)}" title="Kick ${esc(p.name)}" style="flex-shrink:0;margin-left:4px;background:transparent;border:none;cursor:pointer;padding:2px 4px;border-radius:4px;color:#e11d48;font-size:.75rem;opacity:.55;transition:opacity .15s" onmouseover="this.style.opacity='1';this.style.background='#fee2e2'" onmouseout="this.style.opacity='.55';this.style.background='transparent'">✕</button>
         </div>`;
       }).join('')
     :`<div style="padding:20px;text-align:center;color:var(--mid);font-size:.83rem">Waiting for students to join…</div>`;
@@ -1446,6 +1466,7 @@ function hostHTML(){
       ${standingsOverlayHTML()}
       ${reportsOverlayHTML()}
       ${hostSettingsOverlayHTML()}
+      ${kickConfirmModalHTML()}
     ${dismissBombOverlayHTML()}
     </div>`;
   }
@@ -1475,12 +1496,16 @@ function hostHTML(){
             </div>
             <span id="host-timer-digits" style="font-size:.85rem;font-weight:700;color:${timerLeft<timerTotal*0.25?'var(--bad)':'var(--ink)'};min-width:28px;text-align:right">${Math.min(timerTotal,Math.ceil(timerLeft))}s</span>
           </div>`
-        :`<input type="number" min="0" max="300" value="${hostTimerSeconds}" id="timer-sec-live" class="q-count-input" style="width:60px"/>
-           <span class="muted small">sec</span>`}
+        :`<button id="btn-select-question" title="Select question text to search" style="display:flex;align-items:center;gap:4px;padding:3px 8px;background:var(--faint);border:1px solid var(--line);border-radius:6px;font-size:.72rem;font-weight:600;color:var(--mid);cursor:pointer;flex-shrink:0">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+            Select Q
+          </button>
+          <input type="number" min="0" max="300" value="${hostTimerSeconds}" id="timer-sec-live" class="q-count-input" style="width:60px"/>
+          <span class="muted small">sec</span>`}
     </div>`;
 
   // Question text
-  const qInfo=q?`<p class="${''+urduCls(q)}" style="font-size:.83rem;line-height:${urduCls(q)?'2.2':'1.4'};flex-shrink:0;color:var(--ink)">${renderMath(q.text.length>130?q.text.slice(0,128)+'…':q.text)}</p>`
+  const qInfo=q?`<p data-q-text class="${''+urduCls(q)}" style="font-size:.83rem;line-height:${urduCls(q)?'2.2':'1.4'};flex-shrink:0;color:var(--ink)">${renderMath(q.text.length>130?q.text.slice(0,128)+'…':q.text)}</p>`
     :`<p class="muted small" style="flex-shrink:0">Select a question above or use ‹ › to navigate.</p>`;
 
   // Live response bars (shown when live instead of key)
@@ -1550,6 +1575,7 @@ function hostHTML(){
     ${standingsOverlayHTML()}
     ${reportsOverlayHTML()}
     ${hostSettingsOverlayHTML()}
+    ${kickConfirmModalHTML()}
   </div>`;
 }
 
@@ -1593,6 +1619,7 @@ function hostEndedHTML(){
     ${haltBombOverlayHTML()}
     ${haltMenuOverlayHTML()}
     ${backupRestoreOverlayHTML()}
+    ${kickConfirmModalHTML()}
     ${dismissBombOverlayHTML()}
   </div>`;
 }
@@ -1918,8 +1945,7 @@ function attach(){
   on('btn-login',   doLogin);
   on('btn-register',doRegister);
   document.getElementById('auth-pw')?.addEventListener('keydown',e=>{ if(e.key==='Enter'){ if(authTab==='login') doLogin(); else doRegister(); }});
-  document.getElementById('auth-username')?.addEventListener('keydown',e=>{ if(e.key==='Enter'){ document.getElementById('auth-email')?.focus()||document.getElementById('auth-pw')?.focus(); }});
-  document.getElementById('auth-email')?.addEventListener('keydown',e=>{ if(e.key==='Enter'){ if(authTab==='login') doLogin(); else document.getElementById('auth-pw')?.focus(); }});
+  document.getElementById('auth-username')?.addEventListener('keydown',e=>{ if(e.key==='Enter'){ document.getElementById('auth-pw')?.focus(); }});
   // Live username availability check (register tab only)
   if(authTab==='register'){
     _unLastChecked=''; // reset cache on each render
@@ -2362,6 +2388,49 @@ function attach(){
   on('btn-reset', ()=>{ if(confirm('Reset everything?')){ send({type:'reset'}); questions=[]; selIdx=-1; answerKey=-1; inspectPid=null; subjects=[]; repoPath=null; stopMic(); cumulativeAnswerTimes={}; render(); } });
   on('btn-close-inspect',()=>{ inspectPid=null; render(); });
 
+  // ── SELECT QUESTION button — auto-selects question text so host can search it ──
+  on('btn-select-question',()=>{
+    // Try to find the question text element in the host preview panel
+    const qEls = document.querySelectorAll('.host-q-panel p, .q-panel p, [data-q-text]');
+    let target = qEls[0];
+    // Fallback: find any <p> in the question area that has meaningful text
+    if(!target){
+      document.querySelectorAll('p').forEach(p=>{
+        const t = p.innerText||p.textContent||'';
+        if(t.length > 8 && !target) target = p;
+      });
+    }
+    if(!target) { showToast('No question text found to select.','neutral'); return; }
+    try{
+      const range = document.createRange();
+      range.selectNodeContents(target);
+      const sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(range);
+      showToast('📋 Question text selected — now copy and search!','good');
+    }catch(e){ showToast('Could not select text.','bad'); }
+  });
+
+  // ── KICK student — event delegation on kick buttons in student rows ──
+  document.querySelectorAll('.btn-kick-student').forEach(btn=>{
+    btn.addEventListener('click', e=>{
+      e.stopPropagation();
+      kickConfirmPid  = btn.dataset.kickPid;
+      kickConfirmName = btn.dataset.kickName || 'this student';
+      render();
+    });
+  });
+
+  // Kick modal confirm / cancel
+  on('btn-kick-confirm',()=>{
+    if(!kickConfirmPid){ kickConfirmPid=null; kickConfirmName=''; render(); return; }
+    send({ type:'kick_student', pid: kickConfirmPid });
+    showToast(`🚫 ${kickConfirmName} has been kicked.`,'neutral');
+    kickConfirmPid=null; kickConfirmName='';
+    render();
+  });
+  on('btn-kick-cancel',()=>{ kickConfirmPid=null; kickConfirmName=''; render(); });
+
   // Host ended — Continue
   on('btn-continue-session',()=>{ send({type:'continue_session'}); });
   // Halt: show halt menu directly (bomb only plays on Stop & Dismiss)
@@ -2784,7 +2853,6 @@ async function doLogin(){
 async function doRegister(){
   const name=document.getElementById('auth-name')?.value?.trim();
   const username=document.getElementById('auth-username')?.value?.trim()||'';
-  const email=document.getElementById('auth-email')?.value?.trim()||'';
   const pw=document.getElementById('auth-pw')?.value;
   const err=document.getElementById('auth-err'); if(err)err.textContent='';
   if(!name){if(err)err.textContent='Full name is required';return;}
@@ -2793,17 +2861,14 @@ async function doRegister(){
   if(username.length<3){if(err)err.textContent='Username must be at least 3 characters';return;}
   const unHint=document.getElementById('un-hint');
   if(unHint&&unHint.textContent==='Username is already taken'){if(err)err.textContent='That username is already taken — please choose another';return;}
-  if(email&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){if(err)err.textContent='Enter a valid email address';return;}
   try{
-    const d=await apiPost('/api/register',{name,username,email:email||undefined,password:pw});
+    const d=await apiPost('/api/register',{name,username,password:pw});
     if(d.pending){
-      // Show pending message — do NOT log in
       if(err){
         err.style.color='var(--good)';
         err.textContent='✅ '+d.message;
       }
-      // Clear the form fields
-      ['auth-name','auth-username','auth-email','auth-pw'].forEach(id=>{
+      ['auth-name','auth-username','auth-pw'].forEach(id=>{
         const el=document.getElementById(id); if(el) el.value='';
       });
     } else {

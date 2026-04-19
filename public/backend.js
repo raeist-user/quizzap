@@ -30,6 +30,10 @@ let repoLoading=false;
 // Host halt confirmation menu state
 let showingHaltMenu=false;
 let showingHaltBomb=false, haltBombTimer=null; // bomb drop animation before halt menu
+
+// Kick modal state (host only)
+let kickConfirmPid=null;   // pid of student being kicked
+let kickConfirmName='';    // display name for modal
 let showingDismissBomb=false, dismissBombTimer=null; // bomb before stop & dismiss fires
 
 // Session backup / restore overlay (host only)
@@ -770,6 +774,11 @@ function connect(){
       case 'auth_ok':   hostAuthed=true; fetchHostSchedules(); browseRepo(); fetchAdminRequests(); navPush(); render(); break;
       case 'auth_fail': { const el=document.getElementById('pw-err'); if(el)el.textContent='Incorrect password.'; break; }
       case 'left':      doLeave(); break;
+      case 'host_kicked':
+        // Host has kicked this participant — reset their session state and go home
+        showToast('🚫 You have been removed from this session by the host.','bad');
+        setTimeout(()=>doLeave(), 1800);
+        break;
       case 'hand_raised':
       case 'speak_request': {
         // Both aliases arrive here — show Allow/Dismiss popup on host
