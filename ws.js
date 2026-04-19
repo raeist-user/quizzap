@@ -20,6 +20,7 @@ let gameScores       = {};          // key → { name, userId, total }
 let sessionSnapshots = [];
 let sessionCounter   = 0;
 let grandTotalPushed = 0;           // cumulative questions pushed across all sub-sessions (survives reset)
+let bannedPids       = new Set();   // pids/userIds banned for the current session (cleared on shutdown)
 
 // ── WS CLIENT REGISTRY ────────────────────────────────────────────────────────
 let seq     = 0;
@@ -266,6 +267,14 @@ function initWS(server) {
           if (!msg.name?.trim()) break;
           let pid = msg.pid;
 
+          // Block banned participants from rejoining this session
+          const isBannedPid    = pid && bannedPids.has(pid);
+          const isBannedUserId = msg.userId && bannedPids.has(String(msg.userId));
+          if (isBannedPid || isBannedUserId) {
+            tx(ws, { type: 'host_kicked' }); // tell client they're still banned
+            break;
+          }
+
           if (pid && state.participants[pid]) {
             state.participants[pid].name = msg.name.trim().slice(0, 32);
             if (!state.participants[pid].userId && msg.userId)
@@ -452,6 +461,8 @@ function initWS(server) {
 
             // Accumulate grand total of pushed questions across all sub-sessions
             grandTotalPushed += previewTotal;
+            // Clear bans for the new sub-session
+            bannedPids = new Set();
 
             clients.forEach(c => {
               if (c.role === 'participant')
@@ -529,6 +540,7 @@ function initWS(server) {
           sessionSnapshots = [];
           sessionCounter = 0;
           grandTotalPushed = 0;
+          bannedPids = new Set();
           state = fresh();
           broadcast();
           break;
@@ -542,6 +554,37 @@ function initWS(server) {
           tx(ws, { type: 'left' });
           broadcast();
           break;
+
+        case 'kick_student': {
+          if (client.role !== 'host') break;
+          const kickPid = msg.pid;
+          if (!kickPid) break;
+
+          // Add the pid (and userId if available) to the ban set for this session
+          bannedPids.add(kickPid);
+          const kickedParticipant = state.participants[kickPid];
+          if (kickedParticipant?.userId) bannedPids.add(String(kickedParticipant.userId));
+
+          // Find the WS client for this pid and send them the kick message
+          clients.forEach((c) => {
+            if (c.pid === kickPid) {
+              tx(c.ws, { type: 'host_kicked' });
+              // Clean up their client state
+              delete state.answers[c.pid];
+              c.role = null; c.pid = null;
+            }
+          });
+
+          // Remove from participants so they disappear from the board
+          delete state.participants[kickPid];
+          delete state.answers[kickPid];
+          delete state.answerTimes[kickPid];
+          delete state.cumulativeTimes[kickPid];
+
+          console.log(`[kick] Banned pid=${kickPid}`);
+          broadcast();
+          break;
+        }
 
         case 'answer':
           if (client.role !== 'participant' || !client.pid) break;
