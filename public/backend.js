@@ -836,6 +836,18 @@ function connect(){
           showToast('❌ Failed to open session: '+m.reason+'\nTry refreshing the page.','bad');
         }
         break;
+      case 'thumb_up_received': {
+        // Host receives notification that a student sent 👍
+        if(role==='host'){
+          showToast(`👍🏻 ${m.name||'A student'} gave a thumbs up!`,'neutral');
+          // Update the 👍 badge in-place for this student row without full re-render
+          document.querySelectorAll('.host-students-inner [data-pid="'+m.pid+'"] .thumb-badge, .host-students-inner [data-pid="'+m.pid+'"]').forEach(el=>{
+            const badge=el.querySelector('.thumb-badge');
+            if(badge) badge.textContent='👍🏻';
+          });
+        }
+        break;
+      }
       case 'peer_list': for(const cid of m.cids) await hostCallPeer(cid); break;
       case 'rtc_new_peer': if(role==='host') await hostCallPeer(m.cid); break;
       case 'rtc_offer':    if(role==='participant') await studentHandleOffer(m.signal); break;
@@ -1418,6 +1430,56 @@ async function generateQuiz(){
    Reads the source .txt file, finds the question, moves the @ marker
    to the newly selected correct option, and writes back to GitHub.
 ══════════════════════════════════════ */
+/* ══════════════════════════════════════
+   GITHUB QUESTION DELETER
+   Reads the source .txt file, removes the question line + its options line,
+   renumbers remaining questions, then writes back to GitHub.
+══════════════════════════════════════ */
+async function deleteQuestionFromGitHub(q){
+  if(!q||!q.subject||!q.chapter) return {ok:false,error:'No subject/chapter info on question'};
+  if(!isValidToken())             return {ok:false,error:'No GitHub token configured'};
+  const fileName=q.chapter+'.txt';
+  const encS=q.subject.split('/').map(encodeURIComponent).join('/');
+  const encF=encodeURIComponent(fileName);
+  const apiUrl=`https://api.github.com/repos/${GITHUB_REPO}/contents/resources/${encS}/${encF}?ref=${GITHUB_BRANCH}`;
+  try{
+    const res=await fetch(apiUrl,{headers:ghHeaders()});
+    if(!res.ok) throw new Error(`Cannot read file (HTTP ${res.status})`);
+    const data=await res.json();
+    const bytes=Uint8Array.from(atob(data.content.replace(/\n/g,'')),c=>c.charCodeAt(0));
+    const fileText=new TextDecoder('utf-8').decode(bytes);
+    const lines=fileText.split('\n');
+    // Find the question line
+    const origText=q.text.trim();
+    let qi=-1;
+    for(let i=0;i<lines.length;i++){
+      const stripped=lines[i].trim().replace(/^\d+[.)]\s*/,'');
+      if(stripped===origText&&i+1<lines.length&&/\(A\)/i.test(lines[i+1])){ qi=i; break; }
+    }
+    if(qi<0) return {ok:false,error:'Question not found in file — delete manually'};
+    // Remove the question line and its options line (2 lines total)
+    lines.splice(qi,2);
+    // Renumber remaining questions that have a numeric prefix
+    let num=1;
+    const renumbered=lines.map(l=>{
+      const m=l.match(/^(\d+[.)]\s*)(.*)/);
+      if(m&&!/^\(A\)/i.test(m[2].trim())) return `${num++}. ${m[2]}`;
+      if(m) return l; // options line — don't renumber
+      if(l.trim()&&!/^\(A\)/i.test(l.trim())) { /* plain question without number */ }
+      return l;
+    });
+    const newContent=renumbered.join('\n');
+    const writeUrl=`https://api.github.com/repos/${GITHUB_REPO}/contents/resources/${encS}/${encF}`;
+    const wr=await fetch(writeUrl,{method:'PUT',headers:ghWriteHeaders(),body:JSON.stringify({
+      message:`Delete question: ${origText.slice(0,55)}`,
+      content:btoa(unescape(encodeURIComponent(newContent))),
+      sha:data.sha, branch:GITHUB_BRANCH
+    })});
+    if(!wr.ok) throw new Error(`Write failed (HTTP ${wr.status})`);
+    return {ok:true};
+  }catch(e){ return {ok:false,error:e.message}; }
+}
+
 async function updateReportedQuestionInGitHub(q, newText, newOptions, newCorrect){
   if(!q||!q.subject||!q.chapter) return {ok:false,error:'No subject/chapter info on question'};
   if(!isValidToken())             return {ok:false,error:'No GitHub token configured'};

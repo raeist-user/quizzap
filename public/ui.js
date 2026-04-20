@@ -541,7 +541,8 @@ function waitHTML(){
           '</div>'
         : '<div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">'+
             '<button class="btn btn-ghost btn-sm" id="btn-leave">Leave session</button>'+
-            '<button class="btn btn-ghost btn-sm" id="btn-raise-hand" style="gap:5px;font-size:.8rem">✋ Request to Speak</button>'+
+            '<button class="btn btn-ghost btn-sm" id="btn-raise-hand" style="gap:5px;font-size:.8rem">🎙️ Request to Speak</button>'+
+            '<button class="btn btn-ghost btn-sm" id="btn-thumbs-up" title="Send thumbs up to host" style="gap:3px;font-size:.8rem;padding:4px 8px">👍🏻</button>'+
           '</div>'
     )+
     lbHTML+
@@ -575,8 +576,9 @@ function questionViewHTML(){
           ? `<button class="btn btn-sm" id="btn-end-speak" style="gap:4px;font-size:.78rem;background:#ede9fe;color:#4338ca;border-color:#a5b4fc">🎙️ Done Speaking</button>`
           : speakRequestPending
             ? `<button class="btn btn-ghost btn-sm" disabled style="gap:4px;font-size:.78rem;opacity:.6"><span style="display:inline-block;width:10px;height:10px;border:2px solid #a5b4fc;border-top-color:#6366f1;border-radius:50%;animation:spin .8s linear infinite"></span> Waiting…</button>`
-            : `<button class="btn btn-ghost btn-sm" id="btn-raise-hand" style="gap:4px;font-size:.78rem" title="Request to speak">✋ Speak</button>`
+            : `<button class="btn btn-ghost btn-sm" id="btn-raise-hand" style="gap:4px;font-size:.78rem" title="Request to speak">🎙️ Speak</button>`
         }
+        <button class="btn btn-ghost btn-sm" id="btn-thumbs-up" title="Send thumbs up to host" style="gap:3px;font-size:.78rem;padding:4px 8px">👍🏻</button>
         <button class="btn btn-ghost btn-sm" id="btn-leave">Leave</button>
       </div>
     </div>
@@ -1165,11 +1167,14 @@ function reportsOverlayHTML(){
             <div class="${uc?'urdu':''}" style="font-size:.85rem;line-height:${uc?'2.2':'1.5'};padding:9px 11px;background:var(--faint);border:1px solid var(--line);border-radius:6px">${renderMath(q&&q.text||'')}</div>
           </div>
           <div style="margin-bottom:10px">${optR}</div>
-          <div style="display:flex;gap:7px">
+          <div style="display:flex;gap:7px;flex-wrap:wrap">
             <button class="btn btn-dark btn-sm" data-r-edit="${r.rid}" style="gap:5px;font-size:.78rem">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>Edit
             </button>
             <button class="btn btn-ghost btn-sm" data-r-dismiss="${r.rid}" style="font-size:.78rem">&#x2715; Dismiss</button>
+            <button class="btn btn-sm" data-r-delete="${r.rid}" style="font-size:.78rem;background:#fff1f2;color:#be123c;border-color:#fecdd3;gap:5px">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>Delete Q
+            </button>
           </div>
         </div>`;
       }
@@ -1326,6 +1331,7 @@ function hostHTML(){
         const isWrong=ans!==undefined&&ans!==null&&ans!==S.correct;
         const isFastest = isRevealed && p.id===fastestPid;
         const pStreak = streakMap[p.id] || 0;
+        const hasThumb = S.thumbsUp && S.thumbsUp.includes(p.id);
         return `<div style="display:flex;align-items:center;gap:8px;padding:7px 10px;border-bottom:1px solid var(--line);font-size:.83rem${isFastest?';background:#fffbeb':''}">
           <div style="min-width:22px;text-align:center;font-size:.72rem;color:var(--mid)">${medals[i]||('#'+(i+1))}</div>
           <div class="j-av" style="flex-shrink:0${isFastest?';background:#f59e0b;color:#fff':''}">${initials(p.name)}</div>
@@ -1337,6 +1343,7 @@ function hostHTML(){
             </div>
           </div>
           <div style="font-size:.72rem;font-weight:700;min-width:26px;text-align:center;padding:2px 5px;border-radius:4px;${isCorrect?'background:#dcfce7;color:#16a34a':isWrong?'background:#fee2e2;color:#be123c':ans!==undefined&&ans!==null?'background:var(--faint);color:var(--mid)':'color:var(--mid)'}">${ansStr}</div>
+          <div style="min-width:20px;text-align:center;font-size:.9rem" title="${hasThumb?p.name+' gave thumbs up':''}">${hasThumb?'👍🏻':''}</div>
           <div style="display:flex;flex-direction:column;align-items:flex-end;min-width:52px;gap:1px">
             ${ansTime!=null?`<span style="font-size:.7rem;color:var(--mid)">${parseFloat(ansTime).toFixed(2)}s</span>`:'<span style="min-height:14px"></span>'}
             ${cumTime!=null?`<span style="font-size:.62rem;color:#a0a0ac" title="Cumulative">Σ${parseFloat(cumTime).toFixed(1)}s</span>`:''}
@@ -2624,6 +2631,16 @@ function attach(){
     if(btn){ btn.disabled=true; btn.style.opacity='.5'; setTimeout(()=>{ btn.disabled=false; btn.style.opacity=''; },10000); }
   });
 
+  // ── STUDENT: Thumbs up button — notifies host with 👍 on their row ───────
+  on('btn-thumbs-up', ()=>{
+    send({type:'thumb_up', pid:myPid, name:myName||currentUser?.name||'Student'});
+    const btn=document.getElementById('btn-thumbs-up');
+    if(btn){
+      btn.textContent='👍🏻✓'; btn.style.opacity='.5'; btn.disabled=true;
+      setTimeout(()=>{ btn.textContent='👍🏻'; btn.style.opacity=''; btn.disabled=false; },8000);
+    }
+  });
+
   updateMicDot();
 
   // Global host keyboard shortcuts — re-attach fresh on every render
@@ -2637,7 +2654,7 @@ function attach(){
   // Expand/collapse individual report card
   document.querySelectorAll('[data-r-expand]').forEach(el=>{
     el.addEventListener('click', e=>{
-      if(e.target.closest('[data-r-dismiss]')||e.target.closest('[data-r-edit]')) return;
+      if(e.target.closest('[data-r-dismiss]')||e.target.closest('[data-r-edit]')||e.target.closest('[data-r-delete]')) return;
       const rid=+el.dataset.rExpand;
       if(expandedReportRid===rid){ expandedReportRid=null; editingReportRid=null; editReportDraft={}; }
       else { expandedReportRid=rid; editingReportRid=null; editReportDraft={}; }
@@ -2652,6 +2669,34 @@ function attach(){
       const rid=+el.dataset.rDismiss;
       send({type:'dismiss_report', rid});
       if(expandedReportRid===rid){ expandedReportRid=null; editingReportRid=null; editReportDraft={}; }
+    });
+  });
+
+  // Delete question from GitHub source file
+  document.querySelectorAll('[data-r-delete]').forEach(el=>{
+    el.addEventListener('click', async e=>{
+      e.stopPropagation();
+      const rid=+el.dataset.rDelete;
+      const rep=receivedReports.find(r=>r.rid===rid);
+      if(!rep||!rep.question) return;
+      const q=rep.question;
+      const label=(q.text||'').slice(0,80)+(q.text&&q.text.length>80?'…':'');
+      if(!confirm(`Delete this question from GitHub?\n\n"${label}"\n\nThis will permanently remove it from the source file. This cannot be undone.`)) return;
+      // Show working state
+      el.textContent='Deleting…'; el.disabled=true;
+      const msgEl=document.getElementById('report-edit-msg');
+      if(msgEl){ msgEl.style.color='var(--mid)'; msgEl.textContent='Deleting question from GitHub…'; }
+      const result=await deleteQuestionFromGitHub(q);
+      if(result.ok){
+        // Dismiss the report too since question no longer exists
+        send({type:'dismiss_report', rid});
+        if(expandedReportRid===rid){ expandedReportRid=null; editingReportRid=null; editReportDraft={}; }
+        showToast('🗑 Question deleted from GitHub source file.','good');
+      } else {
+        el.textContent='Delete Q'; el.disabled=false;
+        if(msgEl){ msgEl.style.color='var(--bad)'; msgEl.textContent='Delete failed: '+(result.error||'Unknown error'); }
+        showToast('❌ Delete failed: '+(result.error||'Unknown error'),'bad');
+      }
     });
   });
 
