@@ -5,7 +5,7 @@ const bcrypt   = require('bcryptjs');
 const mongoose = require('mongoose');
 const {
   User, PendingReg, UpdateReq, Notice, Schedule,
-  LeaderboardEntry, ScoreLog, SessionEntry,
+  LeaderboardEntry, ScoreLog, SessionEntry, ReportDB,
 } = require('./models');
 const { shared, txHost, getBackupWindow } = require('./ws');
 const { SessionBackup } = require('./models');
@@ -479,7 +479,7 @@ function initRoutes(app) {
 
   // ── SELF QUIZ REPORTS ────────────────────────────────────────────────────────
 
-  app.post('/api/selfquiz/report', (req, res) => {
+  app.post('/api/selfquiz/report', async (req, res) => {
     try {
       const { question, correct, reporterName, note } = req.body;
       if (!question?.text) return res.status(400).json({ error: 'question.text required' });
@@ -489,8 +489,13 @@ function initRoutes(app) {
         existing.count += 1;
         existing.note   = note || existing.note;
         existing.ts     = Date.now();
+        // Sync update to DB
+        ReportDB.findOneAndUpdate(
+          { rid: existing.rid },
+          { $set: { count: existing.count, note: existing.note, ts: existing.ts } }
+        ).catch(() => {});
       } else {
-        shared.questionReports.push({
+        const newRep = {
           rid:            ++shared.reportCounter,
           question,
           correct:        correct ?? null,
@@ -501,7 +506,10 @@ function initRoutes(app) {
           ts:             Date.now(),
           count:          1,
           source:         'selfquiz',
-        });
+        };
+        shared.questionReports.push(newRep);
+        // Persist to MongoDB so reports survive server restarts
+        ReportDB.create(newRep).catch(e => console.warn('[ReportDB] selfquiz save error:', e.message));
       }
       txHost({ type: 'report_received', reports: shared.questionReports });
       res.json({ ok: true });
