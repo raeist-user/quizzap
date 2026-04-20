@@ -374,7 +374,13 @@
     </div>
 
     <div class="q-card" id="quiz-card">
-      <div class="q-num" id="q-num">Q1</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px">
+        <div class="q-num" id="q-num" style="margin-bottom:0">Q1</div>
+        <button id="btn-select-q" onclick="selectQuestionText()" title="Select question text to search" style="display:flex;align-items:center;gap:4px;padding:3px 8px;background:var(--faint);border:1px solid var(--line);border-radius:6px;font-size:.72rem;font-weight:600;color:var(--mid);cursor:pointer;flex-shrink:0;-webkit-tap-highlight-color:transparent">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+          Select Q
+        </button>
+      </div>
       <div class="q-text" id="q-text">Loading…</div>
       <div class="opt-grid" id="q-options"></div>
       <div id="answer-notice"></div>
@@ -928,6 +934,25 @@ function selectOption(idx){
     updateNavScore();
   }
   renderQuestion();
+}
+
+function selectQuestionText(){
+  const el=document.getElementById('q-text');
+  if(!el){ toast('No question loaded yet.'); return; }
+  try{
+    const range=document.createRange();
+    range.selectNodeContents(el);
+    const sel=window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(range);
+    const btn=document.getElementById('btn-select-q');
+    if(btn){
+      const orig=btn.innerHTML;
+      btn.innerHTML='<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Selected!';
+      btn.style.color='var(--good,#16a34a)'; btn.style.borderColor='var(--good,#16a34a)';
+      setTimeout(()=>{ btn.innerHTML=orig; btn.style.color=''; btn.style.borderColor=''; },2000);
+    }
+  }catch(e){ toast('Could not select text.'); }
 }
 
 function goQuestion(dir){
