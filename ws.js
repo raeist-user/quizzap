@@ -53,6 +53,7 @@ function fresh() {
     questionPushedAt: null,
     totalQuestions:   0,
     pushedCount:      0,
+    thumbsUp:         [],  // pids who sent 👍 for the current question
   };
 }
 
@@ -88,6 +89,7 @@ function project(role, pid) {
     cumulativeTimes:  state.cumulativeTimes,
     totalQuestions:   state.totalQuestions,
     pushedCount:      state.pushedCount,
+    thumbsUp:         state.thumbsUp,   // array of pids who sent 👍 this question
   };
 
   if (role === 'host') return {
@@ -363,6 +365,7 @@ function initWS(server) {
           state.correct          = msg.correct;
           state.answers          = {};
           state.answerTimes      = {};
+          state.thumbsUp         = [];   // reset thumbs for new question
           state.timerSeconds     = Math.max(0, parseInt(msg.timerSeconds) || 0);
           state.questionPushedAt = Date.now();
           state.pushedCount      += 1;
@@ -582,6 +585,18 @@ function initWS(server) {
           delete state.cumulativeTimes[kickPid];
 
           console.log(`[kick] Banned pid=${kickPid}`);
+          broadcast();
+          break;
+        }
+
+        case 'thumb_up': {
+          // Any participant can send a thumbs up; deduplicate by pid
+          if (client.role !== 'participant' || !client.pid) break;
+          if (!state.thumbsUp.includes(client.pid)) {
+            state.thumbsUp.push(client.pid);
+          }
+          // Notify host immediately with a lightweight badge update message
+          txHost({ type: 'thumb_up_received', pid: client.pid, name: client.name || 'Student' });
           broadcast();
           break;
         }
