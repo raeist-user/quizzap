@@ -851,7 +851,11 @@ async function selectFile(name,url,rowEl){
   try{
     const res=await fetch(url);
     const text=await res.text();
-    allQuestions=parseQuestions(text);
+    allQuestions=parseQuestions(text).map(q=>({
+      ...q,
+      subject: currentFolder,
+      chapter: name.replace(/\.txt$/i,'')
+    }));
     if(!allQuestions.length){ info.textContent='⚠ No questions found in this file'; return; }
     document.getElementById('setup-count').placeholder=`all (${allQuestions.length})`;
     document.getElementById('setup-count').max=allQuestions.length;
