@@ -221,6 +221,15 @@
     .report-btn:hover{background:#fef0b0}
     .report-btn:active{opacity:.7}
     .report-btn.reported{color:var(--mid);background:var(--faint);border-color:var(--line)}
+    /* ── Inline edit panel ── */
+    .edit-panel{background:var(--white);border:1.5px solid var(--ink);border-radius:var(--r-lg);padding:14px;margin-top:8px;display:none}
+    .edit-panel.open{display:block;animation:fadeIn .18s ease both}
+    .edit-panel-lbl{font-size:.62rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--mid);margin-bottom:5px}
+    .edit-opt-row{display:flex;align-items:center;gap:7px;margin-bottom:6px}
+    .edit-opt-badge{width:24px;height:24px;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:.67rem;font-weight:700;flex-shrink:0;cursor:pointer;border:1.5px solid var(--line);background:var(--faint);color:var(--mid);transition:all .15s}
+    .edit-opt-badge.correct-sel{background:var(--ink);color:#fff;border-color:var(--ink)}
+    .edit-panel-actions{display:flex;gap:7px;margin-top:12px;flex-wrap:wrap}
+    .edit-panel-msg{font-size:.75rem;margin-top:6px;min-height:1em;color:var(--mid)}
 
     .result-card{background:var(--white);border:1px solid var(--line);border-radius:var(--r-xl);padding:32px 22px;text-align:center;box-shadow:var(--sh-md);animation:popIn .4s var(--t-spring) both}
     .result-emoji{font-size:3.4rem;margin-bottom:12px;display:block;animation:popIn .5s .1s var(--t-spring) both;animation-fill-mode:both}
@@ -376,10 +385,16 @@
     <div class="q-card" id="quiz-card">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px">
         <div class="q-num" id="q-num" style="margin-bottom:0">Q1</div>
-        <button id="btn-select-q" onclick="selectQuestionText()" title="Select question text to search" style="display:flex;align-items:center;gap:4px;padding:3px 8px;background:var(--faint);border:1px solid var(--line);border-radius:6px;font-size:.72rem;font-weight:600;color:var(--mid);cursor:pointer;flex-shrink:0;-webkit-tap-highlight-color:transparent">
-          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-          Select Q
-        </button>
+        <div style="display:flex;gap:6px;align-items:center">
+          <button id="btn-ask-gpt" onclick="openChatGPT()" title="Ask ChatGPT about this question" style="display:flex;align-items:center;gap:4px;padding:3px 8px;background:#10a37f;border:1px solid #10a37f;border-radius:6px;font-size:.72rem;font-weight:600;color:#fff;cursor:pointer;flex-shrink:0;-webkit-tap-highlight-color:transparent">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            GPT
+          </button>
+          <button id="btn-select-q" onclick="selectQuestionText()" title="Select question text to search" style="display:flex;align-items:center;gap:4px;padding:3px 8px;background:var(--faint);border:1px solid var(--line);border-radius:6px;font-size:.72rem;font-weight:600;color:var(--mid);cursor:pointer;flex-shrink:0;-webkit-tap-highlight-color:transparent">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+            Select Q
+          </button>
+        </div>
       </div>
       <div class="q-text" id="q-text">Loading…</div>
       <div class="opt-grid" id="q-options"></div>
@@ -389,7 +404,33 @@
     </div>
 
     <div class="report-row">
-      <button class="report-btn" id="report-btn" onclick="openReportModal()">⚑ Report this question</button>
+      <button class="report-btn" id="edit-q-btn" onclick="toggleEditPanel()">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+        Edit this question
+      </button>
+    </div>
+
+    <!-- Inline edit panel -->
+    <div class="edit-panel" id="edit-panel">
+      <div class="edit-panel-lbl">Question text</div>
+      <textarea id="edit-qtext" class="form-input" rows="3" style="resize:vertical;font-size:.85rem;margin-bottom:10px"></textarea>
+
+      <div class="edit-panel-lbl">Options</div>
+      <div id="edit-options-wrap" style="margin-bottom:10px"></div>
+
+      <div class="edit-panel-lbl">Correct answer <span style="font-weight:400;text-transform:none;letter-spacing:0;font-size:.7rem">(tap to select)</span></div>
+      <div id="edit-key-wrap" style="display:flex;flex-direction:column;gap:5px;margin-bottom:12px"></div>
+
+      <div class="edit-panel-actions">
+        <button class="btn btn-dark" style="flex:1;justify-content:center;gap:5px;font-size:.82rem" onclick="saveEditedQuestion()">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17,21 17,13 7,13 7,21"/></svg>Save &amp; Fix
+        </button>
+        <button class="btn" style="flex:1;justify-content:center;gap:5px;font-size:.82rem;background:#fff1f2;color:#be123c;border-color:#fecdd3" onclick="deleteEditedQuestion()">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>Delete Q
+        </button>
+        <button class="btn btn-ghost" style="font-size:.82rem;padding:8px 14px" onclick="closeEditPanel()">Cancel</button>
+      </div>
+      <div class="edit-panel-msg" id="edit-panel-msg"></div>
     </div>
 
     <div class="nav-row mt3">
@@ -466,6 +507,11 @@ let streak        = 0;
 function isValidToken(){ return MY_TOKEN && !MY_TOKEN.startsWith('%%') && MY_TOKEN.length>0; }
 function ghHeaders(){
   const h={'Accept':'application/vnd.github+json'};
+  if(isValidToken()) h['Authorization']='Bearer '+MY_TOKEN;
+  return h;
+}
+function ghWriteHeaders(){
+  const h={'Accept':'application/vnd.github+json','Content-Type':'application/json'};
   if(isValidToken()) h['Authorization']='Bearer '+MY_TOKEN;
   return h;
 }
@@ -841,6 +887,8 @@ function restartQuiz(){ startQuiz(); }
 function renderQuestion(){
   const q=quizQuestions[currentIdx];
   if(!q) return;
+  // Always close the edit panel when moving to a new question
+  closeEditPanel();
 
   document.getElementById('quiz-counter').textContent=`Question ${currentIdx+1} / ${quizQuestions.length}`;
   document.getElementById('quiz-score').textContent=`✓ ${score}`;
@@ -934,6 +982,203 @@ function selectOption(idx){
     updateNavScore();
   }
   renderQuestion();
+}
+
+// ── ChatGPT opener ──────────────────────────────────────────────────────────
+function openChatGPT(){
+  const q=quizQuestions[currentIdx];
+  if(!q){ toast('No question loaded.'); return; }
+  const opts=['A','B','C','D'].map((l,i)=>`${l}) ${q.options[i]||''}`).join(', ');
+  const prompt=`${q.text}\n\nOptions: ${opts}\n\nWhat is the correct answer and why?`;
+  const url='https://chatgpt.com/?q='+encodeURIComponent(prompt);
+  window.open(url,'_blank','noopener');
+}
+
+// ── Inline edit panel state ──────────────────────────────────────────────────
+let editCorrectSel=-1; // which option is selected as correct in edit panel
+
+function toggleEditPanel(){
+  const panel=document.getElementById('edit-panel');
+  if(panel.classList.contains('open')){ closeEditPanel(); return; }
+  const q=quizQuestions[currentIdx];
+  if(!q) return;
+  editCorrectSel=q.correct??0;
+  // Populate textarea
+  document.getElementById('edit-qtext').value=q.text||'';
+  // Render option inputs
+  renderEditOptions(q.options);
+  document.getElementById('edit-panel-msg').textContent='';
+  panel.classList.add('open');
+  document.getElementById('edit-q-btn').textContent='✕ Close edit';
+  setTimeout(()=>document.getElementById('edit-qtext').focus(),60);
+}
+
+function closeEditPanel(){
+  document.getElementById('edit-panel').classList.remove('open');
+  const btn=document.getElementById('edit-q-btn');
+  if(btn) btn.innerHTML='<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg> Edit this question';
+}
+
+function renderEditOptions(options){
+  const isUrdu=URDU_RE.test((options||[]).join(''));
+  const wrap=document.getElementById('edit-options-wrap');
+  const keyWrap=document.getElementById('edit-key-wrap');
+  if(!wrap||!keyWrap) return;
+  wrap.innerHTML=(options||[]).map((o,i)=>`
+    <div class="edit-opt-row">
+      <div class="edit-opt-badge${editCorrectSel===i?' correct-sel':''}" data-eidx="${i}" onclick="setEditCorrect(${i})">${'ABCD'[i]}</div>
+      <input class="form-input" id="edit-opt-${i}" value="${o.replace(/"/g,'&quot;')}" style="flex:1;padding:6px 9px;font-size:.82rem;${isUrdu?'direction:rtl;text-align:right;font-family:var(--urdu);':''}"/>
+    </div>`).join('');
+  // Key answer selector
+  keyWrap.innerHTML=(options||[]).map((o,i)=>`
+    <div onclick="setEditCorrect(${i})" style="display:flex;align-items:center;gap:8px;padding:7px 10px;border:1.5px solid ${editCorrectSel===i?'var(--ink)':'var(--line)'};border-radius:8px;cursor:pointer;background:${editCorrectSel===i?'var(--ink)':'var(--white)'};transition:all .15s">
+      <div style="width:22px;height:22px;border-radius:5px;background:${editCorrectSel===i?'#fff':'var(--faint)'};color:${editCorrectSel===i?'var(--ink)':'var(--mid)'};display:flex;align-items:center;justify-content:center;font-size:.67rem;font-weight:700;flex-shrink:0">${'ABCD'[i]}</div>
+      <span style="font-size:.82rem;${editCorrectSel===i?'color:#fff;font-weight:600':'color:var(--ink)'}${isUrdu?';direction:rtl;font-family:var(--urdu)':''}">${o}</span>
+    </div>`).join('');
+}
+
+function setEditCorrect(idx){
+  editCorrectSel=idx;
+  // Re-render just the option badges and key selector
+  const q=quizQuestions[currentIdx];
+  const opts=['A','B','C','D'];
+  document.querySelectorAll('.edit-opt-badge').forEach(el=>{
+    const i=+el.dataset.eidx;
+    el.classList.toggle('correct-sel',i===idx);
+  });
+  // Re-render key wrap
+  const currentOpts=opts.map((_,i)=>document.getElementById('edit-opt-'+i)?.value||q.options[i]||'');
+  const isUrdu=URDU_RE.test(currentOpts.join(''));
+  const keyWrap=document.getElementById('edit-key-wrap');
+  if(keyWrap) keyWrap.innerHTML=currentOpts.map((o,i)=>`
+    <div onclick="setEditCorrect(${i})" style="display:flex;align-items:center;gap:8px;padding:7px 10px;border:1.5px solid ${idx===i?'var(--ink)':'var(--line)'};border-radius:8px;cursor:pointer;background:${idx===i?'var(--ink)':'var(--white)'};transition:all .15s">
+      <div style="width:22px;height:22px;border-radius:5px;background:${idx===i?'#fff':'var(--faint)'};color:${idx===i?'var(--ink)':'var(--mid)'};display:flex;align-items:center;justify-content:center;font-size:.67rem;font-weight:700;flex-shrink:0">${opts[i]}</div>
+      <span style="font-size:.82rem;${idx===i?'color:#fff;font-weight:600':'color:var(--ink)'}${isUrdu?';direction:rtl;font-family:var(--urdu)':''}">${o}</span>
+    </div>`).join('');
+}
+
+async function saveEditedQuestion(){
+  const q=quizQuestions[currentIdx];
+  if(!q||!q.subject||!q.chapter){ setEditMsg('No subject/chapter info — cannot save to GitHub','bad'); return; }
+  if(!isValidToken()){ setEditMsg('GitHub token not configured','bad'); return; }
+  const newText=document.getElementById('edit-qtext')?.value?.trim();
+  if(!newText){ setEditMsg('Question text cannot be empty','bad'); return; }
+  const newOptions=['A','B','C','D'].map((_,i)=>document.getElementById('edit-opt-'+i)?.value?.trim()||q.options[i]||'');
+  if(newOptions.some(o=>!o)){ setEditMsg('All options must be filled in','bad'); return; }
+  if(editCorrectSel<0||editCorrectSel>3){ setEditMsg('Select the correct answer','bad'); return; }
+  setEditMsg('Saving to GitHub…','neutral');
+  const result=await updateQuestionInGitHub(q,newText,newOptions,editCorrectSel);
+  if(result.ok){
+    // Update in-memory question so it reflects immediately
+    q.text=newText; q.options=newOptions; q.correct=editCorrectSel;
+    setEditMsg('✓ Saved successfully!','good');
+    closeEditPanel();
+    renderQuestion();
+    toast('Question updated ✓');
+  } else {
+    setEditMsg('Save failed: '+(result.error||'Unknown error'),'bad');
+  }
+}
+
+async function deleteEditedQuestion(){
+  const q=quizQuestions[currentIdx];
+  if(!q||!q.subject||!q.chapter){ setEditMsg('No subject/chapter info — cannot delete','bad'); return; }
+  if(!isValidToken()){ setEditMsg('GitHub token not configured','bad'); return; }
+  const label=(q.text||'').slice(0,80)+(q.text&&q.text.length>80?'…':'');
+  if(!confirm(`Delete this question from GitHub?\n\n"${label}"\n\nThis cannot be undone.`)) return;
+  setEditMsg('Deleting from GitHub…','neutral');
+  const result=await deleteQuestionInGitHub(q);
+  if(result.ok){
+    closeEditPanel();
+    // Remove from quiz list and advance
+    quizQuestions.splice(currentIdx,1);
+    if(currentIdx>=quizQuestions.length) currentIdx=Math.max(0,quizQuestions.length-1);
+    toast('Question deleted ✓');
+    if(quizQuestions.length===0){ confirmFinish(); } else { renderQuestion(); }
+  } else {
+    setEditMsg('Delete failed: '+(result.error||'Unknown error'),'bad');
+  }
+}
+
+function setEditMsg(msg,type){
+  const el=document.getElementById('edit-panel-msg');
+  if(!el) return;
+  el.textContent=msg;
+  el.style.color=type==='good'?'var(--good)':type==='bad'?'var(--bad)':'var(--mid)';
+}
+
+// ── GitHub write/delete helpers (mirrors backend.js pattern) ────────────────
+async function updateQuestionInGitHub(q,newText,newOptions,newCorrect){
+  const fileName=q.chapter+'.txt';
+  const encS=q.subject.split('/').map(encodeURIComponent).join('/');
+  const encF=encodeURIComponent(fileName);
+  const apiUrl=`https://api.github.com/repos/${GITHUB_REPO}/contents/resources/${encS}/${encF}?ref=${GITHUB_BRANCH}`;
+  try{
+    const res=await fetch(apiUrl,{headers:ghHeaders()});
+    if(!res.ok) throw new Error(`Cannot read file (HTTP ${res.status})`);
+    const data=await res.json();
+    const bytes=Uint8Array.from(atob(data.content.replace(/\n/g,'')),c=>c.charCodeAt(0));
+    const fileText=new TextDecoder('utf-8').decode(bytes);
+    const lines=fileText.split('\n');
+    const origText=q.text.trim();
+    let qi=-1;
+    for(let i=0;i<lines.length;i++){
+      const stripped=lines[i].trim().replace(/^\d+[.)]\s*/,'');
+      if(stripped===origText&&i+1<lines.length&&/\(A\)/i.test(lines[i+1])){ qi=i; break; }
+    }
+    if(qi<0) return {ok:false,error:'Question not found in file — edit manually'};
+    const pfx=(lines[qi].match(/^(\d+[.)]\s*)/))||[''];
+    lines[qi]=pfx[0]+newText.trim();
+    lines[qi+1]=newOptions.map((o,i)=>`(${['A','B','C','D'][i]}) ${o.replace(/@/g,'').trim()}${i===newCorrect?' @':''}`).join(', ');
+    const newContent=lines.join('\n');
+    const writeUrl=`https://api.github.com/repos/${GITHUB_REPO}/contents/resources/${encS}/${encF}`;
+    const wr=await fetch(writeUrl,{method:'PUT',headers:ghWriteHeaders(),body:JSON.stringify({
+      message:`Fix answer: ${newText.trim().slice(0,55)}`,
+      content:btoa(unescape(encodeURIComponent(newContent))),
+      sha:data.sha,branch:GITHUB_BRANCH
+    })});
+    if(!wr.ok) throw new Error(`Write failed (HTTP ${wr.status})`);
+    return {ok:true};
+  }catch(e){ return {ok:false,error:e.message}; }
+}
+
+async function deleteQuestionInGitHub(q){
+  const fileName=q.chapter+'.txt';
+  const encS=q.subject.split('/').map(encodeURIComponent).join('/');
+  const encF=encodeURIComponent(fileName);
+  const apiUrl=`https://api.github.com/repos/${GITHUB_REPO}/contents/resources/${encS}/${encF}?ref=${GITHUB_BRANCH}`;
+  try{
+    const res=await fetch(apiUrl,{headers:ghHeaders()});
+    if(!res.ok) throw new Error(`Cannot read file (HTTP ${res.status})`);
+    const data=await res.json();
+    const bytes=Uint8Array.from(atob(data.content.replace(/\n/g,'')),c=>c.charCodeAt(0));
+    const fileText=new TextDecoder('utf-8').decode(bytes);
+    const lines=fileText.split('\n');
+    const origText=q.text.trim();
+    let qi=-1;
+    for(let i=0;i<lines.length;i++){
+      const stripped=lines[i].trim().replace(/^\d+[.)]\s*/,'');
+      if(stripped===origText&&i+1<lines.length&&/\(A\)/i.test(lines[i+1])){ qi=i; break; }
+    }
+    if(qi<0) return {ok:false,error:'Question not found in file'};
+    lines.splice(qi,2);
+    // Renumber remaining questions
+    let num=1;
+    const renumbered=lines.map(l=>{
+      const m=l.match(/^(\d+[.)]\s*)(.*)/);
+      if(m&&!/^\(A\)/i.test(m[2].trim())) return `${num++}. ${m[2]}`;
+      return l;
+    });
+    const newContent=renumbered.join('\n');
+    const writeUrl=`https://api.github.com/repos/${GITHUB_REPO}/contents/resources/${encS}/${encF}`;
+    const wr=await fetch(writeUrl,{method:'PUT',headers:ghWriteHeaders(),body:JSON.stringify({
+      message:`Delete question: ${origText.slice(0,55)}`,
+      content:btoa(unescape(encodeURIComponent(newContent))),
+      sha:data.sha,branch:GITHUB_BRANCH
+    })});
+    if(!wr.ok) throw new Error(`Write failed (HTTP ${wr.status})`);
+    return {ok:true};
+  }catch(e){ return {ok:false,error:e.message}; }
 }
 
 function selectQuestionText(){
