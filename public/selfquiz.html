@@ -230,6 +230,7 @@
     .edit-opt-badge.correct-sel{background:var(--ink);color:#fff;border-color:var(--ink)}
     .edit-panel-actions{display:flex;gap:7px;margin-top:12px;flex-wrap:wrap}
     .edit-panel-msg{font-size:.75rem;margin-top:6px;min-height:1em;color:var(--mid)}
+    #edit-qtext:focus{border-color:var(--line);box-shadow:none}
 
     .result-card{background:var(--white);border:1px solid var(--line);border-radius:var(--r-xl);padding:32px 22px;text-align:center;box-shadow:var(--sh-md);animation:popIn .4s var(--t-spring) both}
     .result-emoji{font-size:3.4rem;margin-bottom:12px;display:block;animation:popIn .5s .1s var(--t-spring) both;animation-fill-mode:both}
@@ -417,9 +418,6 @@
 
       <div class="edit-panel-lbl">Options</div>
       <div id="edit-options-wrap" style="margin-bottom:10px"></div>
-
-      <div class="edit-panel-lbl">Correct answer <span style="font-weight:400;text-transform:none;letter-spacing:0;font-size:.7rem">(tap to select)</span></div>
-      <div id="edit-key-wrap" style="display:flex;flex-direction:column;gap:5px;margin-bottom:12px"></div>
 
       <div class="edit-panel-actions">
         <button class="btn btn-dark" style="flex:1;justify-content:center;gap:5px;font-size:.82rem" onclick="saveEditedQuestion()">
@@ -897,8 +895,10 @@ function renderQuestion(){
   document.getElementById('q-text').innerHTML=escLatex(q.text);
 
   const rBtn=document.getElementById('report-btn');
-  if(reported.has(currentIdx)){ rBtn.classList.add('reported');rBtn.textContent='✓ Reported'; }
-  else{ rBtn.classList.remove('reported');rBtn.innerHTML='⚑ Report this question'; }
+  if(rBtn){
+    if(reported.has(currentIdx)){ rBtn.classList.add('reported');rBtn.textContent='✓ Reported'; }
+    else{ rBtn.classList.remove('reported');rBtn.innerHTML='⚑ Report this question'; }
+  }
 
   document.getElementById('prev-btn').disabled=currentIdx===0;
   const isLast=currentIdx===quizQuestions.length-1;
@@ -1022,39 +1022,20 @@ function closeEditPanel(){
 function renderEditOptions(options){
   const isUrdu=URDU_RE.test((options||[]).join(''));
   const wrap=document.getElementById('edit-options-wrap');
-  const keyWrap=document.getElementById('edit-key-wrap');
-  if(!wrap||!keyWrap) return;
+  if(!wrap) return;
   wrap.innerHTML=(options||[]).map((o,i)=>`
     <div class="edit-opt-row">
       <div class="edit-opt-badge${editCorrectSel===i?' correct-sel':''}" data-eidx="${i}" onclick="setEditCorrect(${i})">${'ABCD'[i]}</div>
       <input class="form-input" id="edit-opt-${i}" value="${o.replace(/"/g,'&quot;')}" style="flex:1;padding:6px 9px;font-size:.82rem;${isUrdu?'direction:rtl;text-align:right;font-family:var(--urdu);':''}"/>
     </div>`).join('');
-  // Key answer selector
-  keyWrap.innerHTML=(options||[]).map((o,i)=>`
-    <div onclick="setEditCorrect(${i})" style="display:flex;align-items:center;gap:8px;padding:7px 10px;border:1.5px solid ${editCorrectSel===i?'var(--ink)':'var(--line)'};border-radius:8px;cursor:pointer;background:${editCorrectSel===i?'var(--ink)':'var(--white)'};transition:all .15s">
-      <div style="width:22px;height:22px;border-radius:5px;background:${editCorrectSel===i?'#fff':'var(--faint)'};color:${editCorrectSel===i?'var(--ink)':'var(--mid)'};display:flex;align-items:center;justify-content:center;font-size:.67rem;font-weight:700;flex-shrink:0">${'ABCD'[i]}</div>
-      <span style="font-size:.82rem;${editCorrectSel===i?'color:#fff;font-weight:600':'color:var(--ink)'}${isUrdu?';direction:rtl;font-family:var(--urdu)':''}">${o}</span>
-    </div>`).join('');
 }
 
 function setEditCorrect(idx){
   editCorrectSel=idx;
-  // Re-render just the option badges and key selector
-  const q=quizQuestions[currentIdx];
-  const opts=['A','B','C','D'];
   document.querySelectorAll('.edit-opt-badge').forEach(el=>{
     const i=+el.dataset.eidx;
     el.classList.toggle('correct-sel',i===idx);
   });
-  // Re-render key wrap
-  const currentOpts=opts.map((_,i)=>document.getElementById('edit-opt-'+i)?.value||q.options[i]||'');
-  const isUrdu=URDU_RE.test(currentOpts.join(''));
-  const keyWrap=document.getElementById('edit-key-wrap');
-  if(keyWrap) keyWrap.innerHTML=currentOpts.map((o,i)=>`
-    <div onclick="setEditCorrect(${i})" style="display:flex;align-items:center;gap:8px;padding:7px 10px;border:1.5px solid ${idx===i?'var(--ink)':'var(--line)'};border-radius:8px;cursor:pointer;background:${idx===i?'var(--ink)':'var(--white)'};transition:all .15s">
-      <div style="width:22px;height:22px;border-radius:5px;background:${idx===i?'#fff':'var(--faint)'};color:${idx===i?'var(--ink)':'var(--mid)'};display:flex;align-items:center;justify-content:center;font-size:.67rem;font-weight:700;flex-shrink:0">${opts[i]}</div>
-      <span style="font-size:.82rem;${idx===i?'color:#fff;font-weight:600':'color:var(--ink)'}${isUrdu?';direction:rtl;font-family:var(--urdu)':''}">${o}</span>
-    </div>`).join('');
 }
 
 async function saveEditedQuestion(){
