@@ -170,7 +170,7 @@
     /* QUESTION CARD */
     .q-card{background:var(--white);border:1px solid var(--line);border-radius:var(--r-lg);padding:12px 14px 12px;box-shadow:var(--sh-sm);margin-bottom:8px}
     .q-num{font-size:.62rem;font-weight:800;color:var(--mid);letter-spacing:.08em;text-transform:uppercase;margin-bottom:5px}
-    .q-text{font-size:1.05rem;font-weight:600;line-height:1.55;margin-bottom:12px;cursor:text;user-select:all;-webkit-user-select:all}
+    .q-text{font-size:1.05rem;font-weight:600;line-height:1.55;margin-bottom:12px;cursor:text;user-select:text;-webkit-user-select:text}
 
     /* OPTIONS */
     .opt-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px}
@@ -209,8 +209,8 @@
       min-height:calc(100dvh - 58px - 40px);
     }
     #view-quiz .q-card{
-      flex:1;overflow-y:auto;
-      max-height:calc(100dvh - 320px);
+      overflow-y:auto;
+      max-height:calc(100dvh - 300px);
     }
     .page:has(#view-quiz.active){padding-bottom:20px}
 
@@ -384,18 +384,18 @@
     </div>
 
     <div class="q-card" id="quiz-card">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
         <div class="q-num" id="q-num" style="margin-bottom:0">Q1</div>
         <div style="display:flex;gap:6px;align-items:center">
-          <button id="btn-ask-gpt" onclick="openChatGPT()" title="Ask ChatGPT about this question" style="display:flex;align-items:center;gap:4px;padding:3px 8px;background:#3d9e84;border:1px solid #3d9e84;border-radius:6px;font-size:.72rem;font-weight:600;color:#fff;cursor:pointer;flex-shrink:0;-webkit-tap-highlight-color:transparent">
+          <button id="btn-ask-gpt" onclick="openChatGPT()" title="Ask ChatGPT about this question" style="display:flex;align-items:center;gap:4px;padding:3px 8px;background:#f0f0f0;border:1px solid #d0d0d0;border-radius:6px;font-size:.72rem;font-weight:600;color:#111;cursor:pointer;flex-shrink:0;-webkit-tap-highlight-color:transparent">
             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
             GPT
           </button>
-          <button id="btn-ask-claude" onclick="openClaude()" title="Ask Claude about this question" style="display:flex;align-items:center;gap:4px;padding:3px 8px;background:#a8664e;border:1px solid #a8664e;border-radius:6px;font-size:.72rem;font-weight:600;color:#fff;cursor:pointer;flex-shrink:0;-webkit-tap-highlight-color:transparent">
+          <button id="btn-ask-claude" onclick="openClaude()" title="Ask Claude about this question" style="display:flex;align-items:center;gap:4px;padding:3px 8px;background:#f0f0f0;border:1px solid #d0d0d0;border-radius:6px;font-size:.72rem;font-weight:600;color:#111;cursor:pointer;flex-shrink:0;-webkit-tap-highlight-color:transparent">
             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
             Claude
           </button>
-          <button id="edit-q-btn" onclick="toggleEditPanel()" title="Edit this question" style="display:flex;align-items:center;gap:4px;padding:3px 8px;background:#fef3d0;border:1px solid #e5c76a;border-radius:6px;font-size:.72rem;font-weight:600;color:#a07a10;cursor:pointer;flex-shrink:0;-webkit-tap-highlight-color:transparent">
+          <button id="edit-q-btn" onclick="toggleEditPanel()" title="Edit this question" style="display:flex;align-items:center;gap:4px;padding:3px 8px;background:#f0f0f0;border:1px solid #d0d0d0;border-radius:6px;font-size:.72rem;font-weight:600;color:#111;cursor:pointer;flex-shrink:0;-webkit-tap-highlight-color:transparent">
             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
             Edit
           </button>
@@ -973,16 +973,8 @@ function openClaude(){
   if(!q){ toast('No question loaded.'); return; }
   const opts=['A','B','C','D'].map((l,i)=>`${l}) ${q.options[i]||''}`).join(', ');
   const prompt=`${q.text}\n\nOptions: ${opts}\n\nWhat is the correct answer and why?`;
-  const encoded=encodeURIComponent(prompt);
-  const fallback=encodeURIComponent('https://claude.ai/new?q='+encoded);
-  // Android intent URL: tries to open Claude app, falls back to browser
-  const intentUrl=`intent://claude.ai/new?q=${encoded}#Intent;scheme=https;package=com.anthropic.claude;S.browser_fallback_url=${fallback};end`;
-  const a=document.createElement('a');
-  a.href=intentUrl;
-  a.rel='noopener';
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
+  const url='https://claude.ai/new?q='+encodeURIComponent(prompt);
+  window.open(url,'_blank','noopener');
 }
 
 
