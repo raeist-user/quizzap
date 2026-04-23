@@ -178,7 +178,7 @@
     .opt-grid{display:grid;grid-template-columns:1fr 1fr;gap:5px}
     @media(max-width:480px){.opt-grid{grid-template-columns:1fr}}
 
-    .opt-card{display:flex;align-items:center;gap:8px;padding:10px 12px;border:1.5px solid var(--line);border-radius:var(--r-lg);cursor:pointer;background:var(--white);transition:all var(--t-fast);font-size:.88rem;position:relative;overflow:hidden;text-align:left;font-family:var(--sans);font-weight:500;line-height:1.4;width:100%}
+    .opt-card{display:flex;align-items:center;gap:10px;padding:13px 14px;border:1.5px solid var(--line);border-radius:var(--r-lg);cursor:pointer;background:var(--white);transition:all var(--t-fast);font-size:1rem;position:relative;overflow:hidden;text-align:left;font-family:var(--sans);font-weight:500;line-height:1.45;width:100%}
     .opt-card:not(.locked):hover{border-color:var(--ink);transform:translateY(-2px);box-shadow:var(--sh-sm)}
     .opt-card:not(.locked):active{transform:scale(.97) translateY(0)}
     .opt-card.chosen{border-color:var(--ink);background:var(--faint)}
@@ -187,7 +187,7 @@
     .opt-card.wrong-chosen{border-color:var(--bad);background:#fff1f2;opacity:1;animation:shake .38s ease both}
     .opt-card.locked{cursor:default}
 
-    .opt-key{width:26px;height:26px;flex-shrink:0;border-radius:7px;background:var(--faint);border:1.5px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:.68rem;font-weight:800;transition:all var(--t-fast)}
+    .opt-key{width:30px;height:30px;flex-shrink:0;border-radius:7px;background:var(--faint);border:1.5px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:.75rem;font-weight:800;transition:all var(--t-fast)}
     .opt-card:not(.locked):hover .opt-key{background:var(--ink);color:#fff;border-color:var(--ink)}
     .opt-card.chosen .opt-key{background:var(--ink);color:#fff;border-color:var(--ink)}
     .opt-card.correct .opt-key{background:var(--good);color:#fff;border-color:var(--good)}
