@@ -172,13 +172,13 @@
     /* QUESTION CARD */
     .q-card{background:var(--white);border:1px solid var(--line);border-radius:var(--r-lg);padding:10px 12px 10px;box-shadow:var(--sh-sm);margin-bottom:0}
     .q-num{font-size:.62rem;font-weight:800;color:var(--mid);letter-spacing:.08em;text-transform:uppercase;margin-bottom:5px}
-    .q-text{font-size:1rem;font-weight:600;line-height:1.5;margin-bottom:8px;cursor:text;user-select:all;-webkit-user-select:all}
+    .q-text{font-size:var(--fs-question,1rem);font-weight:600;line-height:1.5;margin-bottom:8px;cursor:text;user-select:all;-webkit-user-select:all}
 
     /* OPTIONS */
     .opt-grid{display:grid;grid-template-columns:1fr 1fr;gap:5px}
     @media(max-width:480px){.opt-grid{grid-template-columns:1fr}}
 
-    .opt-card{display:flex;align-items:center;gap:10px;padding:13px 14px;border:1.5px solid var(--line);border-radius:var(--r-lg);cursor:pointer;background:var(--white);transition:all var(--t-fast);font-size:1rem;position:relative;overflow:hidden;text-align:left;font-family:var(--sans);font-weight:500;line-height:1.45;width:100%}
+    .opt-card{display:flex;align-items:center;gap:10px;padding:13px 14px;border:1.5px solid var(--line);border-radius:var(--r-lg);cursor:pointer;background:var(--white);transition:all var(--t-fast);font-size:var(--fs-options,1rem);position:relative;overflow:hidden;text-align:left;font-family:var(--sans);font-weight:500;line-height:1.45;width:100%}
     .opt-card:not(.locked):hover{border-color:var(--ink);transform:translateY(-2px);box-shadow:var(--sh-sm)}
     .opt-card:not(.locked):active{transform:scale(.97) translateY(0)}
     .opt-card.chosen{border-color:var(--ink);background:var(--faint)}
@@ -307,6 +307,22 @@
     .modal-textarea{width:100%;padding:9px 11px;font-family:var(--sans);font-size:.83rem;border:1.5px solid var(--line);border-radius:var(--r-sm);outline:none;resize:none;min-height:80px;margin-bottom:12px;transition:border-color var(--t-fast)}
     .modal-textarea:focus{border-color:var(--accent)}
     .modal-actions{display:flex;gap:8px}
+    /* ── FONT SIZE SETTINGS ── */
+    .fs-fab{position:fixed;bottom:80px;right:16px;width:42px;height:42px;border-radius:50%;background:var(--ink);color:#fff;border:none;cursor:pointer;display:none;align-items:center;justify-content:center;z-index:150;box-shadow:var(--sh-md);transition:transform var(--t-spring),background var(--t-fast);-webkit-tap-highlight-color:transparent;font-size:1.1rem}
+    .fs-fab.visible{display:flex}
+    .fs-fab:active{transform:scale(.9)}
+
+    .fs-panel{position:fixed;bottom:136px;right:16px;background:var(--white);border:1.5px solid var(--line);border-radius:var(--r-lg);padding:16px;width:220px;z-index:149;box-shadow:var(--sh-lg);display:none;animation:slideUp .2s ease both}
+    .fs-panel.open{display:block}
+    .fs-panel-title{font-size:.62rem;font-weight:800;letter-spacing:.09em;text-transform:uppercase;color:var(--mid);margin-bottom:12px}
+    .fs-row{display:flex;flex-direction:column;gap:5px;margin-bottom:12px}
+    .fs-row:last-child{margin-bottom:0}
+    .fs-label{display:flex;justify-content:space-between;align-items:center;font-size:.78rem;font-weight:600}
+    .fs-val{font-size:.72rem;font-weight:700;color:var(--accent);min-width:32px;text-align:right}
+    .fs-controls{display:flex;align-items:center;gap:6px}
+    .fs-slider{flex:1;accent-color:var(--accent);height:4px;cursor:pointer}
+    .fs-reset{font-size:.65rem;font-weight:700;color:var(--mid);cursor:pointer;padding:2px 6px;border-radius:4px;border:1px solid var(--line);background:var(--faint);white-space:nowrap;-webkit-tap-highlight-color:transparent}
+    .fs-reset:active{opacity:.6}
   </style>
 </head>
 <body>
@@ -439,6 +455,28 @@
       <div class="report-row">
         <button class="report-btn" id="report-btn" onclick="openReportModal()">⚑ Report</button>
         <button class="btn btn-ghost btn-sm" id="finish-btn" onclick="confirmFinish()" style="margin-left:8px">■ Finish Quiz</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- FONT SIZE FAB -->
+  <button class="fs-fab" id="fs-fab" onclick="toggleFsPanel()" title="Font size settings">⚙</button>
+
+  <!-- FONT SIZE PANEL -->
+  <div class="fs-panel" id="fs-panel">
+    <div class="fs-panel-title">Font Size</div>
+    <div class="fs-row">
+      <div class="fs-label">Question <span class="fs-val" id="fs-q-val">16px</span></div>
+      <div class="fs-controls">
+        <input class="fs-slider" type="range" id="fs-q-slider" min="12" max="28" step="1" value="16" oninput="applyFontSize()"/>
+        <span class="fs-reset" onclick="resetFs('q')">Reset</span>
+      </div>
+    </div>
+    <div class="fs-row">
+      <div class="fs-label">Options <span class="fs-val" id="fs-o-val">16px</span></div>
+      <div class="fs-controls">
+        <input class="fs-slider" type="range" id="fs-o-slider" min="12" max="26" step="1" value="16" oninput="applyFontSize()"/>
+        <span class="fs-reset" onclick="resetFs('o')">Reset</span>
       </div>
     </div>
   </div>
@@ -1337,6 +1375,69 @@ function applyUrduFont(root){
 document.addEventListener('DOMContentLoaded',()=>{ applyUrduFont(); });
 const _urduObserver = new MutationObserver(()=>applyUrduFont());
 _urduObserver.observe(document.body,{childList:true,subtree:true});
+
+// ── FONT SIZE SETTINGS ────────────────────────────────────────────────────────
+const FS_KEY_Q = 'scc_fs_question';
+const FS_KEY_O = 'scc_fs_options';
+
+function applyFontSize(){
+  const qVal = +document.getElementById('fs-q-slider').value;
+  const oVal = +document.getElementById('fs-o-slider').value;
+  document.documentElement.style.setProperty('--fs-question', qVal+'px');
+  document.documentElement.style.setProperty('--fs-options', oVal+'px');
+  document.getElementById('fs-q-val').textContent = qVal+'px';
+  document.getElementById('fs-o-val').textContent = oVal+'px';
+  try{ localStorage.setItem(FS_KEY_Q, qVal); localStorage.setItem(FS_KEY_O, oVal); }catch(e){}
+}
+
+function resetFs(which){
+  if(which==='q'){
+    document.getElementById('fs-q-slider').value=16;
+  } else {
+    document.getElementById('fs-o-slider').value=16;
+  }
+  applyFontSize();
+}
+
+function toggleFsPanel(){
+  const panel = document.getElementById('fs-panel');
+  panel.classList.toggle('open');
+}
+
+// Close panel when clicking outside
+document.addEventListener('click', function(e){
+  const panel = document.getElementById('fs-panel');
+  const fab = document.getElementById('fs-fab');
+  if(panel && panel.classList.contains('open') && !panel.contains(e.target) && e.target!==fab){
+    panel.classList.remove('open');
+  }
+});
+
+// Show/hide FAB with quiz view
+const _origShowView = showView;
+// Patch: already handled in showView via quiz-bottom-nav logic;
+// we hook into the same place via MutationObserver on view-quiz class
+(function(){
+  const quizView = document.getElementById('view-quiz');
+  if(!quizView) return;
+  const fab = document.getElementById('fs-fab');
+  new MutationObserver(()=>{
+    const isActive = quizView.classList.contains('active');
+    if(fab) fab.classList.toggle('visible', isActive);
+    if(!isActive){ const p=document.getElementById('fs-panel'); if(p) p.classList.remove('open'); }
+  }).observe(quizView,{attributes:true,attributeFilter:['class']});
+})();
+
+// Restore saved font sizes on load
+(function(){
+  try{
+    const q = parseInt(localStorage.getItem(FS_KEY_Q))||16;
+    const o = parseInt(localStorage.getItem(FS_KEY_O))||16;
+    document.getElementById('fs-q-slider').value = q;
+    document.getElementById('fs-o-slider').value = o;
+    applyFontSize();
+  }catch(e){}
+})();
 </script>
 </body>
 </html>
