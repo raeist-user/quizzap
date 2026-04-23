@@ -387,21 +387,17 @@
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px">
         <div class="q-num" id="q-num" style="margin-bottom:0">Q1</div>
         <div style="display:flex;gap:6px;align-items:center">
-          <button id="btn-ask-gpt" onclick="openChatGPT()" title="Ask ChatGPT about this question" style="display:flex;align-items:center;gap:4px;padding:3px 8px;background:#10a37f;border:1px solid #10a37f;border-radius:6px;font-size:.72rem;font-weight:600;color:#fff;cursor:pointer;flex-shrink:0;-webkit-tap-highlight-color:transparent">
+          <button id="btn-ask-gpt" onclick="openChatGPT()" title="Ask ChatGPT about this question" style="display:flex;align-items:center;gap:4px;padding:3px 8px;background:#3d9e84;border:1px solid #3d9e84;border-radius:6px;font-size:.72rem;font-weight:600;color:#fff;cursor:pointer;flex-shrink:0;-webkit-tap-highlight-color:transparent">
             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
             GPT
           </button>
-          <button id="btn-ask-claude" onclick="openClaude()" title="Ask Claude about this question" style="display:flex;align-items:center;gap:4px;padding:3px 8px;background:#c96442;border:1px solid #c96442;border-radius:6px;font-size:.72rem;font-weight:600;color:#fff;cursor:pointer;flex-shrink:0;-webkit-tap-highlight-color:transparent">
+          <button id="btn-ask-claude" onclick="openClaude()" title="Ask Claude about this question" style="display:flex;align-items:center;gap:4px;padding:3px 8px;background:#a8664e;border:1px solid #a8664e;border-radius:6px;font-size:.72rem;font-weight:600;color:#fff;cursor:pointer;flex-shrink:0;-webkit-tap-highlight-color:transparent">
             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
             Claude
           </button>
-          <button id="edit-q-btn" onclick="toggleEditPanel()" title="Edit this question" style="display:flex;align-items:center;gap:4px;padding:3px 8px;background:var(--warn-bg);border:1px solid #fcd34d;border-radius:6px;font-size:.72rem;font-weight:600;color:var(--warn);cursor:pointer;flex-shrink:0;-webkit-tap-highlight-color:transparent">
+          <button id="edit-q-btn" onclick="toggleEditPanel()" title="Edit this question" style="display:flex;align-items:center;gap:4px;padding:3px 8px;background:#fef3d0;border:1px solid #e5c76a;border-radius:6px;font-size:.72rem;font-weight:600;color:#a07a10;cursor:pointer;flex-shrink:0;-webkit-tap-highlight-color:transparent">
             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
             Edit
-          </button>
-          <button id="btn-select-q" onclick="selectQuestionText()" title="Select question text to search" style="display:flex;align-items:center;gap:4px;padding:3px 8px;background:var(--faint);border:1px solid var(--line);border-radius:6px;font-size:.72rem;font-weight:600;color:var(--mid);cursor:pointer;flex-shrink:0;-webkit-tap-highlight-color:transparent">
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-            Select Q
           </button>
         </div>
       </div>
@@ -409,32 +405,11 @@
       <div class="opt-grid" id="q-options"></div>
       <div id="answer-notice"></div>
       <div id="streak-notice-wrap"></div>
-      <div class="reveal-hint" id="reveal-hint" style="display:none">Tap an option to answer</div>
-    </div>
-
-    <!-- Inline edit panel -->
-    <div class="edit-panel" id="edit-panel">
-      <div class="edit-panel-lbl">Question text</div>
-      <textarea id="edit-qtext" class="form-input" rows="3" style="resize:vertical;font-size:.85rem;margin-bottom:10px"></textarea>
-
-      <div class="edit-panel-lbl">Options</div>
-      <div id="edit-options-wrap" style="margin-bottom:10px"></div>
-
-      <div class="edit-panel-actions">
-        <button class="btn btn-dark" style="flex:1;justify-content:center;gap:5px;font-size:.82rem" onclick="saveEditedQuestion()">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17,21 17,13 7,13 7,21"/></svg>Save &amp; Fix
-        </button>
-        <button class="btn" style="flex:1;justify-content:center;gap:5px;font-size:.82rem;background:#fff1f2;color:#be123c;border-color:#fecdd3" onclick="deleteEditedQuestion()">
-          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>Delete Q
-        </button>
-        <button class="btn btn-ghost" style="font-size:.82rem;padding:8px 14px" onclick="closeEditPanel()">Cancel</button>
-      </div>
-      <div class="edit-panel-msg" id="edit-panel-msg"></div>
     </div>
 
     <div class="nav-row mt3">
-      <button class="btn btn-white" id="prev-btn" onclick="goQuestion(-1)" disabled>← Prev</button>
-      <button class="btn btn-dark" id="next-btn" onclick="goQuestion(1)">Next →</button>
+      <button class="btn btn-white" id="prev-btn" onclick="goQuestion(-1)" disabled style="padding:13px 18px">← Prev</button>
+      <button class="btn btn-dark" id="next-btn" onclick="goQuestion(1)" style="padding:13px 18px">Next →</button>
     </div>
     <div style="margin-top:10px;text-align:center">
       <button class="btn btn-ghost btn-sm" onclick="confirmFinish()">⏹ Finish Quiz</button>
@@ -887,23 +862,35 @@ function startQuiz(){
 
 function restartQuiz(){ startQuiz(); }
 
+let editMode = false;
+
 function renderQuestion(){
+  editMode = false;
   const q=quizQuestions[currentIdx];
   if(!q) return;
-  // Always close the edit panel when moving to a new question
-  closeEditPanel();
+
+  // Reset edit button
+  const editBtn=document.getElementById('edit-q-btn');
+  if(editBtn) editBtn.innerHTML='<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg> Edit';
 
   document.getElementById('quiz-counter').textContent=`Question ${currentIdx+1} / ${quizQuestions.length}`;
   document.getElementById('quiz-score').textContent=`✓ ${score}`;
   document.getElementById('quiz-progress').style.width=((currentIdx+1)/quizQuestions.length*100).toFixed(1)+'%';
   document.getElementById('q-num').textContent=`Q${currentIdx+1}`;
-  document.getElementById('q-text').innerHTML=escLatex(q.text);
 
-  const rBtn=document.getElementById('report-btn');
-  if(rBtn){
-    if(reported.has(currentIdx)){ rBtn.classList.add('reported');rBtn.textContent='✓ Reported'; }
-    else{ rBtn.classList.remove('reported');rBtn.innerHTML='⚑ Report this question'; }
-  }
+  const qTextEl=document.getElementById('q-text');
+  qTextEl.innerHTML=escLatex(q.text);
+  qTextEl.style.cursor='text';
+  qTextEl.style.userSelect='text';
+  qTextEl.onclick=()=>{
+    try{
+      const range=document.createRange();
+      range.selectNodeContents(qTextEl);
+      const sel=window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(range);
+    }catch(e){}
+  };
 
   document.getElementById('prev-btn').disabled=currentIdx===0;
   const isLast=currentIdx===quizQuestions.length-1;
@@ -913,6 +900,7 @@ function renderQuestion(){
 
   const optWrap=document.getElementById('q-options');
   optWrap.innerHTML='';
+  optWrap.style.gridTemplateColumns='';
   const isRevealed=revealed[currentIdx];
   const myAnswer=userAnswers[currentIdx];
   const correctIdx=q.correct;
@@ -923,14 +911,8 @@ function renderQuestion(){
     btn.className='opt-card';
     if(isRevealed){
       btn.classList.add('locked');
-      // If correct choice (regardless if user picked it or not)
-      if(i===correctIdx) {
-        btn.classList.add('correct');
-      }
-      // If user picked wrong choice
-      if(i===myAnswer && i!==correctIdx) {
-        btn.classList.add('wrong-chosen');
-      }
+      if(i===correctIdx) btn.classList.add('correct');
+      if(i===myAnswer && i!==correctIdx) btn.classList.add('wrong-chosen');
     } else {
       if(i===myAnswer) btn.classList.add('chosen');
     }
@@ -959,9 +941,6 @@ function renderQuestion(){
       streakWrap.innerHTML=`<div class="streak-notice ${cls}">${fire} ${label}</div>`;
     }
   }
-
-  const hint=document.getElementById('reveal-hint');
-  hint.style.display=(!isRevealed&&myAnswer===undefined&&typeof correctIdx==='number')?'block':'none';
 
   const card=document.getElementById('quiz-card');
   card.style.animation='none';
@@ -1013,43 +992,57 @@ function openClaude(){
 let editCorrectSel=-1; // which option is selected as correct in edit panel
 
 function toggleEditPanel(){
-  const panel=document.getElementById('edit-panel');
-  if(panel.classList.contains('open')){ closeEditPanel(); return; }
+  if(editMode){ closeEditPanel(); return; }
   const q=quizQuestions[currentIdx];
   if(!q) return;
+  editMode=true;
   editCorrectSel=q.correct??0;
-  // Populate textarea
-  document.getElementById('edit-qtext').value=q.text||'';
-  // Render option inputs
-  renderEditOptions(q.options);
-  document.getElementById('edit-panel-msg').textContent='';
-  panel.classList.add('open');
-  document.getElementById('edit-q-btn').textContent='✕ Close';
-  setTimeout(()=>document.getElementById('edit-qtext').focus(),60);
+  renderEditInPlace(q);
 }
 
 function closeEditPanel(){
-  document.getElementById('edit-panel').classList.remove('open');
-  const btn=document.getElementById('edit-q-btn');
-  if(btn) btn.innerHTML='<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg> Edit';
+  renderQuestion();
 }
 
-function renderEditOptions(options){
-  const isUrdu=URDU_RE.test((options||[]).join(''));
-  const wrap=document.getElementById('edit-options-wrap');
-  if(!wrap) return;
-  wrap.innerHTML=(options||[]).map((o,i)=>`
+function renderEditInPlace(q){
+  const editBtn=document.getElementById('edit-q-btn');
+  if(editBtn) editBtn.textContent='✕ Close';
+
+  const isUrdu=URDU_RE.test(q.text+q.options.join(''));
+  const rtl=isUrdu?'direction:rtl;text-align:right;font-family:var(--urdu);':'';
+
+  // Replace q-text with textarea
+  const qTextEl=document.getElementById('q-text');
+  qTextEl.onclick=null;
+  qTextEl.style.cursor='';
+  qTextEl.innerHTML=`<textarea id="edit-qtext" class="form-input" rows="3" style="resize:vertical;font-size:.85rem;width:100%;${rtl}">${esc(q.text)}</textarea>`;
+
+  // Replace opt-grid with editable inputs (single column)
+  const optWrap=document.getElementById('q-options');
+  optWrap.style.gridTemplateColumns='1fr';
+  optWrap.innerHTML=q.options.map((o,i)=>`
     <div class="edit-opt-row">
       <div class="edit-opt-badge${editCorrectSel===i?' correct-sel':''}" data-eidx="${i}" onclick="setEditCorrect(${i})">${'ABCD'[i]}</div>
-      <input class="form-input" id="edit-opt-${i}" value="${o.replace(/"/g,'&quot;')}" style="flex:1;padding:6px 9px;font-size:.82rem;${isUrdu?'direction:rtl;text-align:right;font-family:var(--urdu);':''}"/>
+      <input class="form-input" id="edit-opt-${i}" value="${o.replace(/"/g,'&quot;')}" style="flex:1;padding:6px 9px;font-size:.82rem;${rtl}"/>
     </div>`).join('');
+
+  // Action buttons in answer-notice area
+  document.getElementById('answer-notice').innerHTML=`
+    <div style="display:flex;gap:7px;margin-top:12px;flex-wrap:wrap">
+      <button class="btn btn-dark" style="flex:1;justify-content:center;font-size:.82rem" onclick="saveEditedQuestion()">💾 Save &amp; Fix</button>
+      <button class="btn" style="flex:1;justify-content:center;font-size:.82rem;background:#fff1f2;color:#be123c;border-color:#fecdd3" onclick="deleteEditedQuestion()">🗑 Delete Q</button>
+      <button class="btn btn-ghost" style="font-size:.82rem;padding:8px 14px" onclick="closeEditPanel()">Cancel</button>
+    </div>
+    <div id="edit-panel-msg" class="edit-panel-msg" style="margin-top:6px"></div>`;
+
+  document.getElementById('streak-notice-wrap').innerHTML='';
+  setTimeout(()=>{ const t=document.getElementById('edit-qtext'); if(t) t.focus(); },60);
 }
 
 function setEditCorrect(idx){
   editCorrectSel=idx;
   document.querySelectorAll('.edit-opt-badge').forEach(el=>{
-    const i=+el.dataset.eidx;
-    el.classList.toggle('correct-sel',i===idx);
+    el.classList.toggle('correct-sel',+el.dataset.eidx===idx);
   });
 }
 
@@ -1177,24 +1170,6 @@ async function deleteQuestionInGitHub(q){
   }catch(e){ return {ok:false,error:e.message}; }
 }
 
-function selectQuestionText(){
-  const el=document.getElementById('q-text');
-  if(!el){ toast('No question loaded yet.'); return; }
-  try{
-    const range=document.createRange();
-    range.selectNodeContents(el);
-    const sel=window.getSelection();
-    sel.removeAllRanges();
-    sel.addRange(range);
-    const btn=document.getElementById('btn-select-q');
-    if(btn){
-      const orig=btn.innerHTML;
-      btn.innerHTML='<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Selected!';
-      btn.style.color='var(--good,#16a34a)'; btn.style.borderColor='var(--good,#16a34a)';
-      setTimeout(()=>{ btn.innerHTML=orig; btn.style.color=''; btn.style.borderColor=''; },2000);
-    }
-  }catch(e){ toast('Could not select text.'); }
-}
 
 function goQuestion(dir){
   playNavClick();
