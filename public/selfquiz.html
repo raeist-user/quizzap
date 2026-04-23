@@ -85,8 +85,10 @@
     .nav-back{display:flex;align-items:center;gap:5px;font-size:.79rem;font-weight:600;color:var(--mid);cursor:pointer;padding:6px 12px;border-radius:var(--r-sm);border:1.5px solid var(--line);background:var(--white);white-space:nowrap;flex-shrink:0;transition:all var(--t-fast);text-decoration:none}
     .nav-back:hover{background:var(--faint);border-color:#bbb;transform:translateX(-1px)}
     .nav-back:active{transform:scale(.97)}
-    .nav-score-badge{font-size:.73rem;font-weight:800;color:var(--good);background:var(--good-bg);border:1.5px solid #a7f3d0;padding:4px 11px;border-radius:20px;display:none;gap:4px;align-items:center}
+    .nav-score-badge{font-size:.73rem;font-weight:700;background:var(--white);border:1.5px solid var(--line);padding:4px 10px;border-radius:20px;display:none;gap:6px;align-items:center;color:var(--ink)}
     .nav-score-badge.show{display:inline-flex;animation:popIn .3s var(--t-spring)}
+    .ns-correct{color:var(--good);font-weight:800}
+    .ns-wrong{color:var(--bad);font-weight:800}
 
     /* BUTTONS */
     .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;font-family:var(--sans);font-size:.82rem;font-weight:700;padding:9px 18px;border-radius:var(--r-sm);border:1.5px solid transparent;cursor:pointer;transition:all var(--t-fast);white-space:nowrap;letter-spacing:.01em;-webkit-tap-highlight-color:transparent}
@@ -105,7 +107,7 @@
     .btn-sm{padding:5px 12px;font-size:.74rem}
     .btn-full{width:100%}
 
-    .page{padding:20px 16px 100px;max-width:600px;margin:0 auto}
+    .page{padding:12px 14px 100px;max-width:600px;margin:0 auto}
     .view{display:none}.view.active{display:block;animation:up .25s ease both}
 
     /* GATE */
@@ -159,24 +161,24 @@
     .q-info-box{background:var(--accent-bg);border:1px solid #bfdbfe;border-radius:var(--r-sm);padding:9px 13px;font-size:.8rem;color:var(--accent);font-weight:600;margin-top:10px}
 
     /* QUIZ HEADER */
-    .quiz-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;gap:8px}
+    .quiz-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:5px;gap:8px}
     .quiz-counter{font-size:.78rem;font-weight:700;color:var(--mid)}
     .quiz-score-pill{font-size:.76rem;font-weight:800;color:var(--good);background:var(--good-bg);border:1.5px solid #a7f3d0;padding:3px 12px;border-radius:20px;transition:all .25s var(--t-spring)}
     .quiz-score-pill.bump{animation:scoreCount .35s var(--t-spring)}
 
-    .progress-bar-wrap{height:6px;background:var(--line);border-radius:20px;margin-bottom:10px;overflow:hidden}
+    .progress-bar-wrap{height:5px;background:var(--line);border-radius:20px;margin-bottom:6px;overflow:hidden}
     .progress-bar{height:100%;background:linear-gradient(90deg,var(--accent),#6366f1);border-radius:20px;transition:width .45s cubic-bezier(.34,1.2,.64,1)}
 
     /* QUESTION CARD */
-    .q-card{background:var(--white);border:1px solid var(--line);border-radius:var(--r-lg);padding:12px 14px 12px;box-shadow:var(--sh-sm);margin-bottom:8px}
+    .q-card{background:var(--white);border:1px solid var(--line);border-radius:var(--r-lg);padding:10px 12px 10px;box-shadow:var(--sh-sm);margin-bottom:0}
     .q-num{font-size:.62rem;font-weight:800;color:var(--mid);letter-spacing:.08em;text-transform:uppercase;margin-bottom:5px}
-    .q-text{font-size:1.05rem;font-weight:600;line-height:1.55;margin-bottom:12px;cursor:text;user-select:text;-webkit-user-select:text}
+    .q-text{font-size:1rem;font-weight:600;line-height:1.5;margin-bottom:8px;cursor:text;user-select:text;-webkit-user-select:text}
 
     /* OPTIONS */
-    .opt-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+    .opt-grid{display:grid;grid-template-columns:1fr 1fr;gap:5px}
     @media(max-width:480px){.opt-grid{grid-template-columns:1fr}}
 
-    .opt-card{display:flex;align-items:center;gap:9px;padding:13px 14px;border:1.5px solid var(--line);border-radius:var(--r-lg);cursor:pointer;background:var(--white);transition:all var(--t-fast);font-size:.88rem;position:relative;overflow:hidden;text-align:left;font-family:var(--sans);font-weight:500;line-height:1.4;width:100%}
+    .opt-card{display:flex;align-items:center;gap:8px;padding:10px 12px;border:1.5px solid var(--line);border-radius:var(--r-lg);cursor:pointer;background:var(--white);transition:all var(--t-fast);font-size:.88rem;position:relative;overflow:hidden;text-align:left;font-family:var(--sans);font-weight:500;line-height:1.4;width:100%}
     .opt-card:not(.locked):hover{border-color:var(--ink);transform:translateY(-2px);box-shadow:var(--sh-sm)}
     .opt-card:not(.locked):active{transform:scale(.97) translateY(0)}
     .opt-card.chosen{border-color:var(--ink);background:var(--faint)}
@@ -210,7 +212,7 @@
     #view-quiz .q-card{
       overflow-y:auto;
     }
-    .page:has(#view-quiz.active){padding-bottom:120px}
+    .page:has(#view-quiz.active){padding-bottom:100px}
 
     /* ── Fixed bottom nav for quiz ── */
     .quiz-bottom-nav{
@@ -218,7 +220,7 @@
       bottom:0;left:0;right:0;
       background:var(--bg);
       border-top:1px solid var(--line);
-      padding:10px 16px 18px;
+      padding:8px 14px 16px;
       z-index:150;
       box-shadow:0 -4px 16px rgba(14,14,18,.07);
     }
@@ -310,7 +312,7 @@
 <nav>
   <div class="brand">Shadab <small>Self Quiz</small></div>
   <div class="nav-right">
-    <span class="nav-score-badge" id="nav-score">✓ 0</span>
+    <span class="nav-score-badge" id="nav-score"><span class="ns-correct" id="ns-c">✓ 0</span><span class="ns-wrong" id="ns-w">✗ 0</span></span>
     <a class="nav-back" href="/">← Home</a>
   </div>
 </nav>
@@ -392,14 +394,13 @@
   <div class="view" id="view-quiz">
     <div class="quiz-header">
       <span class="quiz-counter" id="quiz-counter">Question 1 / 10</span>
-      <span class="quiz-score-pill" id="quiz-score">✓ 0</span>
     </div>
     <div class="progress-bar-wrap">
       <div class="progress-bar" id="quiz-progress" style="width:0%"></div>
     </div>
 
     <div class="q-card" id="quiz-card">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
         <div class="q-num" id="q-num" style="margin-bottom:0">Q1</div>
         <div style="display:flex;gap:6px;align-items:center">
           <button id="btn-ask-gpt" onclick="openChatGPT()" title="Ask ChatGPT about this question" style="display:flex;align-items:center;gap:4px;padding:3px 8px;background:#f0f0f0;border:1px solid #d0d0d0;border-radius:6px;font-size:.72rem;font-weight:600;color:#111;cursor:pointer;flex-shrink:0;-webkit-tap-highlight-color:transparent">
@@ -495,6 +496,7 @@ let userAnswers   = {};
 let revealed      = {};
 let reported      = new Set();
 let score         = 0;
+let incorrectCount= 0;
 let streak        = 0;
 
 // ── HELPERS ──────────────────────────────────────────────────────────────────
@@ -875,7 +877,7 @@ function startQuiz(){
   let pool=allQuestions.slice(start,start+countVal);
   if(doShuffle) pool=shuffle(pool);
   quizQuestions=pool;
-  currentIdx=0;userAnswers={};revealed={};reported=new Set();score=0;streak=0;
+  currentIdx=0;userAnswers={};revealed={};reported=new Set();score=0;incorrectCount=0;streak=0;
   updateNavScore();
   playClick();
   showView('view-quiz');
@@ -972,6 +974,7 @@ function selectOption(idx){
       if(streak>=5) setTimeout(burstConfetti,200);
     } else {
       streak=0;
+      incorrectCount++;
       setTimeout(playWrong,80);
     }
     updateNavScore();
@@ -1197,11 +1200,11 @@ function confirmFinish(){
 
 function updateNavScore(){
   const b=document.getElementById('nav-score');
-  b.textContent=`✓ ${score}`;
   b.classList.add('show');
-  const pill=document.getElementById('quiz-score');
-  pill.classList.remove('bump');
-  requestAnimationFrame(()=>pill.classList.add('bump'));
+  const c=document.getElementById('ns-c');
+  const w=document.getElementById('ns-w');
+  if(c) c.textContent=`✓ ${score}`;
+  if(w) w.textContent=`✗ ${incorrectCount}`;
 }
 
 // ── RESULTS ───────────────────────────────────────────────────────────────────
