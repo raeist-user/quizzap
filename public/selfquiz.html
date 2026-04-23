@@ -104,7 +104,7 @@
     .btn-ghost{background:var(--white);color:var(--mid);border-color:var(--line)}
     .btn-ghost:not(:disabled):hover{background:var(--faint);color:var(--ink)}
     .btn-warn{background:#d97706;color:#fff;border-color:#d97706}
-    .btn-sm{padding:5px 12px;font-size:.74rem}
+    .btn-sm{height:36px;padding:0 12px;font-size:.74rem}
     .btn-full{width:100%}
 
     .page{padding:12px 14px 0;max-width:600px;margin:0 auto}
@@ -236,9 +236,9 @@
       gap:var(--nav-gap,8px);
     }
     .nav-row{display:flex;gap:8px}
-    .nav-row .btn{flex:1;padding:var(--nav-btn-pad,9px) 18px;font-size:var(--nav-btn-fs,.82rem)}
-    .report-row{text-align:center;margin-top:2px}
-    .report-btn{display:inline-flex;align-items:center;gap:5px;padding:6px 14px;font-size:.73rem;font-weight:700;color:var(--warn);background:var(--warn-bg);border:1px solid #fcd34d;border-radius:var(--r-sm);cursor:pointer;-webkit-tap-highlight-color:transparent;transition:all var(--t-fast)}
+    .nav-row .btn{flex:1;height:44px;font-size:.84rem;padding:0 18px}
+    .report-row{display:flex;align-items:center;justify-content:center;gap:8px;margin-top:2px}
+    .report-btn{display:inline-flex;align-items:center;gap:5px;height:36px;padding:0 14px;font-size:.73rem;font-weight:700;color:var(--warn);background:var(--warn-bg);border:1px solid #fcd34d;border-radius:var(--r-sm);cursor:pointer;-webkit-tap-highlight-color:transparent;transition:all var(--t-fast);white-space:nowrap}
     .report-btn:hover{background:#fef0b0}
     .report-btn:active{opacity:.7}
     .report-btn.reported{color:var(--mid);background:var(--faint);border-color:var(--line)}
@@ -451,8 +451,8 @@
       </div>
       <div class="report-row">
         <button class="report-btn" id="report-btn" onclick="openReportModal()">⚑ Report</button>
-        <button class="btn btn-ghost btn-sm" id="finish-btn" onclick="confirmFinish()" style="margin-left:8px">■ Finish Quiz</button>
-        <button class="btn btn-ghost btn-sm" onclick="toggleFsPanel()" id="fs-settings-btn" title="Display settings" style="margin-left:8px;padding:5px 10px">⚙</button>
+        <button class="btn btn-ghost btn-sm" id="finish-btn" onclick="confirmFinish()">■ Finish Quiz</button>
+        <button class="btn btn-ghost btn-sm" onclick="toggleFsPanel()" id="fs-settings-btn" title="Display settings" style="padding:0 10px">⚙</button>
       </div>
     </div>
   </div>
@@ -1383,11 +1383,11 @@ const FS_KEY_Q   = 'scc_fs_question';
 const FS_KEY_O   = 'scc_fs_options';
 const FS_KEY_NAV = 'scc_fs_nav';
 
-// Nav size presets: [pad-top, pad-bottom, gap, btn-pad, btn-fs, approx total height, label]
+// Nav size presets: only outer padding scales — buttons stay fixed size
 const NAV_PRESETS = [
-  { padV:'6px',  padB:'10px', gap:'5px',  btnPad:'6px',  btnFs:'.78rem', h:'72px',  label:'S' },
-  { padV:'10px', padB:'16px', gap:'8px',  btnPad:'9px',  btnFs:'.82rem', h:'90px',  label:'M' },
-  { padV:'16px', padB:'22px', gap:'12px', btnPad:'14px', btnFs:'.9rem',  h:'116px', label:'L' },
+  { padV:'4px',  padB:'8px',  gap:'6px',  h:'76px',  label:'S' },
+  { padV:'10px', padB:'16px', gap:'8px',  h:'96px',  label:'M' },
+  { padV:'20px', padB:'26px', gap:'10px', h:'118px', label:'L' },
 ];
 
 function applyFontSize(){
@@ -1404,12 +1404,10 @@ function applyNavSize(){
   const idx = (+document.getElementById('fs-nav-slider').value) - 1;
   const p = NAV_PRESETS[idx];
   const root = document.documentElement;
-  root.style.setProperty('--nav-pad-v',  p.padV);
-  root.style.setProperty('--nav-pad-b',  p.padB);
-  root.style.setProperty('--nav-gap',    p.gap);
-  root.style.setProperty('--nav-btn-pad',p.btnPad);
-  root.style.setProperty('--nav-btn-fs', p.btnFs);
-  root.style.setProperty('--nav-h',      p.h);
+  root.style.setProperty('--nav-pad-v', p.padV);
+  root.style.setProperty('--nav-pad-b', p.padB);
+  root.style.setProperty('--nav-gap',   p.gap);
+  root.style.setProperty('--nav-h',     p.h);
   document.getElementById('fs-nav-val').textContent = p.label;
   try{ localStorage.setItem(FS_KEY_NAV, idx+1); }catch(e){}
 }
