@@ -170,13 +170,13 @@
     /* QUESTION CARD */
     .q-card{background:var(--white);border:1px solid var(--line);border-radius:var(--r-lg);padding:12px 14px 12px;box-shadow:var(--sh-sm);margin-bottom:8px}
     .q-num{font-size:.62rem;font-weight:800;color:var(--mid);letter-spacing:.08em;text-transform:uppercase;margin-bottom:5px}
-    .q-text{font-size:.88rem;font-weight:600;line-height:1.5;margin-bottom:10px}
+    .q-text{font-size:1.05rem;font-weight:600;line-height:1.55;margin-bottom:12px;cursor:text;user-select:all;-webkit-user-select:all}
 
     /* OPTIONS */
     .opt-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px}
     @media(max-width:480px){.opt-grid{grid-template-columns:1fr}}
 
-    .opt-card{display:flex;align-items:center;gap:9px;padding:9px 11px;border:1.5px solid var(--line);border-radius:var(--r-lg);cursor:pointer;background:var(--white);transition:all var(--t-fast);font-size:.78rem;position:relative;overflow:hidden;text-align:left;font-family:var(--sans);font-weight:500;line-height:1.4;width:100%}
+    .opt-card{display:flex;align-items:center;gap:9px;padding:13px 14px;border:1.5px solid var(--line);border-radius:var(--r-lg);cursor:pointer;background:var(--white);transition:all var(--t-fast);font-size:.88rem;position:relative;overflow:hidden;text-align:left;font-family:var(--sans);font-weight:500;line-height:1.4;width:100%}
     .opt-card:not(.locked):hover{border-color:var(--ink);transform:translateY(-2px);box-shadow:var(--sh-sm)}
     .opt-card:not(.locked):active{transform:scale(.97) translateY(0)}
     .opt-card.chosen{border-color:var(--ink);background:var(--faint)}
@@ -880,17 +880,6 @@ function renderQuestion(){
 
   const qTextEl=document.getElementById('q-text');
   qTextEl.innerHTML=escLatex(q.text);
-  qTextEl.style.cursor='text';
-  qTextEl.style.userSelect='text';
-  qTextEl.onclick=()=>{
-    try{
-      const range=document.createRange();
-      range.selectNodeContents(qTextEl);
-      const sel=window.getSelection();
-      sel.removeAllRanges();
-      sel.addRange(range);
-    }catch(e){}
-  };
 
   document.getElementById('prev-btn').disabled=currentIdx===0;
   const isLast=currentIdx===quizQuestions.length-1;
@@ -984,8 +973,16 @@ function openClaude(){
   if(!q){ toast('No question loaded.'); return; }
   const opts=['A','B','C','D'].map((l,i)=>`${l}) ${q.options[i]||''}`).join(', ');
   const prompt=`${q.text}\n\nOptions: ${opts}\n\nWhat is the correct answer and why?`;
-  const url='https://claude.ai/new?q='+encodeURIComponent(prompt);
-  window.open(url,'_blank','noopener');
+  const encoded=encodeURIComponent(prompt);
+  const fallback=encodeURIComponent('https://claude.ai/new?q='+encoded);
+  // Android intent URL: tries to open Claude app, falls back to browser
+  const intentUrl=`intent://claude.ai/new?q=${encoded}#Intent;scheme=https;package=com.anthropic.claude;S.browser_fallback_url=${fallback};end`;
+  const a=document.createElement('a');
+  a.href=intentUrl;
+  a.rel='noopener';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
 }
 
 
@@ -1013,8 +1010,6 @@ function renderEditInPlace(q){
 
   // Replace q-text with textarea
   const qTextEl=document.getElementById('q-text');
-  qTextEl.onclick=null;
-  qTextEl.style.cursor='';
   qTextEl.innerHTML=`<textarea id="edit-qtext" class="form-input" rows="3" style="resize:vertical;font-size:.85rem;width:100%;${rtl}">${esc(q.text)}</textarea>`;
 
   // Replace opt-grid with editable inputs (single column)
