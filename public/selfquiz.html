@@ -220,7 +220,7 @@
       backdrop-filter:blur(10px);
       -webkit-backdrop-filter:blur(10px);
       border-top:1px solid var(--line);
-      padding:10px 14px 16px;
+      padding:var(--nav-pad-v,10px) 14px var(--nav-pad-b,16px);
       z-index:100;
     }
     .quiz-bottom-nav-inner{
@@ -228,15 +228,15 @@
       margin:0 auto;
     }
     /* So the fixed bar doesn't cover content, add padding to the page when quiz is active */
-    .page:has(#view-quiz.active){padding-bottom:90px}
+    .page:has(#view-quiz.active){padding-bottom:var(--nav-h,90px)}
 
     .quiz-bottom-nav-inner{
       display:flex;
       flex-direction:column;
-      gap:8px;
+      gap:var(--nav-gap,8px);
     }
     .nav-row{display:flex;gap:8px}
-    .nav-row .btn{flex:1}
+    .nav-row .btn{flex:1;padding:var(--nav-btn-pad,9px) 18px;font-size:var(--nav-btn-fs,.82rem)}
     .report-row{text-align:center;margin-top:2px}
     .report-btn{display:inline-flex;align-items:center;gap:5px;padding:6px 14px;font-size:.73rem;font-weight:700;color:var(--warn);background:var(--warn-bg);border:1px solid #fcd34d;border-radius:var(--r-sm);cursor:pointer;-webkit-tap-highlight-color:transparent;transition:all var(--t-fast)}
     .report-btn:hover{background:#fef0b0}
@@ -308,11 +308,8 @@
     .modal-textarea:focus{border-color:var(--accent)}
     .modal-actions{display:flex;gap:8px}
     /* ── FONT SIZE SETTINGS ── */
-    .fs-fab{position:fixed;bottom:96px;right:14px;width:38px;height:38px;border-radius:50%;background:var(--ink);color:#fff;border:none;cursor:pointer;display:none;align-items:center;justify-content:center;z-index:150;box-shadow:var(--sh-md);transition:transform var(--t-spring),background var(--t-fast);-webkit-tap-highlight-color:transparent;font-size:1rem}
-    .fs-fab.visible{display:flex}
-    .fs-fab:active{transform:scale(.9)}
-
-    .fs-panel{position:fixed;bottom:144px;right:14px;background:var(--white);border:1.5px solid var(--line);border-radius:var(--r-lg);padding:16px;width:220px;z-index:149;box-shadow:var(--sh-lg);display:none;animation:slideUp .2s ease both}
+    .fs-panel{position:fixed;bottom:var(--nav-h,90px);right:14px;background:var(--white);border:1.5px solid var(--line);border-radius:var(--r-lg);padding:16px;width:228px;z-index:149;box-shadow:var(--sh-lg);display:none;animation:slideUp .2s ease both}
+    .fs-panel.open{display:block}
     .fs-panel.open{display:block}
     .fs-panel-title{font-size:.62rem;font-weight:800;letter-spacing:.09em;text-transform:uppercase;color:var(--mid);margin-bottom:12px}
     .fs-row{display:flex;flex-direction:column;gap:5px;margin-bottom:12px}
@@ -455,16 +452,14 @@
       <div class="report-row">
         <button class="report-btn" id="report-btn" onclick="openReportModal()">⚑ Report</button>
         <button class="btn btn-ghost btn-sm" id="finish-btn" onclick="confirmFinish()" style="margin-left:8px">■ Finish Quiz</button>
+        <button class="btn btn-ghost btn-sm" onclick="toggleFsPanel()" id="fs-settings-btn" title="Display settings" style="margin-left:8px;padding:5px 10px">⚙</button>
       </div>
     </div>
   </div>
 
-  <!-- FONT SIZE FAB -->
-  <button class="fs-fab" id="fs-fab" onclick="toggleFsPanel()" title="Font size settings">⚙</button>
-
-  <!-- FONT SIZE PANEL -->
+  <!-- FONT SIZE PANEL (opens upward from bottom nav) -->
   <div class="fs-panel" id="fs-panel">
-    <div class="fs-panel-title">Font Size</div>
+    <div class="fs-panel-title">Display Settings</div>
     <div class="fs-row">
       <div class="fs-label">Question <span class="fs-val" id="fs-q-val">16px</span></div>
       <div class="fs-controls">
@@ -477,6 +472,13 @@
       <div class="fs-controls">
         <input class="fs-slider" type="range" id="fs-o-slider" min="12" max="26" step="1" value="16" oninput="applyFontSize()"/>
         <span class="fs-reset" onclick="resetFs('o')">Reset</span>
+      </div>
+    </div>
+    <div class="fs-row">
+      <div class="fs-label">Nav Size <span class="fs-val" id="fs-nav-val">M</span></div>
+      <div class="fs-controls">
+        <input class="fs-slider" type="range" id="fs-nav-slider" min="1" max="3" step="1" value="2" oninput="applyNavSize()"/>
+        <span class="fs-reset" onclick="resetFs('nav')">Reset</span>
       </div>
     </div>
   </div>
@@ -1377,8 +1379,16 @@ const _urduObserver = new MutationObserver(()=>applyUrduFont());
 _urduObserver.observe(document.body,{childList:true,subtree:true});
 
 // ── FONT SIZE SETTINGS ────────────────────────────────────────────────────────
-const FS_KEY_Q = 'scc_fs_question';
-const FS_KEY_O = 'scc_fs_options';
+const FS_KEY_Q   = 'scc_fs_question';
+const FS_KEY_O   = 'scc_fs_options';
+const FS_KEY_NAV = 'scc_fs_nav';
+
+// Nav size presets: [pad-top, pad-bottom, gap, btn-pad, btn-fs, approx total height, label]
+const NAV_PRESETS = [
+  { padV:'6px',  padB:'10px', gap:'5px',  btnPad:'6px',  btnFs:'.78rem', h:'72px',  label:'S' },
+  { padV:'10px', padB:'16px', gap:'8px',  btnPad:'9px',  btnFs:'.82rem', h:'90px',  label:'M' },
+  { padV:'16px', padB:'22px', gap:'12px', btnPad:'14px', btnFs:'.9rem',  h:'116px', label:'L' },
+];
 
 function applyFontSize(){
   const qVal = +document.getElementById('fs-q-slider').value;
@@ -1390,13 +1400,24 @@ function applyFontSize(){
   try{ localStorage.setItem(FS_KEY_Q, qVal); localStorage.setItem(FS_KEY_O, oVal); }catch(e){}
 }
 
+function applyNavSize(){
+  const idx = (+document.getElementById('fs-nav-slider').value) - 1;
+  const p = NAV_PRESETS[idx];
+  const root = document.documentElement;
+  root.style.setProperty('--nav-pad-v',  p.padV);
+  root.style.setProperty('--nav-pad-b',  p.padB);
+  root.style.setProperty('--nav-gap',    p.gap);
+  root.style.setProperty('--nav-btn-pad',p.btnPad);
+  root.style.setProperty('--nav-btn-fs', p.btnFs);
+  root.style.setProperty('--nav-h',      p.h);
+  document.getElementById('fs-nav-val').textContent = p.label;
+  try{ localStorage.setItem(FS_KEY_NAV, idx+1); }catch(e){}
+}
+
 function resetFs(which){
-  if(which==='q'){
-    document.getElementById('fs-q-slider').value=16;
-  } else {
-    document.getElementById('fs-o-slider').value=16;
-  }
-  applyFontSize();
+  if(which==='q'){ document.getElementById('fs-q-slider').value=16; applyFontSize(); }
+  else if(which==='o'){ document.getElementById('fs-o-slider').value=16; applyFontSize(); }
+  else if(which==='nav'){ document.getElementById('fs-nav-slider').value=2; applyNavSize(); }
 }
 
 function toggleFsPanel(){
@@ -1407,35 +1428,23 @@ function toggleFsPanel(){
 // Close panel when clicking outside
 document.addEventListener('click', function(e){
   const panel = document.getElementById('fs-panel');
-  const fab = document.getElementById('fs-fab');
-  if(panel && panel.classList.contains('open') && !panel.contains(e.target) && e.target!==fab){
+  const btn   = document.getElementById('fs-settings-btn');
+  if(panel && panel.classList.contains('open') && !panel.contains(e.target) && e.target!==btn && !btn.contains(e.target)){
     panel.classList.remove('open');
   }
 });
 
-// Show/hide FAB with quiz view
-const _origShowView = showView;
-// Patch: already handled in showView via quiz-bottom-nav logic;
-// we hook into the same place via MutationObserver on view-quiz class
-(function(){
-  const quizView = document.getElementById('view-quiz');
-  if(!quizView) return;
-  const fab = document.getElementById('fs-fab');
-  new MutationObserver(()=>{
-    const isActive = quizView.classList.contains('active');
-    if(fab) fab.classList.toggle('visible', isActive);
-    if(!isActive){ const p=document.getElementById('fs-panel'); if(p) p.classList.remove('open'); }
-  }).observe(quizView,{attributes:true,attributeFilter:['class']});
-})();
-
-// Restore saved font sizes on load
+// Restore saved settings on load
 (function(){
   try{
-    const q = parseInt(localStorage.getItem(FS_KEY_Q))||16;
-    const o = parseInt(localStorage.getItem(FS_KEY_O))||16;
-    document.getElementById('fs-q-slider').value = q;
-    document.getElementById('fs-o-slider').value = o;
+    const q   = parseInt(localStorage.getItem(FS_KEY_Q))||16;
+    const o   = parseInt(localStorage.getItem(FS_KEY_O))||16;
+    const nav = parseInt(localStorage.getItem(FS_KEY_NAV))||2;
+    document.getElementById('fs-q-slider').value   = q;
+    document.getElementById('fs-o-slider').value   = o;
+    document.getElementById('fs-nav-slider').value = nav;
     applyFontSize();
+    applyNavSize();
   }catch(e){}
 })();
 </script>
