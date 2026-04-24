@@ -5,10 +5,11 @@ const mongoose = require('mongoose');
 // ── USER ──────────────────────────────────────────────────────────────────────
 const userSchema = new mongoose.Schema({
   name:        { type: String, required: true, trim: true, maxlength: 50 },
-  // email is optional for new users (legacy users still have it); sparse allows multiple nulls in a unique index
-  email:       { type: String, required: false, trim: true, lowercase: true, unique: true, sparse: true, default: null },
+  // email is optional for new users — sparse index ignores MISSING fields (undefined), not null
+  // Do NOT set default:null here; omit the field entirely when not provided
+  email:       { type: String, required: false, trim: true, lowercase: true, unique: true, sparse: true },
   username:    {
-    type: String, lowercase: true, trim: true, sparse: true, unique: true, default: null,
+    type: String, lowercase: true, trim: true, sparse: true, unique: true,
     validate: {
       validator: v => v === null || v === undefined || /^[a-zA-Z0-9_]{3,30}$/.test(v),
       message:   'Username must be 3–30 characters: letters, numbers, underscores only',
@@ -24,9 +25,9 @@ const User = mongoose.model('User', userSchema);
 // ── PENDING REGISTRATIONS ─────────────────────────────────────────────────────
 const pendingRegSchema = new mongoose.Schema({
   name:      { type: String, required: true, trim: true, maxlength: 50 },
-  // email is optional for new registrations; sparse allows multiple nulls in a unique index
-  email:     { type: String, required: false, trim: true, lowercase: true, unique: true, sparse: true, default: null },
-  username:  { type: String, lowercase: true, trim: true, sparse: true, unique: true, default: null },
+  // email omitted entirely (undefined) when not provided — sparse index won't index it
+  email:     { type: String, required: false, trim: true, lowercase: true, unique: true, sparse: true },
+  username:  { type: String, lowercase: true, trim: true, sparse: true, unique: true },
   password:  { type: String, required: true },
   createdAt: { type: Date, default: Date.now },
 });

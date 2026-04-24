@@ -68,19 +68,22 @@ function initRoutes(app) {
       }
 
       const hashed = await bcrypt.hash(password, 10);
-      await PendingReg.create({
+      const pendingDoc = {
         name: name.trim(),
-        email: emailVal ? emailVal.toLowerCase() : null,
         username: uname.toLowerCase(),
         password: hashed,
-      });
+      };
+      // Only set email if one was actually provided — omitting it entirely avoids
+      // the sparse-index conflict that null would cause with other no-email users
+      if (emailVal) pendingDoc.email = emailVal.toLowerCase();
+      await PendingReg.create(pendingDoc);
       res.json({ pending: true, message: 'Registration submitted! Your account is pending approval by the host.' });
     } catch (e) {
       if (e.code === 11000) {
         const field = Object.keys(e.keyPattern || {})[0] || '';
-        if (field === 'email')    return res.status(400).json({ error: 'An account with this email already exists' });
         if (field === 'username') return res.status(400).json({ error: 'Username already taken' });
-        return res.status(500).json({ error: 'Registration failed — please try again' });
+        if (field === 'email')    return res.status(400).json({ error: 'An account with this email already exists' });
+        return res.status(400).json({ error: 'Username already taken — please choose another' });
       }
       console.error('Register error:', e.message);
       res.status(500).json({ error: 'Registration failed' });
@@ -229,7 +232,16 @@ function initRoutes(app) {
         await PendingReg.findByIdAndDelete(pr._id);
         return res.status(400).json({ error: 'Email already registered' });
       }
-      const newUser = await User.create({ name: pr.name, email: pr.email || null, username: pr.username || null, password: pr.password, role: 'student', status: 'approved' });
+      const newUserDoc = {
+        name: pr.name,
+        username: pr.username || undefined,
+        password: pr.password,
+        role: 'student',
+        status: 'approved',
+      };
+      // Only set email if it was provided — omit entirely to avoid sparse-index conflict
+      if (pr.email) newUserDoc.email = pr.email;
+      const newUser = await User.create(newUserDoc);
       console.log('[approve] User created:', newUser._id, newUser.email);
       await PendingReg.findByIdAndDelete(pr._id);
       res.json({ ok: true });

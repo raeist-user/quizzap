@@ -37,6 +37,31 @@ function scheduleTodayLBReset() {
 mongoose.connect(MONGODB_URI)
   .then(async () => {
     console.log('MongoDB connected — db:', mongoose.connection.db.databaseName);
+
+    // ── ONE-TIME MIGRATION: ensure email indexes are sparse ────────────────
+    // The old non-sparse unique index on email causes duplicate key errors when
+    // multiple users have no email (undefined). Drop it so Mongoose recreates
+    // it as sparse on next sync. Safe to run on every boot — fails silently if
+    // already done.
+    try {
+      const db = mongoose.connection.db;
+      for (const colName of ['users', 'pendingregs']) {
+        try {
+          await db.collection(colName).dropIndex('email_1');
+          console.log(`[Migration] Dropped old non-sparse email index on ${colName}`);
+        } catch (e) {
+          if (e.codeName !== 'IndexNotFound') console.warn(`[Migration] ${colName} email index:`, e.message);
+        }
+      }
+      // Re-sync indexes so Mongoose recreates them as sparse
+      const { User, PendingReg } = require('./models');
+      await User.syncIndexes();
+      await PendingReg.syncIndexes();
+      console.log('[Migration] Email indexes recreated as sparse ✓');
+    } catch (e) {
+      console.warn('[Migration] Index migration error (non-fatal):', e.message);
+    }
+    // ──────────────────────────────────────────────────────────────────────
     try {
       const saved = await ReportDB.find().sort({ ts: 1 }).lean();
       shared.questionReports = saved.map(r => ({
