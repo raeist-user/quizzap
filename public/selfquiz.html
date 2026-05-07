@@ -1044,8 +1044,14 @@ function openClaude(){
   if(!q){ toast('No question loaded.'); return; }
   const opts=['A','B','C','D'].map((l,i)=>`${l}) ${q.options[i]||''}`).join(', ');
   const prompt=`${q.text}\n\nOptions: ${opts}\n\nWhat is the correct answer and why?`;
-  const url='https://claude.ai/new?q='+encodeURIComponent(prompt);
-  window.open(url,'_blank','noopener');
+  // Claude.ai doesn't support ?q= pre-fill, so copy prompt to clipboard first
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(prompt).then(()=>{
+      toast('Prompt copied — paste it in Claude ✓');
+    }).catch(()=>{});
+  }
+  // Use https://claude.ai (not /new) to avoid triggering the mobile app protocol
+  window.open('https://claude.ai','_blank','noopener,noreferrer');
 }
 
 
