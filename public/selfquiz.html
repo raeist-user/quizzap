@@ -439,6 +439,7 @@
       <div id="answer-notice"></div>
       <div id="streak-notice-wrap"></div>
     </div>
+    </div>
 
   </div>
 
@@ -1043,17 +1044,13 @@ function openClaude(){
   const q=quizQuestions[currentIdx];
   if(!q){ toast('No question loaded.'); return; }
   const opts=['A','B','C','D'].map((l,i)=>`${l}) ${q.options[i]||''}`).join(', ');
-  const prompt=`${q.text}\n\nOptions: ${opts}\n\nWhat is the correct answer and why?`;
-  // Claude has no supported URL param for pre-filling regular chat.
-  // Best UX: copy prompt to clipboard, then open the app.
-  if(navigator.clipboard && navigator.clipboard.writeText){
-    navigator.clipboard.writeText(prompt).then(()=>{
-      toast('Prompt copied — paste it in Claude ✓', 3500);
-    }).catch(()=>{ toast('Open Claude and type your question'); });
-  } else {
-    toast('Open Claude and type your question');
-  }
-  window.open('https://claude.ai/new','_blank','noopener,noreferrer');
+  const prompt=`${q.text}
+
+Options: ${opts}
+
+What is the correct answer and why?`;
+  const url='https://claude.ai/new?q='+encodeURIComponent(prompt);
+  window.open(url,'_blank','noopener');
 }
 
 
