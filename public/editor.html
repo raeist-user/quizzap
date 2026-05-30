@@ -324,7 +324,13 @@
           <div class="file-list-head">
             <span style="font-size:1rem">📁</span>
             <span class="file-list-head-title" id="ed-folder-title">—</span>
-            <button class="btn btn-ghost btn-sm" onclick="edGoHome()" style="font-size:.72rem;padding:4px 8px">← Back</button>
+            <button class="btn btn-ghost btn-sm" id="btn-rename-folder" onclick="startFolderRename()" style="font-size:.72rem;padding:4px 6px;line-height:1" title="Rename folder">✎</button>
+            <div id="folder-rename-form" style="display:none;align-items:center;gap:5px;flex:1;min-width:0">
+              <input id="folder-rename-input" class="form-input" style="flex:1;min-width:60px;padding:4px 8px;font-size:.78rem" maxlength="50" onkeydown="handleFolderRenameKey(event)"/>
+              <button class="btn btn-good btn-sm" style="padding:4px 10px;font-size:.72rem;flex-shrink:0" onclick="confirmFolderRename()">✓</button>
+              <button class="btn btn-ghost btn-sm" style="padding:4px 8px;font-size:.72rem;flex-shrink:0" onclick="cancelFolderRename()">✕</button>
+            </div>
+            <button class="btn btn-ghost btn-sm" id="btn-back-folder" onclick="edGoHome()" style="font-size:.72rem;padding:4px 8px">← Back</button>
           </div>
           <div id="ed-file-list-body" class="file-list-body">
             <div class="loading-row"><span class="spin"></span>Loading…</div>
@@ -937,6 +943,66 @@ async function deleteFile(fileName){
     await loadFolderFiles(edCurrentFolder);
     renderFileList();
   } catch(e){ toast('Delete error: ' + e.message, 'warn'); }
+}
+
+/* ── Rename folder ── */
+function startFolderRename(){
+  const inp = document.getElementById('folder-rename-input');
+  inp.value = edCurrentFolder;
+  document.getElementById('ed-folder-title').style.display = 'none';
+  document.getElementById('btn-rename-folder').style.display = 'none';
+  document.getElementById('folder-rename-form').style.display = 'flex';
+  document.getElementById('btn-back-folder').style.display = 'none';
+  inp.focus(); inp.select();
+}
+
+function cancelFolderRename(){
+  document.getElementById('ed-folder-title').style.display = '';
+  document.getElementById('btn-rename-folder').style.display = '';
+  document.getElementById('folder-rename-form').style.display = 'none';
+  document.getElementById('btn-back-folder').style.display = '';
+}
+
+function handleFolderRenameKey(e){
+  if(e.key === 'Enter')  confirmFolderRename();
+  if(e.key === 'Escape') cancelFolderRename();
+}
+
+async function confirmFolderRename(){
+  const inp = document.getElementById('folder-rename-input');
+  let newName = inp.value.trim().replace(/[^\w\- ]/g,'');
+  if(!newName){ toast('Folder name required','warn'); return; }
+  if(newName === edCurrentFolder){ cancelFolderRename(); return; }
+  if(!isValidToken()){ toast('GitHub token not configured','warn'); return; }
+  cancelFolderRename();
+  toast('Renaming folder…');
+  try {
+    const oldEnc = encodeURIComponent(edCurrentFolder);
+    const res = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/contents/resources/${oldEnc}?ref=${GITHUB_BRANCH}`, { headers: ghHeaders() });
+    if(!res.ok) throw new Error(`GitHub API ${res.status}`);
+    const items = await res.json();
+    // Move each file: create at new path, delete at old path
+    for(const item of items){
+      const getRes = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/contents/${item.path}?ref=${GITHUB_BRANCH}`, { headers: ghHeaders() });
+      if(!getRes.ok) throw new Error(`Could not read ${item.name}`);
+      const fileData = await getRes.json();
+      const encNew  = encodeURIComponent(newName);
+      const encFile = encodeURIComponent(item.name);
+      const putRes = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/contents/resources/${encNew}/${encFile}`, {
+        method: 'PUT', headers: ghWriteHeaders(),
+        body: JSON.stringify({ message: `Rename folder: ${edCurrentFolder} → ${newName}`, content: fileData.content.replace(/\n/g,''), branch: GITHUB_BRANCH })
+      });
+      if(!putRes.ok) throw new Error(`Could not create ${item.name} in new folder`);
+      const delRes = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/contents/${item.path}`, {
+        method: 'DELETE', headers: ghWriteHeaders(),
+        body: JSON.stringify({ message: `Rename folder: remove ${item.path}`, sha: item.sha, branch: GITHUB_BRANCH })
+      });
+      if(!delRes.ok) throw new Error(`Could not remove old ${item.name}`);
+    }
+    toast(`Folder renamed to "${newName}"`, 'good');
+    edCurrentFolder = newName;
+    openFolder(newName);
+  } catch(e){ toast('Rename failed: ' + e.message, 'warn'); }
 }
 
 /* ── Delete folder ── */

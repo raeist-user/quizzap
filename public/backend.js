@@ -1420,6 +1420,13 @@ async function generateQuiz(){
       picked.forEach(q=>{ q.subject=subjName; q.chapter=file.name.replace(/\.txt$/i,''); });
       all=[...all,...picked];
     }
+    // Global shuffle: interleave questions from all selected files/folders
+    if(hostRandomize && all.length>1){
+      for(let i=all.length-1;i>0;i--){
+        const j=Math.floor(Math.random()*(i+1));
+        [all[i],all[j]]=[all[j],all[i]];
+      }
+    }
     questions=all; selIdx=0; answerKey=all[0]?.correct??-1;
     msg.innerHTML=''; render();
   }catch(e){ msg.innerHTML=`<div class="notice n-bad mt2">${esc(e.message)}</div>`; }
