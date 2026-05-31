@@ -1,0 +1,305 @@
+त्रिकोणमिति गणित की वह शाखा है जो किसके माप से संबंधित है?
+(A) केवल कोणों, (B) केवल वृत्तों, (C) केवल भुजाओं, (D) त्रिभुज की भुजाओं और कोणों @
+
+समकोण त्रिभुज में sin θ का मान किसके बराबर होता है?
+(A) आधार / कर्ण, (B) लंब / कर्ण @, (C) कर्ण / लंब, (D) लंब / आधार
+
+समकोण त्रिभुज में cos θ ज्ञात करने का सूत्र क्या है?
+(A) कर्ण / आधार, (B) आधार / लंब, (C) आधार / कर्ण @, (D) लंब / कर्ण
+
+tan θ का मान भुजाओं के अनुपात में क्या होता है?
+(A) लंब / कर्ण, (B) आधार / कर्ण, (C) आधार / लंब, (D) लंब / आधार @
+
+cosec θ का मान sin θ के पदों में क्या होता है?
+(A) sin θ / cos θ, (B) 1 / tan θ, (C) 1 / cos θ, (D) 1 / sin θ @
+
+sec θ और cos θ का गुणनफल किसके बराबर होता है?
+(A) 0, (B) -1, (C) 2, (D) 1 @
+
+cot θ और tan θ का गुणनफल क्या होता है?
+(A) cos θ, (B) 1 @, (C) sin θ, (D) 0
+
+tan θ का मान sin और cos के पदों में क्या है?
+(A) sin θ / cos θ @, (B) sin θ * cos θ, (C) cos θ / sin θ, (D) 1 / sin θ
+
+मूलभूत सर्वसमिका sin² θ + cos² θ का मान क्या होता है?
+(A) 2, (B) 0, (C) 1 @, (D) -1
+
+sec² θ - tan² θ का मान किसके बराबर है?
+(A) sin² θ, (B) cot² θ, (C) 0, (D) 1 @
+
+cosec² θ - cot² θ का मान क्या होता है?
+(A) -1, (B) 1 @, (C) tan² θ, (D) 0
+
+sin θ और cos θ का मान कभी भी किससे अधिक नहीं हो सकता?
+(A) 1 @, (B) 0.5, (C) 0, (D) 2
+
+sec θ और cosec θ का मान हमेशा किससे अधिक या बराबर होता है?
+(A) 0, (B) 0.5, (C) 1 @, (D) 2
+
+sin 90-θ किसके बराबर होता है?
+(A) cos θ @, (B) -sin θ, (C) sin θ, (D) tan θ
+
+tan 90-θ का मान क्या होता है?
+(A) sin θ, (B) cot θ @, (C) sec θ, (D) tan θ
+
+cosec 90-θ का मान किसके बराबर है?
+(A) cos θ, (B) cosec θ, (C) sec θ @, (D) sin θ
+
+sin -x का मान क्या होता है?
+(A) sin x, (B) -sin x @, (C) cos x, (D) -cos x
+
+cos -x का मान क्या होता है?
+(A) -sin x, (B) -cos x, (C) cos x @, (D) sin x
+
+tan -x का मान क्या होता है?
+(A) -tan x @, (B) tan x, (C) cot x, (D) -cot x
+
+व्यंजक a sin x + b cos x का अधिकतम मान क्या होता है?
+(A) sqrt a + b, (B) a + b, (C) a² + b², (D) sqrt a² + b² @
+
+व्यंजक a sin x + b cos x का न्यूनतम मान क्या होता है?
+(A) 0, (B) -a² + b², (C) -sqrt a² + b² @, (D) a - b
+
+यदि a sin² x + b cos² x में a > b हो, तो अधिकतम मान क्या होगा?
+(A) a @, (B) b, (C) sqrt ab, (D) a + b
+
+यदि a sin² x + b cos² x में a < b हो, तो न्यूनतम मान क्या होगा?
+(A) b, (B) 0, (C) a @, (D) a - b
+
+a sin² x + b cosec² x का न्यूनतम मान क्या होता है?
+(A) ab, (B) 2 * sqrt ab @, (C) a + b, (D) sqrt a² + b²
+
+a tan² x + b cot² x का न्यूनतम मान क्या होता है?
+(A) 2 * sqrt ab @, (B) 1, (C) ab, (D) a + b
+
+sin A + B का सही सूत्र क्या है?
+(A) sin A cos B - cos A sin B, (B) sin A cos B + cos A sin B @, (C) sin A sin B + cos A cos B, (D) cos A cos B - sin A sin B
+
+sin A - B का सही सूत्र क्या है?
+(A) sin A cos B - cos A sin B @, (B) sin A cos B + cos A sin B, (C) cos A cos B + sin A sin B, (D) sin A sin B - cos A cos B
+
+cos A + B का सही सूत्र क्या है?
+(A) sin A cos B + cos A sin B, (B) cos A cos B - sin A sin B @, (C) cos A sin B - sin A cos B, (D) cos A cos B + sin A sin B
+
+cos A - B का सही सूत्र क्या है?
+(A) cos A cos B - sin A sin B, (B) sin A cos B - cos A sin B, (C) cos A cos B + sin A sin B @, (D) sin A sin B + cos A cos B
+
+sin 2A का सूत्र tan A के पदों में क्या है?
+(A) 2 tan A / 1 + tan A, (B) 2 tan A / 1 - tan² A, (C) tan² A / 1 + tan A, (D) 2 tan A / 1 + tan² A @
+
+cos 2A का मान cos और sin दोनों के पदों में क्या है?
+(A) 2 cos² A + 1, (B) cos² A + sin² A, (C) cos² A - sin² A @, (D) 1 - 2 cos² A
+
+cos 2A का सूत्र केवल cos के पदों में क्या है?
+(A) cos² A - 1, (B) 1 - 2 cos² A, (C) 2 cos² A - 1 @, (D) 2 sin² A - 1
+
+cos 2A का सूत्र केवल sin के पदों में क्या है?
+(A) 1 - 2 sin² A @, (B) 2 sin² A - 1, (C) 2 cos² A - 1, (D) 1 - sin² A
+
+cos 2A का सूत्र tan A के पदों में क्या है?
+(A) 1 - tan² A / 1 + tan² A @, (B) 2 tan A / 1 - tan² A, (C) 1 + tan² A / 1 - tan² A, (D) tan² A / 1 + tan² A
+
+tan 2A का सही सूत्र क्या है?
+(A) 2 tan A / 1 - tan² A @, (B) tan² A / 1 - tan A, (C) 2 tan A / 1 - tan A, (D) 2 tan A / 1 + tan² A
+
+sin 3A का सही सूत्र क्या है?
+(A) 3 sin³ A - 4 sin A, (B) 3 sin A - 4 sin³ A @, (C) 3 sin A + 4 sin³ A, (D) 4 sin A - 3 sin³ A
+
+cos 3A का सही सूत्र क्या है?
+(A) 4 cos³ A + 3 cos A, (B) 3 cos A - 4 cos³ A, (C) 4 cos³ A - 3 cos A @, (D) 4 cos A - 3 cos³ A
+
+tan 3A का सही सूत्र क्या है?
+(A) 3 tan A - tan² A / 1 - 3 tan A, (B) 3 tan A + tan³ A / 1 + 3 tan² A, (C) 3 tan A - tan³ A / 1 - 3 tan² A @, (D) tan A - 3 tan³ A / 1 - tan² A
+
+sin θ * sin 2θ * sin 4θ का मान किसके बराबर है?
+(A) 1/2 sin 3θ, (B) sin 3θ, (C) 1/4 cos 3θ, (D) 1/4 sin 3θ @
+
+cos θ * cos 2θ * cos 4θ का मान क्या होता है?
+(A) 1/4 sin 3θ, (B) cos 3θ, (C) 1/4 cos 3θ @, (D) 1/2 cos 3θ
+
+tan θ * tan 2θ * tan 4θ का मान क्या होता है?
+(A) 1/4 tan 3θ, (B) 3 tan θ, (C) tan 3θ @, (D) tan θ / 4
+
+tan A + B का सही विस्तार क्या है?
+(A) tan A + tan B, (B) tan A - tan B / 1 + tan A tan B, (C) tan A + tan B / 1 + tan A tan B, (D) tan A + tan B / 1 - tan A tan B @
+
+tan A - B का सही विस्तार क्या है?
+(A) tan A - tan B / 1 - tan A tan B, (B) tan A - tan B / 1 + tan A tan B @, (C) tan A + tan B / 1 - tan A tan B, (D) tan A - tan B
+
+cot A + B का सही सूत्र क्या है?
+(A) cot A + cot B / cot A cot B - 1, (B) cot A cot B - 1 / cot B + cot A @, (C) cot B + cot A / cot A cot B + 1, (D) cot A cot B + 1 / cot B - cot A
+
+cot A - B का सही सूत्र क्या है?
+(A) cot A cot B + 1 / cot B - cot A @, (B) cot A cot B - 1, (C) cot A cot B - 1 / cot B + cot A, (D) cot A - cot B / cot A cot B + 1
+
+sin C + sin D का सही सूत्र क्या है?
+(A) 2 sin C+D/2 * cos C-D/2 @, (B) 2 sin C+D/2 * sin C-D/2, (C) 2 cos C+D/2 * sin C-D/2, (D) 2 cos C+D/2 * cos C-D/2
+
+sin C - sin D का सही सूत्र क्या है?
+(A) 2 sin C+D/2 * cos C-D/2, (B) 2 cos C+D/2 * sin C-D/2 @, (C) 2 cos C+D/2 * cos C-D/2, (D) 2 sin C+D/2 * sin C-D/2
+
+cos C + cos D का सही सूत्र क्या है?
+(A) 2 sin C+D/2 * cos C-D/2, (B) -2 sin C+D/2 * sin C-D/2, (C) 2 cos C+D/2 * cos C-D/2 @, (D) 2 cos C+D/2 * sin C-D/2
+
+cos C - cos D का सही सूत्र क्या है?
+(A) 2 cos C+D/2 * cos C-D/2, (B) 2 cos C+D/2 * sin C-D/2, (C) 2 sin C+D/2 * sin D-C/2 @, (D) 2 sin C+D/2 * sin C-D/2
+
+यदि a sin X + b cos X = m और a cos X - b sin X = n हो, तो कौन सा संबंध सही है?
+(A) a² + b² = m² + n² @, (B) a² - b² = m² - n², (C) a² + b² = m² - n², (D) a + b = m + n
+
+यदि a sec X + b tan X = m और a tan X - b sec X = n हो, तो कौन सा संबंध सही है?
+(A) a² - b² = m² - n² @, (B) a - b = m - n, (C) a² - b² = n² - m², (D) a² + b² = m² + n²
+
+sec x + tan x का मान किसके बराबर होता है?
+(A) tan x - sec x, (B) 1 / sec x - tan x @, (C) 1 / sec x + tan x, (D) 1 / cos x
+
+cosec x + cot x का मान किसके बराबर होता है?
+(A) 1 / sin x, (B) 1 / cosec x - cot x @, (C) cot x - cosec x, (D) 1 / cosec x + cot x
+
+यदि A + B + C = 180° हो, तो cot A cot B + cot B cot C + cot C cot A का मान क्या होगा?
+(A) 1 @, (B) 0, (C) -1, (D) tan A tan B tan C
+
+यदि A + B + C = 90° हो, तो tan A tan B + tan B tan C + tan C tan A का मान क्या होगा?
+(A) 0, (B) 1 @, (C) 3, (D) -1
+
+यदि A + B = 45° हो, तो 1 + tan A * 1 + tan B का मान क्या होगा?
+(A) 0, (B) 1, (C) 2 @, (D) 4
+
+यदि A + B = 45° हो, तो 1 - cot A * 1 - cot B का मान क्या होगा?
+(A) 0, (B) -2, (C) 2 @, (D) 1
+
+sin² x * cos⁴ x का अधिकतम मान क्या होता है?
+(A) 1/2, (B) 1 @, (C) 1/4, (D) 0
+
+sin x * cos x ^ n का अधिकतम मान क्या होगा?
+(A) 0.5 ^ n @, (B) 0.5, (C) 1, (D) 2 ^ n
+
+sin⁴ x + cos⁴ x का न्यूनतम मान क्या होता है?
+(A) 0, (B) 1, (C) 1/2 @, (D) 1/4
+
+समकोण त्रिभुज में कर्ण को कैसे दर्शाया जाता है?
+(A) H @, (B) P, (C) K, (D) B
+
+त्रिकोणमिति में लंब के लिए किस अक्षर का प्रयोग किया जाता है?
+(A) B, (B) P @, (C) L, (D) H
+
+त्रिकोणमिति में आधार के लिए किस अक्षर का प्रयोग किया जाता है?
+(A) A, (B) P, (C) H, (D) B @
+
+sec θ का मान भुजाओं के अनुपात में क्या होता है?
+(A) कर्ण / आधार @, (B) कर्ण / लंब, (C) लंब / कर्ण, (D) आधार / कर्ण
+
+cosec θ का मान भुजाओं के अनुपात में क्या होता है?
+(A) कर्ण / आधार, (B) कर्ण / लंब @, (C) लंब / कर्ण, (D) आधार / कर्ण
+
+cot θ का मान भुजाओं के अनुपात में क्या होता है?
+(A) कर्ण / आधार, (B) लंब / कर्ण, (C) लंब / आधार, (D) आधार / लंब @
+
+यदि x-axis 180 या 360 पर कोण बदलता है, तो sin θ में क्या परिवर्तन होता है?
+(A) -sin θ होता है, (B) कोई परिवर्तन नहीं @, (C) cos θ में बदलता है, (D) tan θ होता है
+
+यदि y-axis 90 या 270 पर कोण बदलता है, तो sin θ किसमें बदलता है?
+(A) cosec θ, (B) sin θ ही रहता है, (C) cos θ @, (D) tan θ
+
+y-axis पर tan θ किसमें परिवर्तित होता है?
+(A) tan θ, (B) cot θ @, (C) sin θ, (D) sec θ
+
+y-axis पर cosec θ किसमें परिवर्तित होता है?
+(A) sin θ, (B) cot θ, (C) sec θ @, (D) cosec θ
+
+चतुर्थांश में दूसरे चतुर्थांश 90-180 में कौन से फलन धनात्मक होते हैं?
+(A) केवल tan और cot, (B) केवल sin और cosec @, (C) केवल sin और cos, (D) सभी फलन
+
+तीसरे चतुर्थांश 180-270 में कौन से त्रिकोणमितीय फलन धनात्मक होते हैं?
+(A) sin और cosec, (B) सभी, (C) tan और cot @, (D) cos और sec
+
+चौथे चतुर्थांश 270-360 में कौन से फलन धनात्मक होते हैं?
+(A) cos और sec @, (B) tan और cot, (C) sin और cos, (D) केवल sin
+
+प्रथम चतुर्थांश 0-90 में धनात्मक फलनों की संख्या कितनी है?
+(A) 0, (B) 2, (C) सभी 6 @, (D) 4
+
+sin² θ + cos⁴ θ का न्यूनतम मान ज्ञात करने के लिए θ का मान क्या रखा जाता है?
+(A) 0, (B) 30, (C) 90, (D) 45 @
+
+sin² 45 + cos⁴ 45 का मान क्या होगा?
+(A) 1, (B) 1/4, (C) 1/2, (D) 3/4 @
+
+sin⁴ x + cos⁴ x का अधिकतम मान क्या होता है?
+(A) 1 @, (B) 0, (C) 2, (D) 1/2
+
+tan x और cot x विषम घात की सीमा क्या होती है?
+(A) 0 से +inf, (B) -inf से +inf @, (C) 1 से +inf, (D) -1 से +1
+
+tan x और cot x सम घात की न्यूनतम सीमा क्या है?
+(A) -1, (B) -inf, (C) 1, (D) 0 @
+
+sec x और cosec x सम घात का न्यूनतम मान क्या होता है?
+(A) -1, (B) 0, (C) 1 @, (D) -inf
+
+a sin² x + b cos² x में यदि a < b हो, तो अधिकतम मान क्या होगा?
+(A) a + b, (B) b @, (C) a, (D) 0
+
+a sec² x + b cosec² x का न्यूनतम मान क्या होता है?
+(A) 2 * sqrt ab, (B) a + b, (C) sqrt a + sqrt b का वर्ग @, (D) ab
+
+a cos² x + b sec² x का न्यूनतम मान क्या होता है?
+(A) ab, (B) sqrt a + b, (C) a + b, (D) 2 * sqrt ab @
+
+sin 2A का मान cos A के पदों में क्या है?
+(A) 2 sin A cos A @, (B) 1 - 2 sin² A, (C) 2 tan A, (D) 2 cos² A - 1
+
+त्रिकोणमितीय फलनों में सम घात वाले sin x और cos x का न्यूनतम मान क्या होता है?
+(A) -inf, (B) 0 @, (C) -1, (D) 1
+
+त्रिकोणमितीय फलनों में विषम घात वाले sin x और cos x का न्यूनतम मान क्या है?
+(A) 0, (B) -1 @, (C) -inf, (D) 1
+
+2 sin A cos A किसके बराबर है?
+(A) tan 2A, (B) cos 2A, (C) sin 2A @, (D) sin A
+
+1 - 2 sin² A किसके बराबर है?
+(A) sin 2A, (B) cos 2A @, (C) tan 2A, (D) cos² A
+
+2 cos² A - 1 किसका सूत्र है?
+(A) sin² A, (B) cos 2A @, (C) sin 2A, (D) cos 3A
+
+1 - tan² A / 1 + tan² A किसका मान है?
+(A) tan 2A, (B) cot 2A, (C) cos 2A @, (D) sin 2A
+
+2 tan A / 1 + tan² A किसका सूत्र है?
+(A) sin A, (B) cos 2A, (C) sin 2A @, (D) tan 2A
+
+2 tan A / 1 - tan² A किसका सूत्र है?
+(A) tan A, (B) tan 2A @, (C) cos 2A, (D) sin 2A
+
+3 sin A - 4 sin³ A किसका मान है?
+(A) sin 2A, (B) tan 3A, (C) sin 3A @, (D) cos 3A
+
+4 cos³ A - 3 cos A किसका मान है?
+(A) cos 3A @, (B) cos 2A, (C) sin 3A, (D) tan 3A
+
+3 tan A - tan³ A / 1 - 3 tan² A किसका सूत्र है?
+(A) tan 3A @, (B) cot 3A, (C) tan 2A, (D) tan A
+
+sin A + B + sin A - B किसके बराबर होता है?
+(A) 2 cos A cos B, (B) 2 cos A sin B, (C) 2 sin A sin B, (D) 2 sin A cos B @
+
+sin A + B - sin A - B किसके बराबर होता है?
+(A) 2 sin A cos B, (B) 2 cos A cos B, (C) 2 sin A sin B, (D) 2 cos A sin B @
+
+cos A + B + cos A - B किसके बराबर होता है?
+(A) 2 cos A sin B, (B) 2 sin A sin B, (C) 2 cos A cos B @, (D) 2 sin A cos B
+
+cos A - B - cos A + B किसके बराबर होता है?
+(A) 2 sin A sin B @, (B) 2 cos A cos B, (C) 2 cos A sin B, (D) 2 sin A cos B
+
+sin C + sin D में यदि C = 60 और D = 30 हो, तो पहला पद क्या होगा?
+(A) sin 90, (B) 2 cos 45, (C) 2 sin 15, (D) 2 sin 45 @
+
+यदि sin θ + tan θ = p और tan θ - sin θ = q हो, तो p² - q² का मान क्या होगा?
+(A) 2 * sqrt pq, (B) 4 pq, (C) pq, (D) 4 * sqrt pq @
+
+sec A + tan A = x हो, तो sec A - tan A का मान क्या होगा?
+(A) x, (B) 1 / x @, (C) -x, (D) x²
