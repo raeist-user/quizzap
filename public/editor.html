@@ -977,28 +977,60 @@ async function confirmFolderRename(){
   cancelFolderRename();
   toast('Renaming folder…');
   try {
-    const oldEnc = encodeURIComponent(edCurrentFolder);
-    const res = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/contents/resources/${oldEnc}?ref=${GITHUB_BRANCH}`, { headers: ghHeaders() });
-    if(!res.ok) throw new Error(`GitHub API ${res.status}`);
-    const items = await res.json();
-    // Move each file: create at new path, delete at old path
-    for(const item of items){
-      const getRes = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/contents/${item.path}?ref=${GITHUB_BRANCH}`, { headers: ghHeaders() });
-      if(!getRes.ok) throw new Error(`Could not read ${item.name}`);
-      const fileData = await getRes.json();
-      const encNew  = encodeURIComponent(newName);
-      const encFile = encodeURIComponent(item.name);
-      const putRes = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/contents/resources/${encNew}/${encFile}`, {
-        method: 'PUT', headers: ghWriteHeaders(),
-        body: JSON.stringify({ message: `Rename folder: ${edCurrentFolder} → ${newName}`, content: fileData.content.replace(/\n/g,''), branch: GITHUB_BRANCH })
-      });
-      if(!putRes.ok) throw new Error(`Could not create ${item.name} in new folder`);
-      const delRes = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/contents/${item.path}`, {
-        method: 'DELETE', headers: ghWriteHeaders(),
-        body: JSON.stringify({ message: `Rename folder: remove ${item.path}`, sha: item.sha, branch: GITHUB_BRANCH })
-      });
-      if(!delRes.ok) throw new Error(`Could not remove old ${item.name}`);
+    const base       = `https://api.github.com/repos/${GITHUB_REPO}`;
+    const oldPrefix  = `resources/${edCurrentFolder}/`;
+    const newPrefix  = `resources/${newName}/`;
+
+    // 1. Get latest commit SHA on the branch
+    const refRes = await fetch(`${base}/git/refs/heads/${GITHUB_BRANCH}`, { headers: ghHeaders() });
+    if(!refRes.ok) throw new Error(`Could not get branch ref: ${refRes.status}`);
+    const latestCommitSha = (await refRes.json()).object.sha;
+
+    // 2. Get the commit's root tree SHA
+    const commitRes = await fetch(`${base}/git/commits/${latestCommitSha}`, { headers: ghHeaders() });
+    if(!commitRes.ok) throw new Error(`Could not get commit: ${commitRes.status}`);
+    const rootTreeSha = (await commitRes.json()).tree.sha;
+
+    // 3. Get the full recursive tree so we can see all paths
+    const treeRes = await fetch(`${base}/git/trees/${rootTreeSha}?recursive=1`, { headers: ghHeaders() });
+    if(!treeRes.ok) throw new Error(`Could not get tree: ${treeRes.status}`);
+    const allItems = (await treeRes.json()).tree;
+
+    const folderBlobs = allItems.filter(i => i.type === 'blob' && i.path.startsWith(oldPrefix));
+    if(!folderBlobs.length) throw new Error('No files found in that folder');
+
+    // 4. Build tree patch: point old paths to null (delete) and new paths to the same blob SHA (create)
+    const treePatch = [];
+    for(const item of folderBlobs){
+      // Add file at new path (reuse the existing blob — no re-upload needed)
+      treePatch.push({ path: newPrefix + item.path.slice(oldPrefix.length), mode: item.mode, type: 'blob', sha: item.sha });
+      // Remove file at old path
+      treePatch.push({ path: item.path, mode: item.mode, type: 'blob', sha: null });
     }
+
+    // 5. Create a new tree based on the existing root tree + our patch
+    const newTreeRes = await fetch(`${base}/git/trees`, {
+      method: 'POST', headers: ghWriteHeaders(),
+      body: JSON.stringify({ base_tree: rootTreeSha, tree: treePatch })
+    });
+    if(!newTreeRes.ok) throw new Error(`Could not create tree: ${newTreeRes.status}`);
+    const newTreeSha = (await newTreeRes.json()).sha;
+
+    // 6. Create a single commit for the rename (atomic — one commit, no intermediate state)
+    const newCommitRes = await fetch(`${base}/git/commits`, {
+      method: 'POST', headers: ghWriteHeaders(),
+      body: JSON.stringify({ message: `Rename folder: ${edCurrentFolder} → ${newName}`, tree: newTreeSha, parents: [latestCommitSha] })
+    });
+    if(!newCommitRes.ok) throw new Error(`Could not create commit: ${newCommitRes.status}`);
+    const newCommitSha = (await newCommitRes.json()).sha;
+
+    // 7. Advance the branch ref to the new commit
+    const updateRefRes = await fetch(`${base}/git/refs/heads/${GITHUB_BRANCH}`, {
+      method: 'PATCH', headers: ghWriteHeaders(),
+      body: JSON.stringify({ sha: newCommitSha })
+    });
+    if(!updateRefRes.ok) throw new Error(`Could not update branch: ${updateRefRes.status}`);
+
     toast(`Folder renamed to "${newName}"`, 'good');
     edCurrentFolder = newName;
     openFolder(newName);
