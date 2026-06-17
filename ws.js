@@ -90,6 +90,7 @@ function project(role, pid) {
     totalQuestions:   state.totalQuestions,
     pushedCount:      state.pushedCount,
     thumbsUp:         state.thumbsUp,   // array of pids who sent 👍 this question
+    serverTime:       Date.now(),        // client uses this to correct local clock skew
   };
 
   if (role === 'host') return {
@@ -606,6 +607,12 @@ function initWS(server) {
           if (state.status !== 'question') break;
           if (state.answers[client.pid] !== undefined) break;
           if (typeof msg.idx !== 'number' || msg.idx < 0 || msg.idx > 3) break;
+          // Server-side timer enforcement: reject answers that arrive after the
+          // timer has expired. Allow a 1.5 s grace window for network latency.
+          if (state.timerSeconds > 0 && state.questionPushedAt) {
+            const elapsed = (Date.now() - state.questionPushedAt) / 1000;
+            if (elapsed > state.timerSeconds + 1.5) break;
+          }
           state.answers[client.pid] = msg.idx;
           if (typeof msg.timeTaken === 'number' && msg.timeTaken >= 0)
             state.answerTimes[client.pid] = parseFloat(msg.timeTaken.toFixed(2));
