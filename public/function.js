@@ -177,11 +177,20 @@ function startTimerDisplay(){
     if(timerInterval){clearInterval(timerInterval);timerInterval=null;}
     return;
   }
+  // If this question's timer already hit zero, never restart it.
+  // (State broadcasts arrive on every answer, which re-triggers render → startTimerDisplay.
+  // Without this guard the timer would restart from where the clock currently is.)
+  if(startTimerDisplay._expiredAt===start) return;
   if(timerInterval && startTimerDisplay._lastStart===start) return;
   if(timerInterval){clearInterval(timerInterval);timerInterval=null;}
   startTimerDisplay._lastStart=start;
   function tick(){
-    const elapsed=Math.max(0,(Date.now()-start)/1000);
+    // clockOffset corrects for the difference between the server's clock (used
+    // for questionPushedAt) and this client's local clock.  Without it, students
+    // whose device clock is behind the server see elapsed=negative → timer frozen;
+    // students whose clock is ahead see elapsed>total immediately → options locked.
+    const now=Date.now()+clockOffset;
+    const elapsed=Math.max(0,(now-start)/1000);
     const remaining=Math.max(0, total-elapsed);
     const displaySecs=Math.min(total, Math.ceil(remaining));
     const pct=(remaining/total)*100;
@@ -207,6 +216,7 @@ function startTimerDisplay(){
     }
     if(remaining<=0){
       clearInterval(timerInterval);timerInterval=null;
+      startTimerDisplay._expiredAt=start; // prevent restart for this question
       document.querySelectorAll('.opt-card').forEach(c=>c.classList.add('locked'));
     }
   }

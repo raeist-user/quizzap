@@ -63,6 +63,10 @@ let remoteConn=null;
 
 // Timer
 let timerInterval=null;
+// Clock-skew correction: difference between server clock and local clock (ms).
+// Updated on every incoming state broadcast so it stays accurate.
+// Usage: corrected "now" = Date.now() + clockOffset
+let clockOffset=0;
 
 // Push question debounce
 let pushing=false, pushTimeout=null;
@@ -678,6 +682,16 @@ function connect(){
         showingHalted=false; haltedIsPreview=false; haltedSnapshot=[];
         render(); break;
       case 'state': {
+        // ── Clock-skew correction ───────────────────────────────────────────
+        // serverTime is Date.now() on the server at broadcast time. Comparing
+        // it to our local Date.now() gives the offset to apply everywhere we
+        // need to measure elapsed time against questionPushedAt (also a server
+        // timestamp). We use an exponential moving average so a single stale
+        // packet doesn't throw off the offset.
+        if(m.payload.serverTime){
+          const sample = m.payload.serverTime - Date.now();
+          clockOffset = Math.round(clockOffset * 0.75 + sample * 0.25);
+        }
         const ns=m.payload.status, inc=m.payload.myScore||0;
         if(ns==='idle'&&prevStatus==='revealed'){ scoreGain=inc-prevMyScore; if(scoreGain<0)scoreGain=0; }
         if(ns==='question'){
@@ -689,6 +703,7 @@ function connect(){
             localAnswerTimes={};
             studentQCount++;
             startTimerDisplay._lastStart=null; // force timer restart for new question
+            startTimerDisplay._expiredAt=null;    // clear expiry guard for new question
             lastFastestPid=null; // clear fastest badge so it doesn't carry over from previous question
           }
           // Clear push-stuck state

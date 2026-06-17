@@ -1491,7 +1491,7 @@ function hostHTML(){
   // Timer row — shows input when idle, live countdown when question is live
   const timerTotal=S.timerSeconds||hostTimerSeconds;
   const timerLeft=timerTotal&&S.questionPushedAt&&isLive
-    ?Math.max(0,timerTotal-(Date.now()-S.questionPushedAt)/1000)
+    ?Math.max(0,timerTotal-((Date.now()+clockOffset)-S.questionPushedAt)/1000)
     :null;
   const timerRow=`
     <div class="timer-input-row" style="flex-shrink:0">
@@ -2606,7 +2606,8 @@ function attach(){
       if(S.status==='revealed') return;
       if(el.classList.contains('locked')) return;
       // Record how many seconds since question was pushed — with sub-second precision
-      const ms = S.questionPushedAt ? Date.now()-S.questionPushedAt : null;
+      // Use clockOffset to correct for server/client clock skew (same fix as the timer display).
+      const ms = S.questionPushedAt ? (Date.now()+clockOffset)-S.questionPushedAt : null;
       const secs = ms!==null ? parseFloat(Math.max(0,ms/1000).toFixed(2)) : null;
       myLastAnswerTime = secs;
       if(secs!==null && myPid) localAnswerTimes[myPid]=secs; // precise click-time for self
