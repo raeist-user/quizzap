@@ -820,7 +820,6 @@ function teacherDashboardHTML(){
     </div>
   </div>`;
 }
-}
 
 function standingsOverlayHTML(){
   if(!showStandingsOverlay) return '';
