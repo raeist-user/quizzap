@@ -779,12 +779,12 @@ function schedOverlayHTML(){ return teacherDashboardHTML(); }
 function teacherDashboardHTML(){
   if(!sidebarSchedOpen) return '';
   const parts=Object.values(S.participants||{}).slice().sort((a,b)=>(b.score||0)-(a.score||0));
-  const cidMap=S.cidMap||{};
   function ini(n){return n.split(' ').map(w=>w[0]||'').join('').slice(0,2).toUpperCase();}
 
   const cards=parts.map(p=>{
-    const pCid=cidMap[p.id]||'';
-    const isSpeaking=(pCid&&pCid===activeSpeakerCid)||false;
+    // Use activeSpeakerPid (client-side var in backend.js) to show speaking state.
+    // This avoids reliance on cidMap being current in the rendered state.
+    const isSpeaking=typeof activeSpeakerPid!=='undefined' && activeSpeakerPid===p.id;
     return `<div style="border:1.5px solid var(--line);border-radius:10px;padding:10px;display:flex;flex-direction:column;gap:7px;background:var(--white)">
       <div style="display:flex;align-items:center;gap:7px">
         <div class="j-av" style="width:30px;height:30px;font-size:.7rem;flex-shrink:0;${isSpeaking?'background:#6366f1;color:#fff':'background:#e0e7ff;color:#4338ca'}">${ini(p.name)}</div>
@@ -795,7 +795,7 @@ function teacherDashboardHTML(){
         <button class="btn btn-sm btn-kick-student" data-kick-pid="${p.id}" data-kick-name="${esc(p.name)}" style="padding:3px 8px;background:#fff1f2;color:#be123c;border-color:#fecdd3;font-size:.72rem;flex-shrink:0" title="Kick ${esc(p.name)}">✕ Kick</button>
       </div>
       <div style="display:flex;align-items:center;gap:5px">
-        <button class="btn btn-sm td-mic-toggle" data-td-pid="${p.id}" data-td-cid="${pCid}" style="flex:1;justify-content:center;font-size:.73rem;gap:4px;padding:4px 6px;${isSpeaking?'background:#e0e7ff;color:#4338ca;border-color:#a5b4fc':'background:var(--faint);color:var(--mid);border-color:var(--line)'}">
+        <button class="btn btn-sm td-mic-toggle" data-td-pid="${p.id}" style="flex:1;justify-content:center;font-size:.73rem;gap:4px;padding:4px 6px;${isSpeaking?'background:#e0e7ff;color:#4338ca;border-color:#a5b4fc':'background:var(--faint);color:var(--mid);border-color:var(--line)'}">
           🎙️ ${isSpeaking?'Mute':'Enable Mic'}
         </button>
       </div>
@@ -2106,18 +2106,20 @@ function attach(){
   document.querySelectorAll('.td-mic-toggle').forEach(btn=>{
     btn.addEventListener('click',()=>{
       const pid=btn.dataset.tdPid;
-      const cid=btn.dataset.tdCid;
-      if(!cid) return;
-      const isSpeaking=(cid===activeSpeakerCid);
+      if(!pid) return;
+      const isSpeaking=(typeof activeSpeakerPid!=='undefined' && activeSpeakerPid===pid);
       if(isSpeaking){
-        send({type:'speak_end',toCid:cid});
-        hostCleanupSpeaker();
+        // Mute: send host_disable_mic with pid — server resolves to cid
+        send({type:'host_disable_mic',pid});
+        hostCleanupSpeaker();  // clears activeSpeakerPid/Cid/Name
         render();
       } else {
+        // Enable: send host_enable_mic with pid — server resolves to cid and relays speak_allowed
         const pName=(S.participants||[]).find(p=>p.id===pid)?.name||'Student';
-        activeSpeakerName=pName; activeSpeakerCid=cid;
-        send({type:'host_enable_mic',toCid:cid});
-        // Don't show the floating banner — speaking state is shown in dashboard card
+        activeSpeakerName=pName;
+        activeSpeakerPid=pid;
+        // activeSpeakerCid will be set when rtc_speaker_offer arrives at host
+        send({type:'host_enable_mic',pid});
         render();
       }
     });

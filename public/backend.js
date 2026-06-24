@@ -817,7 +817,14 @@ function connect(){
         break;
       }
       case 'rtc_speaker_offer': {
-        if(role==='host') hostHandleSpeakerOffer(m.fromCid, m.signal);
+        if(role==='host'){
+          // Also update activeSpeakerCid/Pid from the actual offer sender (handles both flows)
+          if(!activeSpeakerCid) activeSpeakerCid=m.fromCid;
+          if(!activeSpeakerPid){
+            activeSpeakerPid=Object.entries(S.cidMap||{}).find(([,c])=>c===m.fromCid)?.[0]||null;
+          }
+          hostHandleSpeakerOffer(m.fromCid, m.signal);
+        }
         break;
       }
       case 'rtc_speaker_answer': {
@@ -969,6 +976,8 @@ function showSpeakRequestToast(studentName, fromCid){
   inner.querySelector('.hr-allow').addEventListener('click',()=>{
     clearTimeout(timer);
     activeSpeakerName=studentName; activeSpeakerCid=fromCid;
+    // Resolve pid from cidMap for dashboard state tracking
+    activeSpeakerPid = Object.entries(S.cidMap||{}).find(([,c])=>c===fromCid)?.[0] || null;
     send({type:'speak_allowed',toCid:fromCid});
     showActiveSpeakerBanner(studentName);
     dismissCard(); render();
@@ -991,6 +1000,7 @@ let participantPeerConn  = null;
 // Speak-request state (host side)
 let activeSpeakerName = null;
 let activeSpeakerCid  = null;
+let activeSpeakerPid  = null;   // pid of currently speaking student (for dashboard highlight)
 
 // Floating banner on host showing who is speaking + Mute button
 function showActiveSpeakerBanner(name){
@@ -1012,22 +1022,41 @@ function hostCleanupSpeaker(){
   if(pc){ try{pc.close();}catch(e){} delete peerConns['__speaker__']; }
   const el=document.getElementById('speaker-audio');
   if(el){ el.srcObject=null; el.remove(); }
-  activeSpeakerName=null; activeSpeakerCid=null;
+  activeSpeakerName=null; activeSpeakerCid=null; activeSpeakerPid=null;
 }
 
 // Participant mic functions (called from speak_allowed / speak_end / btn-end-speak)
 async function startParticipantMic(){
   try{
     if(participantMicStream){ participantMicStream.getTracks().forEach(t=>t.stop()); participantMicStream=null; }
+    if(participantPeerConn){ try{participantPeerConn.close();}catch(e){} participantPeerConn=null; }
+
     participantMicStream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true},video:false});
     isSpeakingNow=true; speakRequestPending=false;
-    if(participantPeerConn){ try{participantPeerConn.close();}catch(e){} participantPeerConn=null; }
+
     const pc=new RTCPeerConnection(STUN); participantPeerConn=pc;
-    participantMicStream.getTracks().forEach(t=>pc.addTrack(t,participantMicStream));
+
+    // ── "Perfect negotiation" pattern (from reference implementation) ──────────
+    // Adding tracks triggers onnegotiationneeded which creates and sends the offer
+    // automatically. This is more reliable than manually calling createOffer().
+    let _makingOffer=false;
+    pc.onnegotiationneeded=async()=>{
+      try{
+        _makingOffer=true;
+        const offer=await pc.createOffer();
+        await pc.setLocalDescription(offer);
+        send({type:'rtc_speaker_offer',signal:{type:pc.localDescription.type,sdp:pc.localDescription.sdp}});
+      }catch(e){ console.error('negotiation err:',e); }
+      finally{ _makingOffer=false; }
+    };
+    // ──────────────────────────────────────────────────────────────────────────
+
     pc.onicecandidate=ev=>{ if(ev.candidate) send({type:'rtc_ice_to_host_from_speaker',signal:ev.candidate.toJSON()}); };
     pc.onconnectionstatechange=()=>{ if(['failed','closed','disconnected'].includes(pc.connectionState)) stopParticipantMic(false); };
-    const offer=await pc.createOffer(); await pc.setLocalDescription(offer);
-    send({type:'rtc_speaker_offer',signal:{type:pc.localDescription.type,sdp:pc.localDescription.sdp}});
+
+    // Adding tracks fires onnegotiationneeded → offer created and sent automatically
+    participantMicStream.getTracks().forEach(t=>pc.addTrack(t,participantMicStream));
+
     render(); showToast('🎙️ You can speak now. Host will mute you when done.','good');
   }catch(e){
     speakRequestPending=false; isSpeakingNow=false;
