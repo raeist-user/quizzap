@@ -635,18 +635,22 @@ function initWS(server) {
         }
 
         case 'host_enable_mic': {
-          // Host directly enables a student's mic without student needing to press button
+          // Host directly enables a student's mic using pid; server resolves to cid internally
           if (client.role !== 'host') break;
-          const { toCid: micCid } = msg;
-          if (!micCid) break;
-          txCid(micCid, { type: 'speak_allowed' });
+          const { pid: micPid } = msg;
+          if (!micPid) break;
+          const targetCid = participantCids[micPid];
+          if (!targetCid) break;
+          txCid(targetCid, { type: 'speak_allowed' });
           break;
         }
 
         case 'host_disable_mic': {
-          // Host ends a student's mic session from dashboard
+          // Host ends a student's mic session using pid; server resolves to cid internally
           if (client.role !== 'host') break;
-          const { toCid: muteCid } = msg;
+          const { pid: mutePid } = msg;
+          if (!mutePid) break;
+          const muteCid = participantCids[mutePid];
           if (!muteCid) break;
           txCid(muteCid, { type: 'speak_end' });
           break;
