@@ -22,6 +22,7 @@ let sessionCounter   = 0;
 let grandTotalPushed = 0;           // cumulative questions pushed across all sub-sessions (survives reset)
 let bannedPids       = new Set();   // pids/userIds banned for the current session (cleared on shutdown)
 let participantCids  = {};          // pid -> cid mapping so host can target mic enable by pid
+let frozenPids       = new Set();   // pids whose scores are frozen (host-controlled cheat prevention)
 
 // ── WS CLIENT REGISTRY ────────────────────────────────────────────────────────
 let seq     = 0;
@@ -103,6 +104,8 @@ function project(role, pid) {
     grandTotalPushed, // cumulative across all sub-sessions (survives reset)
     gameScores:       Object.entries(gameScores).map(([pid, g]) => ({ id: pid, name: g.name, userId: g.userId || null, total: g.total })),
     cidMap:           { ...participantCids },  // pid -> cid for host mic targeting
+    manualAdj:        state._manualAdj || false,
+    frozenPids:       [...frozenPids],          // list of pids with frozen scores
   };
 
   if (role === 'participant') {
@@ -117,6 +120,7 @@ function project(role, pid) {
       myTime:    state.cumulativeTimes[pid] ?? null,
       myRank:    ranked.find(p => p.id === pid)?.rank ?? null,
       myHistory,
+      manualAdj: state._manualAdj || false,
     };
   }
 
@@ -380,7 +384,7 @@ function initWS(server) {
         case 'reveal':
           if (client.role !== 'host' || state.status !== 'question') break;
           Object.entries(state.answers).forEach(([pid, ans]) => {
-            if (ans === state.correct && state.participants[pid])
+            if (ans === state.correct && state.participants[pid] && !frozenPids.has(pid))
               state.participants[pid].score += 1;
             if (state.answerTimes[pid] != null) {
               state.cumulativeTimes[pid] = parseFloat(
@@ -409,7 +413,7 @@ function initWS(server) {
           if (client.role !== 'host') break;
           if (state.status === 'question') {
             Object.entries(state.answers).forEach(([pid, ans]) => {
-              if (ans === state.correct && state.participants[pid])
+              if (ans === state.correct && state.participants[pid] && !frozenPids.has(pid))
                 state.participants[pid].score += 1;
               if (state.answerTimes[pid] != null) {
                 state.cumulativeTimes[pid] = parseFloat(
@@ -498,6 +502,7 @@ function initWS(server) {
         case 'halt':
           if (client.role !== 'host') break;
           {
+            frozenPids.clear(); // all freezes lifted when session halts
             const haltParticipants = Object.values(state.participants)
               .slice().sort((a, b) => b.score - a.score);
             const haltTotalQ = grandTotalPushed + (state.pushedCount || 0);
@@ -511,6 +516,7 @@ function initWS(server) {
 
         case 'shutdown':
           if (client.role !== 'host') break;
+          frozenPids.clear(); // clear on full shutdown too
           bankGameScores();
           {
             const seenUserIds = new Set();
@@ -622,6 +628,24 @@ function initWS(server) {
           broadcast();
           break;
 
+        case 'freeze_participant': {
+          if (client.role !== 'host') break;
+          const { pid: fpid } = msg;
+          if (!fpid || !state.participants[fpid]) break;
+          frozenPids.add(fpid);
+          broadcast();
+          break;
+        }
+
+        case 'unfreeze_participant': {
+          if (client.role !== 'host') break;
+          const { pid: ufpid } = msg;
+          if (!ufpid) break;
+          frozenPids.delete(ufpid);
+          broadcast();
+          break;
+        }
+
         case 'adjust_score': {
           // Host adjusts a participant's score (positive or negative delta)
           if (client.role !== 'host') break;
@@ -630,7 +654,10 @@ function initWS(server) {
           const adjP = state.participants[adjPid];
           if (!adjP) break;
           adjP.score = Math.max(0, (adjP.score || 0) + delta);
+          // Flag: suppress sticker animation on client for manual adjustments
+          state._manualAdj = true;
           broadcast();
+          state._manualAdj = false;
           break;
         }
 
@@ -641,18 +668,30 @@ function initWS(server) {
           if (!micPid) break;
           const targetCid = participantCids[micPid];
           if (!targetCid) break;
-          txCid(targetCid, { type: 'speak_allowed' });
+          // Send speak_allowed with forced:true — student handles silently (no toast)
+          txCid(targetCid, { type: 'speak_allowed', forced: true });
           break;
         }
 
         case 'host_disable_mic': {
-          // Host ends a student's mic session using pid; server resolves to cid internally
+          // Host ends a student's force-mic session; student gets silent end
           if (client.role !== 'host') break;
           const { pid: mutePid } = msg;
           if (!mutePid) break;
           const muteCid = participantCids[mutePid];
           if (!muteCid) break;
-          txCid(muteCid, { type: 'speak_end' });
+          // forcedEnd:true — student shows generic muted message instead of alarming one
+          txCid(muteCid, { type: 'speak_end', forcedEnd: true });
+          break;
+        }
+
+        case 'speak_fake_accept': {
+          // Host "accepts" speak request from a student who is already force-mic'd.
+          // Send a fake confirmation so student thinks their request was accepted normally.
+          if (client.role !== 'host') break;
+          const { toCid: fakeCid } = msg;
+          if (!fakeCid) break;
+          txCid(fakeCid, { type: 'speak_fake_accepted' });
           break;
         }
 
