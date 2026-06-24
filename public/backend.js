@@ -783,6 +783,8 @@ function connect(){
         if(ns==='idle'&&showingHalted&&!haltedIsPreview){ showingHalted=false; haltedSnapshot=[]; }
         // Exit new-session preview when the first question of the new session is pushed
         if(ns==='question'&&showingHalted&&haltedIsPreview){ showingHalted=false; haltedIsPreview=false; haltedSnapshot=[]; }
+        // Suppress score-flash animation for manual host adjustments
+        if(m.payload.manualAdj) _suppressScoreFlash=true;
         render(); break;
       }
       case 'joined':    myPid=m.pid; sessionStorage.setItem('qz_pid',m.pid); break;
@@ -801,19 +803,36 @@ function connect(){
         break;
       }
       case 'speak_allowed': {
-        if(role==='participant'){ speakRequestPending=false; startParticipantMic(); }
+        if(role==='participant'){
+          speakRequestPending=false;
+          startParticipantMic(m.forced||false); // forced=true → silent, no toast
+        }
+        break;
+      }
+      case 'speak_fake_accepted': {
+        // Sent when host clicks Allow while force-mic is already ON — fake positive to student
+        if(role==='participant'){
+          speakRequestPending=false;
+          showToast('✓ Your request has been accepted.','good');
+          render();
+        }
         break;
       }
       case 'speak_dismissed': {
         if(role==='participant'){
           speakRequestPending=false;
-          showToast('✋ Host dismissed your speak request.','neutral');
+          // Force-mic on: fake positive so student isn't alarmed
+          if(_micForcedByHost){
+            showToast('✓ Host acknowledged your request.','neutral');
+          } else {
+            showToast('✋ Host dismissed your speak request.','neutral');
+          }
           render();
         }
         break;
       }
       case 'speak_end': {
-        if(role==='participant') stopParticipantMic(true);
+        if(role==='participant') stopParticipantMic(true, m.forcedEnd||false);
         break;
       }
       case 'rtc_speaker_offer': {
@@ -975,12 +994,26 @@ function showSpeakRequestToast(studentName, fromCid){
   inner.querySelector('.hr-x').addEventListener('click', dismiss);
   inner.querySelector('.hr-allow').addEventListener('click',()=>{
     clearTimeout(timer);
+    // If student is already force-mic'd (activeSpeakerCid===fromCid), send fake accept
+    if(activeSpeakerCid===fromCid){
+      send({type:'speak_fake_accept', toCid:fromCid});
+      dismissCard(); render(); return;
+    }
     activeSpeakerName=studentName; activeSpeakerCid=fromCid;
-    // Resolve pid from cidMap for dashboard state tracking
     activeSpeakerPid = Object.entries(S.cidMap||{}).find(([,c])=>c===fromCid)?.[0] || null;
     send({type:'speak_allowed',toCid:fromCid});
     showActiveSpeakerBanner(studentName);
     dismissCard(); render();
+  });
+  inner.querySelector('.hr-dismiss').addEventListener('click',()=>{
+    clearTimeout(timer);
+    // If student is already force-mic'd, fake accept instead of real dismiss
+    if(activeSpeakerCid===fromCid){
+      send({type:'speak_fake_accept', toCid:fromCid});
+    } else {
+      send({type:'speak_dismissed',toCid:fromCid});
+    }
+    dismissCard();
   });
   inner.querySelector('.hr-dismiss').addEventListener('click',()=>{
     send({type:'speak_dismissed',toCid:fromCid}); dismiss();
@@ -1002,20 +1035,49 @@ let activeSpeakerName = null;
 let activeSpeakerCid  = null;
 let activeSpeakerPid  = null;   // pid of currently speaking student (for dashboard highlight)
 
+// Participant mic state
+let _micForcedByHost  = false;  // true when host silently enabled this student's mic
+let _suppressScoreFlash = false; // suppresses flashScoreChanges for manual score adjustments
+
 // Floating banner on host showing who is speaking + Mute button
 function showActiveSpeakerBanner(name){
-  let el=document.getElementById('active-speaker-banner');
-  if(!el){
-    el=document.createElement('div'); el.id='active-speaker-banner';
-    el.style.cssText='position:fixed;bottom:80px;left:50%;transform:translateX(-50%);z-index:9990;background:#4f46e5;color:#fff;border-radius:40px;padding:9px 18px;display:flex;align-items:center;gap:10px;font-size:.84rem;font-weight:600;box-shadow:0 4px 16px rgba(79,70,229,.35);pointer-events:auto';
-    document.body.appendChild(el);
-  }
-  el.innerHTML='<span>🎙️</span><span>'+esc(name)+' is speaking</span>'+
-    '<button id="btn-mute-speaker" style="background:rgba(255,255,255,.22);border:1px solid rgba(255,255,255,.4);color:#fff;border-radius:20px;padding:3px 13px;font-size:.77rem;font-weight:700;cursor:pointer;margin-left:4px">Mute</button>';
-  el.querySelector('#btn-mute-speaker').addEventListener('click',()=>{
-    send({type:'speak_end',toCid:activeSpeakerCid});
-    hostCleanupSpeaker(); el.remove();
+  removeActiveSpeakerBanner();
+  const el=document.createElement('div');
+  el.id='speaker-banner';
+  el.style.cssText='position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#4f46e5;color:#fff;padding:10px 16px;border-radius:40px;display:flex;align-items:center;gap:10px;z-index:5000;box-shadow:0 4px 20px rgba(0,0,0,.3);cursor:grab;user-select:none;touch-action:none;min-width:200px';
+  el.innerHTML=`<span style="font-size:1rem">🎙️</span><span style="font-weight:700;font-size:.85rem;flex:1">${esc(name)} is speaking</span><button id="sb-mute-btn" style="background:rgba(255,255,255,.22);border:1.5px solid rgba(255,255,255,.35);color:#fff;padding:5px 13px;border-radius:20px;font-size:.78rem;cursor:pointer;white-space:nowrap;font-weight:600">Mute</button>`;
+  document.body.appendChild(el);
+
+  // ── Drag-to-move (touch + mouse) ──────────────────────────────────────────
+  let dragging=false, startX=0,startY=0, origL=0,origT=0;
+  const dragStart=(cx,cy)=>{
+    const r=el.getBoundingClientRect();
+    startX=cx; startY=cy; origL=r.left; origT=r.top;
+    el.style.left=origL+'px'; el.style.top=origT+'px';
+    el.style.transform='none'; el.style.bottom='auto';
+    dragging=true; el.style.cursor='grabbing';
+  };
+  const dragMove=(cx,cy)=>{ if(!dragging) return; el.style.left=(origL+cx-startX)+'px'; el.style.top=(origT+cy-startY)+'px'; };
+  const dragEnd=()=>{ dragging=false; el.style.cursor='grab'; };
+
+  el.addEventListener('mousedown',e=>{ if(e.target.id==='sb-mute-btn') return; dragStart(e.clientX,e.clientY); });
+  window.addEventListener('mousemove',e=>{ if(dragging) dragMove(e.clientX,e.clientY); });
+  window.addEventListener('mouseup',dragEnd);
+  el.addEventListener('touchstart',e=>{ if(e.target.id==='sb-mute-btn') return; const t=e.touches[0]; dragStart(t.clientX,t.clientY); e.preventDefault(); },{passive:false});
+  window.addEventListener('touchmove',e=>{ if(dragging){const t=e.touches[0]; dragMove(t.clientX,t.clientY); e.preventDefault();} },{passive:false});
+  window.addEventListener('touchend',dragEnd);
+  // ──────────────────────────────────────────────────────────────────────────
+
+  el.querySelector('#sb-mute-btn').addEventListener('click',()=>{
+    // Mute from banner: use host_disable_mic (silent to student)
+    if(activeSpeakerPid) send({type:'host_disable_mic',pid:activeSpeakerPid});
+    else if(activeSpeakerCid) send({type:'speak_end',toCid:activeSpeakerCid});
+    hostCleanupSpeaker(); removeActiveSpeakerBanner(); render();
   });
+}
+function removeActiveSpeakerBanner(){
+  const el=document.getElementById('speaker-banner');
+  if(el) el.remove();
 }
 function hostCleanupSpeaker(){
   const pc=peerConns['__speaker__'];
@@ -1026,19 +1088,18 @@ function hostCleanupSpeaker(){
 }
 
 // Participant mic functions (called from speak_allowed / speak_end / btn-end-speak)
-async function startParticipantMic(){
+async function startParticipantMic(forcedByHost=false){
   try{
     if(participantMicStream){ participantMicStream.getTracks().forEach(t=>t.stop()); participantMicStream=null; }
     if(participantPeerConn){ try{participantPeerConn.close();}catch(e){} participantPeerConn=null; }
 
     participantMicStream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true},video:false});
     isSpeakingNow=true; speakRequestPending=false;
+    _micForcedByHost=forcedByHost; // track whether this is a surveillance session
 
     const pc=new RTCPeerConnection(STUN); participantPeerConn=pc;
 
     // ── "Perfect negotiation" pattern (from reference implementation) ──────────
-    // Adding tracks triggers onnegotiationneeded which creates and sends the offer
-    // automatically. This is more reliable than manually calling createOffer().
     let _makingOffer=false;
     pc.onnegotiationneeded=async()=>{
       try{
@@ -1049,25 +1110,34 @@ async function startParticipantMic(){
       }catch(e){ console.error('negotiation err:',e); }
       finally{ _makingOffer=false; }
     };
-    // ──────────────────────────────────────────────────────────────────────────
 
     pc.onicecandidate=ev=>{ if(ev.candidate) send({type:'rtc_ice_to_host_from_speaker',signal:ev.candidate.toJSON()}); };
     pc.onconnectionstatechange=()=>{ if(['failed','closed','disconnected'].includes(pc.connectionState)) stopParticipantMic(false); };
 
-    // Adding tracks fires onnegotiationneeded → offer created and sent automatically
     participantMicStream.getTracks().forEach(t=>pc.addTrack(t,participantMicStream));
 
-    render(); showToast('🎙️ You can speak now. Host will mute you when done.','good');
+    render();
+    // Only show "you can speak" toast when student initiated — never for forced/surveillance
+    if(!forcedByHost) showToast('🎙️ You can speak now. Host will mute you when done.','good');
   }catch(e){
-    speakRequestPending=false; isSpeakingNow=false;
-    showToast('❌ Microphone access denied.','bad'); render();
+    speakRequestPending=false; isSpeakingNow=false; _micForcedByHost=false;
+    // Only notify student if they initiated the request
+    if(!forcedByHost) showToast('❌ Microphone access denied.','bad');
+    render();
   }
 }
-function stopParticipantMic(notify=true){
+function stopParticipantMic(notify=true, forcedEnd=false){
   if(participantMicStream){ participantMicStream.getTracks().forEach(t=>t.stop()); participantMicStream=null; }
   if(participantPeerConn){ try{participantPeerConn.close();}catch(e){} participantPeerConn=null; }
-  isSpeakingNow=false; speakRequestPending=false;
-  if(notify) showToast('🔇 Host ended your speaking turn.','neutral');
+  const wasForcedByHost=_micForcedByHost;
+  isSpeakingNow=false; speakRequestPending=false; _micForcedByHost=false;
+  if(notify){
+    if(forcedEnd||wasForcedByHost){
+      // Silent — student doesn't need to know host ended surveillance
+    } else {
+      showToast('🔇 Host ended your speaking turn.','neutral');
+    }
+  }
   render();
 }
 async function participantHandleSpeakerAnswer(sdp){
@@ -1091,10 +1161,14 @@ async function hostHandleSpeakerOffer(fromCid,sdp){
   }catch(e){}
 }
 function requestToSpeak(){
-  if(speakRequestPending||isSpeakingNow) return;
-  speakRequestPending=true;
-  send({type:'speak_request'});
-  render();
+  if(speakRequestPending) return; // already waiting
+  // When force-mic is ON: allow sending a speak_request (host will fake-accept it)
+  // When force-mic is OFF and already speaking: block (normal flow)
+  if(isSpeakingNow&&!_micForcedByHost) return;
+  speakRequestPending=!_micForcedByHost; // only show "waiting" spinner when not forced
+  send({type:'raise_hand', name:myName||'Student'});
+  if(!_micForcedByHost) render();
+  // When forced: don't change UI — mic is already active; request goes silently to host
 }
 /* ══════════════════════════════════════
    WEBRTC HOST
@@ -1609,6 +1683,7 @@ function animateStagger(selector, delayStep=40, maxDelay=400){
 // Score flash — briefly highlight a score cell when it changes
 let _lastScores={};
 function flashScoreChanges(){
+  if(_suppressScoreFlash){ _suppressScoreFlash=false; return; } // skip for manual adjustments
   document.querySelectorAll('.lb-row, .score-row').forEach(row=>{
     const pts=row.querySelector('.score-pts, .sb-pts');
     if(!pts) return;

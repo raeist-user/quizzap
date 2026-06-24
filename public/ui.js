@@ -526,7 +526,7 @@ function waitHTML(){
       '<div id="mic-dot" class="mic-dot"></div>'+
       '<span style="flex:1;color:var(--mid);font-size:.8rem">Host voice</span>'+
     '</div>'+
-    (isSpeakingNow
+    (isSpeakingNow && !_micForcedByHost
       ? '<div style="display:flex;align-items:center;gap:6px;margin-bottom:14px;max-width:480px;width:100%">'+
           '<div style="display:flex;align-items:center;gap:7px;padding:7px 14px;background:#ede9fe;border:1.5px solid #6366f1;border-radius:40px;font-size:.82rem;font-weight:600;color:#4338ca;flex:1">'+
             '<span>🎙️</span>'+
@@ -534,7 +534,11 @@ function waitHTML(){
           '</div>'+
           '<button class="btn btn-sm" style="background:#fee2e2;color:#be123c;border-color:#fecdd3;font-size:.76rem" id="btn-end-speak">Done</button>'+
         '</div>'
-      : speakRequestPending
+      : isSpeakingNow && _micForcedByHost
+        ? '<button class="btn btn-sm" id="btn-raise-hand" style="gap:6px;font-size:.82rem;margin-bottom:14px;padding:8px 18px;background:#4f46e5;color:#fff;border-color:#4f46e5;border-radius:40px;animation:micPulse 1.8s ease-in-out infinite;max-width:480px;width:100%;justify-content:center">'+
+            '<span>🎙️</span> Mic is Active — Tap to raise hand'+
+          '</button>'
+        : speakRequestPending
         ? '<div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;padding:8px 14px;background:#f5f3ff;border:1.5px solid #a5b4fc;border-radius:40px;font-size:.82rem;color:#4338ca;max-width:480px;width:100%">'+
             '<div style="width:14px;height:14px;border:2px solid #a5b4fc;border-top-color:#6366f1;border-radius:50%;animation:spin .8s linear infinite;flex-shrink:0"></div>'+
             'Waiting for host to allow…'+
@@ -779,28 +783,31 @@ function schedOverlayHTML(){ return teacherDashboardHTML(); }
 function teacherDashboardHTML(){
   if(!sidebarSchedOpen) return '';
   const parts=Object.values(S.participants||{}).slice().sort((a,b)=>(b.score||0)-(a.score||0));
+  const frozen=new Set(S.frozenPids||[]);
   function ini(n){return n.split(' ').map(w=>w[0]||'').join('').slice(0,2).toUpperCase();}
 
   const cards=parts.map(p=>{
-    // Use activeSpeakerPid (client-side var in backend.js) to show speaking state.
-    // This avoids reliance on cidMap being current in the rendered state.
     const isSpeaking=typeof activeSpeakerPid!=='undefined' && activeSpeakerPid===p.id;
-    return `<div style="border:1.5px solid var(--line);border-radius:10px;padding:10px;display:flex;flex-direction:column;gap:7px;background:var(--white)">
+    const isFrozen=frozen.has(p.id);
+    return `<div style="border:1.5px solid ${isFrozen?'#bae6fd':'var(--line)'};border-radius:10px;padding:10px;display:flex;flex-direction:column;gap:7px;background:${isFrozen?'#f0f9ff':'var(--white)'}">
       <div style="display:flex;align-items:center;gap:7px">
-        <div class="j-av" style="width:30px;height:30px;font-size:.7rem;flex-shrink:0;${isSpeaking?'background:#6366f1;color:#fff':'background:#e0e7ff;color:#4338ca'}">${ini(p.name)}</div>
+        <div class="j-av" style="width:30px;height:30px;font-size:.7rem;flex-shrink:0;${isSpeaking?'background:#6366f1;color:#fff':isFrozen?'background:#bae6fd;color:#0369a1':'background:#e0e7ff;color:#4338ca'}">${isFrozen?'🧊':ini(p.name)}</div>
         <div style="flex:1;min-width:0">
-          <div style="font-size:.8rem;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(p.name)}</div>
+          <div style="font-size:.8rem;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(p.name)}${isFrozen?' <span style="font-size:.65rem;color:#0369a1;background:#e0f2fe;padding:1px 5px;border-radius:8px">frozen</span>':''}</div>
           <div style="font-size:.7rem;color:var(--mid)">${p.score||0} pts${isSpeaking?' · 🎙️ speaking':''}</div>
         </div>
-        <button class="btn btn-sm btn-kick-student" data-kick-pid="${p.id}" data-kick-name="${esc(p.name)}" style="padding:3px 8px;background:#fff1f2;color:#be123c;border-color:#fecdd3;font-size:.72rem;flex-shrink:0" title="Kick ${esc(p.name)}">✕ Kick</button>
+        <button class="btn btn-sm btn-kick-student" data-kick-pid="${p.id}" data-kick-name="${esc(p.name)}" style="padding:3px 8px;background:#fff1f2;color:#be123c;border-color:#fecdd3;font-size:.72rem;flex-shrink:0">✕</button>
       </div>
-      <div style="display:flex;align-items:center;gap:5px">
-        <button class="btn btn-sm td-mic-toggle" data-td-pid="${p.id}" style="flex:1;justify-content:center;font-size:.73rem;gap:4px;padding:4px 6px;${isSpeaking?'background:#e0e7ff;color:#4338ca;border-color:#a5b4fc':'background:var(--faint);color:var(--mid);border-color:var(--line)'}">
-          🎙️ ${isSpeaking?'Mute':'Enable Mic'}
+      <div style="display:flex;gap:5px">
+        <button class="btn btn-sm td-mic-toggle" data-td-pid="${p.id}" style="flex:1;justify-content:center;font-size:.7rem;padding:4px 6px;${isSpeaking?'background:#e0e7ff;color:#4338ca;border-color:#a5b4fc':'background:var(--faint);color:var(--mid);border-color:var(--line)'}">
+          🎙️ ${isSpeaking?'Mute':'Mic'}
+        </button>
+        <button class="btn btn-sm td-freeze-btn" data-freeze-pid="${p.id}" data-frozen="${isFrozen?'1':'0'}" style="flex:1;justify-content:center;font-size:.7rem;padding:4px 6px;${isFrozen?'background:#e0f2fe;color:#0369a1;border-color:#bae6fd':'background:var(--faint);color:var(--mid);border-color:var(--line)'}">
+          🧊 ${isFrozen?'Unfreeze':'Freeze'}
         </button>
       </div>
       <div style="display:flex;align-items:center;gap:4px">
-        <span style="font-size:.68rem;color:var(--mid);white-space:nowrap">Score adj:</span>
+        <span style="font-size:.68rem;color:var(--mid);white-space:nowrap">Score:</span>
         <button class="btn btn-ghost btn-sm td-adj-btn" data-adj-pid="${p.id}" data-adj-dir="-" style="padding:2px 8px;font-size:.85rem;font-weight:700;flex-shrink:0">−</button>
         <input type="number" class="form-input td-adj-val" data-adj-pid="${p.id}" value="1" min="1" max="99" style="width:46px;text-align:center;padding:3px 4px;font-size:.8rem;flex-shrink:0"/>
         <button class="btn btn-ghost btn-sm td-adj-btn" data-adj-pid="${p.id}" data-adj-dir="+" style="padding:2px 8px;font-size:.85rem;font-weight:700;flex-shrink:0">+</button>
@@ -810,7 +817,7 @@ function teacherDashboardHTML(){
 
   return `<div id="teacher-dashboard" style="position:fixed;left:0;right:0;bottom:0;top:48px;background:var(--white);z-index:400;display:flex;flex-direction:column;overflow:hidden">
     <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:2px solid var(--line);background:var(--faint);flex-shrink:0">
-      <span style="font-weight:700;font-size:.9rem">👩‍🏫 Teacher Dashboard <span style="font-weight:400;color:var(--mid);font-size:.78rem">${parts.length} student${parts.length!==1?'s':''}</span></span>
+      <span style="font-weight:700;font-size:.9rem">👩‍🏫 Teacher Dashboard <span style="font-weight:400;color:var(--mid);font-size:.78rem">${parts.length} student${parts.length!==1?'s':''}${frozen.size?' · ❄️ '+frozen.size+' frozen':''}</span></span>
       <button class="btn btn-ghost btn-sm" id="btn-sched-close" style="padding:4px 10px">✕ Close</button>
     </div>
     <div style="flex:1;overflow-y:auto;padding:10px">
@@ -2120,6 +2127,7 @@ function attach(){
         activeSpeakerPid=pid;
         // activeSpeakerCid will be set when rtc_speaker_offer arrives at host
         send({type:'host_enable_mic',pid});
+        showActiveSpeakerBanner(pName); // draggable banner so host can track speaker
         render();
       }
     });
@@ -2132,6 +2140,14 @@ function attach(){
       const inp=document.querySelector('.td-adj-val[data-adj-pid="'+pid+'"]');
       const amt=Math.max(1,Math.min(99,parseInt(inp?.value)||1));
       send({type:'adjust_score',pid,delta:dir==='+'?amt:-amt});
+    });
+  });
+  // Freeze / Unfreeze score toggle
+  document.querySelectorAll('.td-freeze-btn').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      const pid=btn.dataset.freezePid;
+      const frozen=btn.dataset.frozen==='1';
+      send({type: frozen?'unfreeze_participant':'freeze_participant', pid});
     });
   });
 

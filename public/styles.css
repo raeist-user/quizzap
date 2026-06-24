@@ -29,6 +29,7 @@
     @keyframes chipIn{from{opacity:0;transform:scale(.85) translateY(6px)}to{opacity:1;transform:scale(1) translateY(0)}}
     @keyframes popIn{0%{opacity:0;transform:scale(.88)}65%{transform:scale(1.03)}100%{opacity:1;transform:scale(1)}}
     @keyframes urgentPulse{0%,100%{opacity:1}50%{opacity:.6}}
+    @keyframes micPulse{0%,100%{box-shadow:0 0 0 0 rgba(79,70,229,.45)}60%{box-shadow:0 0 0 8px rgba(79,70,229,0)}}
     @keyframes barGrow{from{width:0}}
     @keyframes shimmer{from{background-position:-200% center}to{background-position:200% center}}
     @keyframes rowIn{from{opacity:0;transform:translateX(-8px)}to{opacity:1;transform:translateX(0)}}
