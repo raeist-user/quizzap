@@ -21,6 +21,7 @@ let sessionSnapshots = [];
 let sessionCounter   = 0;
 let grandTotalPushed = 0;           // cumulative questions pushed across all sub-sessions (survives reset)
 let bannedPids       = new Set();   // pids/userIds banned for the current session (cleared on shutdown)
+let participantCids  = {};          // pid -> cid mapping so host can target mic enable by pid
 
 // ── WS CLIENT REGISTRY ────────────────────────────────────────────────────────
 let seq     = 0;
@@ -101,6 +102,7 @@ function project(role, pid) {
     sessionSnapshots,
     grandTotalPushed, // cumulative across all sub-sessions (survives reset)
     gameScores:       Object.entries(gameScores).map(([pid, g]) => ({ id: pid, name: g.name, userId: g.userId || null, total: g.total })),
+    cidMap:           { ...participantCids },  // pid -> cid for host mic targeting
   };
 
   if (role === 'participant') {
@@ -332,6 +334,7 @@ function initWS(server) {
           client.role   = 'participant'; client.pid = pid;
           client.name   = state.participants[pid].name;
           client.userId = msg.userId || null;
+          participantCids[pid] = cid;   // register pid->cid for host mic targeting
           tx(ws, { type: 'joined', pid });
           broadcast();
           txHost({ type: 'rtc_new_peer', cid });
@@ -619,6 +622,36 @@ function initWS(server) {
           broadcast();
           break;
 
+        case 'adjust_score': {
+          // Host adjusts a participant's score (positive or negative delta)
+          if (client.role !== 'host') break;
+          const { pid: adjPid, delta } = msg;
+          if (!adjPid || typeof delta !== 'number') break;
+          const adjP = state.participants[adjPid];
+          if (!adjP) break;
+          adjP.score = Math.max(0, (adjP.score || 0) + delta);
+          broadcast();
+          break;
+        }
+
+        case 'host_enable_mic': {
+          // Host directly enables a student's mic without student needing to press button
+          if (client.role !== 'host') break;
+          const { toCid: micCid } = msg;
+          if (!micCid) break;
+          txCid(micCid, { type: 'speak_allowed' });
+          break;
+        }
+
+        case 'host_disable_mic': {
+          // Host ends a student's mic session from dashboard
+          if (client.role !== 'host') break;
+          const { toCid: muteCid } = msg;
+          if (!muteCid) break;
+          txCid(muteCid, { type: 'speak_end' });
+          break;
+        }
+
         case 'raise_hand': {
           if (client.role !== 'participant' || !client.pid) break;
           const raiseName = (msg.name || client.name || 'A student').slice(0, 40);
@@ -785,6 +818,7 @@ function initWS(server) {
       const c = clients.get(cid);
       if (c?.role === 'participant' && c.pid) {
         delete state.answers[c.pid];
+        delete participantCids[c.pid];   // clean up cid map
         broadcast();
       }
       if (cid === hostCid) hostCid = null;
