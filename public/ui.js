@@ -552,17 +552,22 @@ function waitHTML(){
 function questionViewHTML(){
   const q=S.question; if(!q) return waitHTML();
   const answered=S.myAnswer!==null&&S.myAnswer!==undefined;
+  // Also check sessionStorage: prevents re-answering on refresh before WS state arrives
+  let localAnswer=null;
+  try{ const v=sessionStorage.getItem('qans_'+(S.questionPushedAt||'')); if(v!==null) localAnswer=+v; }catch(_){}
+  const effectiveAnswer = answered ? S.myAnswer : (localAnswer!==null ? localAnswer : null);
+  const effectiveAnswered = effectiveAnswer !== null && effectiveAnswer !== undefined;
   const revealed=S.status==='revealed', correct=S.correct;
   const opts=q.options.map((o,i)=>{
     let cls='opt-card';
-    if(revealed){cls+=' locked';if(i===S.myAnswer){cls+=(i===correct?' correct':' wrong-chosen');}}
-    else if(answered){cls+=' locked';if(i===S.myAnswer)cls+=' chosen';}
-    else if(i===S.myAnswer) cls+=' chosen';
+    if(revealed){cls+=' locked';if(i===effectiveAnswer){cls+=(i===correct?' correct':' wrong-chosen');}}
+    else if(effectiveAnswered){cls+=' locked';if(i===effectiveAnswer)cls+=' chosen';}
+    else if(i===effectiveAnswer) cls+=' chosen';
     return `<div class="${cls}" data-opt="${i}"><div class="opt-key">${'ABCD'[i]}</div><span class="${''+urduCls(q)}">${renderMath(o)}</span></div>`;
   }).join('');
   let notice='';
-  if(revealed&&answered){ const ok=S.myAnswer===correct; notice=`<div class="notice ${ok?'n-good':'n-bad'} mt3">${ok?'✓ Correct — +1 point':`✗ Wrong. Correct: ${esc(q.options[correct])}`}</div>`; }
-  else if(answered&&!revealed){ notice=`<div class="notice n-neutral mt3">Answer submitted — waiting for reveal.</div>`; }
+  if(revealed&&effectiveAnswered){ const ok=effectiveAnswer===correct; notice=`<div class="notice ${ok?'n-good':'n-bad'} mt3">${ok?'✓ Correct — +1 point':`✗ Wrong. Correct: ${esc(q.options[correct])}`}</div>`; }
+  else if(effectiveAnswered&&!revealed){ notice=`<div class="notice n-neutral mt3">Answer submitted — waiting for reveal.</div>`; }
   const hasTimer=S.timerSeconds&&S.status==='question';
   // Report button: visible after reveal so student can flag wrong answer key
   const canReport=revealed&&q&&!myReportedQuestions.has(q.text);
@@ -769,38 +774,52 @@ function hostFinalLeaderboardHTML(){
   </div>`;
 }
 
-function schedOverlayHTML(){
+function schedOverlayHTML(){ return teacherDashboardHTML(); }
+
+function teacherDashboardHTML(){
   if(!sidebarSchedOpen) return '';
-  const upcoming=hostSchedules.filter(s=>s.ts>Date.now()-3600000);
-  const schedRows=upcoming.length
-    ?upcoming.map(s=>{
-      const d=new Date(s.ts);
-      return `<div class="sched-card" style="margin-bottom:6px;padding:8px 10px">
-        <div class="sched-date-blk" style="min-width:36px;padding:4px 7px"><div class="sched-day" style="font-size:.95rem">${d.getDate()}</div><div class="sched-mon">${d.toLocaleString('en',{month:'short'})}</div></div>
-        <div class="sched-info">
-          <div class="sched-title" style="font-size:.8rem">${esc(s.title)}</div>
-          <div class="sched-meta">${d.toLocaleTimeString('en',{hour:'2-digit',minute:'2-digit'})}${s.notes?' · '+esc(s.notes):''}</div>
-          <div class="sched-cd">${cdStr(s.ts)}</div>
+  const parts=Object.values(S.participants||{}).slice().sort((a,b)=>(b.score||0)-(a.score||0));
+  const cidMap=S.cidMap||{};
+  function ini(n){return n.split(' ').map(w=>w[0]||'').join('').slice(0,2).toUpperCase();}
+
+  const cards=parts.map(p=>{
+    const pCid=cidMap[p.id]||'';
+    const isSpeaking=(pCid&&pCid===activeSpeakerCid)||false;
+    return `<div style="border:1.5px solid var(--line);border-radius:10px;padding:10px;display:flex;flex-direction:column;gap:7px;background:var(--white)">
+      <div style="display:flex;align-items:center;gap:7px">
+        <div class="j-av" style="width:30px;height:30px;font-size:.7rem;flex-shrink:0;${isSpeaking?'background:#6366f1;color:#fff':'background:#e0e7ff;color:#4338ca'}">${ini(p.name)}</div>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:.8rem;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(p.name)}</div>
+          <div style="font-size:.7rem;color:var(--mid)">${p.score||0} pts${isSpeaking?' · 🎙️ speaking':''}</div>
         </div>
-        <span class="sched-del" data-sdel="${s._id}">✕</span>
-      </div>`;
-    }).join('')
-    :'<p class="muted small" style="padding:4px 0 10px">No upcoming sessions.</p>';
-  return `<div id="sched-overlay" style="position:absolute;bottom:0;left:0;right:0;background:var(--white);border-top:2px solid var(--line);border-radius:12px 12px 0 0;padding:16px;z-index:300;max-height:70%;overflow-y:auto;">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
-      <span style="font-weight:700;font-size:.9rem">📅 Schedule</span>
-      <button class="btn btn-ghost btn-sm" id="btn-sched-close">✕</button>
+        <button class="btn btn-sm btn-kick-student" data-kick-pid="${p.id}" data-kick-name="${esc(p.name)}" style="padding:3px 8px;background:#fff1f2;color:#be123c;border-color:#fecdd3;font-size:.72rem;flex-shrink:0" title="Kick ${esc(p.name)}">✕ Kick</button>
+      </div>
+      <div style="display:flex;align-items:center;gap:5px">
+        <button class="btn btn-sm td-mic-toggle" data-td-pid="${p.id}" data-td-cid="${pCid}" style="flex:1;justify-content:center;font-size:.73rem;gap:4px;padding:4px 6px;${isSpeaking?'background:#e0e7ff;color:#4338ca;border-color:#a5b4fc':'background:var(--faint);color:var(--mid);border-color:var(--line)'}">
+          🎙️ ${isSpeaking?'Mute':'Enable Mic'}
+        </button>
+      </div>
+      <div style="display:flex;align-items:center;gap:4px">
+        <span style="font-size:.68rem;color:var(--mid);white-space:nowrap">Score adj:</span>
+        <button class="btn btn-ghost btn-sm td-adj-btn" data-adj-pid="${p.id}" data-adj-dir="-" style="padding:2px 8px;font-size:.85rem;font-weight:700;flex-shrink:0">−</button>
+        <input type="number" class="form-input td-adj-val" data-adj-pid="${p.id}" value="1" min="1" max="99" style="width:46px;text-align:center;padding:3px 4px;font-size:.8rem;flex-shrink:0"/>
+        <button class="btn btn-ghost btn-sm td-adj-btn" data-adj-pid="${p.id}" data-adj-dir="+" style="padding:2px 8px;font-size:.85rem;font-weight:700;flex-shrink:0">+</button>
+      </div>
+    </div>`;
+  }).join('');
+
+  return `<div id="teacher-dashboard" style="position:fixed;left:0;right:0;bottom:0;top:48px;background:var(--white);z-index:400;display:flex;flex-direction:column;overflow:hidden">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:2px solid var(--line);background:var(--faint);flex-shrink:0">
+      <span style="font-weight:700;font-size:.9rem">👩‍🏫 Teacher Dashboard <span style="font-weight:400;color:var(--mid);font-size:.78rem">${parts.length} student${parts.length!==1?'s':''}</span></span>
+      <button class="btn btn-ghost btn-sm" id="btn-sched-close" style="padding:4px 10px">✕ Close</button>
     </div>
-    ${schedRows}
-    <hr/>
-    <div style="display:flex;flex-direction:column;gap:6px;margin-top:10px">
-      <input class="form-input" id="sched-title" placeholder="Session title" maxlength="60" style="font-size:.82rem;padding:8px 10px"/>
-      <input class="form-input" type="datetime-local" id="sched-dt" style="font-size:.82rem;padding:8px 10px"/>
-      <input class="form-input" id="sched-notes" placeholder="Notes (optional)" maxlength="100" style="font-size:.82rem;padding:8px 10px"/>
-      <button class="btn btn-dark btn-sm btn-full" id="btn-sched-add">+ Add to schedule</button>
-      <div class="form-msg" id="sched-msg"></div>
+    <div style="flex:1;overflow-y:auto;padding:10px">
+      ${parts.length
+        ?`<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">${cards}</div>`
+        :`<div style="text-align:center;padding:40px 20px;color:var(--mid)"><div style="font-size:2rem;margin-bottom:8px">👥</div><div style="font-size:.85rem">No students connected yet</div></div>`}
     </div>
   </div>`;
+}
 }
 
 function standingsOverlayHTML(){
@@ -1264,7 +1283,7 @@ function hostHTML(){
         </button>
       </div>
       <button class="btn btn-ghost btn-sm" id="btn-sched-nav" style="flex-shrink:0;padding:4px 8px;gap:4px;font-size:.75rem">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>Sched
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>Dashboard
       </button>
       <div style="position:relative;flex-shrink:0">
         <button class="btn btn-ghost btn-sm" id="btn-reports-open" title="Received question reports" style="padding:4px 8px;font-size:.75rem;gap:4px">
@@ -2084,25 +2103,38 @@ function attach(){
     }catch(e){msg.className='form-msg err';msg.textContent=e.message;}
   });
 
-  // Host schedule (sidebar)
-  on('btn-sched-add', async ()=>{
-    const title=document.getElementById('sched-title')?.value?.trim();
-    const dt=document.getElementById('sched-dt')?.value;
-    const notes=document.getElementById('sched-notes')?.value?.trim();
-    const msg=document.getElementById('sched-msg'); if(!msg)return;
-    if(!title||!dt){msg.className='form-msg err';msg.textContent='Title and date required';return;}
-    const ts=new Date(dt).getTime();
-    if(ts<=Date.now()){msg.className='form-msg err';msg.textContent='Choose a future date';return;}
-    try{
-      await apiPost('/api/schedules',{title,ts,notes:notes||''},true);
-      msg.className='form-msg ok'; msg.textContent='✓ Scheduled!';
-      await fetchHostSchedules();
-      setTimeout(()=>{ if(document.getElementById('sched-msg')) document.getElementById('sched-msg').textContent=''; },2000);
-    }catch(e){ msg.className='form-msg err'; msg.textContent=e.message; }
+  // Teacher Dashboard event handlers
+  // Mic toggle: host enables or mutes a student's mic directly from dashboard
+  document.querySelectorAll('.td-mic-toggle').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      const pid=btn.dataset.tdPid;
+      const cid=btn.dataset.tdCid;
+      if(!cid) return;
+      const isSpeaking=(cid===activeSpeakerCid);
+      if(isSpeaking){
+        send({type:'speak_end',toCid:cid});
+        hostCleanupSpeaker();
+        removeActiveSpeakerBanner();
+        render();
+      } else {
+        const pName=(S.participants||[]).find(p=>p.id===pid)?.name||'Student';
+        activeSpeakerName=pName; activeSpeakerCid=cid;
+        send({type:'host_enable_mic',toCid:cid});
+        showActiveSpeakerBanner(pName);
+        render();
+      }
+    });
   });
-  document.querySelectorAll('[data-sdel]').forEach(el=>el.addEventListener('click', async()=>{
-    try{ await apiDel('/api/schedules/'+el.dataset.sdel); await fetchHostSchedules(); }catch(e){}
-  }));
+  // Score adjustment +/- buttons
+  document.querySelectorAll('.td-adj-btn').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      const pid=btn.dataset.adjPid;
+      const dir=btn.dataset.adjDir;
+      const inp=document.querySelector('.td-adj-val[data-adj-pid="'+pid+'"]');
+      const amt=Math.max(1,Math.min(99,parseInt(inp?.value)||1));
+      send({type:'adjust_score',pid,delta:dir==='+'?amt:-amt});
+    });
+  });
 
   // Landing tabs
   on('ht-home',()=>{ homeSection='home'; render(); });
@@ -2605,6 +2637,12 @@ function attach(){
       if(S.myAnswer!==null&&S.myAnswer!==undefined) return;
       if(S.status==='revealed') return;
       if(el.classList.contains('locked')) return;
+      // Prevent re-answering after refresh: save locally before server confirms
+      try{
+        const _qKey='qans_'+(S.questionPushedAt||'');
+        if(sessionStorage.getItem(_qKey)!==null) return;
+        sessionStorage.setItem(_qKey, String(+el.dataset.opt));
+      }catch(_){}
       // Record how many seconds since question was pushed — with sub-second precision
       // Use clockOffset to correct for server/client clock skew (same fix as the timer display).
       const ms = S.questionPushedAt ? (Date.now()+clockOffset)-S.questionPushedAt : null;
