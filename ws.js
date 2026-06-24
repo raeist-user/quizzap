@@ -635,19 +635,10 @@ function initWS(server) {
         }
 
         case 'host_enable_mic': {
-          // Host directly enables a student's mic — sends speak_allowed to that student
+          // Host directly enables a student's mic without student needing to press button
           if (client.role !== 'host') break;
           const { toCid: micCid } = msg;
           if (!micCid) break;
-          // End any currently speaking student first
-          clients.forEach((c, cid) => {
-            if (c.role === 'participant' && c.isSpeaking && cid !== micCid) {
-              c.isSpeaking = false;
-              tx(c.ws, { type: 'speak_end' });
-            }
-          });
-          const micClient = clients.get(micCid);
-          if (micClient) micClient.isSpeaking = true;
           txCid(micCid, { type: 'speak_allowed' });
           break;
         }
@@ -657,16 +648,20 @@ function initWS(server) {
           if (client.role !== 'host') break;
           const { toCid: muteCid } = msg;
           if (!muteCid) break;
-          const muteClient = clients.get(muteCid);
-          if (muteClient) muteClient.isSpeaking = false;
           txCid(muteCid, { type: 'speak_end' });
           break;
         }
 
-        case 'raise_hand':
+        case 'raise_hand': {
+          if (client.role !== 'participant' || !client.pid) break;
+          const raiseName = (msg.name || client.name || 'A student').slice(0, 40);
+          txHost({ type: 'speak_request', name: raiseName, pid: client.pid, fromCid: cid });
+          break;
+        }
         case 'speak_request': {
-          // Request-to-speak flow removed — host enables mic directly from dashboard
-          // These are no-ops now; kept for graceful handling of old clients
+          if (client.role !== 'participant' || !client.pid) break;
+          const speakName = (client.name || 'A student').slice(0, 40);
+          txHost({ type: 'speak_request', name: speakName, pid: client.pid, fromCid: cid });
           break;
         }
         case 'speak_allowed':
