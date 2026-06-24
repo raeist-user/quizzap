@@ -1367,7 +1367,6 @@ function hostHTML(){
             ${cumTime!=null?`<span style="font-size:.62rem;color:#a0a0ac" title="Cumulative">Σ${parseFloat(cumTime).toFixed(1)}s</span>`:''}
           </div>
           <div style="font-weight:600;min-width:44px;text-align:right">${p.score||0} <span style="font-size:.68rem;color:var(--mid)">pts</span></div>
-          <button class="btn-kick-student" data-kick-pid="${p.id}" data-kick-name="${esc(p.name)}" title="Kick ${esc(p.name)}" style="flex-shrink:0;margin-left:4px;background:transparent;border:none;cursor:pointer;padding:2px 4px;border-radius:4px;color:#e11d48;font-size:.75rem;opacity:.55;transition:opacity .15s" onmouseover="this.style.opacity='1';this.style.background='#fee2e2'" onmouseout="this.style.opacity='.55';this.style.background='transparent'">✕</button>
         </div>`;
       }).join('')
     :`<div style="padding:20px;text-align:center;color:var(--mid);font-size:.83rem">Waiting for students to join…</div>`;
@@ -2113,13 +2112,12 @@ function attach(){
       if(isSpeaking){
         send({type:'speak_end',toCid:cid});
         hostCleanupSpeaker();
-        removeActiveSpeakerBanner();
         render();
       } else {
         const pName=(S.participants||[]).find(p=>p.id===pid)?.name||'Student';
         activeSpeakerName=pName; activeSpeakerCid=cid;
         send({type:'host_enable_mic',toCid:cid});
-        showActiveSpeakerBanner(pName);
+        // Don't show the floating banner — speaking state is shown in dashboard card
         render();
       }
     });

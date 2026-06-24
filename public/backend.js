@@ -920,7 +920,12 @@ function showSpeakRequestToast(studentName, fromCid){
   // If someone is already speaking, auto-dismiss new request
   if(activeSpeakerCid){
     send({type:'speak_dismissed',toCid:fromCid});
-    showToast(`⚠️ ${studentName} wants to speak but mic is already in use.`,'neutral');
+    if(fromCid===activeSpeakerCid){
+      // This is the SAME student the host already enabled — request is implicitly accepted
+      showToast(`✓ ${studentName}'s microphone has already been enabled.`,'good');
+    } else {
+      showToast(`⚠️ ${studentName} wants to speak but mic is already in use.`,'neutral');
+    }
     return;
   }
   let container=document.getElementById('hand-raise-container');
