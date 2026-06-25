@@ -534,11 +534,7 @@ function waitHTML(){
           '</div>'+
           '<button class="btn btn-sm" style="background:#fee2e2;color:#be123c;border-color:#fecdd3;font-size:.76rem" id="btn-end-speak">Done</button>'+
         '</div>'
-      : isSpeakingNow && _micForcedByHost
-        ? '<button class="btn btn-sm" id="btn-raise-hand" style="gap:6px;font-size:.82rem;margin-bottom:14px;padding:8px 18px;background:#4f46e5;color:#fff;border-color:#4f46e5;border-radius:40px;animation:micPulse 1.8s ease-in-out infinite;max-width:480px;width:100%;justify-content:center">'+
-            '<span>🎙️</span> Mic is Active — Tap to raise hand'+
-          '</button>'
-        : speakRequestPending
+      : speakRequestPending
         ? '<div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;padding:8px 14px;background:#f5f3ff;border:1.5px solid #a5b4fc;border-radius:40px;font-size:.82rem;color:#4338ca;max-width:480px;width:100%">'+
             '<div style="width:14px;height:14px;border:2px solid #a5b4fc;border-top-color:#6366f1;border-radius:50%;animation:spin .8s linear infinite;flex-shrink:0"></div>'+
             'Waiting for host to allow…'+
