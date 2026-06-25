@@ -23,6 +23,7 @@ let grandTotalPushed = 0;           // cumulative questions pushed across all su
 let bannedPids       = new Set();   // pids/userIds banned for the current session (cleared on shutdown)
 let participantCids  = {};          // pid -> cid mapping so host can target mic enable by pid
 let frozenPids       = new Set();   // pids whose scores are frozen (host-controlled cheat prevention)
+let exiledPids       = new Set();   // pids who are silently separated from public leaderboard
 
 // ── WS CLIENT REGISTRY ────────────────────────────────────────────────────────
 let seq     = 0;
@@ -106,6 +107,7 @@ function project(role, pid) {
     cidMap:           { ...participantCids },  // pid -> cid for host mic targeting
     manualAdj:        state._manualAdj || false,
     frozenPids:       [...frozenPids],          // list of pids with frozen scores
+    exiledPids:       [...exiledPids],          // list of pids hidden from public leaderboard
   };
 
   if (role === 'participant') {
@@ -121,6 +123,7 @@ function project(role, pid) {
       myRank:    ranked.find(p => p.id === pid)?.rank ?? null,
       myHistory,
       manualAdj: state._manualAdj || false,
+      exiledPids: [...exiledPids],   // participant needs this to know if they're exiled
     };
   }
 
@@ -503,6 +506,7 @@ function initWS(server) {
           if (client.role !== 'host') break;
           {
             frozenPids.clear(); // all freezes lifted when session halts
+          exiledPids.clear(); // exile is session-scoped
             const haltParticipants = Object.values(state.participants)
               .slice().sort((a, b) => b.score - a.score);
             const haltTotalQ = grandTotalPushed + (state.pushedCount || 0);
@@ -517,6 +521,7 @@ function initWS(server) {
         case 'shutdown':
           if (client.role !== 'host') break;
           frozenPids.clear(); // clear on full shutdown too
+          exiledPids.clear();
           bankGameScores();
           {
             const seenUserIds = new Set();
@@ -627,6 +632,24 @@ function initWS(server) {
             state.answerTimes[client.pid] = parseFloat(msg.timeTaken.toFixed(2));
           broadcast();
           break;
+
+        case 'exile_participant': {
+          if (client.role !== 'host') break;
+          const { pid: epid } = msg;
+          if (!epid || !state.participants[epid]) break;
+          exiledPids.add(epid);
+          broadcast();
+          break;
+        }
+
+        case 'unexile_participant': {
+          if (client.role !== 'host') break;
+          const { pid: uepid } = msg;
+          if (!uepid) break;
+          exiledPids.delete(uepid);
+          broadcast();
+          break;
+        }
 
         case 'freeze_participant': {
           if (client.role !== 'host') break;
