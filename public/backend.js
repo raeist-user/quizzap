@@ -42,6 +42,7 @@ let backupOverlayState={ list:[], loading:false, error:null, restoredMsg:null };
 
 // Host settings/shortcuts overlay
 let hostSettingsOpen=false;
+let hostEndedTab='public';   // 'public' | 'exiled' — toggle on post-game results screen
 
 // Upload manage state
 let manageEditMode=null;      // null | 'existing' | 'new'
@@ -1702,8 +1703,17 @@ function flashScoreChanges(){
 // Patch render to trigger animations
 const _origRender = render;
 window.render = function(){
+  // Preserve host-students-inner scroll position across re-renders
+  const _scroller = document.querySelector('.host-students-inner');
+  const _savedScroll = _scroller ? _scroller.scrollTop : 0;
+
   _origRender.apply(this, arguments);
+
   requestAnimationFrame(()=>{
+    // Restore scroll position without jumping to top
+    const scroller2 = document.querySelector('.host-students-inner');
+    if(scroller2 && _savedScroll > 0) scroller2.scrollTop = _savedScroll;
+
     animateStagger('.lb-row', 35, 350);
     animateStagger('.hist-row', 45, 500);
     animateStagger('.student-chip', 30, 300);

@@ -449,13 +449,19 @@ function joinHTML(){
 
 function waitHTML(){
   const parts=S.participants||[];
+  const exiledSet=new Set(S.exiledPids||[]);
+  const amIExiled=exiledSet.has(myPid);
   const myP=parts.find(p=>p.id===myPid);
   const history=S.myHistory||[];
-  const waitMsg=history.length?'Wait for next question\u2026':'Waiting for host to start\u2026';
+  const waitMsg=history.length?'Wait for next question…':'Waiting for host to start…';
   const medals=['🥇','🥈','🥉'];
 
-  // ALL students always shown, even with 0 score
-  const sortedParts=sortParticipants(parts);
+  // Filter leaderboard: exiled participants see only other exiled; regular see only non-exiled
+  const visibleParts = amIExiled
+    ? parts.filter(p=>exiledSet.has(p.id))        // exiled students: see exile leaderboard
+    : parts.filter(p=>!exiledSet.has(p.id));       // regular students: hide exiled
+
+  const sortedParts=sortParticipants(visibleParts);
 
   // 🔥 Fastest finger: use persisted lastFastestPid (survives revealed → idle transition)
   const fastestPidP = lastFastestPid;
@@ -493,8 +499,10 @@ function waitHTML(){
   let lbHTML='';
   if(history.length){
     // After at least one question: show full leaderboard with scores
+    const lbTitle=amIExiled?'🚫 Exiled Leaderboard':'🏆 Leaderboard';
+    const lbCount=amIExiled?visibleParts.length+' exiled':parts.filter(p=>!exiledSet.has(p.id)).length+' students';
     lbHTML='<div class="lb-panel">'+
-      '<div class="lb-head"><span style="font-size:.82rem;font-weight:600">🏆 Leaderboard</span><span class="small muted">'+parts.length+' students</span></div>'+
+      '<div class="lb-head"><span style="font-size:.82rem;font-weight:600">'+lbTitle+'</span><span class="small muted">'+lbCount+'</span></div>'+
       (lbRows||'<div style="padding:16px;text-align:center;color:var(--mid);font-size:.82rem">No students yet.</div>')+
       '</div>';
   } else if(parts.length){
@@ -780,16 +788,22 @@ function teacherDashboardHTML(){
   if(!sidebarSchedOpen) return '';
   const parts=Object.values(S.participants||{}).slice().sort((a,b)=>(b.score||0)-(a.score||0));
   const frozen=new Set(S.frozenPids||[]);
+  const exiled=new Set(S.exiledPids||[]);
   function ini(n){return n.split(' ').map(w=>w[0]||'').join('').slice(0,2).toUpperCase();}
 
   const cards=parts.map(p=>{
     const isSpeaking=typeof activeSpeakerPid!=='undefined' && activeSpeakerPid===p.id;
     const isFrozen=frozen.has(p.id);
-    return `<div style="border:1.5px solid ${isFrozen?'#bae6fd':'var(--line)'};border-radius:10px;padding:10px;display:flex;flex-direction:column;gap:7px;background:${isFrozen?'#f0f9ff':'var(--white)'}">
+    const isExiled=exiled.has(p.id);
+    const cardBorder=isExiled?'#fca5a5':isFrozen?'#bae6fd':'var(--line)';
+    const cardBg=isExiled?'#fff5f5':isFrozen?'#f0f9ff':'var(--white)';
+    let avatarStyle=isSpeaking?'background:#6366f1;color:#fff':isExiled?'background:#fca5a5;color:#7f1d1d':isFrozen?'background:#bae6fd;color:#0369a1':'background:#e0e7ff;color:#4338ca';
+    let avatarContent=isExiled?'🚫':isFrozen?'🧊':ini(p.name);
+    return `<div style="border:1.5px solid ${cardBorder};border-radius:10px;padding:10px;display:flex;flex-direction:column;gap:7px;background:${cardBg}">
       <div style="display:flex;align-items:center;gap:7px">
-        <div class="j-av" style="width:30px;height:30px;font-size:.7rem;flex-shrink:0;${isSpeaking?'background:#6366f1;color:#fff':isFrozen?'background:#bae6fd;color:#0369a1':'background:#e0e7ff;color:#4338ca'}">${isFrozen?'🧊':ini(p.name)}</div>
+        <div class="j-av" style="width:30px;height:30px;font-size:.7rem;flex-shrink:0;${avatarStyle}">${avatarContent}</div>
         <div style="flex:1;min-width:0">
-          <div style="font-size:.8rem;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(p.name)}${isFrozen?' <span style="font-size:.65rem;color:#0369a1;background:#e0f2fe;padding:1px 5px;border-radius:8px">frozen</span>':''}</div>
+          <div style="font-size:.8rem;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(p.name)}${isFrozen?' <span style="font-size:.65rem;color:#0369a1;background:#e0f2fe;padding:1px 5px;border-radius:8px">frozen</span>':''}${isExiled?' <span style="font-size:.65rem;color:#991b1b;background:#fee2e2;padding:1px 5px;border-radius:8px">exiled</span>':''}</div>
           <div style="font-size:.7rem;color:var(--mid)">${p.score||0} pts${isSpeaking?' · 🎙️ speaking':''}</div>
         </div>
         <button class="btn btn-sm btn-kick-student" data-kick-pid="${p.id}" data-kick-name="${esc(p.name)}" style="padding:3px 8px;background:#fff1f2;color:#be123c;border-color:#fecdd3;font-size:.72rem;flex-shrink:0">✕</button>
@@ -800,6 +814,9 @@ function teacherDashboardHTML(){
         </button>
         <button class="btn btn-sm td-freeze-btn" data-freeze-pid="${p.id}" data-frozen="${isFrozen?'1':'0'}" style="flex:1;justify-content:center;font-size:.7rem;padding:4px 6px;${isFrozen?'background:#e0f2fe;color:#0369a1;border-color:#bae6fd':'background:var(--faint);color:var(--mid);border-color:var(--line)'}">
           🧊 ${isFrozen?'Unfreeze':'Freeze'}
+        </button>
+        <button class="btn btn-sm td-exile-btn" data-exile-pid="${p.id}" data-exiled="${isExiled?'1':'0'}" style="flex:1;justify-content:center;font-size:.7rem;padding:4px 6px;${isExiled?'background:#fee2e2;color:#991b1b;border-color:#fca5a5':'background:var(--faint);color:var(--mid);border-color:var(--line)'}">
+          🚫 ${isExiled?'Unexile':'Exile'}
         </button>
       </div>
       <div style="display:flex;align-items:center;gap:4px">
@@ -813,7 +830,7 @@ function teacherDashboardHTML(){
 
   return `<div id="teacher-dashboard" style="position:fixed;left:0;right:0;bottom:0;top:48px;background:var(--white);z-index:400;display:flex;flex-direction:column;overflow:hidden">
     <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:2px solid var(--line);background:var(--faint);flex-shrink:0">
-      <span style="font-weight:700;font-size:.9rem">👩‍🏫 Teacher Dashboard <span style="font-weight:400;color:var(--mid);font-size:.78rem">${parts.length} student${parts.length!==1?'s':''}${frozen.size?' · ❄️ '+frozen.size+' frozen':''}</span></span>
+      <span style="font-weight:700;font-size:.9rem">👩‍🏫 Teacher Dashboard <span style="font-weight:400;color:var(--mid);font-size:.78rem">${parts.length} student${parts.length!==1?'s':''}${frozen.size?' · ❄️ '+frozen.size+' frozen':''}${exiled.size?' · 🚫 '+exiled.size+' exiled':''}</span></span>
       <button class="btn btn-ghost btn-sm" id="btn-sched-close" style="padding:4px 10px">✕ Close</button>
     </div>
     <div style="flex:1;overflow-y:auto;padding:10px">
@@ -1270,8 +1287,8 @@ function hostHTML(){
   const pushedSoFar = S.pushedCount || 0;
   const totalLoaded = questions.length || 0;
   const standingsLabel = parts.length
-    ? `📊 ${currentSessionLabel} · ${parts.length} joined`
-    : `📊 Standings`;
+    ? `${currentSessionLabel} · ${parts.length} joined`
+    : '';
   const pushedLabel = totalLoaded > 0
     ? `Q${pushedSoFar}/${totalLoaded}`
     : pushedSoFar > 0 ? `Q${pushedSoFar}` : '';
@@ -1353,11 +1370,13 @@ function hostHTML(){
         const isFastest = isRevealed && p.id===fastestPid;
         const pStreak = streakMap[p.id] || 0;
         const hasThumb = S.thumbsUp && S.thumbsUp.includes(p.id);
-        return `<div style="display:flex;align-items:center;gap:8px;padding:7px 10px;border-bottom:1px solid var(--line);font-size:.83rem${isFastest?';background:#fffbeb':''}">
+        const isExiledHost = (S.exiledPids||[]).includes(p.id);
+        const rowExileBg = isExiledHost ? ';background:rgba(254,226,226,0.55)' : '';
+        return `<div style="display:flex;align-items:center;gap:8px;padding:7px 10px;border-bottom:1px solid var(--line);font-size:.83rem${isFastest?';background:#fffbeb':''}${rowExileBg}">
           <div style="min-width:22px;text-align:center;font-size:.72rem;color:var(--mid)">${medals[i]||('#'+(i+1))}</div>
-          <div class="j-av" style="flex-shrink:0${isFastest?';background:#f59e0b;color:#fff':''}">${initials(p.name)}</div>
+          <div class="j-av" style="flex-shrink:0${isFastest?';background:#f59e0b;color:#fff':isExiledHost?';background:#fca5a5;color:#7f1d1d':''}">${isExiledHost?'🚫':initials(p.name)}</div>
           <div style="flex:1;overflow:hidden;min-width:0">
-            <div style="white-space:nowrap;text-overflow:ellipsis;overflow:hidden">${esc(p.name)}</div>
+            <div style="white-space:nowrap;text-overflow:ellipsis;overflow:hidden">${esc(p.name)}${isExiledHost?' <span style="font-size:.65rem;color:#991b1b;background:#fee2e2;padding:1px 4px;border-radius:6px">exiled</span>':''}</div>
             <div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:1px">
               ${isFastest?'<span class="ff-badge">⚡ Fastest</span>':''}
               ${streakBadgeHTML(pStreak)}
@@ -1611,25 +1630,43 @@ function hostHTML(){
 ══════════════════════════════════════ */
 function hostEndedHTML(){
   const history=S.history||[], parts=S.participants||[];
-  const sorted=[...parts].sort((a,b)=>(b.score||0)-(a.score||0));
+  const exiledSet=new Set(S.exiledPids||[]);
+  const publicParts=[...parts].filter(p=>!exiledSet.has(p.id)).sort((a,b)=>(b.score||0)-(a.score||0));
+  const exiledParts=[...parts].filter(p=>exiledSet.has(p.id)).sort((a,b)=>(b.score||0)-(a.score||0));
+  const sorted = hostEndedTab==='exiled' ? exiledParts : publicParts;
   const partMap={}; parts.forEach(p=>partMap[p.id]=p);
   const totalQs=history.length;
   const totalLabel=String(totalQs||S.pushedCount||0);
-  const table=parts.length&&history.length?`<div class="itbl-wrap"><table class="itbl">
-    <thead><tr><th>Student</th>${history.map((_,i)=>`<th>Q${i+1}</th>`).join('')}<th>Score</th></tr></thead>
-    <tbody>${sorted.map(p=>`<tr data-pid="${p.id}"><td><strong>${esc(p.name)}</strong></td>
-      ${history.map(h=>{const ans=h.answers[p.id]??null;if(ans===null)return'<td class="c-nil">—</td>';return`<td class="${ans===h.correct?'c-ok':'c-bad'}">${'ABCD'[ans]}${ans===h.correct?' ✓':' ✗'}</td>`;}).join('')}
-      <td><strong>${p.score||0}</strong><span style="font-size:.7rem;color:var(--mid)">/${totalLabel}</span></td></tr>`).join('')}</tbody>
-  </table></div>`:'<div class="notice n-neutral">No data recorded.</div>';
+
+  function buildTable(rows){
+    if(!rows.length||!history.length) return '<div class="notice n-neutral">No data recorded.</div>';
+    return `<div class="itbl-wrap"><table class="itbl">
+      <thead><tr><th>Student</th>${history.map((_,i)=>`<th>Q${i+1}</th>`).join('')}<th>Score</th></tr></thead>
+      <tbody>${rows.map(p=>`<tr data-pid="${p.id}"><td><strong>${esc(p.name)}</strong></td>
+        ${history.map(h=>{const ans=h.answers[p.id]??null;if(ans===null)return'<td class="c-nil">—</td>';return`<td class="${ans===h.correct?'c-ok':'c-bad'}">${'ABCD'[ans]}${ans===h.correct?' ✓':' ✗'}</td>`;}).join('')}
+        <td><strong>${p.score||0}</strong><span style="font-size:.7rem;color:var(--mid)">/${totalLabel}</span></td></tr>`).join('')}
+      </tbody></table></div>`;
+  }
+
+  const table=buildTable(sorted);
   let detail='';
   if(inspectPid&&partMap[inspectPid]){
     const p=partMap[inspectPid];
     detail=`<div class="detail-wrap"><div class="detail-head"><span><strong>${esc(p.name)}</strong> — ${p.score||0}/${totalLabel}</span><button class="btn btn-ghost btn-sm" id="btn-close-inspect">Close</button></div>
       ${history.map((h,i)=>{const ans=h.answers[p.id]??null;return`<div class="detail-row"><div class="detail-q">Q${i+1}: ${renderMath(h.question.text)}</div>
         <div class="ans-chips">${h.question.options.map((o,oi)=>{let cls='ac-none';if(oi===h.correct)cls='ac-good';if(ans===oi&&oi!==h.correct)cls='ac-bad';const mark=oi===ans?(oi===h.correct?' ✓':' ✗'):'';
-          return`<span class="ans-chip ${cls}" style="${oi===ans||oi===h.correct?'font-weight:600':''}">${'ABCD'[oi]}) ${renderMath(o)}${mark}</span>`;}).join('')}${ans===null?'<span class="ans-chip ac-none">No answer</span>':''}</div></div>`;}).join('')}
+          return`<span class="ans-chip ${cls}" style="${oi===ans||oi===h.correct?'font-weight:600':''}">${'ABCD'[oi]}) ${renderMath(o)}${mark}</span>`;}).join('')}${ans===null?'<span class="ans-chip ac-none">No answer</span>':''}
+        </div></div>`;}).join('')}
     </div>`;
   }
+
+  const toggleBtns=`<div style="display:flex;gap:6px;margin-bottom:14px">
+    <button class="btn btn-sm" id="btn-ended-tab-public" style="flex:1;justify-content:center;font-size:.8rem;${hostEndedTab==='public'?'background:#1d1d22;color:#fff;border-color:#1d1d22':''
+}">🏆 Public (${publicParts.length})</button>
+    <button class="btn btn-sm" id="btn-ended-tab-exiled" style="flex:1;justify-content:center;font-size:.8rem;${hostEndedTab==='exiled'?'background:#dc2626;color:#fff;border-color:#dc2626':'color:#991b1b;border-color:#fca5a5'
+}">🚫 Exiled (${exiledParts.length})</button>
+  </div>`;
+
   return `<div style="position:relative;padding:16px;width:100%;box-sizing:border-box">
     <div class="results-header">
       <h2>Results</h2>
@@ -1642,7 +1679,8 @@ function hostEndedHTML(){
     <div class="notice n-neutral mb3" style="font-size:.79rem">
       <strong>Continue</strong> — return to waiting room &nbsp;·&nbsp; <strong>Halt</strong> — send students home
     </div>
-    <p class="muted small mb2">Tap any row to inspect answers.</p>${table}${detail}
+    <p class="muted small mb2">Tap any row to inspect answers.</p>
+    ${toggleBtns}${table}${detail}
     ${haltBombOverlayHTML()}
     ${haltMenuOverlayHTML()}
     ${backupRestoreOverlayHTML()}
@@ -1650,6 +1688,7 @@ function hostEndedHTML(){
     ${dismissBombOverlayHTML()}
   </div>`;
 }
+
 /* ══════════════════════════════════════
    PROFILE PAGE
 ══════════════════════════════════════ */
@@ -2146,6 +2185,14 @@ function attach(){
       send({type: frozen?'unfreeze_participant':'freeze_participant', pid});
     });
   });
+  // Exile / Unexile toggle
+  document.querySelectorAll('.td-exile-btn').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      const pid=btn.dataset.exilePid;
+      const exiled=btn.dataset.exiled==='1';
+      send({type: exiled?'unexile_participant':'exile_participant', pid});
+    });
+  });
 
   // Landing tabs
   on('ht-home',()=>{ homeSection='home'; render(); });
@@ -2437,6 +2484,8 @@ function attach(){
   on('btn-end',   ()=>{ if(confirm('End session and show results?')) send({type:'end_session'}); });
   on('btn-reset', ()=>{ if(confirm('Reset everything?')){ send({type:'reset'}); questions=[]; selIdx=-1; answerKey=-1; inspectPid=null; subjects=[]; repoPath=null; stopMic(); cumulativeAnswerTimes={}; render(); } });
   on('btn-close-inspect',()=>{ inspectPid=null; render(); });
+  on('btn-ended-tab-public',()=>{ hostEndedTab='public'; render(); });
+  on('btn-ended-tab-exiled',()=>{ hostEndedTab='exiled'; render(); });
 
   // ── SELECT QUESTION button — auto-selects question text so host can search it ──
   on('btn-select-question',()=>{
