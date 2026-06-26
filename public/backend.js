@@ -53,14 +53,8 @@ let editorFullscreen=false;   // whether the editor is in fullscreen overlay mod
 
 // Voice (host)
 let localStream=null;
-const peerConns={};
-
-// Voice (student)
-let remoteConn=null;
-
-// Speak-request flow (see voice.js)
-// speakRequestPending, isSpeakingNow, participantMicStream, participantPeerConn
-// activeSpeakerName, activeSpeakerCid  — all declared in voice.js
+// Mic system — see rebuilt functions below
+// All state is managed in the MIC SYSTEM block
 
 // Timer
 let timerInterval=null;
@@ -804,58 +798,40 @@ function connect(){
         break;
       }
       case 'speak_allowed': {
-        if(role==='participant'){
-          speakRequestPending=false;
-          startParticipantMic(m.forced||false); // forced=true → silent, no toast
-        }
+        if(role==='participant'){ srPending=false; srStart(m.forced||false); }
         break;
       }
       case 'speak_fake_accepted': {
-        // Sent when host clicks Allow while force-mic is already ON — fake positive to student
-        if(role==='participant'){
-          speakRequestPending=false;
-          showToast('✓ Your request has been accepted.','good');
-          render();
-        }
+        if(role==='participant'){ srPending=false; showToast('✓ Your request has been accepted.','good'); render(); }
         break;
       }
       case 'speak_dismissed': {
         if(role==='participant'){
-          speakRequestPending=false;
-          // Force-mic on: fake positive so student isn't alarmed
-          if(_micForcedByHost){
-            showToast('✓ Host acknowledged your request.','neutral');
-          } else {
-            showToast('✋ Host dismissed your speak request.','neutral');
-          }
-          render();
+          const _wasForced=srForced;
+          srPending=false;
+          showToast(_wasForced?'✓ Host acknowledged your request.':'✋ Host dismissed your speak request.','neutral');
+          if(!_wasForced) render();
         }
         break;
       }
       case 'speak_end': {
-        if(role==='participant') stopParticipantMic(true, m.forcedEnd||false);
+        if(role==='participant') srStop(true, m.forcedEnd||false);
         break;
       }
       case 'rtc_speaker_offer': {
         if(role==='host'){
-          // Also update activeSpeakerCid/Pid from the actual offer sender (handles both flows)
-          if(!activeSpeakerCid) activeSpeakerCid=m.fromCid;
-          if(!activeSpeakerPid){
-            activeSpeakerPid=Object.entries(S.cidMap||{}).find(([,c])=>c===m.fromCid)?.[0]||null;
-          }
-          hostHandleSpeakerOffer(m.fromCid, m.signal);
+          if(!hlCid) hlCid=m.fromCid;
+          if(!hlPid) hlPid=Object.entries(S.cidMap||{}).find(([,c])=>c===m.fromCid)?.[0]||null;
+          hlHandleOffer(m.fromCid, m.signal);
         }
         break;
       }
       case 'rtc_speaker_answer': {
-        if(role==='participant') participantHandleSpeakerAnswer(m.signal);
+        if(role==='participant') srHandleAnswer(m.signal);
         break;
       }
       case 'rtc_ice_speaker': {
-        if(role==='host'&&peerConns['__speaker__'])
-          peerConns['__speaker__'].addIceCandidate(new RTCIceCandidate(m.signal)).catch(()=>{});
-        if(role==='participant'&&participantPeerConn)
-          participantPeerConn.addIceCandidate(new RTCIceCandidate(m.signal)).catch(()=>{});
+        handleIceSpeaker(m.signal);
         break;
       }
       case 'report_received': {
@@ -890,13 +866,12 @@ function connect(){
         }
         break;
       }
-      case 'peer_list': for(const cid of m.cids) await hostCallPeer(cid); break;
-      case 'rtc_new_peer': if(role==='host') await hostCallPeer(m.cid); break;
-      case 'rtc_offer':    if(role==='participant') await studentHandleOffer(m.signal); break;
-      case 'rtc_answer':   if(role==='host') await hostHandleAnswer(m.fromCid,m.signal); break;
+      case 'peer_list': for(const cid of m.cids) await hbConnectToStudent(cid); break;
+      case 'rtc_new_peer': if(role==='host') await hbConnectToStudent(m.cid); break;
+      case 'rtc_offer':    if(role==='participant') await sbHandleHostOffer(m.signal); break;
+      case 'rtc_answer':   if(role==='host') await hbHandleAnswer(m.fromCid, m.signal); break;
       case 'rtc_ice':
-        if(role==='host'&&peerConns[m.fromCid]) peerConns[m.fromCid].addIceCandidate(new RTCIceCandidate(m.signal)).catch(()=>{});
-        if(role==='participant'&&remoteConn)     remoteConn.addIceCandidate(new RTCIceCandidate(m.signal)).catch(()=>{});
+        handleIceBroadcast(m.fromCid||null, m.signal);
         break;
       case 'shutdown_complete':
         // Server has finished persisting leaderboard — refresh today's tab
@@ -1026,21 +1001,236 @@ function showSpeakRequestToast(studentName, fromCid){
 // Store host password input for reconnection — persisted in sessionStorage to survive refresh
 let HOST_PASSWORD_INPUT = sessionStorage.getItem('scc_hpw') || '';
 
-// ── Speak-request state (participant side) ────────────────────────────────────
-let speakRequestPending = false;
-let isSpeakingNow       = false;
-let participantMicStream = null;
-let participantPeerConn  = null;
-// Speak-request state (host side)
-let activeSpeakerName = null;
-let activeSpeakerCid  = null;
-let activeSpeakerPid  = null;   // pid of currently speaking student (for dashboard highlight)
+/* ════════════════════════════════════════════════════════════════════════════
+   MIC SYSTEM — rebuilt from scratch
+   
+   CHANNEL A  Host broadcast: host mic → every student (teacher speaks to class)
+   CHANNEL B  Speak request:  one student mic → host only (Q&A / surveillance)
+════════════════════════════════════════════════════════════════════════════ */
 
-// Participant mic state
-let _micForcedByHost  = false;  // true when host silently enabled this student's mic
-let _suppressScoreFlash = false; // suppresses flashScoreChanges for manual score adjustments
+// ── Shared config ──────────────────────────────────────────────────────────
+const STUN_CFG = { iceServers:[{urls:'stun:stun.l.google.com:19302'},{urls:'stun:stun1.l.google.com:19302'}] };
+const MIC_CONSTRAINTS = { audio:{ echoCancellation:true, noiseSuppression:true, autoGainControl:true }, video:false };
 
-// Floating banner on host showing who is speaking + Mute button
+// ── Channel A state (host broadcasts to all students) ─────────────────────
+let hbStream = null;        // Host MediaStream
+const hbPeers = {};         // { [studentCid]: RTCPeerConnection }
+
+// ── Channel B state (one student speaks to host) ──────────────────────────
+// Student side
+let srStream  = null;       // Student MediaStream
+let srConn    = null;       // Student RTCPeerConnection (offerer)
+let srPending = false;      // Waiting for host approval
+let srActive  = false;      // Mic is live
+let srForced  = false;      // Opened silently by host (surveillance)
+
+// Host side
+let hlConn = null;          // Host RTCPeerConnection (answerer)
+let hlPid  = null;          // PID of student being listened to
+let hlCid  = null;          // CID of student being listened to
+let hlName = null;          // Display name
+
+// Legacy aliases used by ui.js — map to new state
+Object.defineProperty(window,'isSpeakingNow',{get:()=>srActive,set:()=>{}});
+Object.defineProperty(window,'speakRequestPending',{get:()=>srPending,set:v=>{srPending=v;}});
+Object.defineProperty(window,'_micForcedByHost',{get:()=>srForced,set:()=>{}});
+Object.defineProperty(window,'activeSpeakerPid',{get:()=>hlPid,set:v=>{hlPid=v;}});
+Object.defineProperty(window,'activeSpeakerCid',{get:()=>hlCid,set:v=>{hlCid=v;}});
+Object.defineProperty(window,'activeSpeakerName',{get:()=>hlName,set:v=>{hlName=v;}});
+Object.defineProperty(window,'localStream',{get:()=>hbStream,set:()=>{}});
+
+/* ── CHANNEL A: Host Broadcast ────────────────────────────────────────────── */
+
+async function hbStart(){
+  if(hbStream) return;
+  try{
+    hbStream=await navigator.mediaDevices.getUserMedia(MIC_CONSTRAINTS);
+    send({type:'get_peer_list'});
+    updateMicDot(); render();
+  }catch(e){
+    showToast('❌ Microphone access denied.','bad');
+  }
+}
+
+function hbStop(){
+  if(hbStream){ hbStream.getTracks().forEach(t=>t.stop()); hbStream=null; }
+  Object.values(hbPeers).forEach(pc=>{try{pc.close();}catch(e){}});
+  Object.keys(hbPeers).forEach(k=>delete hbPeers[k]);
+  send({type:'mic_end_broadcast'});
+  updateMicDot(); render();
+}
+
+async function hbConnectToStudent(cid){
+  if(!hbStream) return;
+  hbCleanupPeer(cid);
+  const pc=new RTCPeerConnection(STUN_CFG); hbPeers[cid]=pc;
+  hbStream.getTracks().forEach(t=>pc.addTrack(t,hbStream));
+  pc.onicecandidate=ev=>{if(ev.candidate) send({type:'rtc_ice_to_peer',toCid:cid,signal:ev.candidate.toJSON()});};
+  pc.onconnectionstatechange=()=>{ if(['failed','closed','disconnected'].includes(pc.connectionState)) hbCleanupPeer(cid); };
+  try{
+    const offer=await pc.createOffer();
+    await pc.setLocalDescription(offer);
+    send({type:'rtc_offer',toCid:cid,signal:{type:pc.localDescription.type,sdp:pc.localDescription.sdp}});
+  }catch(e){ hbCleanupPeer(cid); }
+}
+
+async function hbHandleAnswer(cid,sdp){
+  const pc=hbPeers[cid];
+  if(!pc||pc.signalingState==='stable') return;
+  try{ await pc.setRemoteDescription(new RTCSessionDescription(sdp)); }catch(e){}
+}
+
+function hbCleanupPeer(cid){
+  const pc=hbPeers[cid];
+  if(pc){try{pc.close();}catch(e){} delete hbPeers[cid];}
+}
+
+/* ── Channel A, Student Side: receive host broadcast ─────────────────────── */
+
+let sbConn=null;
+
+async function sbHandleHostOffer(sdp){
+  sbCleanup();
+  const pc=new RTCPeerConnection(STUN_CFG); sbConn=pc;
+  pc.onicecandidate=ev=>{if(ev.candidate) send({type:'rtc_ice_to_host',signal:ev.candidate.toJSON()});};
+  pc.ontrack=ev=>{
+    let a=document.getElementById('host-audio');
+    if(!a){a=document.createElement('audio');a.id='host-audio';a.autoplay=true;document.body.appendChild(a);}
+    if(a.srcObject!==ev.streams[0]){a.srcObject=ev.streams[0];a.play().catch(()=>{});}
+    updateMicDot();
+  };
+  pc.oniceconnectionstatechange=()=>{
+    if(['failed','disconnected','closed'].includes(pc.iceConnectionState)) sbCleanup();
+    updateMicDot();
+  };
+  try{
+    await pc.setRemoteDescription(new RTCSessionDescription(sdp));
+    const ans=await pc.createAnswer();
+    await pc.setLocalDescription(ans);
+    send({type:'rtc_answer',signal:{type:pc.localDescription.type,sdp:pc.localDescription.sdp}});
+  }catch(e){ sbCleanup(); }
+}
+
+function sbCleanup(){
+  if(sbConn){try{sbConn.close();}catch(e){} sbConn=null;}
+  const a=document.getElementById('host-audio');
+  if(a){a.srcObject=null;a.remove();}
+  updateMicDot();
+}
+
+/* ── CHANNEL B: Student Speaks to Host ───────────────────────────────────── */
+
+function srRaiseHand(){
+  if(srPending) return;
+  if(srActive&&!srForced) return; // already properly speaking
+  srPending=!srForced;            // forced: don't show spinner (cosmetic raise_hand)
+  send({type:'raise_hand',name:myName||'Student'});
+  if(!srForced) render();
+}
+
+async function srStart(forcedByHost=false){
+  srCleanup();
+  srForced=forcedByHost;
+  try{
+    srStream=await navigator.mediaDevices.getUserMedia(MIC_CONSTRAINTS);
+  }catch(e){
+    srPending=false; srForced=false;
+    // Only reveal the failure to the student if THEY initiated it
+    if(!forcedByHost){ showToast('❌ Microphone access denied.','bad'); render(); }
+    return;
+  }
+  srActive=true; srPending=false;
+  const pc=new RTCPeerConnection(STUN_CFG); srConn=pc;
+  let makingOffer=false;
+  pc.onnegotiationneeded=async()=>{
+    if(makingOffer) return;
+    try{
+      makingOffer=true;
+      await pc.setLocalDescription(await pc.createOffer());
+      send({type:'rtc_speaker_offer',signal:{type:pc.localDescription.type,sdp:pc.localDescription.sdp}});
+    }catch(e){console.error('[srStart]',e);}
+    finally{makingOffer=false;}
+  };
+  pc.onicecandidate=ev=>{if(ev.candidate) send({type:'rtc_ice_to_host_from_speaker',signal:ev.candidate.toJSON()});};
+  pc.onconnectionstatechange=()=>{if(['failed','closed','disconnected'].includes(pc.connectionState)) srCleanup();};
+  srStream.getTracks().forEach(t=>pc.addTrack(t,srStream)); // triggers onnegotiationneeded
+  // ↓ Only tell the student and re-render when THEY initiated the session
+  if(!forcedByHost){ render(); showToast('🎙️ You can speak now. Host will mute you when done.','good'); }
+}
+
+async function srHandleAnswer(sdp){
+  if(!srConn||srConn.signalingState==='stable') return;
+  try{ await srConn.setRemoteDescription(new RTCSessionDescription(sdp)); }catch(e){}
+}
+
+function srStop(notify=true,forcedEnd=false){
+  const wasForced=srForced;
+  srCleanup();
+  if(notify&&!forcedEnd&&!wasForced) showToast('🔇 Host ended your speaking turn.','neutral');
+  // Only re-render when the student was actively speaking (shows/hides the speaking UI)
+  // When force-mic ends silently, the DOM is already showing the normal button — no render needed
+  if(!wasForced) render();
+}
+
+function srCleanup(){
+  if(srStream){srStream.getTracks().forEach(t=>t.stop());srStream=null;}
+  if(srConn){try{srConn.close();}catch(e){} srConn=null;}
+  srActive=false; srPending=false; srForced=false;
+}
+
+/* ── Channel B, Host Side: listen to one student ─────────────────────────── */
+
+async function hlHandleOffer(fromCid,sdp){
+  hlCleanup();
+  const pc=new RTCPeerConnection(STUN_CFG); hlConn=pc; hlCid=fromCid;
+  pc.onicecandidate=ev=>{if(ev.candidate) send({type:'rtc_ice_to_speaker',toCid:fromCid,signal:ev.candidate.toJSON()});};
+  pc.ontrack=ev=>{
+    let a=document.getElementById('speaker-audio');
+    if(!a){a=document.createElement('audio');a.id='speaker-audio';a.autoplay=true;document.body.appendChild(a);}
+    if(a.srcObject!==ev.streams[0]){a.srcObject=ev.streams[0];a.play().catch(()=>{});}
+    if(hlName) showToast(`🎙️ ${hlName} is speaking…`,'good');
+  };
+  pc.onconnectionstatechange=()=>{if(['failed','closed','disconnected'].includes(pc.connectionState)) hlCleanup();};
+  try{
+    await pc.setRemoteDescription(new RTCSessionDescription(sdp));
+    const ans=await pc.createAnswer();
+    await pc.setLocalDescription(ans);
+    send({type:'rtc_speaker_answer',toCid:fromCid,signal:{type:pc.localDescription.type,sdp:pc.localDescription.sdp}});
+  }catch(e){ hlCleanup(); }
+}
+
+function hlCleanup(){
+  if(hlConn){try{hlConn.close();}catch(e){} hlConn=null;}
+  const a=document.getElementById('speaker-audio');
+  if(a){a.srcObject=null;a.remove();}
+  hlPid=null; hlCid=null; hlName=null;
+}
+
+/* ── ICE routing ──────────────────────────────────────────────────────────── */
+
+function handleIceSpeaker(signal){
+  if(role==='host'&&hlConn) hlConn.addIceCandidate(new RTCIceCandidate(signal)).catch(()=>{});
+  if(role==='participant'&&srConn) srConn.addIceCandidate(new RTCIceCandidate(signal)).catch(()=>{});
+}
+
+function handleIceBroadcast(fromCid,signal){
+  if(role==='host'&&hbPeers[fromCid]) hbPeers[fromCid].addIceCandidate(new RTCIceCandidate(signal)).catch(()=>{});
+  if(role==='participant'&&sbConn) sbConn.addIceCandidate(new RTCIceCandidate(signal)).catch(()=>{});
+}
+
+/* ── Full teardown ────────────────────────────────────────────────────────── */
+
+function stopMic(){ hbStop(); srCleanup(); sbCleanup(); hlCleanup(); render(); }
+
+function updateMicDot(){
+  const d=document.getElementById('mic-dot');
+  if(!d) return;
+  const live=!!hbStream||(sbConn?.iceConnectionState==='connected')||(sbConn?.iceConnectionState==='completed');
+  d.className='mic-dot'+(live?' live':'');
+}
+
+/* ── Speak-request popup for host (Allow / Dismiss) ──────────────────────── */
+
 function showActiveSpeakerBanner(name){
   removeActiveSpeakerBanner();
   const el=document.createElement('div');
@@ -1048,171 +1238,75 @@ function showActiveSpeakerBanner(name){
   el.style.cssText='position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#4f46e5;color:#fff;padding:10px 16px;border-radius:40px;display:flex;align-items:center;gap:10px;z-index:5000;box-shadow:0 4px 20px rgba(0,0,0,.3);cursor:grab;user-select:none;touch-action:none;min-width:200px';
   el.innerHTML=`<span style="font-size:1rem">🎙️</span><span style="font-weight:700;font-size:.85rem;flex:1">${esc(name)} is speaking</span><button id="sb-mute-btn" style="background:rgba(255,255,255,.22);border:1.5px solid rgba(255,255,255,.35);color:#fff;padding:5px 13px;border-radius:20px;font-size:.78rem;cursor:pointer;white-space:nowrap;font-weight:600">Mute</button>`;
   document.body.appendChild(el);
-
-  // ── Drag-to-move (touch + mouse) ──────────────────────────────────────────
-  let dragging=false, startX=0,startY=0, origL=0,origT=0;
-  const dragStart=(cx,cy)=>{
-    const r=el.getBoundingClientRect();
-    startX=cx; startY=cy; origL=r.left; origT=r.top;
-    el.style.left=origL+'px'; el.style.top=origT+'px';
-    el.style.transform='none'; el.style.bottom='auto';
-    dragging=true; el.style.cursor='grabbing';
-  };
-  const dragMove=(cx,cy)=>{ if(!dragging) return; el.style.left=(origL+cx-startX)+'px'; el.style.top=(origT+cy-startY)+'px'; };
-  const dragEnd=()=>{ dragging=false; el.style.cursor='grab'; };
-
-  el.addEventListener('mousedown',e=>{ if(e.target.id==='sb-mute-btn') return; dragStart(e.clientX,e.clientY); });
-  window.addEventListener('mousemove',e=>{ if(dragging) dragMove(e.clientX,e.clientY); });
-  window.addEventListener('mouseup',dragEnd);
-  el.addEventListener('touchstart',e=>{ if(e.target.id==='sb-mute-btn') return; const t=e.touches[0]; dragStart(t.clientX,t.clientY); e.preventDefault(); },{passive:false});
-  window.addEventListener('touchmove',e=>{ if(dragging){const t=e.touches[0]; dragMove(t.clientX,t.clientY); e.preventDefault();} },{passive:false});
-  window.addEventListener('touchend',dragEnd);
-  // ──────────────────────────────────────────────────────────────────────────
-
+  let dragging=false,startX=0,startY=0,origL=0,origT=0;
+  const ds=(cx,cy)=>{const r=el.getBoundingClientRect();startX=cx;startY=cy;origL=r.left;origT=r.top;el.style.cssText+=';left:'+origL+'px;top:'+origT+'px;transform:none;bottom:auto';dragging=true;el.style.cursor='grabbing';};
+  const dm=(cx,cy)=>{if(!dragging)return;el.style.left=(origL+cx-startX)+'px';el.style.top=(origT+cy-startY)+'px';};
+  const de=()=>{dragging=false;el.style.cursor='grab';};
+  el.addEventListener('mousedown',e=>{if(e.target.id==='sb-mute-btn')return;ds(e.clientX,e.clientY);});
+  window.addEventListener('mousemove',e=>{if(dragging)dm(e.clientX,e.clientY);});
+  window.addEventListener('mouseup',de);
+  el.addEventListener('touchstart',e=>{if(e.target.id==='sb-mute-btn')return;const t=e.touches[0];ds(t.clientX,t.clientY);e.preventDefault();},{passive:false});
+  window.addEventListener('touchmove',e=>{if(dragging){const t=e.touches[0];dm(t.clientX,t.clientY);e.preventDefault();}},{passive:false});
+  window.addEventListener('touchend',de);
   el.querySelector('#sb-mute-btn').addEventListener('click',()=>{
-    // Mute from banner: use host_disable_mic (silent to student)
-    if(activeSpeakerPid) send({type:'host_disable_mic',pid:activeSpeakerPid});
-    else if(activeSpeakerCid) send({type:'speak_end',toCid:activeSpeakerCid});
-    hostCleanupSpeaker(); removeActiveSpeakerBanner(); render();
+    if(hlPid) send({type:'host_disable_mic',pid:hlPid});
+    else if(hlCid) send({type:'speak_end',toCid:hlCid});
+    hlCleanup(); removeActiveSpeakerBanner(); render();
   });
 }
-function removeActiveSpeakerBanner(){
-  const el=document.getElementById('speaker-banner');
-  if(el) el.remove();
-}
-function hostCleanupSpeaker(){
-  const pc=peerConns['__speaker__'];
-  if(pc){ try{pc.close();}catch(e){} delete peerConns['__speaker__']; }
-  const el=document.getElementById('speaker-audio');
-  if(el){ el.srcObject=null; el.remove(); }
-  activeSpeakerName=null; activeSpeakerCid=null; activeSpeakerPid=null;
-}
+function removeActiveSpeakerBanner(){ const el=document.getElementById('speaker-banner'); if(el) el.remove(); }
+// hostCleanupSpeaker kept as alias for backward compat
+function hostCleanupSpeaker(){ hlCleanup(); }
 
-// Participant mic functions (called from speak_allowed / speak_end / btn-end-speak)
-async function startParticipantMic(forcedByHost=false){
-  try{
-    if(participantMicStream){ participantMicStream.getTracks().forEach(t=>t.stop()); participantMicStream=null; }
-    if(participantPeerConn){ try{participantPeerConn.close();}catch(e){} participantPeerConn=null; }
-
-    participantMicStream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true},video:false});
-    isSpeakingNow=true; speakRequestPending=false;
-    _micForcedByHost=forcedByHost; // track whether this is a surveillance session
-
-    const pc=new RTCPeerConnection(STUN); participantPeerConn=pc;
-
-    // ── "Perfect negotiation" pattern (from reference implementation) ──────────
-    let _makingOffer=false;
-    pc.onnegotiationneeded=async()=>{
-      try{
-        _makingOffer=true;
-        const offer=await pc.createOffer();
-        await pc.setLocalDescription(offer);
-        send({type:'rtc_speaker_offer',signal:{type:pc.localDescription.type,sdp:pc.localDescription.sdp}});
-      }catch(e){ console.error('negotiation err:',e); }
-      finally{ _makingOffer=false; }
-    };
-
-    pc.onicecandidate=ev=>{ if(ev.candidate) send({type:'rtc_ice_to_host_from_speaker',signal:ev.candidate.toJSON()}); };
-    pc.onconnectionstatechange=()=>{ if(['failed','closed','disconnected'].includes(pc.connectionState)) stopParticipantMic(false); };
-
-    participantMicStream.getTracks().forEach(t=>pc.addTrack(t,participantMicStream));
-
-    render();
-    // Only show "you can speak" toast when student initiated — never for forced/surveillance
-    if(!forcedByHost) showToast('🎙️ You can speak now. Host will mute you when done.','good');
-  }catch(e){
-    speakRequestPending=false; isSpeakingNow=false; _micForcedByHost=false;
-    // Only notify student if they initiated the request
-    if(!forcedByHost) showToast('❌ Microphone access denied.','bad');
-    render();
+function showSpeakRequestToast(studentName,fromCid){
+  if(hlCid){
+    send({type:'speak_dismissed',toCid:fromCid});
+    showToast(fromCid===hlCid?`✓ ${studentName}'s mic is already enabled.`:`⚠️ ${studentName} wants to speak but mic is already in use.`,fromCid===hlCid?'good':'neutral');
+    return;
   }
-}
-function stopParticipantMic(notify=true, forcedEnd=false){
-  if(participantMicStream){ participantMicStream.getTracks().forEach(t=>t.stop()); participantMicStream=null; }
-  if(participantPeerConn){ try{participantPeerConn.close();}catch(e){} participantPeerConn=null; }
-  const wasForcedByHost=_micForcedByHost;
-  isSpeakingNow=false; speakRequestPending=false; _micForcedByHost=false;
-  if(notify){
-    if(forcedEnd||wasForcedByHost){
-      // Silent — student doesn't need to know host ended surveillance
-    } else {
-      showToast('🔇 Host ended your speaking turn.','neutral');
-    }
+  let container=document.getElementById('hand-raise-container');
+  if(!container){
+    container=document.createElement('div');
+    container.id='hand-raise-container';
+    container.style.cssText='position:fixed;top:58px;right:12px;z-index:9998;display:flex;flex-direction:column;gap:8px;pointer-events:none;max-width:300px;min-width:240px';
+    document.body.appendChild(container);
   }
-  render();
-}
-async function participantHandleSpeakerAnswer(sdp){
-  const pc=participantPeerConn; if(!pc||pc.signalingState==='stable') return;
-  try{ await pc.setRemoteDescription(new RTCSessionDescription(sdp)); }catch(e){}
-}
-async function hostHandleSpeakerOffer(fromCid,sdp){
-  const pc=new RTCPeerConnection(STUN); peerConns['__speaker__']=pc;
-  pc.onicecandidate=ev=>{ if(ev.candidate) send({type:'rtc_ice_to_speaker',toCid:fromCid,signal:ev.candidate.toJSON()}); };
-  pc.ontrack=ev=>{
-    let el=document.getElementById('speaker-audio');
-    if(!el){ el=document.createElement('audio'); el.id='speaker-audio'; el.autoplay=true; document.body.appendChild(el); }
-    if(el.srcObject!==ev.streams[0]){ el.srcObject=ev.streams[0]; el.play().catch(()=>{}); }
-    showToast(`🎙️ ${activeSpeakerName||'Student'} is speaking…`,'good');
-  };
-  pc.onconnectionstatechange=()=>{ if(['failed','closed','disconnected'].includes(pc.connectionState)) hostCleanupSpeaker(); };
-  try{
-    await pc.setRemoteDescription(new RTCSessionDescription(sdp));
-    const answer=await pc.createAnswer(); await pc.setLocalDescription(answer);
-    send({type:'rtc_speaker_answer',toCid:fromCid,signal:{type:pc.localDescription.type,sdp:pc.localDescription.sdp}});
-  }catch(e){}
-}
-function requestToSpeak(){
-  if(speakRequestPending) return; // already waiting
-  // When force-mic is ON: allow sending a speak_request (host will fake-accept it)
-  // When force-mic is OFF and already speaking: block (normal flow)
-  if(isSpeakingNow&&!_micForcedByHost) return;
-  speakRequestPending=!_micForcedByHost; // only show "waiting" spinner when not forced
-  send({type:'raise_hand', name:myName||'Student'});
-  if(!_micForcedByHost) render();
-  // When forced: don't change UI — mic is already active; request goes silently to host
-}
-/* ══════════════════════════════════════
-   WEBRTC HOST
-══════════════════════════════════════ */
-async function startMic(){
-  try{
-    if(localStream){localStream.getTracks().forEach(t=>t.stop());localStream=null;}
-    localStream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true},video:false});
-    render(); send({type:'get_peers'});
-  }catch(e){ alert('Microphone access denied.'); }
-}
-function stopMic(){
-  if(localStream){localStream.getTracks().forEach(t=>t.stop());localStream=null;}
-  Object.values(peerConns).forEach(pc=>pc.close());
-  Object.keys(peerConns).forEach(k=>delete peerConns[k]);
-  render();
-}
-async function hostCallPeer(cid){
-  if(!localStream) return;
-  if(peerConns[cid]){peerConns[cid].close();delete peerConns[cid];}
-  const pc=new RTCPeerConnection(STUN); peerConns[cid]=pc;
-  localStream.getTracks().forEach(t=>pc.addTrack(t,localStream));
-  pc.onicecandidate=ev=>{ if(ev.candidate) send({type:'rtc_ice_to_peer',toCid:cid,signal:ev.candidate.toJSON()}); };
-  pc.onconnectionstatechange=()=>{ if(['failed','closed','disconnected'].includes(pc.connectionState)){pc.close();delete peerConns[cid];} };
-  try{ const offer=await pc.createOffer(); await pc.setLocalDescription(offer); send({type:'rtc_offer',toCid:cid,signal:{type:pc.localDescription.type,sdp:pc.localDescription.sdp}}); }catch(e){}
-}
-async function hostHandleAnswer(cid,sdp){
-  const pc=peerConns[cid]; if(!pc||pc.signalingState==='stable') return;
-  try{ await pc.setRemoteDescription(new RTCSessionDescription(sdp)); }catch(e){}
+  const card=document.createElement('div');
+  card.style.cssText='background:#fff;border:2px solid #6366f1;border-radius:14px;padding:14px;box-shadow:0 4px 20px rgba(0,0,0,.15);pointer-events:auto;animation:fadeIn .2s ease';
+  const inner=document.createElement('div');
+  inner.innerHTML=
+    '<div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:12px">'+
+    '<span style="font-size:1.3rem">🎤</span>'+
+    '<div><div style="font-size:.83rem;font-weight:700;color:#3730a3;line-height:1.3">'+esc(studentName)+' wants to speak</div>'+
+    '<div style="font-size:.73rem;color:#6366f1;margin-top:2px">Allow mic so only you hear them?</div></div>'+
+    '<button class="hr-x" style="margin-left:auto;background:none;border:none;cursor:pointer;color:#a5b4fc;font-size:1rem;padding:0;flex-shrink:0">✕</button></div>'+
+    '<div style="display:flex;gap:8px">'+
+    '<button class="hr-allow btn btn-dark btn-sm" style="flex:1;justify-content:center;background:#4338ca;border-color:#4338ca">✓ Allow</button>'+
+    '<button class="hr-dismiss btn btn-ghost btn-sm" style="flex:1;justify-content:center">✕ Dismiss</button></div>';
+  card.appendChild(inner);
+  container.appendChild(card);
+  const timer=setTimeout(()=>dismissCard(),12000);
+  function dismissCard(){ card.style.opacity='0'; card.style.transform='translateX(30px)'; setTimeout(()=>card.remove(),230); }
+  inner.querySelector('.hr-x').addEventListener('click',()=>{ clearTimeout(timer); send({type:'speak_dismissed',toCid:fromCid}); dismissCard(); });
+  inner.querySelector('.hr-allow').addEventListener('click',()=>{
+    clearTimeout(timer);
+    if(hlCid===fromCid){ send({type:'speak_fake_accept',toCid:fromCid}); dismissCard(); render(); return; }
+    hlName=studentName; hlCid=fromCid;
+    hlPid=Object.entries(S.cidMap||{}).find(([,c])=>c===fromCid)?.[0]||null;
+    send({type:'speak_allowed',toCid:fromCid});
+    showActiveSpeakerBanner(studentName);
+    dismissCard(); render();
+  });
+  inner.querySelector('.hr-dismiss').addEventListener('click',()=>{
+    clearTimeout(timer);
+    send({type:hlCid===fromCid?'speak_fake_accept':'speak_dismissed',toCid:fromCid});
+    dismissCard();
+  });
 }
 
-/* ══════════════════════════════════════
-   WEBRTC STUDENT
-══════════════════════════════════════ */
-async function studentHandleOffer(sdp){
-  if(remoteConn){try{remoteConn.close();}catch(e){} remoteConn=null;}
-  const pc=new RTCPeerConnection(STUN); remoteConn=pc;
-  pc.onicecandidate=ev=>{ if(ev.candidate) send({type:'rtc_ice_to_host',signal:ev.candidate.toJSON()}); };
-  pc.ontrack=ev=>{ const a=document.getElementById('remote-audio'); if(a&&a.srcObject!==ev.streams[0]){a.srcObject=ev.streams[0];a.play().catch(()=>{});} updateMicDot(); };
-  pc.oniceconnectionstatechange=()=>updateMicDot();
-  try{ await pc.setRemoteDescription(new RTCSessionDescription(sdp)); const ans=await pc.createAnswer(); await pc.setLocalDescription(ans); send({type:'rtc_answer',signal:{type:pc.localDescription.type,sdp:pc.localDescription.sdp}}); }catch(e){}
-}
-function updateMicDot(){ const d=document.getElementById('mic-dot'); if(!d)return; const st=remoteConn?.iceConnectionState; d.className='mic-dot'+(st==='connected'||st==='completed'?' live':st==='failed'?' err':''); }
+function requestToSpeak(){ srRaiseHand(); }
+
+
 /* ══════════════════════════════════════
    RESOURCE BROWSER / GITHUB MANAGER
 ══════════════════════════════════════ */

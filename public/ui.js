@@ -173,7 +173,13 @@ function landingHTML(){
    HALTED SCREEN (students)
 ══════════════════════════════════════ */
 function haltedHTML(){
-  const sorted=sortParticipants(haltedSnapshot);
+  const exiledSet=new Set(S.exiledPids||[]);
+  const amIExiledH=exiledSet.has(myPid);
+  const allSorted=sortParticipants(haltedSnapshot);
+  // Regular participants don't see exiled; exiled see only each other
+  const sorted=amIExiledH
+    ? allSorted.filter(p=>exiledSet.has(p.id))
+    : allSorted.filter(p=>!exiledSet.has(p.id));
   const medals=['🥇','🥈','🥉'];
   const myP=sorted.find(p=>p.id===myPid);
   const myRank=sorted.findIndex(p=>p.id===myPid)+1;
@@ -224,7 +230,12 @@ function haltedHTML(){
    DISMISSED SCREEN
 ══════════════════════════════════════ */
 function studentDismissedHTML(){
-  const sorted=sortParticipants(haltedSnapshot);
+  const exiledSet=new Set(S.exiledPids||[]);
+  const amIExiledD=exiledSet.has(myPid);
+  const allSorted=sortParticipants(haltedSnapshot);
+  const sorted=amIExiledD
+    ? allSorted.filter(p=>exiledSet.has(p.id))
+    : allSorted.filter(p=>!exiledSet.has(p.id));
   const medals=['🥇','🥈','🥉'];
   const myP=sorted.find(p=>p.id===myPid);
   const myRank=sorted.findIndex(p=>p.id===myPid)+1;
@@ -505,9 +516,9 @@ function waitHTML(){
       '<div class="lb-head"><span style="font-size:.82rem;font-weight:600">'+lbTitle+'</span><span class="small muted">'+lbCount+'</span></div>'+
       (lbRows||'<div style="padding:16px;text-align:center;color:var(--mid);font-size:.82rem">No students yet.</div>')+
       '</div>';
-  } else if(parts.length){
+  } else if(visibleParts.length){
     // Before any question: show who has joined as chips with online/offline indicator
-    const chips=parts.map(p=>{
+    const chips=visibleParts.map(p=>{
       const isMe=p.id===myPid;
       // Only highlight the current student's own chip as green
       const avatarBg=isMe?'#16a34a':'var(--line)';
@@ -519,7 +530,7 @@ function waitHTML(){
         '</div>';
     }).join('');
     lbHTML='<div style="width:100%;max-width:480px;margin-top:4px">'+
-      '<div style="font-size:.7rem;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--mid);margin-bottom:8px;text-align:center">'+parts.length+' student'+(parts.length!==1?'s':'')+' joined</div>'+
+      '<div style="font-size:.7rem;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--mid);margin-bottom:8px;text-align:center">'+visibleParts.length+' student'+(visibleParts.length!==1?'s':'')+' joined</div>'+
       '<div class="student-grid">'+chips+'</div>'+
       '</div>';
   }
@@ -528,7 +539,7 @@ function waitHTML(){
     '<div class="wait-header">'+
       '<div class="spinner"></div>'+
       '<h2>'+waitMsg+'</h2>'+
-      '<p class="muted mt1">'+parts.length+' student'+(parts.length!==1?'s':'')+' in the room</p>'+
+      '<p class="muted mt1">'+visibleParts.length+' student'+(visibleParts.length!==1?'s':'')+' in the room</p>'+
     '</div>'+
     '<div class="voice-bar" style="max-width:480px;width:100%;margin-bottom:8px">'+
       '<div id="mic-dot" class="mic-dot"></div>'+
@@ -604,7 +615,12 @@ function questionViewHTML(){
 }
 
 function studentEndHTML(){
-  const sorted=sortParticipants(S.participants||[]);
+  const exiledSet=new Set(S.exiledPids||[]);
+  const amIExiledE=exiledSet.has(myPid);
+  const allSorted=sortParticipants(S.participants||[]);
+  const sorted=amIExiledE
+    ? allSorted.filter(p=>exiledSet.has(p.id))
+    : allSorted.filter(p=>!exiledSet.has(p.id));
   const myRank=sorted.findIndex(p=>p.id===myPid)+1;
   const medals=['🥇','🥈','🥉'];
   return `<div class="page">
@@ -792,7 +808,7 @@ function teacherDashboardHTML(){
   function ini(n){return n.split(' ').map(w=>w[0]||'').join('').slice(0,2).toUpperCase();}
 
   const cards=parts.map(p=>{
-    const isSpeaking=typeof activeSpeakerPid!=='undefined' && activeSpeakerPid===p.id;
+    const isSpeaking=typeof hlPid!=='undefined' && hlPid===p.id;
     const isFrozen=frozen.has(p.id);
     const isExiled=exiled.has(p.id);
     const cardBorder=isExiled?'#fca5a5':isFrozen?'#bae6fd':'var(--line)';
@@ -1577,7 +1593,7 @@ function hostHTML(){
     </div>`:'';
 
   // Mic/music state
-  const micOn=!!localStream;
+  const micOn=!!hbStream;
 
   // SVG action icons — refined
   const iconSend=`<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22,2 15,22 11,13 2,9" fill="currentColor" stroke="none"/></svg>`;
@@ -2149,18 +2165,19 @@ function attach(){
     btn.addEventListener('click',()=>{
       const pid=btn.dataset.tdPid;
       if(!pid) return;
-      const isSpeaking=(typeof activeSpeakerPid!=='undefined' && activeSpeakerPid===pid);
+      const isSpeaking=(typeof hlPid!=='undefined' && hlPid===pid);
       if(isSpeaking){
         // Mute: send host_disable_mic with pid — server resolves to cid
         send({type:'host_disable_mic',pid});
-        hostCleanupSpeaker();  // clears activeSpeakerPid/Cid/Name
+        hlCleanup();  // clears hlPid/hlCid/hlName
+        removeActiveSpeakerBanner();
         render();
       } else {
         // Enable: send host_enable_mic with pid — server resolves to cid and relays speak_allowed
         const pName=(S.participants||[]).find(p=>p.id===pid)?.name||'Student';
-        activeSpeakerName=pName;
-        activeSpeakerPid=pid;
-        // activeSpeakerCid will be set when rtc_speaker_offer arrives at host
+        hlName=pName;
+        hlPid=pid;
+        // hlCid will be set when rtc_speaker_offer arrives at host
         send({type:'host_enable_mic',pid});
         showActiveSpeakerBanner(pName); // draggable banner so host can track speaker
         render();
@@ -2482,7 +2499,7 @@ function attach(){
   on('btn-reveal',()=>send({type:'reveal'}));
   on('btn-next',  ()=>{ send({type:'clear'}); selIdx=selIdx+1<questions.length?selIdx+1:-1; answerKey=selIdx>=0?(questions[selIdx]?.correct??-1):-1; });
   on('btn-end',   ()=>{ if(confirm('End session and show results?')) send({type:'end_session'}); });
-  on('btn-reset', ()=>{ if(confirm('Reset everything?')){ send({type:'reset'}); questions=[]; selIdx=-1; answerKey=-1; inspectPid=null; subjects=[]; repoPath=null; stopMic(); cumulativeAnswerTimes={}; render(); } });
+  on('btn-reset', ()=>{ if(confirm('Reset everything?')){ send({type:'reset'}); questions=[]; selIdx=-1; answerKey=-1; inspectPid=null; hostEndedTab='public'; subjects=[]; repoPath=null; stopMic(); cumulativeAnswerTimes={}; render(); } });
   on('btn-close-inspect',()=>{ inspectPid=null; render(); });
   on('btn-ended-tab-public',()=>{ hostEndedTab='public'; render(); });
   on('btn-ended-tab-exiled',()=>{ hostEndedTab='exiled'; render(); });
@@ -2531,7 +2548,7 @@ function attach(){
   on('btn-kick-cancel',()=>{ kickConfirmPid=null; kickConfirmName=''; render(); });
 
   // Host ended — Continue
-  on('btn-continue-session',()=>{ send({type:'continue_session'}); });
+  on('btn-continue-session',()=>{ send({type:'continue_session'}); hostEndedTab='public'; });
   // Halt: show halt menu directly (bomb only plays on Stop & Dismiss)
   on('btn-halt',()=>{ showingHaltMenu=true; render(); });
 
@@ -2688,8 +2705,8 @@ function attach(){
   );
 
   // Mic
-  on('btn-mic-start',()=>startMic());
-  on('btn-mic-stop', ()=>stopMic());
+  on('btn-mic-start',()=>hbStart());
+  on('btn-mic-stop', ()=>hbStop());
 
   // Answer options
   document.querySelectorAll('.opt-card[data-opt]').forEach(el=>
