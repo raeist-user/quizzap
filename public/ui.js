@@ -1018,7 +1018,28 @@ function testBoardHTML(){
 
   // ── Create Test tab ───────────────────────────────────────────────────────
   function createTab(){
-    const hasSource = tcQSource && tcQSource.questions && tcQSource.questions.length>0;
+    const totalQs = tcQSources.reduce((s,src)=>s+src.questions.length,0);
+    const hasSource = totalQs > 0;
+    const canPublish = hasSource && tcTitle.trim();
+
+    // Source list
+    const srcList = tcQSources.length
+      ? `<div style="display:flex;flex-direction:column;gap:6px;margin-bottom:8px">
+          ${tcQSources.map((src,i)=>`
+            <div style="display:flex;align-items:center;gap:8px;border:1.5px solid #a5b4fc;border-radius:8px;padding:8px 10px;background:#ede9fe">
+              <div style="flex:1;min-width:0">
+                <div style="font-size:.78rem;font-weight:700;color:#4338ca;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(src.label||src.files?.join(', ')||'Source')}</div>
+                <div style="font-size:.68rem;color:var(--mid)">Q${(src.start||0)+1} – Q${(src.start||0)+(src.count||src.questions.length)} · ${src.questions.length} question${src.questions.length!==1?'s':''}</div>
+              </div>
+              <button class="btn btn-ghost btn-sm btn-tc-remove-src" data-src-idx="${i}" style="flex-shrink:0;padding:2px 7px;font-size:.7rem;color:#be123c;border-color:#fecdd3">✕</button>
+            </div>`).join('')}
+        </div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+          <span style="font-size:.72rem;font-weight:700;color:#4338ca">${totalQs} total question${totalQs!==1?'s':''} across ${tcQSources.length} source${tcQSources.length!==1?'s':''}</span>
+          <button class="btn btn-ghost btn-sm" id="btn-tc-clear-src" style="font-size:.7rem;color:var(--mid);padding:2px 8px">Clear all</button>
+        </div>`
+      : '';
+
     return `<div style="padding:14px;display:flex;flex-direction:column;gap:12px">
       <div>
         <label style="font-size:.75rem;font-weight:600;color:var(--mid);display:block;margin-bottom:4px">TEST TITLE *</label>
@@ -1040,21 +1061,43 @@ function testBoardHTML(){
           <span style="font-size:.78rem;color:var(--mid)">${tcTimerType==='total'?'minutes total':'seconds per question'}</span>
         </div>`:''}
       </div>
+
       <div>
-        <label style="font-size:.75rem;font-weight:600;color:var(--mid);display:block;margin-bottom:4px">QUESTION SOURCE</label>
-        ${hasSource
-          ?`<div style="border:1.5px solid #a5b4fc;border-radius:8px;padding:10px;background:#ede9fe">
-              <div style="font-size:.8rem;font-weight:700;color:#4338ca;margin-bottom:4px">✓ ${tcQSource.questions.length} questions loaded</div>
-              <div style="font-size:.72rem;color:var(--mid)">${esc(tcQSource.files?.join(', ')||'')} · Q${(tcQSource.start||0)+1} to Q${(tcQSource.start||0)+(tcQSource.count||tcQSource.questions.length)}</div>
-              <button class="btn btn-ghost btn-sm" id="btn-tc-clear-src" style="margin-top:6px;font-size:.72rem">Change source</button>
-            </div>`
-          :`<button class="btn btn-ghost btn-sm" id="btn-tc-load-src" style="width:100%;justify-content:center;padding:10px;border-style:dashed">
-              📂 Select from GitHub →
-            </button>`}
+        <label style="font-size:.75rem;font-weight:600;color:var(--mid);display:block;margin-bottom:6px">AVAILABILITY WINDOW <span style="font-weight:400;text-transform:none">(optional)</span></label>
+        <div style="display:flex;gap:8px">
+          <div style="flex:1">
+            <div style="font-size:.7rem;color:var(--mid);margin-bottom:3px">From</div>
+            <input class="form-input" type="datetime-local" id="tc-avail-from" value="${esc(tcAvailFrom)}" style="font-size:.8rem"/>
+          </div>
+          <div style="flex:1">
+            <div style="font-size:.7rem;color:var(--mid);margin-bottom:3px">To</div>
+            <input class="form-input" type="datetime-local" id="tc-avail-to" value="${esc(tcAvailTo)}" style="font-size:.8rem"/>
+          </div>
+        </div>
+        <div style="font-size:.7rem;color:var(--mid);margin-top:3px">Leave blank to keep test open indefinitely</div>
       </div>
+
+      <div>
+        <label style="font-size:.75rem;font-weight:600;color:var(--mid);display:block;margin-bottom:6px">QUESTION SOURCES</label>
+        ${srcList}
+        <button class="btn btn-ghost btn-sm" id="btn-tc-load-src" style="width:100%;justify-content:center;padding:9px;border-style:dashed;font-size:.8rem">
+          📂 ${hasSource?'Add another source from GitHub →':'Select from GitHub →'}
+        </button>
+      </div>
+
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border:1.5px solid var(--line);border-radius:8px;background:var(--faint)">
+        <div>
+          <div style="font-size:.8rem;font-weight:600">🔀 Randomize question order</div>
+          <div style="font-size:.7rem;color:var(--mid)">Shuffle all questions before publishing</div>
+        </div>
+        <button id="btn-tc-randomize" style="width:44px;height:26px;border-radius:13px;border:2px solid ${tcRandomize?'#6366f1':'var(--line)'};background:${tcRandomize?'#6366f1':'var(--faint)'};cursor:pointer;position:relative;transition:background .15s,border-color .15s;flex-shrink:0">
+          <div style="width:18px;height:18px;border-radius:9px;background:#fff;position:absolute;top:2px;transition:left .15s;left:${tcRandomize?'20px':'2px'};box-shadow:0 1px 3px rgba(0,0,0,.2)"></div>
+        </button>
+      </div>
+
       ${tcMsg?`<div class="notice ${tcMsg.startsWith('✓')?'n-good':'n-bad'}" style="font-size:.8rem">${esc(tcMsg)}</div>`:''}
-      <button class="btn btn-dark btn-sm" id="btn-tc-publish" style="width:100%;justify-content:center;padding:10px;font-size:.85rem;font-weight:700" ${!hasSource||!tcTitle.trim()?'disabled':''}>
-        📤 Publish Test
+      <button class="btn btn-dark btn-sm" id="btn-tc-publish" style="width:100%;justify-content:center;padding:10px;font-size:.85rem;font-weight:700" ${!canPublish?'disabled':''}>
+        📤 Publish Test ${totalQs?`(${totalQs} question${totalQs!==1?'s':''})`:''} 
       </button>
     </div>`;
   }
@@ -2671,7 +2714,8 @@ function attach(){
   on('btn-test-board-open', ()=>{
     testBoardOpen=true; testBoardTab='create';
     testHistory=null; testViewId=null; testViewAttempts=null; testAttemptDetail=null;
-    tcTitle=''; tcSubject=''; tcTimerType='none'; tcTimerValue=0; tcQSource=null; tcMsg='';
+    tcTitle=''; tcSubject=''; tcTimerType='none'; tcTimerValue=0;
+    tcQSources=[]; tcRandomize=false; tcAvailFrom=''; tcAvailTo=''; tcMsg='';
     render();
     fetchTestHistory();
   });
@@ -2679,27 +2723,36 @@ function attach(){
   on('btn-tb-tab-create', ()=>{ testBoardTab='create'; render(); });
   on('btn-tb-tab-history', ()=>{ testBoardTab='history'; render(); });
 
-  // Create Test form inputs
-  on('tc-title',  (e)=>{ tcTitle   = e?.target?.value||document.getElementById('tc-title')?.value||''; });
-  on('tc-subject',(e)=>{ tcSubject = e?.target?.value||document.getElementById('tc-subject')?.value||''; });
+  // Create Test form inputs — use 'input' so state syncs while typing (fixes publish always-disabled bug)
+  document.getElementById('tc-title')?.addEventListener('input', e=>{ tcTitle=e.target.value; render(); });
+  document.getElementById('tc-subject')?.addEventListener('input', e=>{ tcSubject=e.target.value; });
   document.querySelectorAll('.tc-timer-type').forEach(b=>b.addEventListener('click',()=>{
+    // Preserve whatever value was typed before the re-render wipes the input
+    const liveVal = parseInt(document.getElementById('tc-timer-val')?.value);
+    if(!isNaN(liveVal)) tcTimerValue = liveVal;
     tcTimerType=b.dataset.timer;
     if(tcTimerType==='none') tcTimerValue=0;
     render();
   }));
   const tcValEl=document.getElementById('tc-timer-val');
-  if(tcValEl) tcValEl.addEventListener('change',()=>{ tcTimerValue=parseInt(tcValEl.value)||0; });
+  if(tcValEl) tcValEl.addEventListener('input',()=>{ tcTimerValue=parseInt(tcValEl.value)||0; });
 
   on('btn-tc-load-src', ()=>{
-    // Open the embedded GitHub browser inside the Test Board overlay.
-    // Previously this set testBoardOpen=false and called render(), which painted
-    // the home page because hostHTML() hadn't been entered yet.  Now we stay
-    // inside the overlay by switching to browser mode.
     tcBrowserOpen=true; tcBrowserSubj=null; tcBrowserFiles=null; tcBrowserLoading=false; tcBrowserErr='';
     render();
-    tcBrowserInit(); // async — fetches subjects and re-renders when done
+    tcBrowserInit();
   });
-  on('btn-tc-clear-src', ()=>{ tcQSource=null; tcMsg=''; render(); });
+  on('btn-tc-clear-src', ()=>{ tcQSources=[]; tcMsg=''; render(); });
+  // Remove individual source by index
+  document.querySelectorAll('.btn-tc-remove-src').forEach(b=>b.addEventListener('click',()=>{
+    const i=parseInt(b.dataset.srcIdx);
+    if(!isNaN(i)){ tcQSources.splice(i,1); render(); }
+  }));
+  // Randomize toggle
+  on('btn-tc-randomize', ()=>{ tcRandomize=!tcRandomize; render(); });
+  // Availability pickers
+  document.getElementById('tc-avail-from')?.addEventListener('change',e=>{ tcAvailFrom=e.target.value; });
+  document.getElementById('tc-avail-to')?.addEventListener('change',e=>{ tcAvailTo=e.target.value; });
 
   // ── Embedded GitHub browser (inside Test Board overlay) ───────────────────
   // Back button: if drilled into a subject go up to subject list; otherwise
@@ -2736,23 +2789,34 @@ function attach(){
   });
   on('btn-tc-publish', async ()=>{
     const titleVal=(document.getElementById('tc-title')?.value||tcTitle).trim();
-    const subjectVal=document.getElementById('tc-subject')?.value||tcSubject;
+    const subjectVal=(document.getElementById('tc-subject')?.value||tcSubject).trim();
     if(!titleVal){ tcMsg='Title is required'; render(); return; }
-    if(!tcQSource?.questions?.length){ tcMsg='No questions selected'; render(); return; }
+    if(!tcQSources.length){ tcMsg='No questions selected'; render(); return; }
+    // Merge all sources in order
+    let allQs = tcQSources.flatMap(s=>s.questions);
+    if(tcRandomize) allQs = allQs.slice().sort(()=>Math.random()-.5);
+    if(!allQs.length){ tcMsg='No questions found in selected sources'; render(); return; }
     tcMsg='Publishing…'; render();
     try{
+      const timerEl = document.getElementById('tc-timer-val');
       const timerVal = tcTimerType==='total'
-        ? (parseInt(document.getElementById('tc-timer-val')?.value)||tcTimerValue)*60
-        : (parseInt(document.getElementById('tc-timer-val')?.value)||tcTimerValue);
+        ? (parseInt(timerEl?.value)||tcTimerValue)*60
+        : (parseInt(timerEl?.value)||tcTimerValue);
       await apiPost('/api/tests',{
         title:titleVal, subject:subjectVal,
         timerType:tcTimerType, timerValue:timerVal,
-        questions:tcQSource.questions,
-        sourceRepo:tcQSource.repo||'', sourceFiles:tcQSource.files||[],
-        sourceStart:tcQSource.start||0, sourceCount:tcQSource.count||tcQSource.questions.length,
+        questions:allQs,
+        randomize:tcRandomize,
+        availFrom:tcAvailFrom||null,
+        availTo:tcAvailTo||null,
+        sourceRepo:tcQSources[0]?.repo||'',
+        sourceFiles:tcQSources.flatMap(s=>s.files||[]),
+        sourceStart:tcQSources[0]?.start||0,
+        sourceCount:allQs.length,
       },true);
       tcMsg='✓ Test published!';
-      tcTitle=''; tcSubject=''; tcTimerType='none'; tcTimerValue=0; tcQSource=null;
+      tcTitle=''; tcSubject=''; tcTimerType='none'; tcTimerValue=0;
+      tcQSources=[]; tcRandomize=false; tcAvailFrom=''; tcAvailTo='';
       await fetchTestHistory();
       testBoardTab='history';
     }catch(e){ tcMsg=e.message||'Failed to publish'; }

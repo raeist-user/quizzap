@@ -56,7 +56,10 @@ let testViewAttempts = null;        // attempts for testViewId
 let testAttemptDetail = null;       // { attempt, questions } for per-student view
 // Create-test form state
 let tcTitle='', tcSubject='', tcTimerType='none', tcTimerValue=0;
-let tcQSource=null;                 // { repo, files, start, count, questions }
+let tcQSources=[];                  // [{ repo, files, start, count, questions, label }]
+let tcRandomize=false;              // shuffle questions before publishing
+let tcAvailFrom='';                 // ISO datetime string — when test becomes available
+let tcAvailTo='';                   // ISO datetime string — when test closes
 let tcMsg='';                       // error/success message
 
 // Student
@@ -439,7 +442,7 @@ function _showTcRangeSelector(allQ, sourceLabel){
     const s=Math.max(1,Math.min(total,parseInt(document.getElementById('tc-range-start')?.value)||1));
     const c=Math.max(1,Math.min(total-s+1,parseInt(document.getElementById('tc-range-count')?.value)||total));
     const sliced=allQ.slice(s-1,s-1+c);
-    tcQSource={ questions:sliced, files:[sourceLabel], start:s-1, count:c, repo:GITHUB_REPO };
+    tcQSources.push({ questions:sliced, files:[sourceLabel], start:s-1, count:c, repo:GITHUB_REPO, label:sourceLabel });
     overlay.remove();
     testBoardOpen=true; testBoardTab='create'; render();
   });
