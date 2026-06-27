@@ -143,8 +143,10 @@ function landingHTML(){
   // Buttons differ by role
   const actionButtons = isHost
     ? `<button class="btn btn-dark btn-lg" id="go-host">🖥 Host Interface</button>
+       <button class="btn btn-ghost btn-lg" id="btn-test-board-open" style="margin-top:2px">📋 Test Board</button>
        <button class="btn btn-ghost btn-lg" id="go-selfquiz" style="margin-top:2px">📝 Self Quiz</button>`
-    : `<button class="btn btn-dark btn-lg" id="go-join">🎓 Join Session</button>`;
+    : `<button class="btn btn-dark btn-lg" id="go-join">🎓 Join Session</button>
+       <button class="btn btn-ghost btn-lg" id="btn-avail-tests-open" style="margin-top:2px">📋 Available Tests</button>`;
 
   return `<div class="lb-full-screen">
     <div class="lb-full-inner">
@@ -166,6 +168,151 @@ function landingHTML(){
       </button>
       <p style="font-size:.68rem;color:var(--mid);margin-top:4px;opacity:.65">Tap if changes aren't showing up</p>
     </div>
+  </div>`;
+}
+
+/* ══════════════════════════════════════
+   PLANNED TEST — STUDENT UI
+══════════════════════════════════════ */
+
+function availTestsHTML(){
+  if(!availTestsOpen) return '';
+  const tab = availTestsTab;
+
+  function cardBody(){
+    if(tab==='available'){
+      if(!availTests) return '<div style="padding:40px;text-align:center"><div class="spinner"></div></div>';
+      if(!availTests.length) return '<div style="padding:40px;text-align:center;color:var(--mid)"><div style="font-size:2rem;margin-bottom:8px">📋</div><div style="font-size:.85rem">No tests available right now.</div></div>';
+      return availTests.map(t=>{
+        const timerLabel = t.timerType==='total'?`⏱ ${Math.round(t.timerValue/60)} min total`
+          :t.timerType==='perQuestion'?`⏱ ${t.timerValue}s / question`:'No timer';
+        return `<div class="at-card" data-test-id="${t._id}">
+          <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:8px">
+            <div>
+              <div style="font-weight:700;font-size:.9rem">${esc(t.title)}</div>
+              ${t.subject?`<div style="font-size:.75rem;color:var(--mid);margin-top:1px">📚 ${esc(t.subject)}</div>`:''}
+            </div>
+            <button class="btn btn-dark btn-sm at-start-btn" data-test-id="${t._id}" style="flex-shrink:0;padding:5px 14px;font-size:.78rem">Start →</button>
+          </div>
+          <div style="display:flex;gap:10px;flex-wrap:wrap">
+            <span style="font-size:.72rem;background:var(--faint);padding:2px 8px;border-radius:20px;color:var(--mid)">${timerLabel}</span>
+            <span style="font-size:.72rem;background:var(--faint);padding:2px 8px;border-radius:20px;color:var(--mid)">📝 ${t.questionCount||0} questions</span>
+          </div>
+        </div>`;
+      }).join('');
+    }
+    // Attempted tab
+    if(!myAttempts) return '<div style="padding:40px;text-align:center"><div class="spinner"></div></div>';
+    if(!myAttempts.length) return '<div style="padding:40px;text-align:center;color:var(--mid)"><div style="font-size:2rem;margin-bottom:8px">📂</div><div style="font-size:.85rem">No submitted tests yet.</div></div>';
+    return myAttempts.map(a=>{
+      const t=a.testId||{};
+      const total=(a.correct||0)+(a.incorrect||0)+(a.skipped||0);
+      const pct=total?Math.round((a.correct||0)/total*100):0;
+      const d=a.submittedAt?new Date(a.submittedAt).toLocaleDateString('en',{day:'numeric',month:'short',year:'numeric'}):'';
+      return `<div style="border:1.5px solid var(--line);border-radius:10px;padding:12px;margin-bottom:8px;background:var(--white)">
+        <div style="font-weight:700;font-size:.88rem;margin-bottom:4px">${esc(t.title||'Test')}</div>
+        ${t.subject?`<div style="font-size:.72rem;color:var(--mid);margin-bottom:8px">📚 ${esc(t.subject)}</div>`:''}
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:8px">
+          <div style="background:#dcfce7;border-radius:8px;padding:8px;text-align:center">
+            <div style="font-size:1.2rem;font-weight:700;color:#16a34a">${a.correct||0}</div>
+            <div style="font-size:.65rem;color:#15803d;font-weight:600">CORRECT</div>
+          </div>
+          <div style="background:#fee2e2;border-radius:8px;padding:8px;text-align:center">
+            <div style="font-size:1.2rem;font-weight:700;color:#dc2626">${a.incorrect||0}</div>
+            <div style="font-size:.65rem;color:#b91c1c;font-weight:600">WRONG</div>
+          </div>
+          <div style="background:#f3f4f6;border-radius:8px;padding:8px;text-align:center">
+            <div style="font-size:1.2rem;font-weight:700;color:var(--mid)">${a.skipped||0}</div>
+            <div style="font-size:.65rem;color:var(--mid);font-weight:600">SKIPPED</div>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;justify-content:space-between;font-size:.75rem;color:var(--mid)">
+          <span>Score: <strong style="color:var(--ink)">${a.score||0}/${total}</strong> (${pct}%)</span>
+          <span>${d}</span>
+        </div>
+        <div style="margin-top:8px;padding:6px 10px;background:var(--faint);border-radius:6px;font-size:.72rem;color:var(--mid);text-align:center">
+          🔒 Detailed review · <em>Coming soon</em>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  return `<div id="avail-tests-overlay" style="position:fixed;inset:0;background:var(--white);z-index:500;display:flex;flex-direction:column;overflow:hidden">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:2px solid var(--line);background:var(--faint);flex-shrink:0">
+      <span style="font-weight:700;font-size:.95rem">📋 Tests</span>
+      <button class="btn btn-ghost btn-sm" id="btn-avail-tests-close">✕ Close</button>
+    </div>
+    <div style="display:flex;border-bottom:1.5px solid var(--line);flex-shrink:0">
+      <button class="btn" id="btn-at-tab-available" style="flex:1;border:none;border-radius:0;padding:10px;font-size:.82rem;font-weight:600;border-bottom:3px solid ${tab==='available'?'#6366f1':'transparent'};color:${tab==='available'?'#4338ca':'var(--mid)'}">📝 Available</button>
+      <button class="btn" id="btn-at-tab-attempted" style="flex:1;border:none;border-radius:0;padding:10px;font-size:.82rem;font-weight:600;border-bottom:3px solid ${tab==='attempted'?'#6366f1':'transparent'};color:${tab==='attempted'?'#4338ca':'var(--mid)'}">📂 Attempted</button>
+    </div>
+    <div style="flex:1;overflow-y:auto;padding:12px">${cardBody()}</div>
+  </div>`;
+}
+
+/* ── Test Taking Interface ──────────────────────────────────────────────────── */
+function atTestHTML(){
+  if(!atTest) return '';
+  const q = atTest.questions[atQIdx];
+  const total = atTest.questions.length;
+  const answered = atAnswers.filter(a=>a!==null&&a!==undefined).length;
+  const opts = q.options.map((o,i)=>{
+    const chosen = atAnswers[atQIdx]===i;
+    return `<div class="opt-card ${chosen?'chosen':''} at-opt" data-at-opt="${i}" style="${chosen?'border-color:#6366f1;background:#ede9fe;':''}">
+      <div class="opt-key">${'ABCD'[i]}</div>
+      <span class="${urduCls({text:o})}">${renderMath(o)}</span>
+    </div>`;
+  }).join('');
+
+  // Timer display
+  let timerBar='';
+  if(atTest.timerType==='total'&&atTimeLeft>0){
+    const pct=Math.round(atTimeLeft/(atTest.timerValue||1)*100);
+    const col=pct>33?'#6366f1':pct>15?'#f59e0b':'#ef4444';
+    timerBar=`<div style="height:4px;background:var(--line);border-radius:2px;margin-bottom:8px"><div style="height:100%;width:${pct}%;background:${col};border-radius:2px;transition:width .5s linear"></div></div>
+    <div style="font-size:.75rem;color:var(--mid);text-align:right;margin-bottom:6px">${Math.floor(atTimeLeft/60)}:${String(atTimeLeft%60).padStart(2,'0')} left</div>`;
+  }
+  if(atTest.timerType==='perQuestion'&&atPerQLeft>0){
+    const pct=Math.round(atPerQLeft/(atTest.timerValue||1)*100);
+    const col=pct>33?'#6366f1':pct>15?'#f59e0b':'#ef4444';
+    timerBar=`<div style="height:4px;background:var(--line);border-radius:2px;margin-bottom:6px"><div style="height:100%;width:${pct}%;background:${col};border-radius:2px;transition:width .5s linear"></div></div>
+    <div style="font-size:.75rem;color:var(--mid);text-align:right;margin-bottom:4px">${atPerQLeft}s</div>`;
+  }
+
+  // Report modal
+  let reportModal='';
+  if(atReportOpen===atQIdx){
+    reportModal=`<div style="position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:600;display:flex;align-items:flex-end">
+      <div style="background:var(--white);border-radius:14px 14px 0 0;padding:16px;width:100%;box-sizing:border-box">
+        <div style="font-weight:700;font-size:.9rem;margin-bottom:10px">🚩 Report Question ${atQIdx+1}</div>
+        <textarea id="at-report-note" placeholder="Describe the issue (optional)" style="width:100%;box-sizing:border-box;padding:8px;border:1.5px solid var(--line);border-radius:8px;font-size:.82rem;min-height:80px;resize:none;font-family:inherit"></textarea>
+        <div style="display:flex;gap:8px;margin-top:10px">
+          <button class="btn btn-dark btn-sm" id="btn-at-report-submit" style="flex:1;justify-content:center">Submit Report</button>
+          <button class="btn btn-ghost btn-sm" id="btn-at-report-cancel">Cancel</button>
+        </div>
+      </div>
+    </div>`;
+  }
+
+  return `<div style="position:fixed;inset:0;background:var(--white);z-index:500;display:flex;flex-direction:column;overflow:hidden">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;border-bottom:1.5px solid var(--line);background:var(--faint);flex-shrink:0">
+      <div style="font-size:.8rem;color:var(--mid)">Q${atQIdx+1}/${total} · ${answered}/${total} answered</div>
+      <div style="font-weight:700;font-size:.85rem;max-width:50%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(atTest.title)}</div>
+      <button class="btn btn-ghost btn-sm" id="btn-at-quit" style="font-size:.75rem;padding:3px 8px">✕ Exit</button>
+    </div>
+    ${timerBar?`<div style="padding:6px 12px 0;flex-shrink:0">${timerBar}</div>`:''}
+    <div style="flex:1;overflow-y:auto;padding:14px 14px 80px">
+      <div class="${urduCls(q)?'urdu':''}" style="font-size:.92rem;font-weight:500;line-height:1.55;margin-bottom:16px">${renderMath(q.text)}</div>
+      <div class="question-opts" style="display:flex;flex-direction:column;gap:8px">${opts}</div>
+    </div>
+    <div style="position:fixed;bottom:0;left:0;right:0;padding:10px 14px;background:var(--white);border-top:1.5px solid var(--line);display:flex;gap:8px;z-index:1">
+      <button class="btn btn-ghost btn-sm" id="btn-at-prev" style="padding:7px 14px" ${atQIdx===0?'disabled':''}>← Prev</button>
+      <button class="btn btn-ghost btn-sm" id="btn-at-flag" title="Report question" style="padding:7px 10px">🚩</button>
+      ${atQIdx<total-1
+        ?`<button class="btn btn-dark btn-sm" id="btn-at-next" style="flex:1;justify-content:center">Next →</button>`
+        :`<button class="btn btn-sm" id="btn-at-submit" style="flex:1;justify-content:center;background:#16a34a;color:#fff;border-color:#16a34a">✓ Submit Test</button>`}
+    </div>
+    ${reportModal}
   </div>`;
 }
 
@@ -857,6 +1004,168 @@ function teacherDashboardHTML(){
   </div>`;
 }
 
+/* ══════════════════════════════════════
+   PLANNED TEST — HOST UI (TEST BOARD)
+══════════════════════════════════════ */
+
+function testBoardHTML(){
+  if(!testBoardOpen) return '';
+
+  // ── Create Test tab ───────────────────────────────────────────────────────
+  function createTab(){
+    const hasSource = tcQSource && tcQSource.questions && tcQSource.questions.length>0;
+    return `<div style="padding:14px;display:flex;flex-direction:column;gap:12px">
+      <div>
+        <label style="font-size:.75rem;font-weight:600;color:var(--mid);display:block;margin-bottom:4px">TEST TITLE *</label>
+        <input class="form-input" id="tc-title" value="${esc(tcTitle)}" placeholder="e.g. Chapter 5 Biology Test" style="font-size:.85rem"/>
+      </div>
+      <div>
+        <label style="font-size:.75rem;font-weight:600;color:var(--mid);display:block;margin-bottom:4px">SUBJECT</label>
+        <input class="form-input" id="tc-subject" value="${esc(tcSubject)}" placeholder="e.g. Biology, Physics…" style="font-size:.85rem"/>
+      </div>
+      <div>
+        <label style="font-size:.75rem;font-weight:600;color:var(--mid);display:block;margin-bottom:4px">TIMER</label>
+        <div style="display:flex;gap:6px">
+          ${['none','total','perQuestion'].map(t=>`<button class="btn btn-sm tc-timer-type" data-timer="${t}" style="flex:1;justify-content:center;font-size:.72rem;${tcTimerType===t?'background:#4338ca;color:#fff;border-color:#4338ca':'background:var(--faint)'}">
+            ${t==='none'?'None':t==='total'?'Total':'Per Q'}
+          </button>`).join('')}
+        </div>
+        ${tcTimerType!=='none'?`<div style="display:flex;align-items:center;gap:8px;margin-top:8px">
+          <input class="form-input" type="number" id="tc-timer-val" value="${tcTimerValue||''}" min="1" max="9999" placeholder="${tcTimerType==='total'?'Minutes':'Seconds'}" style="font-size:.85rem;max-width:120px"/>
+          <span style="font-size:.78rem;color:var(--mid)">${tcTimerType==='total'?'minutes total':'seconds per question'}</span>
+        </div>`:''}
+      </div>
+      <div>
+        <label style="font-size:.75rem;font-weight:600;color:var(--mid);display:block;margin-bottom:4px">QUESTION SOURCE</label>
+        ${hasSource
+          ?`<div style="border:1.5px solid #a5b4fc;border-radius:8px;padding:10px;background:#ede9fe">
+              <div style="font-size:.8rem;font-weight:700;color:#4338ca;margin-bottom:4px">✓ ${tcQSource.questions.length} questions loaded</div>
+              <div style="font-size:.72rem;color:var(--mid)">${esc(tcQSource.files?.join(', ')||'')} · Q${(tcQSource.start||0)+1} to Q${(tcQSource.start||0)+(tcQSource.count||tcQSource.questions.length)}</div>
+              <button class="btn btn-ghost btn-sm" id="btn-tc-clear-src" style="margin-top:6px;font-size:.72rem">Change source</button>
+            </div>`
+          :`<button class="btn btn-ghost btn-sm" id="btn-tc-load-src" style="width:100%;justify-content:center;padding:10px;border-style:dashed">
+              📂 Select from GitHub →
+            </button>`}
+      </div>
+      ${tcMsg?`<div class="notice ${tcMsg.startsWith('✓')?'n-good':'n-bad'}" style="font-size:.8rem">${esc(tcMsg)}</div>`:''}
+      <button class="btn btn-dark btn-sm" id="btn-tc-publish" style="width:100%;justify-content:center;padding:10px;font-size:.85rem;font-weight:700" ${!hasSource||!tcTitle.trim()?'disabled':''}>
+        📤 Publish Test
+      </button>
+    </div>`;
+  }
+
+  // ── History tab ───────────────────────────────────────────────────────────
+  function historyTab(){
+    if(testAttemptDetail) return attemptDetailView();
+    if(testViewId && testViewAttempts) return testLeaderboardView();
+    if(!testHistory) return '<div style="padding:40px;text-align:center"><div class="spinner"></div></div>';
+    if(!testHistory.length) return `<div style="padding:40px;text-align:center;color:var(--mid)"><div style="font-size:2rem;margin-bottom:8px">📋</div><div style="font-size:.85rem">No tests created yet.</div></div>`;
+    return `<div style="padding:12px;display:flex;flex-direction:column;gap:8px">` +
+      testHistory.map(t=>`<div style="border:1.5px solid var(--line);border-radius:10px;padding:12px;background:var(--white)">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:6px">
+          <div>
+            <div style="font-weight:700;font-size:.88rem">${esc(t.title)}</div>
+            ${t.subject?`<div style="font-size:.72rem;color:var(--mid)">${esc(t.subject)}</div>`:''}
+          </div>
+          <span style="font-size:.65rem;padding:2px 7px;border-radius:10px;font-weight:600;flex-shrink:0;background:${t.status==='active'?'#dcfce7':'#f3f4f6'};color:${t.status==='active'?'#166534':'var(--mid)'}">
+            ${t.status==='active'?'Active':'Closed'}
+          </span>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+          ${t.timerType!=='none'?`<span style="font-size:.7rem;background:var(--faint);padding:2px 7px;border-radius:12px;color:var(--mid)">⏱ ${t.timerType==='total'?Math.round((t.timerValue||0)/60)+' min':t.timerValue+'s/Q'}</span>`:''}
+        </div>
+        <div style="display:flex;gap:6px">
+          <button class="btn btn-dark btn-sm tb-view-btn" data-test-id="${t._id}" style="flex:1;justify-content:center;font-size:.75rem">📊 View Results</button>
+          <button class="btn btn-ghost btn-sm tb-toggle-btn" data-test-id="${t._id}" data-status="${t.status}" style="font-size:.75rem">${t.status==='active'?'Close':'Reopen'}</button>
+          <button class="btn btn-ghost btn-sm tb-del-btn" data-test-id="${t._id}" style="font-size:.75rem;color:#be123c;border-color:#fecdd3">🗑</button>
+        </div>
+      </div>`).join('') + '</div>';
+  }
+
+  // ── Test leaderboard (attempts list) ──────────────────────────────────────
+  function testLeaderboardView(){
+    const test = testHistory?.find(t=>t._id===testViewId)||{};
+    const attempts = testViewAttempts||[];
+    const rows = attempts.length ? attempts.map((a,i)=>{
+      const medals=['🥇','🥈','🥉'];
+      const total=(a.correct||0)+(a.incorrect||0)+(a.skipped||0);
+      return `<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--line);cursor:pointer" class="tb-attempt-row" data-attempt-id="${a._id}">
+        <div style="min-width:24px;text-align:center;font-size:.82rem">${medals[i]||('#'+(i+1))}</div>
+        <div class="j-av" style="width:28px;height:28px;font-size:.68rem;flex-shrink:0">${(a.userName||'?').slice(0,2).toUpperCase()}</div>
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:600;font-size:.82rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(a.userName||'Anonymous')}</div>
+          <div style="font-size:.7rem;color:var(--mid)">${a.correct||0}✓ ${a.incorrect||0}✗ ${a.skipped||0}—</div>
+        </div>
+        <div style="font-weight:700;font-size:.88rem">${a.score||0}<span style="font-size:.7rem;font-weight:400;color:var(--mid)">/${total}</span></div>
+        <span style="color:var(--mid);font-size:.8rem">›</span>
+      </div>`;
+    }).join('') : '<div style="padding:30px;text-align:center;color:var(--mid);font-size:.83rem">No attempts yet.</div>';
+
+    return `<div style="display:flex;flex-direction:column;height:100%">
+      <div style="padding:10px 12px;border-bottom:1.5px solid var(--line);background:var(--faint);display:flex;align-items:center;gap:8px;flex-shrink:0">
+        <button class="btn btn-ghost btn-sm" id="btn-tb-back-list" style="padding:4px 8px">← Back</button>
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:700;font-size:.82rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(test.title||'Test')}</div>
+          <div style="font-size:.7rem;color:var(--mid)">${attempts.length} attempt${attempts.length!==1?'s':''}</div>
+        </div>
+      </div>
+      <div style="flex:1;overflow-y:auto">${rows}</div>
+    </div>`;
+  }
+
+  // ── Per-student attempt detail ─────────────────────────────────────────────
+  function attemptDetailView(){
+    const { attempt, questions } = testAttemptDetail;
+    const rows = questions.map((q,i)=>{
+      const ans = attempt.answers[i];
+      const isNull = ans===null||ans===undefined;
+      const cor = q.correct;
+      let status, color;
+      if(isNull){ status='Skipped'; color='#9ca3af'; }
+      else if(ans===cor){ status='Correct ✓'; color='#16a34a'; }
+      else { status='Wrong ✗'; color='#dc2626'; }
+      return `<div style="padding:12px;border-bottom:1px solid var(--line)">
+        <div style="font-size:.78rem;font-weight:600;color:${color};margin-bottom:6px">Q${i+1} — ${status}</div>
+        <div style="font-size:.82rem;margin-bottom:8px;line-height:1.4">${renderMath(q.text)}</div>
+        <div style="display:flex;flex-direction:column;gap:4px">
+          ${q.options.map((o,oi)=>{
+            let bg='var(--faint)', fw='400', border='var(--line)';
+            if(oi===cor){ bg='#dcfce7'; fw='600'; border='#86efac'; }
+            if(!isNull&&oi===ans&&ans!==cor){ bg='#fee2e2'; fw='600'; border='#fca5a5'; }
+            return `<div style="font-size:.78rem;padding:5px 8px;border-radius:6px;background:${bg};font-weight:${fw};border:1px solid ${border}">${'ABCD'[oi]}) ${renderMath(o)}</div>`;
+          }).join('')}
+        </div>
+        ${!isNull&&ans!==cor?`<div style="margin-top:6px;font-size:.72rem;color:#16a34a">✓ Correct: ${esc(q.options[cor])}</div>`:''}
+      </div>`;
+    }).join('');
+
+    return `<div style="display:flex;flex-direction:column;height:100%">
+      <div style="padding:10px 12px;border-bottom:1.5px solid var(--line);background:var(--faint);display:flex;align-items:center;gap:8px;flex-shrink:0">
+        <button class="btn btn-ghost btn-sm" id="btn-tb-back-attempts" style="padding:4px 8px">← Back</button>
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:700;font-size:.82rem">${esc(attempt.userName||'Student')}</div>
+          <div style="font-size:.7rem;color:var(--mid)">${attempt.correct||0}✓ ${attempt.incorrect||0}✗ ${attempt.skipped||0} skipped</div>
+        </div>
+      </div>
+      <div style="flex:1;overflow-y:auto">${rows}</div>
+    </div>`;
+  }
+
+  return `<div id="test-board-overlay" style="position:fixed;inset:0;background:var(--white);z-index:500;display:flex;flex-direction:column;overflow:hidden">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:2px solid var(--line);background:var(--faint);flex-shrink:0">
+      <span style="font-weight:700;font-size:.95rem">📋 Test Board</span>
+      <button class="btn btn-ghost btn-sm" id="btn-test-board-close">✕ Close</button>
+    </div>
+    <div style="display:flex;border-bottom:1.5px solid var(--line);flex-shrink:0">
+      <button class="btn" id="btn-tb-tab-create" style="flex:1;border:none;border-radius:0;padding:10px;font-size:.82rem;font-weight:600;border-bottom:3px solid ${testBoardTab==='create'?'#6366f1':'transparent'};color:${testBoardTab==='create'?'#4338ca':'var(--mid)'}">✏️ Create Test</button>
+      <button class="btn" id="btn-tb-tab-history" style="flex:1;border:none;border-radius:0;padding:10px;font-size:.82rem;font-weight:600;border-bottom:3px solid ${testBoardTab==='history'?'#6366f1':'transparent'};color:${testBoardTab==='history'?'#4338ca':'var(--mid)'}">📚 History</button>
+    </div>
+    <div style="flex:1;overflow-y:auto;${testBoardTab==='history'&&(testViewId||testAttemptDetail)?'overflow:hidden;display:flex;flex-direction:column':''}">
+      ${testBoardTab==='create' ? createTab() : historyTab()}
+    </div>
+  </div>`;
+}
+
 function standingsOverlayHTML(){
   if(!showStandingsOverlay) return '';
   const snaps  = S.sessionSnapshots || [];
@@ -1529,6 +1838,7 @@ function hostHTML(){
       ${reportsOverlayHTML()}
       ${hostSettingsOverlayHTML()}
       ${kickConfirmModalHTML()}
+      ${testBoardHTML()}
     ${dismissBombOverlayHTML()}
     </div>`;
   }
@@ -1638,6 +1948,7 @@ function hostHTML(){
     ${reportsOverlayHTML()}
     ${hostSettingsOverlayHTML()}
     ${kickConfirmModalHTML()}
+    ${testBoardHTML()}
   </div>`;
 }
 
@@ -1702,6 +2013,9 @@ function hostEndedHTML(){
     ${backupRestoreOverlayHTML()}
     ${kickConfirmModalHTML()}
     ${dismissBombOverlayHTML()}
+    ${testBoardHTML()}
+    ${availTestsHTML()}
+    ${atTest?atTestHTML():''}
   </div>`;
 }
 
@@ -2270,6 +2584,175 @@ function attach(){
   // Landing nav — role-based
   on('go-host', ()=>{ role='host'; hostAuthed=false; navPush(); render(); });
   on('go-selfquiz', ()=>{ location.href='/selfquiz'; });
+
+  // ── Test Board (host) ─────────────────────────────────────────────────────
+  on('btn-test-board-open', ()=>{
+    testBoardOpen=true; testBoardTab='create';
+    testHistory=null; testViewId=null; testViewAttempts=null; testAttemptDetail=null;
+    tcTitle=''; tcSubject=''; tcTimerType='none'; tcTimerValue=0; tcQSource=null; tcMsg='';
+    render();
+    fetchTestHistory();
+  });
+  on('btn-test-board-close', ()=>{ testBoardOpen=false; render(); });
+  on('btn-tb-tab-create', ()=>{ testBoardTab='create'; render(); });
+  on('btn-tb-tab-history', ()=>{ testBoardTab='history'; render(); });
+
+  // Create Test form inputs
+  on('tc-title',  (e)=>{ tcTitle   = e?.target?.value||document.getElementById('tc-title')?.value||''; });
+  on('tc-subject',(e)=>{ tcSubject = e?.target?.value||document.getElementById('tc-subject')?.value||''; });
+  document.querySelectorAll('.tc-timer-type').forEach(b=>b.addEventListener('click',()=>{
+    tcTimerType=b.dataset.timer;
+    if(tcTimerType==='none') tcTimerValue=0;
+    render();
+  }));
+  const tcValEl=document.getElementById('tc-timer-val');
+  if(tcValEl) tcValEl.addEventListener('change',()=>{ tcTimerValue=parseInt(tcValEl.value)||0; });
+
+  on('btn-tc-load-src', ()=>{
+    // Open GitHub browser in "test source" mode — reuse existing browse logic
+    testBoardOpen=false; render();
+    setTimeout(()=>{ browseRepo && browseRepo(); _tcLoadingSource=true; }, 50);
+  });
+  on('btn-tc-clear-src', ()=>{ tcQSource=null; tcMsg=''; render(); });
+  on('btn-tc-publish', async ()=>{
+    const titleVal=(document.getElementById('tc-title')?.value||tcTitle).trim();
+    const subjectVal=document.getElementById('tc-subject')?.value||tcSubject;
+    if(!titleVal){ tcMsg='Title is required'; render(); return; }
+    if(!tcQSource?.questions?.length){ tcMsg='No questions selected'; render(); return; }
+    tcMsg='Publishing…'; render();
+    try{
+      const timerVal = tcTimerType==='total'
+        ? (parseInt(document.getElementById('tc-timer-val')?.value)||tcTimerValue)*60
+        : (parseInt(document.getElementById('tc-timer-val')?.value)||tcTimerValue);
+      await apiPost('/api/tests',{
+        title:titleVal, subject:subjectVal,
+        timerType:tcTimerType, timerValue:timerVal,
+        questions:tcQSource.questions,
+        sourceRepo:tcQSource.repo||'', sourceFiles:tcQSource.files||[],
+        sourceStart:tcQSource.start||0, sourceCount:tcQSource.count||tcQSource.questions.length,
+      },true);
+      tcMsg='✓ Test published!';
+      tcTitle=''; tcSubject=''; tcTimerType='none'; tcTimerValue=0; tcQSource=null;
+      await fetchTestHistory();
+      testBoardTab='history';
+    }catch(e){ tcMsg=e.message||'Failed to publish'; }
+    render();
+  });
+
+  // History actions
+  document.querySelectorAll('.tb-view-btn').forEach(b=>b.addEventListener('click',async()=>{
+    testViewId=b.dataset.testId; testViewAttempts=null; testAttemptDetail=null;
+    render();
+    try{
+      const r=await fetch('/api/tests/'+testViewId+'/attempts',{headers:{Authorization:'Bearer '+authToken}});
+      testViewAttempts=(await r.json()).attempts||[];
+    }catch(e){ testViewAttempts=[]; }
+    render();
+  }));
+  document.querySelectorAll('.tb-toggle-btn').forEach(b=>b.addEventListener('click',async()=>{
+    const newStatus=b.dataset.status==='active'?'closed':'active';
+    try{
+      await fetch('/api/tests/'+b.dataset.testId+'/status',{method:'PUT',headers:{'Content-Type':'application/json','Authorization':'Bearer '+authToken},body:JSON.stringify({status:newStatus})});
+      await fetchTestHistory();
+    }catch(e){}
+    render();
+  }));
+  document.querySelectorAll('.tb-del-btn').forEach(b=>b.addEventListener('click',async()=>{
+    if(!confirm('Delete this test and all its attempts?')) return;
+    try{
+      await fetch('/api/tests/'+b.dataset.testId,{method:'DELETE',headers:{Authorization:'Bearer '+authToken}});
+      await fetchTestHistory();
+    }catch(e){}
+    render();
+  }));
+  on('btn-tb-back-list', ()=>{ testViewId=null; testViewAttempts=null; testAttemptDetail=null; render(); });
+  on('btn-tb-back-attempts', ()=>{ testAttemptDetail=null; render(); });
+
+  document.querySelectorAll('.tb-attempt-row').forEach(row=>row.addEventListener('click',async()=>{
+    testAttemptDetail=null; render();
+    try{
+      const r=await fetch('/api/tests/'+testViewId+'/attempts/'+row.dataset.attemptId,{headers:{Authorization:'Bearer '+authToken}});
+      testAttemptDetail=await r.json();
+    }catch(e){ showToast('Failed to load','bad'); }
+    render();
+  }));
+
+  // ── Available Tests (student) ─────────────────────────────────────────────
+  on('btn-avail-tests-open', ()=>{
+    availTestsOpen=true; availTestsTab='available'; availTests=null; myAttempts=null; render();
+    fetchAvailTests(); fetchMyAttempts();
+  });
+  on('btn-avail-tests-close', ()=>{ availTestsOpen=false; atTest=null; atAnswers=[]; if(atTimerHandle){clearInterval(atTimerHandle);atTimerHandle=null;} render(); });
+  on('btn-at-tab-available', ()=>{ availTestsTab='available'; render(); });
+  on('btn-at-tab-attempted', ()=>{ availTestsTab='attempted'; render(); });
+
+  // Start a test
+  document.querySelectorAll('.at-start-btn').forEach(btn=>btn.addEventListener('click',async()=>{
+    const testId=btn.dataset.testId;
+    try{
+      const r=await fetch('/api/tests/'+testId+'/take',{headers:{Authorization:'Bearer '+authToken}});
+      if(r.status===409){ showToast('Already submitted this test','neutral'); return; }
+      const {test}=await r.json();
+      atTest=test; atQIdx=0; atAnswers=new Array(test.questions.length).fill(null);
+      atReportOpen=-1;
+      // Start timers
+      if(test.timerType==='total'){ atTimeLeft=test.timerValue||0; atPerQLeft=0; }
+      else if(test.timerType==='perQuestion'){ atPerQLeft=test.timerValue||0; atTimeLeft=0; }
+      if(atTimerHandle){ clearInterval(atTimerHandle); atTimerHandle=null; }
+      if(test.timerType==='total'||test.timerType==='perQuestion'){
+        atTimerHandle=setInterval(()=>{
+          if(test.timerType==='total'){
+            atTimeLeft=Math.max(0,atTimeLeft-1);
+            if(atTimeLeft===0){ clearInterval(atTimerHandle);atTimerHandle=null; doSubmitTest(); return; }
+          } else {
+            atPerQLeft=Math.max(0,atPerQLeft-1);
+            if(atPerQLeft===0){
+              // Auto-advance to next question or submit
+              if(atQIdx<atTest.questions.length-1){ atQIdx++; atPerQLeft=atTest.timerValue||0; }
+              else { clearInterval(atTimerHandle);atTimerHandle=null; doSubmitTest(); return; }
+            }
+          }
+          render();
+        },1000);
+      }
+      render();
+    }catch(e){ showToast('Failed to load test','bad'); }
+  }));
+
+  // Test navigation
+  on('btn-at-prev', ()=>{ if(atQIdx>0){ atQIdx--; if(atTest?.timerType==='perQuestion') atPerQLeft=atTest.timerValue||0; render(); }});
+  on('btn-at-next', ()=>{ if(atTest&&atQIdx<atTest.questions.length-1){ atQIdx++; if(atTest.timerType==='perQuestion') atPerQLeft=atTest.timerValue||0; render(); }});
+
+  // Answer selection
+  document.querySelectorAll('.at-opt').forEach(el=>el.addEventListener('click',()=>{
+    const idx=+el.dataset.atOpt;
+    atAnswers[atQIdx]=atAnswers[atQIdx]===idx?null:idx; // tap again to deselect
+    render();
+  }));
+
+  // Submit
+  on('btn-at-submit', ()=>{
+    const unanswered=atAnswers.filter(a=>a===null||a===undefined).length;
+    if(unanswered>0&&!confirm(`${unanswered} question${unanswered>1?'s':''} unanswered. Submit anyway?`)) return;
+    doSubmitTest();
+  });
+  on('btn-at-quit', ()=>{
+    if(confirm('Exit test? Progress will be lost.')){ atTest=null; atAnswers=[]; if(atTimerHandle){clearInterval(atTimerHandle);atTimerHandle=null;} render(); }
+  });
+
+  // Question report in test
+  on('btn-at-flag', ()=>{ atReportOpen=atQIdx; render(); });
+  on('btn-at-report-cancel', ()=>{ atReportOpen=-1; render(); });
+  on('btn-at-report-submit', async()=>{
+    const note=document.getElementById('at-report-note')?.value||'';
+    try{
+      await fetch('/api/tests/'+atTest._id+'/report',{method:'POST',
+        headers:{'Content-Type':'application/json','Authorization':'Bearer '+authToken},
+        body:JSON.stringify({questionIdx:atReportOpen,reportedAnswer:atAnswers[atReportOpen]??null,note})});
+      showToast('Report submitted. Thank you!','good');
+    }catch(e){ showToast('Failed to submit report','bad'); }
+    atReportOpen=-1; render();
+  });
   on('go-join',  ()=>{
     role='participant';
     fetchSchedules();

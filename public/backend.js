@@ -44,6 +44,35 @@ let backupOverlayState={ list:[], loading:false, error:null, restoredMsg:null };
 let hostSettingsOpen=false;
 let hostEndedTab='public';   // 'public' | 'exiled' — toggle on post-game results screen
 
+/* ── PLANNED TEST STATE ──────────────────────────────────────────────────────
+   Shared between host (Test Board) and student (Available Tests) views.
+──────────────────────────────────────────────────────────────────────────── */
+// Host
+let testBoardOpen = false;          // is Test Board overlay open?
+let testBoardTab  = 'create';       // 'create' | 'history'
+let testHistory   = null;           // fetched list of host's tests
+let testViewId    = null;           // currently inspected test in history
+let testViewAttempts = null;        // attempts for testViewId
+let testAttemptDetail = null;       // { attempt, questions } for per-student view
+// Create-test form state
+let tcTitle='', tcSubject='', tcTimerType='none', tcTimerValue=0;
+let tcQSource=null;                 // { repo, files, start, count, questions }
+let tcMsg='';                       // error/success message
+
+// Student
+let availTestsOpen = false;         // is Available Tests overlay open?
+let availTestsTab  = 'available';   // 'available' | 'attempted'
+let availTests     = null;          // fetched list of active tests
+let myAttempts     = null;          // fetched list of my submitted attempts
+// Active attempt state
+let atTest         = null;          // full test object being taken
+let atAnswers      = [];            // answers[i] = number|null
+let atQIdx         = 0;            // current question index
+let atTimeLeft     = 0;            // seconds remaining (total timer)
+let atPerQLeft     = 0;            // seconds remaining on current question
+let atTimerHandle  = null;         // setInterval handle
+let atReportOpen   = -1;           // question index with report modal open (-1=none)
+
 // Upload manage state
 let manageEditMode=null;      // null | 'existing' | 'new'
 let manageFolderFiles=[];     // [{name, path, sha}] files in currently selected manage folder
@@ -298,6 +327,116 @@ async function fetchHostSchedules(){
     hostSchedules=d.schedules||[];
     render();
   }catch(e){ hostSchedules=[]; }
+}
+
+/* ── PLANNED TEST helpers ─────────────────────────────────────────────────── */
+
+async function fetchTestHistory(){
+  try{
+    const r=await fetch('/api/tests/host',{headers:{Authorization:'Bearer '+authToken}});
+    const d=await r.json();
+    testHistory=d.tests||[];
+  }catch(e){ testHistory=[]; }
+  render();
+}
+
+async function fetchAvailTests(){
+  try{
+    const r=await fetch('/api/tests',{headers:{Authorization:'Bearer '+authToken}});
+    const d=await r.json();
+    availTests=d.tests||[];
+  }catch(e){ availTests=[]; }
+  render();
+}
+
+async function fetchMyAttempts(){
+  try{
+    const r=await fetch('/api/my-attempts',{headers:{Authorization:'Bearer '+authToken}});
+    const d=await r.json();
+    myAttempts=d.attempts||[];
+  }catch(e){ myAttempts=[]; }
+  render();
+}
+
+async function doSubmitTest(){
+  if(!atTest) return;
+  if(atTimerHandle){ clearInterval(atTimerHandle); atTimerHandle=null; }
+  try{
+    const r=await fetch('/api/tests/'+atTest._id+'/submit',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+authToken},
+      body:JSON.stringify({answers:atAnswers}),
+    });
+    const d=await r.json();
+    if(!r.ok) throw new Error(d.error||'Submission failed');
+    // Show result summary, then move to Attempted tab
+    showToast(`✓ Test submitted! Score: ${d.result.score}/${d.result.total}`,'good');
+    atTest=null; atAnswers=[];
+    availTestsTab='attempted';
+    await fetchMyAttempts();
+  }catch(e){
+    showToast(e.message||'Submission failed','bad');
+  }
+  render();
+}
+
+let _tcLoadingSource=false; // flag: browse result should be piped to test builder
+
+function _showTcRangeSelector(allQ, sourceLabel){
+  // Remove any existing
+  const ex=document.getElementById('tc-range-overlay'); if(ex) ex.remove();
+
+  const total=allQ.length;
+  const overlay=document.createElement('div');
+  overlay.id='tc-range-overlay';
+  overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9000;display:flex;align-items:flex-end';
+  overlay.innerHTML=`<div style="background:var(--white);border-radius:14px 14px 0 0;padding:20px;width:100%;box-sizing:border-box;max-height:80vh;overflow-y:auto">
+    <div style="font-weight:700;font-size:.9rem;margin-bottom:4px">📐 Select Question Range</div>
+    <div style="font-size:.75rem;color:var(--mid);margin-bottom:14px">${esc(sourceLabel)} · ${total} questions total</div>
+    <div style="display:flex;gap:10px;margin-bottom:12px">
+      <div style="flex:1">
+        <label style="font-size:.72rem;font-weight:600;color:var(--mid);display:block;margin-bottom:4px">START FROM (Q#)</label>
+        <input class="form-input" id="tc-range-start" type="number" min="1" max="${total}" value="1" style="font-size:.85rem"/>
+        <div style="font-size:.7rem;color:var(--mid);margin-top:3px">1 = first question</div>
+      </div>
+      <div style="flex:1">
+        <label style="font-size:.72rem;font-weight:600;color:var(--mid);display:block;margin-bottom:4px">HOW MANY</label>
+        <input class="form-input" id="tc-range-count" type="number" min="1" max="${total}" value="${total}" style="font-size:.85rem"/>
+        <div style="font-size:.7rem;color:var(--mid);margin-top:3px">max ${total}</div>
+      </div>
+    </div>
+    <div id="tc-range-preview" style="font-size:.78rem;color:#4338ca;margin-bottom:14px;padding:6px 10px;background:#ede9fe;border-radius:6px">Will use Q1–Q${total} (${total} questions)</div>
+    <div style="display:flex;gap:8px">
+      <button id="tc-range-confirm" class="btn btn-dark btn-sm" style="flex:1;justify-content:center;padding:10px">✓ Use These Questions</button>
+      <button id="tc-range-cancel" class="btn btn-ghost btn-sm" style="padding:10px">Cancel</button>
+    </div>
+  </div>`;
+  document.body.appendChild(overlay);
+
+  function updatePreview(){
+    const s=Math.max(1,Math.min(total,parseInt(document.getElementById('tc-range-start')?.value)||1));
+    const c=Math.max(1,Math.min(total-s+1,parseInt(document.getElementById('tc-range-count')?.value)||total));
+    const end=Math.min(total,s-1+c);
+    const el=document.getElementById('tc-range-preview');
+    if(el) el.textContent=`Will use Q${s}–Q${end} (${c} question${c!==1?'s':''})`;
+  }
+  ['tc-range-start','tc-range-count'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el) el.addEventListener('input',updatePreview);
+  });
+
+  document.getElementById('tc-range-confirm')?.addEventListener('click',()=>{
+    const s=Math.max(1,Math.min(total,parseInt(document.getElementById('tc-range-start')?.value)||1));
+    const c=Math.max(1,Math.min(total-s+1,parseInt(document.getElementById('tc-range-count')?.value)||total));
+    const sliced=allQ.slice(s-1,s-1+c);
+    tcQSource={ questions:sliced, files:[sourceLabel], start:s-1, count:c, repo:GITHUB_REPO };
+    overlay.remove();
+    testBoardOpen=true; testBoardTab='create'; render();
+  });
+  document.getElementById('tc-range-cancel')?.addEventListener('click',()=>{
+    overlay.remove();
+    testBoardOpen=true; testBoardTab='create'; render();
+  });
 }
 
 // ── NOTICE ────────────────────────────────────────────────────────────────────
@@ -1646,6 +1785,14 @@ async function generateQuiz(){
       }
     }
     questions=all; selIdx=0; answerKey=all[0]?.correct??-1;
+    // ── Test Builder intercept: if host opened GitHub browser from Test Board,
+    //    show range selector instead of loading into live quiz.
+    if(_tcLoadingSource){
+      _tcLoadingSource=false;
+      // Show range selector overlay to pick start index and count
+      _showTcRangeSelector(all, selections.map(s=>s.subjName+'/'+s.file.name).join(', '));
+      msg.innerHTML=''; return;
+    }
     msg.innerHTML=''; render();
   }catch(e){ msg.innerHTML=`<div class="notice n-bad mt2">${esc(e.message)}</div>`; }
 }
