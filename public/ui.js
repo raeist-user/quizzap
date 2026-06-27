@@ -1009,7 +1009,12 @@ function teacherDashboardHTML(){
 ══════════════════════════════════════ */
 
 function testBoardHTML(){
-  if(!testBoardOpen) return '';
+  if(!testBoardOpen && !tcBrowserOpen) return '';
+
+  // ── Embedded GitHub browser mode ──────────────────────────────────────────
+  // Rendered instead of the normal Create/History tabs so the host can pick
+  // a source file without ever leaving the Test Board overlay.
+  if(tcBrowserOpen) return tcGitHubBrowserHTML();
 
   // ── Create Test tab ───────────────────────────────────────────────────────
   function createTab(){
@@ -1163,6 +1168,88 @@ function testBoardHTML(){
     <div style="flex:1;overflow-y:auto;${testBoardTab==='history'&&(testViewId||testAttemptDetail)?'overflow:hidden;display:flex;flex-direction:column':''}">
       ${testBoardTab==='create' ? createTab() : historyTab()}
     </div>
+  </div>`;
+}
+
+/* ══════════════════════════════════════
+   EMBEDDED GITHUB BROWSER (TEST BOARD)
+   Self-contained — never closes the Test Board overlay or calls render()
+   from the home-page context.
+══════════════════════════════════════ */
+function tcGitHubBrowserHTML(){
+  const inSubj = tcBrowserSubj !== null;
+
+  function bodyHTML(){
+    if(tcBrowserLoading){
+      return `<div style="padding:56px 20px;display:flex;flex-direction:column;align-items:center;gap:12px;color:var(--mid)">
+        <div class="spinner"></div>
+        <span style="font-size:.84rem">Loading subjects…</span>
+      </div>`;
+    }
+    if(tcBrowserErr){
+      return `<div style="padding:40px 20px;display:flex;flex-direction:column;align-items:center;gap:10px;color:var(--mid);text-align:center">
+        <div style="font-size:2rem">⚠️</div>
+        <span style="font-size:.83rem">${esc(tcBrowserErr)}</span>
+        <button class="btn btn-dark btn-sm" id="btn-tc-browser-retry" style="margin-top:4px">Try again</button>
+      </div>`;
+    }
+    if(!inSubj){
+      if(!subjects.length){
+        return `<div style="padding:48px 20px;display:flex;flex-direction:column;align-items:center;gap:8px;color:var(--mid)">
+          <div style="font-size:2rem">📁</div>
+          <span style="font-size:.83rem">No subject folders found.</span>
+        </div>`;
+      }
+      return `<div class="folder-grid" style="padding:12px">`
+        + subjects.map(s=>`
+          <div class="folder-card" data-tc-subj="${esc(s.name)}" tabindex="0" role="button" aria-label="${esc(s.name)}">
+            <div class="fc-icon">📁</div>
+            <div class="fc-name">${esc(s.name)}</div>
+          </div>`).join('')
+        + `</div>`;
+    }
+    if(tcBrowserFiles === null){
+      return `<div style="padding:56px 20px;display:flex;flex-direction:column;align-items:center;gap:12px;color:var(--mid)">
+        <div class="spinner"></div>
+        <span style="font-size:.84rem">Loading files…</span>
+      </div>`;
+    }
+    if(!tcBrowserFiles.length){
+      return `<div style="padding:40px 20px;display:flex;flex-direction:column;align-items:center;gap:8px;color:var(--mid)">
+        <div style="font-size:2rem">📄</div>
+        <span style="font-size:.83rem">No .txt files in this folder.</span>
+      </div>`;
+    }
+    return `<div style="padding:10px;display:flex;flex-direction:column;gap:6px">`
+      + tcBrowserFiles.map(f=>`
+        <div class="tc-file-row" data-tc-file="${esc(f.path)}" data-tc-fname="${esc(f.name.replace(/\.txt$/i,''))}"
+             style="display:flex;align-items:center;gap:10px;padding:13px 14px;border:1.5px solid var(--line);border-radius:10px;background:var(--white);cursor:pointer">
+          <span style="font-size:1.1rem;flex-shrink:0">📄</span>
+          <span style="flex:1;font-size:.88rem;font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(f.name.replace(/\.txt$/i,''))}</span>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;color:var(--mid)"><polyline points="9,18 15,12 9,6"/></svg>
+        </div>`).join('')
+      + `</div>`;
+  }
+
+  const breadcrumb = inSubj
+    ? `<div style="display:flex;align-items:center;gap:8px;padding:7px 14px;border-bottom:1px solid var(--line);background:var(--faint);flex-shrink:0;font-size:.78rem;color:var(--mid)">
+        <button class="btn btn-ghost btn-sm" id="btn-tc-browser-back" style="padding:3px 8px;font-size:.75rem">← Back</button>
+        <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">📁 ${esc(tcBrowserSubj)}</span>
+      </div>`
+    : '';
+
+  return `<div id="test-board-overlay" style="position:fixed;inset:0;background:var(--white);z-index:500;display:flex;flex-direction:column;overflow:hidden">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:2px solid var(--line);background:var(--faint);flex-shrink:0">
+      <div style="display:flex;align-items:center;gap:8px">
+        ${!inSubj
+          ? `<button class="btn btn-ghost btn-sm" id="btn-tc-browser-back" style="padding:3px 8px;font-size:.75rem">← Back</button>`
+          : ''}
+        <span style="font-weight:700;font-size:.95rem">📂 Select from GitHub</span>
+      </div>
+      <button class="btn btn-ghost btn-sm" id="btn-tc-browser-close">✕ Close</button>
+    </div>
+    ${breadcrumb}
+    <div style="flex:1;overflow-y:auto">${bodyHTML()}</div>
   </div>`;
 }
 
@@ -2604,11 +2691,49 @@ function attach(){
   if(tcValEl) tcValEl.addEventListener('change',()=>{ tcTimerValue=parseInt(tcValEl.value)||0; });
 
   on('btn-tc-load-src', ()=>{
-    // Open GitHub browser in "test source" mode — reuse existing browse logic
-    testBoardOpen=false; render();
-    setTimeout(()=>{ browseRepo && browseRepo(); _tcLoadingSource=true; }, 50);
+    // Open the embedded GitHub browser inside the Test Board overlay.
+    // Previously this set testBoardOpen=false and called render(), which painted
+    // the home page because hostHTML() hadn't been entered yet.  Now we stay
+    // inside the overlay by switching to browser mode.
+    tcBrowserOpen=true; tcBrowserSubj=null; tcBrowserFiles=null; tcBrowserLoading=false; tcBrowserErr='';
+    render();
+    tcBrowserInit(); // async — fetches subjects and re-renders when done
   });
   on('btn-tc-clear-src', ()=>{ tcQSource=null; tcMsg=''; render(); });
+
+  // ── Embedded GitHub browser (inside Test Board overlay) ───────────────────
+  // Back button: if drilled into a subject go up to subject list; otherwise
+  // return to Test Board Create tab.
+  on('btn-tc-browser-back', ()=>{
+    if(tcBrowserSubj){
+      tcBrowserSubj=null; tcBrowserFiles=null; tcBrowserErr=''; render();
+    } else {
+      tcBrowserOpen=false; tcBrowserErr='';
+      testBoardOpen=true; testBoardTab='create'; render();
+    }
+  });
+  // Close X: dismiss the whole browser and go back to Test Board Create tab.
+  on('btn-tc-browser-close', ()=>{
+    tcBrowserOpen=false; tcBrowserSubj=null; tcBrowserFiles=null; tcBrowserErr='';
+    testBoardOpen=true; testBoardTab='create'; render();
+  });
+  // Retry after an error.
+  on('btn-tc-browser-retry', ()=>{
+    tcBrowserErr='';
+    if(tcBrowserSubj) tcBrowserDrillSubject(tcBrowserSubj);
+    else tcBrowserInit();
+  });
+  // Subject folder cards.
+  document.querySelectorAll('[data-tc-subj]').forEach(el=>{
+    el.addEventListener('click', ()=> tcBrowserDrillSubject(el.dataset.tcSubj));
+    el.addEventListener('keydown', e=>{
+      if(e.key==='Enter'||e.key===' '){ e.preventDefault(); tcBrowserDrillSubject(el.dataset.tcSubj); }
+    });
+  });
+  // File rows.
+  document.querySelectorAll('.tc-file-row[data-tc-file]').forEach(el=>{
+    el.addEventListener('click', ()=> tcBrowserPickFile(el.dataset.tcFile, el.dataset.tcFname));
+  });
   on('btn-tc-publish', async ()=>{
     const titleVal=(document.getElementById('tc-title')?.value||tcTitle).trim();
     const subjectVal=document.getElementById('tc-subject')?.value||tcSubject;

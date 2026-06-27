@@ -382,6 +382,16 @@ async function doSubmitTest(){
 
 let _tcLoadingSource=false; // flag: browse result should be piped to test builder
 
+// ── Embedded GitHub browser inside Test Board ─────────────────────────────
+// When the host taps "Select from GitHub" inside the Test Board overlay, we
+// open a self-contained file browser RIGHT INSIDE the overlay instead of
+// trying to reuse the GitHub browser that lives in hostHTML().
+let tcBrowserOpen    = false;   // browser screen is active
+let tcBrowserSubj    = null;    // drilled-in subject name; null = subject list
+let tcBrowserFiles   = null;    // null=loading, Array=loaded file list
+let tcBrowserLoading = false;   // initial subject-list fetch in progress
+let tcBrowserErr     = '';      // last error string
+
 function _showTcRangeSelector(allQ, sourceLabel){
   // Remove any existing
   const ex=document.getElementById('tc-range-overlay'); if(ex) ex.remove();
@@ -437,6 +447,75 @@ function _showTcRangeSelector(allQ, sourceLabel){
     overlay.remove();
     testBoardOpen=true; testBoardTab='create'; render();
   });
+}
+
+/* ── Embedded GitHub browser helpers (called from ui_1_.js event handlers) ── */
+
+// Step 1: load the subject list (reuses/populates the shared `subjects` array)
+async function tcBrowserInit(){
+  if(tcBrowserLoading) return;
+  tcBrowserLoading=true; tcBrowserErr='';
+  render(); // show spinner immediately
+  if(!subjects.length){
+    try{
+      const res=await fetch(`https://api.github.com/repos/${GITHUB_REPO}/contents/resources?ref=${GITHUB_BRANCH}`,{headers:ghHeaders()});
+      if(!res.ok) throw new Error(`GitHub API ${res.status}: Check token and repo.`);
+      const items=await res.json();
+      const dirs=items.filter(i=>i.type==='dir');
+      if(!dirs.length) throw new Error('No subject folders found inside "resources".');
+      subjects=dirs.map(d=>{
+        const ex=subjects.find(s=>s.name===d.name);
+        return ex||{name:d.name,path:d.path,files:[],filesLoaded:false};
+      });
+    }catch(e){ tcBrowserErr=e.message; }
+  }
+  tcBrowserLoading=false; render();
+}
+
+// Step 2: user tapped a subject folder — load its .txt files
+async function tcBrowserDrillSubject(name){
+  tcBrowserSubj=name; tcBrowserFiles=null; tcBrowserErr=''; render();
+  const subj=subjects.find(s=>s.name===name);
+  if(!subj){ tcBrowserErr='Subject not found'; render(); return; }
+  if(subj.filesLoaded){ tcBrowserFiles=subj.files; render(); return; }
+  try{
+    const encodedPath=subj.path.split('/').map(encodeURIComponent).join('/');
+    const res=await fetch(`https://api.github.com/repos/${GITHUB_REPO}/contents/${encodedPath}?ref=${GITHUB_BRANCH}`,{headers:ghHeaders()});
+    if(!res.ok) throw new Error(`GitHub API ${res.status}`);
+    const items=await res.json();
+    subj.files=items
+      .filter(i=>i.type==='file'&&i.name.endsWith('.txt')&&i.name!=='.gitkeep')
+      .map(i=>({name:i.name,path:i.path,sha:i.sha,selected:false,count:0}));
+    subj.filesLoaded=true;
+    tcBrowserFiles=subj.files;
+  }catch(e){ tcBrowserErr=e.message; tcBrowserFiles=[]; }
+  render();
+}
+
+// Step 3: user tapped a file — fetch it, parse questions, open range selector
+async function tcBrowserPickFile(filePath, displayName){
+  // Collapse browser immediately so the overlay stays visible (with loading state)
+  tcBrowserOpen=false; tcBrowserSubj=null; tcBrowserFiles=null; tcBrowserErr='';
+  testBoardOpen=true; testBoardTab='create';
+  render();
+  try{
+    const encodedPath=filePath.split('/').map(encodeURIComponent).join('/');
+    const res=await fetch(`https://api.github.com/repos/${GITHUB_REPO}/contents/${encodedPath}?ref=${GITHUB_BRANCH}`,{headers:ghHeaders()});
+    if(!res.ok) throw new Error(`GitHub API ${res.status}`);
+    const data=await res.json();
+    const bytes=Uint8Array.from(atob(data.content.replace(/\n/g,'')),c=>c.charCodeAt(0));
+    const text=new TextDecoder('utf-8').decode(bytes);
+    const allQ=parseQuestions(text);
+    if(!allQ.length){
+      tcMsg='No valid questions found in that file.';
+      render();
+      return;
+    }
+    _showTcRangeSelector(allQ, displayName);
+  }catch(e){
+    tcMsg='Load failed: '+e.message;
+    render();
+  }
 }
 
 // ── NOTICE ────────────────────────────────────────────────────────────────────
