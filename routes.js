@@ -6,6 +6,7 @@ const mongoose = require('mongoose');
 const {
   User, PendingReg, UpdateReq, Notice, Schedule,
   LeaderboardEntry, ScoreLog, SessionEntry, ReportDB,
+  PlannedTest, TestAttempt,
 } = require('./models');
 const { shared, txHost, getBackupWindow } = require('./ws');
 const { SessionBackup } = require('./models');
@@ -562,6 +563,179 @@ function initRoutes(app) {
       console.error('/api/session-backup/restore error:', e.message);
       res.status(500).json({ error: 'Failed to restore backup' });
     }
+  });
+  /* ══════════════════════════════════════════════════════════════════════════
+     PLANNED TEST API
+  ══════════════════════════════════════════════════════════════════════════ */
+
+  // ── Host: create a test ────────────────────────────────────────────────────
+  app.post('/api/tests', requireHost, async (req, res) => {
+    try {
+      const { title, subject, timerType, timerValue, questions,
+              sourceRepo, sourceFiles, sourceStart, sourceCount } = req.body;
+      if (!title?.trim()) return res.status(400).json({ error: 'Title required' });
+      if (!questions?.length) return res.status(400).json({ error: 'No questions provided' });
+      const test = await PlannedTest.create({
+        title: title.trim(), subject: (subject||'').trim(),
+        timerType: timerType||'none', timerValue: timerValue||0,
+        questions, sourceRepo, sourceFiles, sourceStart, sourceCount,
+        createdBy: req.user.id,
+      });
+      res.json({ ok: true, test });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+  });
+
+  // ── Host: list all tests ───────────────────────────────────────────────────
+  app.get('/api/tests/host', requireHost, async (req, res) => {
+    try {
+      const tests = await PlannedTest.find({ createdBy: req.user.id })
+        .select('-questions').sort({ createdAt: -1 }).lean();
+      res.json({ tests });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+  });
+
+  // ── Host: get one test with full questions ─────────────────────────────────
+  app.get('/api/tests/:id/host', requireHost, async (req, res) => {
+    try {
+      const test = await PlannedTest.findById(req.params.id).lean();
+      if (!test) return res.status(404).json({ error: 'Not found' });
+      res.json({ test });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+  });
+
+  // ── Host: update status (close/reopen) ────────────────────────────────────
+  app.put('/api/tests/:id/status', requireHost, async (req, res) => {
+    try {
+      const { status } = req.body;
+      if (!['active','closed'].includes(status)) return res.status(400).json({ error: 'Invalid status' });
+      const test = await PlannedTest.findOneAndUpdate(
+        { _id: req.params.id, createdBy: req.user.id },
+        { status }, { new: true }
+      );
+      if (!test) return res.status(404).json({ error: 'Not found' });
+      res.json({ ok: true, test });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+  });
+
+  // ── Host: delete a test ───────────────────────────────────────────────────
+  app.delete('/api/tests/:id', requireHost, async (req, res) => {
+    try {
+      await PlannedTest.findOneAndDelete({ _id: req.params.id, createdBy: req.user.id });
+      await TestAttempt.deleteMany({ testId: req.params.id });
+      res.json({ ok: true });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+  });
+
+  // ── Host: get all attempts for a test ─────────────────────────────────────
+  app.get('/api/tests/:id/attempts', requireHost, async (req, res) => {
+    try {
+      const attempts = await TestAttempt.find({ testId: req.params.id })
+        .sort({ score: -1, submittedAt: 1 }).lean();
+      res.json({ attempts });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+  });
+
+  // ── Host: get one attempt in full (per-question detail) ───────────────────
+  app.get('/api/tests/:testId/attempts/:attemptId', requireHost, async (req, res) => {
+    try {
+      const attempt = await TestAttempt.findById(req.params.attemptId).lean();
+      const test    = await PlannedTest.findById(req.params.testId).lean();
+      if (!attempt || !test) return res.status(404).json({ error: 'Not found' });
+      res.json({ attempt, questions: test.questions });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+  });
+
+  // ── Student: list available (active) tests ────────────────────────────────
+  app.get('/api/tests', requireAuth, async (req, res) => {
+    try {
+      const tests = await PlannedTest.find({ status: 'active' })
+        .select('title subject timerType timerValue questions createdAt sourceRepo')
+        .lean();
+      const questionCounts = tests.map(t => ({ ...t, questionCount: t.questions?.length || 0, questions: undefined }));
+      res.json({ tests: questionCounts });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+  });
+
+  // ── Student: start / get a test to attempt ────────────────────────────────
+  app.get('/api/tests/:id/take', requireAuth, async (req, res) => {
+    try {
+      const test = await PlannedTest.findById(req.params.id).lean();
+      if (!test || test.status !== 'active') return res.status(404).json({ error: 'Test not available' });
+      // Check if already completed
+      const existing = await TestAttempt.findOne({ testId: req.params.id, userId: req.user.id, completed: true });
+      if (existing) return res.status(409).json({ error: 'Already submitted', attemptId: existing._id });
+      // Strip correct answers — never sent to student
+      const questions = test.questions.map(q => ({ text: q.text, options: q.options }));
+      res.json({ test: { ...test, questions } });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+  });
+
+  // ── Student: submit attempt ────────────────────────────────────────────────
+  app.post('/api/tests/:id/submit', requireAuth, async (req, res) => {
+    try {
+      const test = await PlannedTest.findById(req.params.id).lean();
+      if (!test || test.status !== 'active') return res.status(404).json({ error: 'Test not available' });
+      const existing = await TestAttempt.findOne({ testId: req.params.id, userId: req.user.id, completed: true });
+      if (existing) return res.status(409).json({ error: 'Already submitted' });
+
+      const { answers } = req.body; // array of number|null, length == questions.length
+      if (!Array.isArray(answers) || answers.length !== test.questions.length)
+        return res.status(400).json({ error: 'Answers array length mismatch' });
+
+      let correct = 0, incorrect = 0, skipped = 0;
+      test.questions.forEach((q, i) => {
+        if (answers[i] === null || answers[i] === undefined) { skipped++; }
+        else if (answers[i] === q.correct) { correct++; }
+        else { incorrect++; }
+      });
+
+      const attempt = await TestAttempt.create({
+        testId: req.params.id,
+        userId: req.user.id,
+        userName: req.user.name,
+        answers,
+        correct, incorrect, skipped,
+        score: correct,
+        submittedAt: new Date(),
+        completed: true,
+      });
+      res.json({ ok: true, result: { correct, incorrect, skipped, score: correct, total: test.questions.length } });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+  });
+
+  // ── Student: my attempts (summary only — no per-question answers) ─────────
+  app.get('/api/my-attempts', requireAuth, async (req, res) => {
+    try {
+      const attempts = await TestAttempt.find({ userId: req.user.id, completed: true })
+        .select('-answers').populate('testId', 'title subject questionCount').sort({ submittedAt: -1 }).lean();
+      res.json({ attempts });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+  });
+
+  // ── Student: submit a question report during a test ───────────────────────
+  app.post('/api/tests/:testId/report', requireAuth, async (req, res) => {
+    try {
+      const { questionIdx, reportedAnswer, note } = req.body;
+      const test = await PlannedTest.findById(req.params.testId).lean();
+      if (!test) return res.status(404).json({ error: 'Test not found' });
+      const q = test.questions[questionIdx];
+      if (!q) return res.status(400).json({ error: 'Invalid question index' });
+      // Also save to the main ReportDB so host sees it in the reports panel
+      const nextRid = (await ReportDB.countDocuments()) + 1;
+      await ReportDB.create({
+        rid: nextRid,
+        question: { text: q.text, options: q.options },
+        correct: q.correct,
+        reportedAnswer: reportedAnswer ?? null,
+        reporterName: req.user.name,
+        reporterPids: [],
+        note: note || '',
+        source: 'test',
+        ts: Date.now(),
+        count: 1,
+      });
+      res.json({ ok: true });
+    } catch (e) { res.status(500).json({ error: e.message }); }
   });
 }
 

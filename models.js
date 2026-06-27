@@ -111,6 +111,52 @@ const sessionSchema = new mongoose.Schema({
 });
 const SessionEntry = mongoose.model('SessionEntry', sessionSchema);
 
+// ── PLANNED TEST ──────────────────────────────────────────────────────────────
+const plannedTestSchema = new mongoose.Schema({
+  title:       { type: String, required: true, trim: true, maxlength: 100 },
+  subject:     { type: String, trim: true, maxlength: 80, default: '' },
+  timerType:   { type: String, enum: ['total','perQuestion','none'], default: 'none' },
+  timerValue:  { type: Number, default: 0 },          // seconds (total) or seconds per Q
+  questions:   [{                                       // baked-in at creation time
+    text:    { type: String },
+    options: [{ type: String }],
+    correct: { type: Number },
+  }],
+  // Source metadata (for display / audit)
+  sourceRepo:   { type: String, default: '' },
+  sourceFiles:  [{ type: String }],
+  sourceStart:  { type: Number, default: 0 },         // nth question start index
+  sourceCount:  { type: Number, default: 0 },
+  status:       { type: String, enum: ['active','closed'], default: 'active' },
+  createdBy:    { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  createdAt:    { type: Date, default: Date.now },
+});
+const PlannedTest = mongoose.model('PlannedTest', plannedTestSchema);
+
+// ── TEST ATTEMPT ──────────────────────────────────────────────────────────────
+const testAttemptSchema = new mongoose.Schema({
+  testId:     { type: mongoose.Schema.Types.ObjectId, ref: 'PlannedTest', required: true, index: true },
+  userId:     { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  userName:   { type: String },
+  // answers[i] = chosen option index (0-3), or null = skipped
+  answers:    [{ type: Number, default: null }],
+  correct:    { type: Number, default: 0 },
+  incorrect:  { type: Number, default: 0 },
+  skipped:    { type: Number, default: 0 },
+  score:      { type: Number, default: 0 },
+  startedAt:  { type: Date, default: Date.now },
+  submittedAt:{ type: Date, default: null },
+  completed:  { type: Boolean, default: false },
+  // Question-level reports submitted during this attempt
+  reports:    [{
+    questionIdx: Number,
+    reportedAnswer: Number,
+    note: String,
+    ts: { type: Date, default: Date.now },
+  }],
+});
+const TestAttempt = mongoose.model('TestAttempt', testAttemptSchema);
+
 // ── QUESTION REPORTS ──────────────────────────────────────────────────────────
 const reportDBSchema = new mongoose.Schema({
   rid:            { type: Number, required: true, unique: true },
@@ -130,4 +176,5 @@ module.exports = {
   User, PendingReg, UpdateReq, Notice, Schedule,
   LeaderboardEntry, ScoreLog,
   SessionBackup, SessionEntry, ReportDB,
+  PlannedTest, TestAttempt,
 };
