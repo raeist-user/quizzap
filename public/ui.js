@@ -146,7 +146,7 @@ function landingHTML(){
        <button class="btn btn-ghost btn-lg" id="btn-test-board-open" style="margin-top:2px">📋 Test Board</button>
        <button class="btn btn-ghost btn-lg" id="go-selfquiz" style="margin-top:2px">📝 Self Quiz</button>`
     : `<button class="btn btn-dark btn-lg" id="go-join">🎓 Join Session</button>
-       <button class="btn btn-ghost btn-lg" id="btn-avail-tests-open" style="margin-top:2px">📋 Available Tests</button>`;
+       <button class="btn btn-ghost btn-lg" id="btn-avail-tests-open" style="margin-top:2px">📋 Test</button>`;
 
   return `<div class="lb-full-screen">
     <div class="lb-full-inner">
@@ -239,7 +239,7 @@ function availTestsHTML(){
 
   return `<div id="avail-tests-overlay" style="position:fixed;inset:0;background:var(--white);z-index:500;display:flex;flex-direction:column;overflow:hidden">
     <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:2px solid var(--line);background:var(--faint);flex-shrink:0">
-      <span style="font-weight:700;font-size:.95rem">📋 Tests</span>
+      <span style="font-weight:700;font-size:.95rem">📋 Test</span>
       <button class="btn btn-ghost btn-sm" id="btn-avail-tests-close">✕ Close</button>
     </div>
     <div style="display:flex;border-bottom:1.5px solid var(--line);flex-shrink:0">
@@ -1838,7 +1838,6 @@ function hostHTML(){
       ${reportsOverlayHTML()}
       ${hostSettingsOverlayHTML()}
       ${kickConfirmModalHTML()}
-      ${testBoardHTML()}
     ${dismissBombOverlayHTML()}
     </div>`;
   }
@@ -1948,7 +1947,6 @@ function hostHTML(){
     ${reportsOverlayHTML()}
     ${hostSettingsOverlayHTML()}
     ${kickConfirmModalHTML()}
-    ${testBoardHTML()}
   </div>`;
 }
 
@@ -2013,9 +2011,6 @@ function hostEndedHTML(){
     ${backupRestoreOverlayHTML()}
     ${kickConfirmModalHTML()}
     ${dismissBombOverlayHTML()}
-    ${testBoardHTML()}
-    ${availTestsHTML()}
-    ${atTest?atTestHTML():''}
   </div>`;
 }
 

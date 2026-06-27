@@ -696,6 +696,8 @@ function render(){
 
   if(screenChanged){
     _transitionView(html, ()=>{
+      // Inject fixed overlays after view settles — they're position:fixed so DOM location doesn't matter
+      _injectTestOverlays();
       attach();
       if(needTimer) startTimerDisplay();
       if(needProfile) setTimeout(loadProfileData,0);
@@ -705,11 +707,29 @@ function render(){
     // Same screen — swap content silently, no animation flash
     const v=document.getElementById('view');
     if(v){ v.innerHTML=html; }
+    _injectTestOverlays();
     attach();
     if(needTimer) startTimerDisplay();
     if(needProfile) setTimeout(loadProfileData,0);
     if(needInspect) setTimeout(loadInspectData,0);
   }
+}
+
+// Injects/updates the test overlays directly on document.body so they work on
+// every view (landing, participant, host) without cluttering each HTML builder.
+function _injectTestOverlays(){
+  function syncEl(wrapperId, innerHtml){
+    let el=document.getElementById(wrapperId);
+    if(innerHtml){
+      if(!el){ el=document.createElement('div'); el.id=wrapperId; document.body.appendChild(el); }
+      el.innerHTML=innerHtml;
+    } else {
+      if(el) el.remove();
+    }
+  }
+  syncEl('test-board-overlay-wrap', testBoardHTML());
+  syncEl('avail-tests-overlay-wrap', availTestsHTML());
+  syncEl('at-test-wrap', atTest?atTestHTML():'');
 }
 
 function _paintView(html){
