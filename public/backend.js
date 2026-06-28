@@ -68,16 +68,61 @@ let availTestsTab  = 'available';   // 'available' | 'attempted'
 let availTests     = null;          // fetched list of active tests
 let myAttempts     = null;          // fetched list of my submitted attempts
 // Active attempt state
-let atTest         = null;          // full test object being taken
-let atAnswers      = [];            // answers[i] = number|null
-let atQIdx         = 0;            // current question index
-let atTimeLeft     = 0;            // seconds remaining (total timer — recomputed from absolute time)
-let atPerQLeft     = 0;            // seconds remaining on current question
-let atTimerHandle  = null;         // setInterval handle
-let atReportOpen   = -1;           // question index with report modal open (-1=none)
-let atStartTime    = 0;            // Date.now() ms when test was started — server-backed total timer anchor
-let atQStartTime   = 0;            // Date.now() ms when current question started — per-Q timer anchor
-let atAutoAdvancing = false;       // true during the 700ms flash before auto-advancing to next question
+let atTest         = null;
+let atAnswers      = [];
+let atQIdx         = 0;
+let atTimeLeft     = 0;
+let atPerQLeft     = 0;
+let atTimerHandle  = null;
+let atReportOpen   = -1;
+let atStartTime    = 0;            // ms anchor — server startedAt
+let atQStartTime   = 0;            // ms anchor — current question start
+let atAutoAdvancing= false;        // blocks input during reveal+advance
+let atRevealData   = null;         // {chosen, correct, isCorrect} during 2 s reveal
+let atBeepedSeconds= new Set();    // which countdown seconds have been beeped
+
+// ── Beep: Web Audio API ───────────────────────────────────────────────────
+function playBeep(freq=880, dur=0.18){
+  try{
+    const ctx=new (window.AudioContext||window.webkitAudioContext)();
+    const osc=ctx.createOscillator();
+    const gain=ctx.createGain();
+    osc.connect(gain); gain.connect(ctx.destination);
+    osc.frequency.value=freq; osc.type='sine';
+    gain.gain.setValueAtTime(0.45, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime+dur);
+    osc.start(); osc.stop(ctx.currentTime+dur);
+    ctx.close();
+  }catch(e){}
+}
+
+// ── Smooth timer RAF loop ─────────────────────────────────────────────────
+// Updates the timer bar + label at ~60 fps without a full re-render.
+function atTimerRAF(){
+  if(!atTest){ return; }
+  const bar=document.getElementById('at-timer-bar');
+  const lbl=document.getElementById('at-timer-lbl');
+  if(!bar){ requestAnimationFrame(atTimerRAF); return; }
+  let pct=100, col='#6366f1', label='';
+  if(atTest.timerType==='total' && atStartTime){
+    const elapsed=(Date.now()-atStartTime)/1000;
+    const rem=Math.max(0,(atTest.timerValue||0)-elapsed);
+    pct=rem/(atTest.timerValue||1)*100;
+    col=pct>33?'#6366f1':pct>15?'#f59e0b':'#ef4444';
+    const mm=Math.floor(rem/60), ss=Math.floor(rem%60);
+    label=`${mm}:${String(ss).padStart(2,'0')}`;
+  } else if(atTest.timerType==='perQuestion' && atQStartTime){
+    const elapsed=(Date.now()-atQStartTime)/1000;
+    const rem=Math.max(0,(atTest.timerValue||0)-elapsed);
+    pct=rem/(atTest.timerValue||1)*100;
+    col=pct>33?'#6366f1':pct>15?'#f59e0b':'#ef4444';
+    label=`${Math.ceil(rem)}s`;
+  }
+  bar.style.width=Math.max(0,Math.min(100,pct))+'%';
+  bar.style.background=col;
+  if(lbl){ lbl.textContent=label; lbl.style.color=col; }
+  requestAnimationFrame(atTimerRAF);
+}
 
 // Upload manage state
 let manageEditMode=null;      // null | 'existing' | 'new'
@@ -366,7 +411,10 @@ async function fetchMyAttempts(){
 
 async function doSubmitTest(){
   if(!atTest) return;
+  // Clean up timer interval and beforeunload guard
   if(atTimerHandle){ clearInterval(atTimerHandle); atTimerHandle=null; }
+  window.removeEventListener('beforeunload', window._atUnloadGuard);
+  atRevealData=null; atAutoAdvancing=false; atBeepedSeconds=new Set();
   try{
     const r=await fetch('/api/tests/'+atTest._id+'/submit',{
       method:'POST',
@@ -375,8 +423,7 @@ async function doSubmitTest(){
     });
     const d=await r.json();
     if(!r.ok) throw new Error(d.error||'Submission failed');
-    // Show result summary, then move to Attempted tab
-    showToast(`✓ Test submitted! Score: ${d.result.score}/${d.result.total}`,'good');
+    showToast(`✓ Submitted! Score: ${d.result?.score??'?'}/${d.result?.total??'?'}`,'good');
     atTest=null; atAnswers=[];
     availTestsTab='attempted';
     await fetchMyAttempts();

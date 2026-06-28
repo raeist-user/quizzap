@@ -259,163 +259,127 @@ function availTestsHTML(){
 /* ── Test Taking Interface ──────────────────────────────────────────────────── */
 function atTestHTML(){
   if(!atTest) return '';
-  const q = atTest.questions[atQIdx];
-  const total = atTest.questions.length;
+  const q      = atTest.questions[atQIdx];
+  const total  = atTest.questions.length;
   const answered = atAnswers.filter(a=>a!==null&&a!==undefined).length;
-
-  // ── Urdu detection (same logic as live quiz) ──────────────────────────────
+  const correctIdx = q.answer ?? q.correct ?? q.correctAnswer ?? -1; // server field
   const isUrdu = urduCls(q);
 
-  // ── Options — instant-answer style (identical to live quiz opt-card) ──────
-  const selectedIdx = atAnswers[atQIdx];
+  // ── Option cards with reveal colouring ───────────────────────────────────
   const opts = q.options.map((o,i)=>{
-    const isChosen = selectedIdx === i;
-    let cls = 'opt-card at-opt';
-    let style = '';
-    if(atAutoAdvancing && isChosen){
-      // Flash green when auto-advancing — confirms the answer was locked
-      cls += ' correct';
-      style = 'pointer-events:none;';
-    } else if(isChosen){
-      cls += ' chosen';
-      style = 'border-color:#6366f1;background:#ede9fe;pointer-events:none;';
-    } else if(atAutoAdvancing){
-      style = 'pointer-events:none;opacity:.55;';
+    let border='1.5px solid var(--line)', bg='var(--white)', color='var(--ink)', opacity='1', pe='auto', badge='';
+    if(atRevealData){
+      const {chosen,correct,isCorrect}=atRevealData;
+      if(i===correct){
+        border='2px solid #16a34a'; bg='#f0fdf4'; color='#14532d';
+        badge=`<div style="font-size:.65rem;font-weight:700;color:#16a34a;background:#dcfce7;padding:1px 7px;border-radius:20px;flex-shrink:0">✓ Correct</div>`;
+      } else if(i===chosen && !isCorrect){
+        border='2px solid #dc2626'; bg='#fef2f2'; color='#7f1d1d';
+        badge=`<div style="font-size:.65rem;font-weight:700;color:#dc2626;background:#fee2e2;padding:1px 7px;border-radius:20px;flex-shrink:0">✗ Wrong</div>`;
+      } else {
+        opacity='.38';
+      }
+      pe='none';
+    } else {
+      const isChosen = atAnswers[atQIdx]===i;
+      if(isChosen){ border='2px solid #6366f1'; bg='#ede9fe'; pe='none'; }
+      if(atAutoAdvancing) pe='none';
     }
-    return `<div class="${cls}" data-at-opt="${i}" style="${style}">
-      <div class="opt-key">${'ABCD'[i]}</div>
-      <span class="${urduCls({text:o})}">${renderMath(o)}</span>
+    return `<div class="at-opt" data-at-opt="${i}"
+      style="display:flex;align-items:center;gap:10px;padding:11px 12px;border-radius:10px;border:${border};background:${bg};color:${color};opacity:${opacity};pointer-events:${pe};cursor:${pe==='none'?'default':'pointer'};transition:border .12s,background .12s">
+      <div style="width:26px;height:26px;border-radius:50%;background:rgba(99,102,241,.09);display:flex;align-items:center;justify-content:center;font-size:.75rem;font-weight:700;flex-shrink:0">${'ABCD'[i]}</div>
+      <span class="${urduCls({text:o})}" style="flex:1;font-size:.88rem;line-height:1.45">${renderMath(o)}</span>
+      ${badge}
     </div>`;
   }).join('');
 
-  // ── Progress row ─────────────────────────────────────────────────────────
-  // Pill bubbles: green = answered, white = current, gray = not yet
+  // ── Progress bubbles ──────────────────────────────────────────────────────
   const bubbles = Array.from({length:total},(_,i)=>{
-    const ans = atAnswers[i];
-    const isCurrent = i === atQIdx;
-    const isDone = ans !== null && ans !== undefined;
-    let bg = isDone ? '#16a34a' : isCurrent ? '#6366f1' : 'var(--line)';
-    let size = isCurrent ? '10px' : '8px';
-    let border = isCurrent ? '2px solid #6366f1' : 'none';
-    return `<div style="width:${size};height:${size};border-radius:50%;background:${bg};flex-shrink:0;border:${border};transition:background .2s"></div>`;
+    const isDone = atAnswers[i]!==null && atAnswers[i]!==undefined;
+    const isCur  = i===atQIdx;
+    const bg = isDone?'#16a34a':isCur?'#6366f1':'var(--line)';
+    const sz = isCur?'10px':'7px';
+    return `<div style="width:${sz};height:${sz};border-radius:50%;background:${bg};flex-shrink:0;transition:background .2s,width .15s,height .15s"></div>`;
   }).join('');
 
-  // ── Server-backed timer ───────────────────────────────────────────────────
-  let timerBar = '';
-  if(atTest.timerType==='total' && atStartTime){
-    const elapsed = (Date.now() - atStartTime) / 1000;
-    const remaining = Math.max(0, (atTest.timerValue||0) - elapsed);
-    const pct = Math.round(remaining / (atTest.timerValue||1) * 100);
-    const col = pct>33?'#6366f1':pct>15?'#f59e0b':'#ef4444';
-    const mm = Math.floor(remaining/60), ss = Math.floor(remaining%60);
-    timerBar = `<div style="padding:0 12px 4px;flex-shrink:0">
-      <div style="height:3px;background:var(--line);border-radius:2px;margin-bottom:4px">
-        <div style="height:100%;width:${pct}%;background:${col};border-radius:2px;transition:width .9s linear"></div>
+  // ── Timer section (animated via RAF — only structure rendered here) ───────
+  let timerSection='';
+  const hasTimer = atTest.timerType==='total'||atTest.timerType==='perQuestion';
+  if(hasTimer){
+    // Initial values (RAF takes over immediately after mount)
+    let initPct=100, initCol='#6366f1', initLabel='';
+    if(atTest.timerType==='total'&&atStartTime){
+      const rem=Math.max(0,(atTest.timerValue||0)-(Date.now()-atStartTime)/1000);
+      initPct=rem/(atTest.timerValue||1)*100;
+      initCol=initPct>33?'#6366f1':initPct>15?'#f59e0b':'#ef4444';
+      const mm=Math.floor(rem/60),ss=Math.floor(rem%60);
+      initLabel=`${mm}:${String(ss).padStart(2,'0')}`;
+    } else if(atTest.timerType==='perQuestion'&&atQStartTime){
+      const rem=Math.max(0,(atTest.timerValue||0)-(Date.now()-atQStartTime)/1000);
+      initPct=rem/(atTest.timerValue||1)*100;
+      initCol=initPct>33?'#6366f1':initPct>15?'#f59e0b':'#ef4444';
+      initLabel=`${Math.ceil(rem)}s`;
+    }
+    timerSection=`<div style="padding:0 12px 5px;flex-shrink:0">
+      <div style="height:4px;background:var(--line);border-radius:2px;overflow:hidden">
+        <div id="at-timer-bar" style="height:100%;width:${Math.max(0,Math.min(100,initPct))}%;background:${initCol};border-radius:2px"></div>
       </div>
-      <div style="display:flex;justify-content:space-between;font-size:.72rem;color:${col};font-weight:600">
-        <span>Total time remaining</span>
-        <span>${mm}:${String(ss).padStart(2,'0')}</span>
-      </div>
-    </div>`;
-  }
-  if(atTest.timerType==='perQuestion' && atQStartTime){
-    const elapsed = (Date.now() - atQStartTime) / 1000;
-    const remaining = Math.max(0, (atTest.timerValue||0) - elapsed);
-    const pct = Math.round(remaining / (atTest.timerValue||1) * 100);
-    const col = pct>33?'#6366f1':pct>15?'#f59e0b':'#ef4444';
-    timerBar = `<div style="padding:0 12px 4px;flex-shrink:0">
-      <div style="height:3px;background:var(--line);border-radius:2px;margin-bottom:4px">
-        <div style="height:100%;width:${pct}%;background:${col};border-radius:2px;transition:width .9s linear"></div>
-      </div>
-      <div style="display:flex;justify-content:space-between;font-size:.72rem;color:${col};font-weight:600">
-        <span>This question</span><span>${Math.ceil(remaining)}s</span>
+      <div style="display:flex;justify-content:space-between;margin-top:3px">
+        <span style="font-size:.68rem;color:var(--mid)">${atTest.timerType==='total'?'Time remaining':'This question'}</span>
+        <span id="at-timer-lbl" style="font-size:.72rem;font-weight:700;color:${initCol}">${initLabel}</span>
       </div>
     </div>`;
   }
 
-  // ── Auto-advance status banner ────────────────────────────────────────────
-  const advanceBanner = atAutoAdvancing
-    ? `<div style="position:fixed;bottom:66px;left:0;right:0;display:flex;justify-content:center;pointer-events:none;z-index:2">
-        <div style="background:#16a34a;color:#fff;font-size:.8rem;font-weight:700;padding:6px 16px;border-radius:20px;box-shadow:0 4px 12px rgba(22,163,74,.35);animation:popIn .18s cubic-bezier(.34,1.56,.64,1) both">
-          ✓ Saved — moving on…
-        </div>
-      </div>`
-    : '';
-
-  // ── Report modal — CLICK ONLY, no textarea ────────────────────────────────
-  let reportModal = '';
-  if(atReportOpen === atQIdx){
-    reportModal = `<div style="position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:600;display:flex;align-items:flex-end">
-      <div style="background:var(--white);border-radius:14px 14px 0 0;padding:20px 16px 28px;width:100%;box-sizing:border-box">
-        <div style="font-size:1.2rem;text-align:center;margin-bottom:8px">🚩</div>
-        <div style="font-weight:700;font-size:.9rem;text-align:center;margin-bottom:6px">Report Question ${atQIdx+1}</div>
-        <div style="font-size:.8rem;color:var(--mid);text-align:center;margin-bottom:16px;line-height:1.5">
-          This question will be flagged for the host to review.<br>No further input needed from you.
-        </div>
-        <div style="display:flex;gap:8px">
-          <button class="btn btn-dark btn-sm" id="btn-at-report-submit" style="flex:1;justify-content:center;padding:10px">Submit Report</button>
-          <button class="btn btn-ghost btn-sm" id="btn-at-report-cancel" style="padding:10px">Cancel</button>
-        </div>
-      </div>
+  // ── Reveal overlay (covers options, shows result banner) ──────────────────
+  let revealBanner='';
+  if(atRevealData){
+    const {isCorrect}=atRevealData;
+    revealBanner=`<div style="margin-top:10px;padding:10px 14px;border-radius:10px;background:${isCorrect?'#f0fdf4':'#fef2f2'};border:1.5px solid ${isCorrect?'#86efac':'#fca5a5'};display:flex;align-items:center;gap:10px;animation:popIn .15s both">
+      <span style="font-size:1.5rem">${isCorrect?'✅':'❌'}</span>
+      <div style="font-size:.83rem;font-weight:700;color:${isCorrect?'#166534':'#991b1b'}">${isCorrect?'Correct!':'Wrong — see correct answer above'}</div>
     </div>`;
   }
-
-  // ── Last question? show mini submit nudge ─────────────────────────────────
-  const isLast = atQIdx === total - 1;
-  const allAnswered = answered === total;
 
   return `<div style="position:fixed;inset:0;background:var(--white);z-index:500;display:flex;flex-direction:column;overflow:hidden">
 
     <!-- Header -->
     <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;border-bottom:1.5px solid var(--line);background:var(--faint);flex-shrink:0">
-      <div style="display:flex;flex-direction:column;gap:2px">
-        <div style="font-size:.78rem;font-weight:700;color:var(--ink)">Q${atQIdx+1} <span style="font-weight:400;color:var(--mid)">of ${total}</span></div>
-        <div style="display:flex;align-items:center;gap:3px;flex-wrap:wrap;max-width:180px">${bubbles}</div>
+      <div>
+        <div style="font-size:.8rem;font-weight:700">Q${atQIdx+1}<span style="font-weight:400;color:var(--mid)">/${total}</span></div>
+        <div style="display:flex;gap:3px;align-items:center;flex-wrap:wrap;max-width:170px;margin-top:3px">${bubbles}</div>
       </div>
-      <div style="display:flex;flex-direction:column;align-items:center;gap:1px;flex-shrink:0">
-        <div style="font-size:.68rem;color:var(--mid);font-weight:600;text-transform:uppercase;letter-spacing:.06em">Answered</div>
-        <div style="font-size:1.1rem;font-weight:800;color:${answered===total?'#16a34a':'var(--ink)'}">${answered}<span style="font-size:.75rem;font-weight:500;color:var(--mid)">/${total}</span></div>
+      <div style="font-size:.88rem;font-weight:700;color:var(--ink);text-align:center;flex:1;padding:0 8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(atTest.title)}</div>
+      <div style="text-align:right;flex-shrink:0">
+        <div style="font-size:.68rem;color:var(--mid);font-weight:600;text-transform:uppercase;letter-spacing:.04em">Answered</div>
+        <div style="font-size:1rem;font-weight:800;color:${answered===total?'#16a34a':'var(--ink)'}">${answered}<span style="font-size:.7rem;font-weight:400;color:var(--mid)">/${total}</span></div>
       </div>
-      <button class="btn btn-ghost btn-sm" id="btn-at-quit" style="font-size:.75rem;padding:4px 10px">✕ Exit</button>
     </div>
 
-    ${timerBar}
+    ${timerSection}
 
-    <!-- Question + Options -->
-    <div style="flex:1;overflow-y:auto;padding:16px 14px 90px">
-      <div class="${isUrdu?'urdu':''}" style="font-size:${isUrdu?'1rem':'.92rem'};font-weight:500;line-height:${isUrdu?'2.4':'1.55'};margin-bottom:18px;${isUrdu?'direction:rtl;text-align:right;':''}">
+    <!-- Scrollable question area -->
+    <div style="flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:14px 13px 30px">
+
+      <!-- Question text -->
+      <div class="${isUrdu?'urdu':''}" style="font-size:${isUrdu?'1.05rem':'.92rem'};font-weight:500;line-height:${isUrdu?'2.5':'1.6'};margin-bottom:16px;${isUrdu?'direction:rtl;text-align:right;':''}">
         ${renderMath(q.text)}
       </div>
-      <div style="display:flex;flex-direction:column;gap:8px">${opts}</div>
 
-      ${isLast && allAnswered && !atAutoAdvancing
-        ? `<div style="margin-top:20px;padding:12px 14px;background:#f0fdf4;border:1.5px solid #86efac;border-radius:10px;display:flex;align-items:center;gap:10px">
-            <span style="font-size:1.2rem">✅</span>
-            <div style="flex:1;font-size:.82rem;color:#166534">All questions answered! Submitting automatically…</div>
-          </div>`
-        : isLast && !atAutoAdvancing
-          ? `<div style="margin-top:20px;padding:10px 14px;background:var(--faint);border:1.5px dashed var(--line);border-radius:10px;font-size:.8rem;color:var(--mid);text-align:center">
-              Last question — select an answer to submit the test
-            </div>`
-          : ''}
+      <!-- Options -->
+      <div style="display:flex;flex-direction:column;gap:9px">${opts}</div>
+
+      <!-- Reveal result banner (right below options) -->
+      ${revealBanner}
+
+      <!-- Inline report button — no modal, no confirmation -->
+      ${!atRevealData?`<button class="btn btn-ghost btn-sm at-report-btn" data-q-idx="${atQIdx}"
+        style="margin-top:14px;width:100%;justify-content:center;font-size:.75rem;color:var(--mid);gap:5px;border-color:var(--line)">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>
+        Report this question
+      </button>`:''}
+
     </div>
-
-    <!-- Bottom bar: flag only (no Prev/Next/Submit) -->
-    <div style="position:fixed;bottom:0;left:0;right:0;padding:10px 14px;background:var(--white);border-top:1.5px solid var(--line);display:flex;align-items:center;justify-content:space-between;z-index:1">
-      <button class="btn btn-ghost btn-sm" id="btn-at-flag" style="gap:6px;font-size:.8rem;color:var(--mid)">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>
-        Report
-      </button>
-      <div style="font-size:.75rem;color:var(--mid)">
-        ${atAutoAdvancing ? '⏳ Moving to next…' : selectedIdx!==null&&selectedIdx!==undefined ? '✓ Answer selected' : 'Tap an option to answer'}
-      </div>
-      ${isLast && !atAutoAdvancing && answered===total
-        ? `<button class="btn btn-sm" id="btn-at-submit" style="background:#16a34a;color:#fff;border-color:#16a34a;font-size:.8rem;padding:6px 14px">Submit ✓</button>`
-        : `<div style="width:72px"></div>`}
-    </div>
-
-    ${advanceBanner}
-    ${reportModal}
   </div>`;
 }
 
@@ -2979,104 +2943,129 @@ function attach(){
     try{
       const r = await fetch('/api/tests/'+testId+'/take', {headers:{Authorization:'Bearer '+authToken}});
       const data = await r.json();
-      if(r.status===409 && !data.test){
-        showToast('Already submitted — you can re-attempt below','neutral'); return;
-      }
+      // 409 with a test object = re-attempt in progress; 409 without = already submitted fresh
+      if(r.status===409 && !data.test){ showToast('Already submitted','neutral'); return; }
       const test = data.test;
-      atTest=test; atQIdx=0; atAnswers=new Array(test.questions.length).fill(null);
-      atReportOpen=-1; atAutoAdvancing=false;
+      atTest=test; atQIdx=0;
+      atAnswers=new Array(test.questions.length).fill(null);
+      atReportOpen=-1; atAutoAdvancing=false; atRevealData=null;
+      atBeepedSeconds=new Set();
 
-      // ── Server-backed timer anchors ────────────────────────────────────────
-      // Use startedAt returned by server if available; else anchor to now.
-      atStartTime = test.startedAt ? new Date(test.startedAt).getTime() : Date.now();
+      // Server-backed anchor: prefer server's startedAt, fallback to now
+      atStartTime  = test.startedAt ? new Date(test.startedAt).getTime() : Date.now();
       atQStartTime = Date.now();
 
+      // Prevent navigation / refresh while test is active
+      window._atUnloadGuard = e=>{ e.preventDefault(); e.returnValue=''; return ''; };
+      window.addEventListener('beforeunload', window._atUnloadGuard);
+
+      // ── Cleanup any previous interval ────────────────────────────────────
       if(atTimerHandle){ clearInterval(atTimerHandle); atTimerHandle=null; }
 
+      // ── Server-backed timer interval (1 s ticks) ─────────────────────────
       if(test.timerType==='total'){
-        // Tick every second; recompute remaining from absolute anchor (not a decrement)
         atTimerHandle = setInterval(()=>{
-          const elapsed = (Date.now() - atStartTime) / 1000;
-          const remaining = Math.max(0, (test.timerValue||0) - elapsed);
-          atTimeLeft = Math.ceil(remaining);
-          if(remaining <= 0){ clearInterval(atTimerHandle); atTimerHandle=null; doSubmitTest(); return; }
-          render();
-        }, 1000);
+          if(!atTest){ clearInterval(atTimerHandle); return; }
+          const elapsed = (Date.now()-atStartTime)/1000;
+          const rem = Math.max(0,(test.timerValue||0)-elapsed);
+          atTimeLeft = Math.ceil(rem);
+          // Countdown beeps at 3 / 2 / 1 seconds left
+          if(rem <= 3 && rem > 0){
+            const s = Math.ceil(rem);
+            if(!atBeepedSeconds.has(s)){
+              atBeepedSeconds.add(s);
+              playBeep(s===1?1200:880, s===1?0.25:0.15);
+            }
+          }
+          if(rem <= 0){ clearInterval(atTimerHandle); atTimerHandle=null; doSubmitTest(); }
+        }, 500); // 500 ms for tighter beep timing
 
       } else if(test.timerType==='perQuestion'){
         atTimerHandle = setInterval(()=>{
-          const elapsed = (Date.now() - atQStartTime) / 1000;
-          const remaining = Math.max(0, (test.timerValue||0) - elapsed);
-          atPerQLeft = Math.ceil(remaining);
-          if(remaining <= 0){
-            // Time's up on this question — lock it blank then auto-advance
-            if(atAnswers[atQIdx] === null) atAnswers[atQIdx] = undefined; // mark skipped
-            if(atQIdx < atTest.questions.length - 1){
-              atQIdx++;
-              atQStartTime = Date.now();
-            } else {
-              clearInterval(atTimerHandle); atTimerHandle=null;
-              doSubmitTest(); return;
+          if(!atTest){ clearInterval(atTimerHandle); return; }
+          const elapsed = (Date.now()-atQStartTime)/1000;
+          const rem = Math.max(0,(test.timerValue||0)-elapsed);
+          atPerQLeft = Math.ceil(rem);
+          if(rem <= 3 && rem > 0){
+            const s = Math.ceil(rem);
+            if(!atBeepedSeconds.has(s)){
+              atBeepedSeconds.add(s);
+              playBeep(s===1?1200:880, s===1?0.25:0.15);
             }
           }
-          render();
-        }, 1000);
+          if(rem <= 0){
+            atBeepedSeconds.clear(); // reset for next question
+            if(atAnswers[atQIdx]===null) atAnswers[atQIdx]=undefined; // mark skipped
+            if(atQIdx < atTest.questions.length-1){
+              atQIdx++; atQStartTime=Date.now(); render();
+            } else {
+              clearInterval(atTimerHandle); atTimerHandle=null; doSubmitTest();
+            }
+          }
+        }, 500);
       }
+
+      // ── Start smooth RAF loop for timer bar ───────────────────────────────
+      requestAnimationFrame(atTimerRAF);
 
       render();
     }catch(e){ showToast('Failed to load test','bad'); }
   }));
 
-  // ── Answer selection — instant reveal + auto-advance ─────────────────────
+  // ── Option tap — instant correct/wrong reveal for 2 s then auto-advance ──
   document.querySelectorAll('.at-opt').forEach(el=>el.addEventListener('click',()=>{
-    if(atAutoAdvancing) return;                    // block double-tap during delay
-    const idx = parseInt(el.dataset.atOpt);
-    if(isNaN(idx)) return;
-    atAnswers[atQIdx] = idx;
-    atAutoAdvancing = true;
-    render();                                       // show green flash immediately
+    if(atAutoAdvancing || atRevealData) return;
+    const chosen = parseInt(el.dataset.atOpt);
+    if(isNaN(chosen)) return;
+    atAnswers[atQIdx] = chosen;
 
-    const delay = 700;
+    // Find correct answer from question data
+    const q = atTest.questions[atQIdx];
+    const correct = q.answer ?? q.correct ?? q.correctAnswer ?? -1;
+    const isCorrect = chosen === correct;
+
+    atRevealData = {chosen, correct, isCorrect};
+    atAutoAdvancing = true;
+    render();
+
+    // After 2 s advance
     setTimeout(()=>{
+      atRevealData = null;
       atAutoAdvancing = false;
-      const total = atTest?.questions?.length || 0;
-      if(atQIdx < total - 1){
+      atBeepedSeconds.clear(); // reset per-Q beeps on advance
+      const total = atTest?.questions?.length||0;
+      if(atQIdx < total-1){
         atQIdx++;
-        atQStartTime = Date.now();                 // reset per-question timer anchor
+        atQStartTime = Date.now();
         render();
       } else {
-        // Last question answered — auto-submit
+        // Last question — auto-submit immediately
         render();
-        setTimeout(()=>doSubmitTest(), 400);
+        doSubmitTest();
       }
-    }, delay);
+    }, 2000);
   }));
 
-  // ── Manual submit (only shown on last Q when all answered) ───────────────
-  on('btn-at-submit', ()=>{ doSubmitTest(); });
-
-  on('btn-at-quit', ()=>{
-    if(confirm('Exit test? Progress will be lost.')){
-      atTest=null; atAnswers=[]; atAutoAdvancing=false;
-      if(atTimerHandle){ clearInterval(atTimerHandle); atTimerHandle=null; }
-      render();
-    }
-  });
-
-  // ── Question report — CLICK ONLY, no textarea ─────────────────────────────
-  on('btn-at-flag',          ()=>{ atReportOpen=atQIdx; render(); });
-  on('btn-at-report-cancel', ()=>{ atReportOpen=-1; render(); });
-  on('btn-at-report-submit', async()=>{
+  // ── Inline report — no modal, no confirmation, instant send ──────────────
+  document.querySelectorAll('.at-report-btn').forEach(btn=>btn.addEventListener('click',async()=>{
+    const qIdx = parseInt(btn.dataset.qIdx??atQIdx);
+    btn.disabled=true; btn.textContent='Sending…';
     try{
       await fetch('/api/tests/'+atTest._id+'/report',{
         method:'POST',
         headers:{'Content-Type':'application/json','Authorization':'Bearer '+authToken},
-        body:JSON.stringify({questionIdx:atReportOpen, reportedAnswer:atAnswers[atReportOpen]??null, note:''})
+        body:JSON.stringify({questionIdx:qIdx, reportedAnswer:atAnswers[qIdx]??null, note:''})
       });
-      showToast('Question reported — thanks!','good');
-    }catch(e){ showToast('Failed to submit report','bad'); }
-    atReportOpen=-1; render();
-  });
+      showToast('🚩 Question reported — thanks!','good');
+    }catch(e){ showToast('Failed to send report','bad'); btn.disabled=false; btn.textContent='Report this question'; }
+  }));
+
+  // Cleanup helper (called by doSubmitTest)
+  window._atCleanupTimer = ()=>{
+    if(atTimerHandle){ clearInterval(atTimerHandle); atTimerHandle=null; }
+    window.removeEventListener('beforeunload', window._atUnloadGuard);
+    atTest=null; atRevealData=null; atAutoAdvancing=false; atBeepedSeconds=new Set();
+  };
   on('go-join',  ()=>{
     role='participant';
     fetchSchedules();
