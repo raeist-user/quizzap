@@ -71,10 +71,13 @@ let myAttempts     = null;          // fetched list of my submitted attempts
 let atTest         = null;          // full test object being taken
 let atAnswers      = [];            // answers[i] = number|null
 let atQIdx         = 0;            // current question index
-let atTimeLeft     = 0;            // seconds remaining (total timer)
+let atTimeLeft     = 0;            // seconds remaining (total timer — recomputed from absolute time)
 let atPerQLeft     = 0;            // seconds remaining on current question
 let atTimerHandle  = null;         // setInterval handle
 let atReportOpen   = -1;           // question index with report modal open (-1=none)
+let atStartTime    = 0;            // Date.now() ms when test was started — server-backed total timer anchor
+let atQStartTime   = 0;            // Date.now() ms when current question started — per-Q timer anchor
+let atAutoAdvancing = false;       // true during the 700ms flash before auto-advancing to next question
 
 // Upload manage state
 let manageEditMode=null;      // null | 'existing' | 'new'
@@ -710,6 +713,18 @@ function setupOutsideClick(){
 /* ══════════════════════════════════════
    RENDER
 ══════════════════════════════════════ */
+
+// Inject keyframes that aren't in the static stylesheet
+(function injectKeyframes(){
+  const s = document.createElement('style');
+  s.textContent = `
+    @keyframes popIn {
+      from { opacity:0; transform:scale(.82) translateY(6px); }
+      to   { opacity:1; transform:scale(1)   translateY(0);   }
+    }
+  `;
+  document.head.appendChild(s);
+})();
 /* ── Screen key: identifies which logical screen is active.
    Transitions only animate when this changes, preventing flicker
    on frequent same-screen re-renders (WS score updates, timer ticks). ── */

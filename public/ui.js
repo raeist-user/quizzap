@@ -183,20 +183,26 @@ function availTestsHTML(){
     if(tab==='available'){
       if(!availTests) return '<div style="padding:40px;text-align:center"><div class="spinner"></div></div>';
       if(!availTests.length) return '<div style="padding:40px;text-align:center;color:var(--mid)"><div style="font-size:2rem;margin-bottom:8px">📋</div><div style="font-size:.85rem">No tests available right now.</div></div>';
+      // Build a set of attempted test IDs for fast lookup
+      const attemptedIds = new Set((myAttempts||[]).map(a=>(a.testId?._id||a.testId||'').toString()));
       return availTests.map(t=>{
+        const isAttempted = attemptedIds.has(t._id.toString());
         const timerLabel = t.timerType==='total'?`⏱ ${Math.round(t.timerValue/60)} min total`
           :t.timerType==='perQuestion'?`⏱ ${t.timerValue}s / question`:'No timer';
-        return `<div class="at-card" data-test-id="${t._id}">
+        return `<div class="at-card" data-test-id="${t._id}" style="${isAttempted?'filter:grayscale(1);opacity:.65;':''}">
           <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:8px">
-            <div>
+            <div style="flex:1;min-width:0">
               <div style="font-weight:700;font-size:.9rem">${esc(t.title)}</div>
               ${t.subject?`<div style="font-size:.75rem;color:var(--mid);margin-top:1px">📚 ${esc(t.subject)}</div>`:''}
             </div>
-            <button class="btn btn-dark btn-sm at-start-btn" data-test-id="${t._id}" style="flex-shrink:0;padding:5px 14px;font-size:.78rem">Start →</button>
+            <button class="btn btn-sm at-start-btn" data-test-id="${t._id}" style="flex-shrink:0;padding:5px 14px;font-size:.78rem;${isAttempted?'background:#9ca3af;border-color:#9ca3af;color:#fff;cursor:pointer;':'background:#4338ca;border-color:#4338ca;color:#fff;'}">
+              ${isAttempted?'Re-attempt':'Start →'}
+            </button>
           </div>
-          <div style="display:flex;gap:10px;flex-wrap:wrap">
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
             <span style="font-size:.72rem;background:var(--faint);padding:2px 8px;border-radius:20px;color:var(--mid)">${timerLabel}</span>
             <span style="font-size:.72rem;background:var(--faint);padding:2px 8px;border-radius:20px;color:var(--mid)">📝 ${t.questionCount||0} questions</span>
+            ${isAttempted?`<span style="font-size:.72rem;background:#f3f4f6;padding:2px 8px;border-radius:20px;color:#6b7280;font-weight:600">✓ Submitted</span>`:''}
           </div>
         </div>`;
       }).join('');
@@ -256,62 +262,159 @@ function atTestHTML(){
   const q = atTest.questions[atQIdx];
   const total = atTest.questions.length;
   const answered = atAnswers.filter(a=>a!==null&&a!==undefined).length;
+
+  // ── Urdu detection (same logic as live quiz) ──────────────────────────────
+  const isUrdu = urduCls(q);
+
+  // ── Options — instant-answer style (identical to live quiz opt-card) ──────
+  const selectedIdx = atAnswers[atQIdx];
   const opts = q.options.map((o,i)=>{
-    const chosen = atAnswers[atQIdx]===i;
-    return `<div class="opt-card ${chosen?'chosen':''} at-opt" data-at-opt="${i}" style="${chosen?'border-color:#6366f1;background:#ede9fe;':''}">
+    const isChosen = selectedIdx === i;
+    let cls = 'opt-card at-opt';
+    let style = '';
+    if(atAutoAdvancing && isChosen){
+      // Flash green when auto-advancing — confirms the answer was locked
+      cls += ' correct';
+      style = 'pointer-events:none;';
+    } else if(isChosen){
+      cls += ' chosen';
+      style = 'border-color:#6366f1;background:#ede9fe;pointer-events:none;';
+    } else if(atAutoAdvancing){
+      style = 'pointer-events:none;opacity:.55;';
+    }
+    return `<div class="${cls}" data-at-opt="${i}" style="${style}">
       <div class="opt-key">${'ABCD'[i]}</div>
       <span class="${urduCls({text:o})}">${renderMath(o)}</span>
     </div>`;
   }).join('');
 
-  // Timer display
-  let timerBar='';
-  if(atTest.timerType==='total'&&atTimeLeft>0){
-    const pct=Math.round(atTimeLeft/(atTest.timerValue||1)*100);
-    const col=pct>33?'#6366f1':pct>15?'#f59e0b':'#ef4444';
-    timerBar=`<div style="height:4px;background:var(--line);border-radius:2px;margin-bottom:8px"><div style="height:100%;width:${pct}%;background:${col};border-radius:2px;transition:width .5s linear"></div></div>
-    <div style="font-size:.75rem;color:var(--mid);text-align:right;margin-bottom:6px">${Math.floor(atTimeLeft/60)}:${String(atTimeLeft%60).padStart(2,'0')} left</div>`;
+  // ── Progress row ─────────────────────────────────────────────────────────
+  // Pill bubbles: green = answered, white = current, gray = not yet
+  const bubbles = Array.from({length:total},(_,i)=>{
+    const ans = atAnswers[i];
+    const isCurrent = i === atQIdx;
+    const isDone = ans !== null && ans !== undefined;
+    let bg = isDone ? '#16a34a' : isCurrent ? '#6366f1' : 'var(--line)';
+    let size = isCurrent ? '10px' : '8px';
+    let border = isCurrent ? '2px solid #6366f1' : 'none';
+    return `<div style="width:${size};height:${size};border-radius:50%;background:${bg};flex-shrink:0;border:${border};transition:background .2s"></div>`;
+  }).join('');
+
+  // ── Server-backed timer ───────────────────────────────────────────────────
+  let timerBar = '';
+  if(atTest.timerType==='total' && atStartTime){
+    const elapsed = (Date.now() - atStartTime) / 1000;
+    const remaining = Math.max(0, (atTest.timerValue||0) - elapsed);
+    const pct = Math.round(remaining / (atTest.timerValue||1) * 100);
+    const col = pct>33?'#6366f1':pct>15?'#f59e0b':'#ef4444';
+    const mm = Math.floor(remaining/60), ss = Math.floor(remaining%60);
+    timerBar = `<div style="padding:0 12px 4px;flex-shrink:0">
+      <div style="height:3px;background:var(--line);border-radius:2px;margin-bottom:4px">
+        <div style="height:100%;width:${pct}%;background:${col};border-radius:2px;transition:width .9s linear"></div>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:.72rem;color:${col};font-weight:600">
+        <span>Total time remaining</span>
+        <span>${mm}:${String(ss).padStart(2,'0')}</span>
+      </div>
+    </div>`;
   }
-  if(atTest.timerType==='perQuestion'&&atPerQLeft>0){
-    const pct=Math.round(atPerQLeft/(atTest.timerValue||1)*100);
-    const col=pct>33?'#6366f1':pct>15?'#f59e0b':'#ef4444';
-    timerBar=`<div style="height:4px;background:var(--line);border-radius:2px;margin-bottom:6px"><div style="height:100%;width:${pct}%;background:${col};border-radius:2px;transition:width .5s linear"></div></div>
-    <div style="font-size:.75rem;color:var(--mid);text-align:right;margin-bottom:4px">${atPerQLeft}s</div>`;
+  if(atTest.timerType==='perQuestion' && atQStartTime){
+    const elapsed = (Date.now() - atQStartTime) / 1000;
+    const remaining = Math.max(0, (atTest.timerValue||0) - elapsed);
+    const pct = Math.round(remaining / (atTest.timerValue||1) * 100);
+    const col = pct>33?'#6366f1':pct>15?'#f59e0b':'#ef4444';
+    timerBar = `<div style="padding:0 12px 4px;flex-shrink:0">
+      <div style="height:3px;background:var(--line);border-radius:2px;margin-bottom:4px">
+        <div style="height:100%;width:${pct}%;background:${col};border-radius:2px;transition:width .9s linear"></div>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:.72rem;color:${col};font-weight:600">
+        <span>This question</span><span>${Math.ceil(remaining)}s</span>
+      </div>
+    </div>`;
   }
 
-  // Report modal
-  let reportModal='';
-  if(atReportOpen===atQIdx){
-    reportModal=`<div style="position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:600;display:flex;align-items:flex-end">
-      <div style="background:var(--white);border-radius:14px 14px 0 0;padding:16px;width:100%;box-sizing:border-box">
-        <div style="font-weight:700;font-size:.9rem;margin-bottom:10px">🚩 Report Question ${atQIdx+1}</div>
-        <textarea id="at-report-note" placeholder="Describe the issue (optional)" style="width:100%;box-sizing:border-box;padding:8px;border:1.5px solid var(--line);border-radius:8px;font-size:.82rem;min-height:80px;resize:none;font-family:inherit"></textarea>
-        <div style="display:flex;gap:8px;margin-top:10px">
-          <button class="btn btn-dark btn-sm" id="btn-at-report-submit" style="flex:1;justify-content:center">Submit Report</button>
-          <button class="btn btn-ghost btn-sm" id="btn-at-report-cancel">Cancel</button>
+  // ── Auto-advance status banner ────────────────────────────────────────────
+  const advanceBanner = atAutoAdvancing
+    ? `<div style="position:fixed;bottom:66px;left:0;right:0;display:flex;justify-content:center;pointer-events:none;z-index:2">
+        <div style="background:#16a34a;color:#fff;font-size:.8rem;font-weight:700;padding:6px 16px;border-radius:20px;box-shadow:0 4px 12px rgba(22,163,74,.35);animation:popIn .18s cubic-bezier(.34,1.56,.64,1) both">
+          ✓ Saved — moving on…
+        </div>
+      </div>`
+    : '';
+
+  // ── Report modal — CLICK ONLY, no textarea ────────────────────────────────
+  let reportModal = '';
+  if(atReportOpen === atQIdx){
+    reportModal = `<div style="position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:600;display:flex;align-items:flex-end">
+      <div style="background:var(--white);border-radius:14px 14px 0 0;padding:20px 16px 28px;width:100%;box-sizing:border-box">
+        <div style="font-size:1.2rem;text-align:center;margin-bottom:8px">🚩</div>
+        <div style="font-weight:700;font-size:.9rem;text-align:center;margin-bottom:6px">Report Question ${atQIdx+1}</div>
+        <div style="font-size:.8rem;color:var(--mid);text-align:center;margin-bottom:16px;line-height:1.5">
+          This question will be flagged for the host to review.<br>No further input needed from you.
+        </div>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-dark btn-sm" id="btn-at-report-submit" style="flex:1;justify-content:center;padding:10px">Submit Report</button>
+          <button class="btn btn-ghost btn-sm" id="btn-at-report-cancel" style="padding:10px">Cancel</button>
         </div>
       </div>
     </div>`;
   }
 
+  // ── Last question? show mini submit nudge ─────────────────────────────────
+  const isLast = atQIdx === total - 1;
+  const allAnswered = answered === total;
+
   return `<div style="position:fixed;inset:0;background:var(--white);z-index:500;display:flex;flex-direction:column;overflow:hidden">
+
+    <!-- Header -->
     <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;border-bottom:1.5px solid var(--line);background:var(--faint);flex-shrink:0">
-      <div style="font-size:.8rem;color:var(--mid)">Q${atQIdx+1}/${total} · ${answered}/${total} answered</div>
-      <div style="font-weight:700;font-size:.85rem;max-width:50%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(atTest.title)}</div>
-      <button class="btn btn-ghost btn-sm" id="btn-at-quit" style="font-size:.75rem;padding:3px 8px">✕ Exit</button>
+      <div style="display:flex;flex-direction:column;gap:2px">
+        <div style="font-size:.78rem;font-weight:700;color:var(--ink)">Q${atQIdx+1} <span style="font-weight:400;color:var(--mid)">of ${total}</span></div>
+        <div style="display:flex;align-items:center;gap:3px;flex-wrap:wrap;max-width:180px">${bubbles}</div>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:center;gap:1px;flex-shrink:0">
+        <div style="font-size:.68rem;color:var(--mid);font-weight:600;text-transform:uppercase;letter-spacing:.06em">Answered</div>
+        <div style="font-size:1.1rem;font-weight:800;color:${answered===total?'#16a34a':'var(--ink)'}">${answered}<span style="font-size:.75rem;font-weight:500;color:var(--mid)">/${total}</span></div>
+      </div>
+      <button class="btn btn-ghost btn-sm" id="btn-at-quit" style="font-size:.75rem;padding:4px 10px">✕ Exit</button>
     </div>
-    ${timerBar?`<div style="padding:6px 12px 0;flex-shrink:0">${timerBar}</div>`:''}
-    <div style="flex:1;overflow-y:auto;padding:14px 14px 80px">
-      <div class="${urduCls(q)?'urdu':''}" style="font-size:.92rem;font-weight:500;line-height:1.55;margin-bottom:16px">${renderMath(q.text)}</div>
-      <div class="question-opts" style="display:flex;flex-direction:column;gap:8px">${opts}</div>
+
+    ${timerBar}
+
+    <!-- Question + Options -->
+    <div style="flex:1;overflow-y:auto;padding:16px 14px 90px">
+      <div class="${isUrdu?'urdu':''}" style="font-size:${isUrdu?'1rem':'.92rem'};font-weight:500;line-height:${isUrdu?'2.4':'1.55'};margin-bottom:18px;${isUrdu?'direction:rtl;text-align:right;':''}">
+        ${renderMath(q.text)}
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px">${opts}</div>
+
+      ${isLast && allAnswered && !atAutoAdvancing
+        ? `<div style="margin-top:20px;padding:12px 14px;background:#f0fdf4;border:1.5px solid #86efac;border-radius:10px;display:flex;align-items:center;gap:10px">
+            <span style="font-size:1.2rem">✅</span>
+            <div style="flex:1;font-size:.82rem;color:#166534">All questions answered! Submitting automatically…</div>
+          </div>`
+        : isLast && !atAutoAdvancing
+          ? `<div style="margin-top:20px;padding:10px 14px;background:var(--faint);border:1.5px dashed var(--line);border-radius:10px;font-size:.8rem;color:var(--mid);text-align:center">
+              Last question — select an answer to submit the test
+            </div>`
+          : ''}
     </div>
-    <div style="position:fixed;bottom:0;left:0;right:0;padding:10px 14px;background:var(--white);border-top:1.5px solid var(--line);display:flex;gap:8px;z-index:1">
-      <button class="btn btn-ghost btn-sm" id="btn-at-prev" style="padding:7px 14px" ${atQIdx===0?'disabled':''}>← Prev</button>
-      <button class="btn btn-ghost btn-sm" id="btn-at-flag" title="Report question" style="padding:7px 10px">🚩</button>
-      ${atQIdx<total-1
-        ?`<button class="btn btn-dark btn-sm" id="btn-at-next" style="flex:1;justify-content:center">Next →</button>`
-        :`<button class="btn btn-sm" id="btn-at-submit" style="flex:1;justify-content:center;background:#16a34a;color:#fff;border-color:#16a34a">✓ Submit Test</button>`}
+
+    <!-- Bottom bar: flag only (no Prev/Next/Submit) -->
+    <div style="position:fixed;bottom:0;left:0;right:0;padding:10px 14px;background:var(--white);border-top:1.5px solid var(--line);display:flex;align-items:center;justify-content:space-between;z-index:1">
+      <button class="btn btn-ghost btn-sm" id="btn-at-flag" style="gap:6px;font-size:.8rem;color:var(--mid)">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>
+        Report
+      </button>
+      <div style="font-size:.75rem;color:var(--mid)">
+        ${atAutoAdvancing ? '⏳ Moving to next…' : selectedIdx!==null&&selectedIdx!==undefined ? '✓ Answer selected' : 'Tap an option to answer'}
+      </div>
+      ${isLast && !atAutoAdvancing && answered===total
+        ? `<button class="btn btn-sm" id="btn-at-submit" style="background:#16a34a;color:#fff;border-color:#16a34a;font-size:.8rem;padding:6px 14px">Submit ✓</button>`
+        : `<div style="width:72px"></div>`}
     </div>
+
+    ${advanceBanner}
     ${reportModal}
   </div>`;
 }
@@ -2870,70 +2973,107 @@ function attach(){
   on('btn-at-tab-available', ()=>{ availTestsTab='available'; render(); });
   on('btn-at-tab-attempted', ()=>{ availTestsTab='attempted'; render(); });
 
-  // Start a test
+  // ── Start a test ─────────────────────────────────────────────────────────
   document.querySelectorAll('.at-start-btn').forEach(btn=>btn.addEventListener('click',async()=>{
-    const testId=btn.dataset.testId;
+    const testId = btn.dataset.testId;
     try{
-      const r=await fetch('/api/tests/'+testId+'/take',{headers:{Authorization:'Bearer '+authToken}});
-      if(r.status===409){ showToast('Already submitted this test','neutral'); return; }
-      const {test}=await r.json();
+      const r = await fetch('/api/tests/'+testId+'/take', {headers:{Authorization:'Bearer '+authToken}});
+      const data = await r.json();
+      if(r.status===409 && !data.test){
+        showToast('Already submitted — you can re-attempt below','neutral'); return;
+      }
+      const test = data.test;
       atTest=test; atQIdx=0; atAnswers=new Array(test.questions.length).fill(null);
-      atReportOpen=-1;
-      // Start timers
-      if(test.timerType==='total'){ atTimeLeft=test.timerValue||0; atPerQLeft=0; }
-      else if(test.timerType==='perQuestion'){ atPerQLeft=test.timerValue||0; atTimeLeft=0; }
+      atReportOpen=-1; atAutoAdvancing=false;
+
+      // ── Server-backed timer anchors ────────────────────────────────────────
+      // Use startedAt returned by server if available; else anchor to now.
+      atStartTime = test.startedAt ? new Date(test.startedAt).getTime() : Date.now();
+      atQStartTime = Date.now();
+
       if(atTimerHandle){ clearInterval(atTimerHandle); atTimerHandle=null; }
-      if(test.timerType==='total'||test.timerType==='perQuestion'){
-        atTimerHandle=setInterval(()=>{
-          if(test.timerType==='total'){
-            atTimeLeft=Math.max(0,atTimeLeft-1);
-            if(atTimeLeft===0){ clearInterval(atTimerHandle);atTimerHandle=null; doSubmitTest(); return; }
-          } else {
-            atPerQLeft=Math.max(0,atPerQLeft-1);
-            if(atPerQLeft===0){
-              // Auto-advance to next question or submit
-              if(atQIdx<atTest.questions.length-1){ atQIdx++; atPerQLeft=atTest.timerValue||0; }
-              else { clearInterval(atTimerHandle);atTimerHandle=null; doSubmitTest(); return; }
+
+      if(test.timerType==='total'){
+        // Tick every second; recompute remaining from absolute anchor (not a decrement)
+        atTimerHandle = setInterval(()=>{
+          const elapsed = (Date.now() - atStartTime) / 1000;
+          const remaining = Math.max(0, (test.timerValue||0) - elapsed);
+          atTimeLeft = Math.ceil(remaining);
+          if(remaining <= 0){ clearInterval(atTimerHandle); atTimerHandle=null; doSubmitTest(); return; }
+          render();
+        }, 1000);
+
+      } else if(test.timerType==='perQuestion'){
+        atTimerHandle = setInterval(()=>{
+          const elapsed = (Date.now() - atQStartTime) / 1000;
+          const remaining = Math.max(0, (test.timerValue||0) - elapsed);
+          atPerQLeft = Math.ceil(remaining);
+          if(remaining <= 0){
+            // Time's up on this question — lock it blank then auto-advance
+            if(atAnswers[atQIdx] === null) atAnswers[atQIdx] = undefined; // mark skipped
+            if(atQIdx < atTest.questions.length - 1){
+              atQIdx++;
+              atQStartTime = Date.now();
+            } else {
+              clearInterval(atTimerHandle); atTimerHandle=null;
+              doSubmitTest(); return;
             }
           }
           render();
-        },1000);
+        }, 1000);
       }
+
       render();
     }catch(e){ showToast('Failed to load test','bad'); }
   }));
 
-  // Test navigation
-  on('btn-at-prev', ()=>{ if(atQIdx>0){ atQIdx--; if(atTest?.timerType==='perQuestion') atPerQLeft=atTest.timerValue||0; render(); }});
-  on('btn-at-next', ()=>{ if(atTest&&atQIdx<atTest.questions.length-1){ atQIdx++; if(atTest.timerType==='perQuestion') atPerQLeft=atTest.timerValue||0; render(); }});
-
-  // Answer selection
+  // ── Answer selection — instant reveal + auto-advance ─────────────────────
   document.querySelectorAll('.at-opt').forEach(el=>el.addEventListener('click',()=>{
-    const idx=+el.dataset.atOpt;
-    atAnswers[atQIdx]=atAnswers[atQIdx]===idx?null:idx; // tap again to deselect
-    render();
+    if(atAutoAdvancing) return;                    // block double-tap during delay
+    const idx = parseInt(el.dataset.atOpt);
+    if(isNaN(idx)) return;
+    atAnswers[atQIdx] = idx;
+    atAutoAdvancing = true;
+    render();                                       // show green flash immediately
+
+    const delay = 700;
+    setTimeout(()=>{
+      atAutoAdvancing = false;
+      const total = atTest?.questions?.length || 0;
+      if(atQIdx < total - 1){
+        atQIdx++;
+        atQStartTime = Date.now();                 // reset per-question timer anchor
+        render();
+      } else {
+        // Last question answered — auto-submit
+        render();
+        setTimeout(()=>doSubmitTest(), 400);
+      }
+    }, delay);
   }));
 
-  // Submit
-  on('btn-at-submit', ()=>{
-    const unanswered=atAnswers.filter(a=>a===null||a===undefined).length;
-    if(unanswered>0&&!confirm(`${unanswered} question${unanswered>1?'s':''} unanswered. Submit anyway?`)) return;
-    doSubmitTest();
-  });
+  // ── Manual submit (only shown on last Q when all answered) ───────────────
+  on('btn-at-submit', ()=>{ doSubmitTest(); });
+
   on('btn-at-quit', ()=>{
-    if(confirm('Exit test? Progress will be lost.')){ atTest=null; atAnswers=[]; if(atTimerHandle){clearInterval(atTimerHandle);atTimerHandle=null;} render(); }
+    if(confirm('Exit test? Progress will be lost.')){
+      atTest=null; atAnswers=[]; atAutoAdvancing=false;
+      if(atTimerHandle){ clearInterval(atTimerHandle); atTimerHandle=null; }
+      render();
+    }
   });
 
-  // Question report in test
-  on('btn-at-flag', ()=>{ atReportOpen=atQIdx; render(); });
+  // ── Question report — CLICK ONLY, no textarea ─────────────────────────────
+  on('btn-at-flag',          ()=>{ atReportOpen=atQIdx; render(); });
   on('btn-at-report-cancel', ()=>{ atReportOpen=-1; render(); });
   on('btn-at-report-submit', async()=>{
-    const note=document.getElementById('at-report-note')?.value||'';
     try{
-      await fetch('/api/tests/'+atTest._id+'/report',{method:'POST',
+      await fetch('/api/tests/'+atTest._id+'/report',{
+        method:'POST',
         headers:{'Content-Type':'application/json','Authorization':'Bearer '+authToken},
-        body:JSON.stringify({questionIdx:atReportOpen,reportedAnswer:atAnswers[atReportOpen]??null,note})});
-      showToast('Report submitted. Thank you!','good');
+        body:JSON.stringify({questionIdx:atReportOpen, reportedAnswer:atAnswers[atReportOpen]??null, note:''})
+      });
+      showToast('Question reported — thanks!','good');
     }catch(e){ showToast('Failed to submit report','bad'); }
     atReportOpen=-1; render();
   });
