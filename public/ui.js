@@ -340,7 +340,8 @@ function atTestHTML(){
     </div>
   </div>`;
 }
-
+/* ══════════════════════════════════════
+   HALTED SCREEN
 ══════════════════════════════════════ */
 function haltedHTML(){
   const exiledSet=new Set(S.exiledPids||[]);
