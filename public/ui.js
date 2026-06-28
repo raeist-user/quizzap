@@ -259,132 +259,88 @@ function availTestsHTML(){
 /* ── Test Taking Interface ──────────────────────────────────────────────────── */
 function atTestHTML(){
   if(!atTest) return '';
-  const q      = atTest.questions[atQIdx];
-  const total  = atTest.questions.length;
-  const answered = atAnswers.filter(a=>a!==null&&a!==undefined).length;
-  const correctIdx = q.answer ?? q.correct ?? q.correctAnswer ?? -1; // server field
-  const isUrdu = urduCls(q);
+  const q          = atTest.questions[atQIdx];
+  const total      = atTest.questions.length;
+  const answered   = atAnswers.filter(a=>a!==null&&a!==undefined).length;
+  const myAnswer   = atAnswers[atQIdx]??null;
+  const effectiveAnswered = myAnswer !== null;
+  const revealed   = !!atRevealData;
+  const correct    = revealed ? atRevealData.correct : -1;
 
-  // ── Option cards with reveal colouring ───────────────────────────────────
+  // Options — identical class logic to live quiz questionViewHTML
   const opts = q.options.map((o,i)=>{
-    let border='1.5px solid var(--line)', bg='var(--white)', color='var(--ink)', opacity='1', pe='auto', badge='';
-    if(atRevealData){
-      const {chosen,correct,isCorrect}=atRevealData;
-      if(i===correct){
-        border='2px solid #16a34a'; bg='#f0fdf4'; color='#14532d';
-        badge=`<div style="font-size:.65rem;font-weight:700;color:#16a34a;background:#dcfce7;padding:1px 7px;border-radius:20px;flex-shrink:0">✓ Correct</div>`;
-      } else if(i===chosen && !isCorrect){
-        border='2px solid #dc2626'; bg='#fef2f2'; color='#7f1d1d';
-        badge=`<div style="font-size:.65rem;font-weight:700;color:#dc2626;background:#fee2e2;padding:1px 7px;border-radius:20px;flex-shrink:0">✗ Wrong</div>`;
-      } else {
-        opacity='.38';
-      }
-      pe='none';
-    } else {
-      const isChosen = atAnswers[atQIdx]===i;
-      if(isChosen){ border='2px solid #6366f1'; bg='#ede9fe'; pe='none'; }
-      if(atAutoAdvancing) pe='none';
+    let cls = 'opt-card';
+    if(revealed){
+      cls += ' locked';
+      if(i===myAnswer){ cls += (i===correct?' correct':' wrong-chosen'); }
+    } else if(effectiveAnswered){
+      cls += ' locked';
+      if(i===myAnswer) cls += ' chosen';
     }
-    return `<div class="at-opt" data-at-opt="${i}"
-      style="display:flex;align-items:center;gap:10px;padding:11px 12px;border-radius:10px;border:${border};background:${bg};color:${color};opacity:${opacity};pointer-events:${pe};cursor:${pe==='none'?'default':'pointer'};transition:border .12s,background .12s">
-      <div style="width:26px;height:26px;border-radius:50%;background:rgba(99,102,241,.09);display:flex;align-items:center;justify-content:center;font-size:.75rem;font-weight:700;flex-shrink:0">${'ABCD'[i]}</div>
-      <span class="${urduCls({text:o})}" style="flex:1;font-size:.88rem;line-height:1.45">${renderMath(o)}</span>
-      ${badge}
-    </div>`;
+    return `<div class="${cls}" data-at-opt="${i}"><div class="opt-key">${'ABCD'[i]}</div><span class="${urduCls(q)}">${renderMath(o)}</span></div>`;
   }).join('');
 
-  // ── Progress bubbles ──────────────────────────────────────────────────────
-  const bubbles = Array.from({length:total},(_,i)=>{
-    const isDone = atAnswers[i]!==null && atAnswers[i]!==undefined;
-    const isCur  = i===atQIdx;
-    const bg = isDone?'#16a34a':isCur?'#6366f1':'var(--line)';
-    const sz = isCur?'10px':'7px';
-    return `<div style="width:${sz};height:${sz};border-radius:50%;background:${bg};flex-shrink:0;transition:background .2s,width .15s,height .15s"></div>`;
-  }).join('');
+  // Notice — identical to live quiz
+  let notice = '';
+  if(revealed && effectiveAnswered){
+    const ok = myAnswer === correct;
+    notice = `<div class="notice ${ok?'n-good':'n-bad'} mt3">${ok ? '✓ Correct!' : `✗ Wrong. Correct: ${esc(q.options[correct]??'')}` }</div>`;
+  } else if(effectiveAnswered && !revealed){
+    notice = `<div class="notice n-neutral mt3">Answer locked — moving to next question…</div>`;
+  }
 
-  // ── Timer section (animated via RAF — only structure rendered here) ───────
-  let timerSection='';
-  const hasTimer = atTest.timerType==='total'||atTest.timerType==='perQuestion';
-  if(hasTimer){
-    // Initial values (RAF takes over immediately after mount)
-    let initPct=100, initCol='#6366f1', initLabel='';
-    if(atTest.timerType==='total'&&atStartTime){
+  // Report button — same style as live quiz, always below options
+  const reportRow = `<div style="text-align:center;margin-top:14px">
+    <button class="btn btn-ghost btn-sm at-report-btn" data-q-idx="${atQIdx}"
+      style="color:var(--mid);font-size:.73rem;gap:5px;padding:5px 13px;border-color:var(--line)">
+      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>
+      Report wrong answer
+    </button>
+  </div>`;
+
+  // Timer — same .timer-wrap markup as live quiz
+  let timerSection = '';
+  if(atTest.timerType !== 'none'){
+    let initPct=100, initSecs='';
+    if(atTest.timerType==='total' && atStartTime){
       const rem=Math.max(0,(atTest.timerValue||0)-(Date.now()-atStartTime)/1000);
       initPct=rem/(atTest.timerValue||1)*100;
-      initCol=initPct>33?'#6366f1':initPct>15?'#f59e0b':'#ef4444';
       const mm=Math.floor(rem/60),ss=Math.floor(rem%60);
-      initLabel=`${mm}:${String(ss).padStart(2,'0')}`;
-    } else if(atTest.timerType==='perQuestion'&&atQStartTime){
+      initSecs=`${mm}:${String(ss).padStart(2,'0')}`;
+    } else if(atTest.timerType==='perQuestion' && atQStartTime){
       const rem=Math.max(0,(atTest.timerValue||0)-(Date.now()-atQStartTime)/1000);
       initPct=rem/(atTest.timerValue||1)*100;
-      initCol=initPct>33?'#6366f1':initPct>15?'#f59e0b':'#ef4444';
-      initLabel=`${Math.ceil(rem)}s`;
+      initSecs=`${Math.ceil(rem)}s`;
     }
-    timerSection=`<div style="padding:0 12px 5px;flex-shrink:0">
-      <div style="height:4px;background:var(--line);border-radius:2px;overflow:hidden">
-        <div id="at-timer-bar" style="height:100%;width:${Math.max(0,Math.min(100,initPct))}%;background:${initCol};border-radius:2px"></div>
-      </div>
-      <div style="display:flex;justify-content:space-between;margin-top:3px">
-        <span style="font-size:.68rem;color:var(--mid)">${atTest.timerType==='total'?'Time remaining':'This question'}</span>
-        <span id="at-timer-lbl" style="font-size:.72rem;font-weight:700;color:${initCol}">${initLabel}</span>
-      </div>
+    timerSection=`<div class="timer-wrap">
+      <div class="timer-bar-track"><div id="at-timer-bar" class="timer-bar-fill" style="width:${Math.max(0,Math.min(100,initPct))}%"></div></div>
+      <div id="at-timer-lbl" class="timer-digits">${initSecs}</div>
     </div>`;
   }
 
-  // ── Reveal overlay (covers options, shows result banner) ──────────────────
-  let revealBanner='';
-  if(atRevealData){
-    const {isCorrect}=atRevealData;
-    revealBanner=`<div style="margin-top:10px;padding:10px 14px;border-radius:10px;background:${isCorrect?'#f0fdf4':'#fef2f2'};border:1.5px solid ${isCorrect?'#86efac':'#fca5a5'};display:flex;align-items:center;gap:10px;animation:popIn .15s both">
-      <span style="font-size:1.5rem">${isCorrect?'✅':'❌'}</span>
-      <div style="font-size:.83rem;font-weight:700;color:${isCorrect?'#166534':'#991b1b'}">${isCorrect?'Correct!':'Wrong — see correct answer above'}</div>
-    </div>`;
-  }
+  // Progress bubbles
+  const bubbles = Array.from({length:total},(_,i)=>{
+    const isDone=atAnswers[i]!==null&&atAnswers[i]!==undefined;
+    const isCur=i===atQIdx;
+    return `<div style="width:${isCur?'9px':'6px'};height:${isCur?'9px':'6px'};border-radius:50%;background:${isDone?'#16a34a':isCur?'#6366f1':'var(--line)'};flex-shrink:0;transition:all .15s"></div>`;
+  }).join('');
 
   return `<div style="position:fixed;inset:0;background:var(--white);z-index:500;display:flex;flex-direction:column;overflow:hidden">
-
-    <!-- Header -->
-    <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;border-bottom:1.5px solid var(--line);background:var(--faint);flex-shrink:0">
-      <div>
-        <div style="font-size:.8rem;font-weight:700">Q${atQIdx+1}<span style="font-weight:400;color:var(--mid)">/${total}</span></div>
-        <div style="display:flex;gap:3px;align-items:center;flex-wrap:wrap;max-width:170px;margin-top:3px">${bubbles}</div>
-      </div>
-      <div style="font-size:.88rem;font-weight:700;color:var(--ink);text-align:center;flex:1;padding:0 8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(atTest.title)}</div>
-      <div style="text-align:right;flex-shrink:0">
-        <div style="font-size:.68rem;color:var(--mid);font-weight:600;text-transform:uppercase;letter-spacing:.04em">Answered</div>
-        <div style="font-size:1rem;font-weight:800;color:${answered===total?'#16a34a':'var(--ink)'}">${answered}<span style="font-size:.7rem;font-weight:400;color:var(--mid)">/${total}</span></div>
-      </div>
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:7px 13px;border-bottom:1.5px solid var(--line);background:var(--faint);flex-shrink:0">
+      <span class="small muted">Q${atQIdx+1}/${total}</span>
+      <div style="display:flex;gap:3px;align-items:center">${bubbles}</div>
+      <span class="small muted">Answered: <strong style="color:${answered===total?'#16a34a':'var(--ink)'}">${answered}/${total}</strong></span>
     </div>
-
     ${timerSection}
-
-    <!-- Scrollable question area -->
-    <div style="flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:14px 13px 30px">
-
-      <!-- Question text -->
-      <div class="${isUrdu?'urdu':''}" style="font-size:${isUrdu?'1.05rem':'.92rem'};font-weight:500;line-height:${isUrdu?'2.5':'1.6'};margin-bottom:16px;${isUrdu?'direction:rtl;text-align:right;':''}">
-        ${renderMath(q.text)}
-      </div>
-
-      <!-- Options -->
-      <div style="display:flex;flex-direction:column;gap:9px">${opts}</div>
-
-      <!-- Reveal result banner (right below options) -->
-      ${revealBanner}
-
-      <!-- Inline report button — no modal, no confirmation -->
-      ${!atRevealData?`<button class="btn btn-ghost btn-sm at-report-btn" data-q-idx="${atQIdx}"
-        style="margin-top:14px;width:100%;justify-content:center;font-size:.75rem;color:var(--mid);gap:5px;border-color:var(--line)">
-        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>
-        Report this question
-      </button>`:''}
-
+    <div class="page" style="overflow-y:auto;-webkit-overflow-scrolling:touch;flex:1">
+      <h2 class="mb3 ${urduCls(q)}" style="user-select:none;-webkit-user-select:none">${renderMath(q.text)}</h2>
+      <div class="opt-grid" style="user-select:none;-webkit-user-select:none">${opts}</div>
+      ${notice}
+      ${reportRow}
     </div>
   </div>`;
 }
 
-/* ══════════════════════════════════════
-   HALTED SCREEN (students)
 ══════════════════════════════════════ */
 function haltedHTML(){
   const exiledSet=new Set(S.exiledPids||[]);
