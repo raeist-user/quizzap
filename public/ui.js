@@ -289,8 +289,6 @@ function atTestHTML(){
   let notice = '';
   if(revealed){
     notice = `<div class="notice ${atRevealData.isCorrect?'n-good':'n-bad'} mt3">${atRevealData.isCorrect ? '✓ Correct!' : `✗ Wrong. Correct: ${esc(q.options[correctIdx]??'')}` }</div>`;
-  } else if(effectiveAnswered){
-    notice = `<div class="notice n-neutral mt3">Checking…</div>`;
   }
 
   // Report button — same style as live quiz, always below options, and always
