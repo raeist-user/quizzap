@@ -69,6 +69,7 @@ let availTests     = null;          // fetched list of active tests
 let myAttempts     = null;          // fetched list of my submitted attempts
 // Active attempt state
 let atTest         = null;
+let atAttemptId    = null;        // server-side TestAttempt._id backing the current attempt — lets a rejoin resume the SAME attempt
 let atAnswers      = [];
 let atQIdx         = 0;
 let atTimeLeft     = 0;
@@ -424,7 +425,7 @@ async function doSubmitTest(){
     const d=await r.json();
     if(!r.ok) throw new Error(d.error||'Submission failed');
     showToast(`✓ Submitted! Score: ${d.result?.score??'?'}/${d.result?.total??'?'}`,'good');
-    atTest=null; atAnswers=[];
+    atTest=null; atAttemptId=null; atAnswers=[];
     availTestsTab='attempted';
     await fetchMyAttempts();
   }catch(e){
@@ -2067,7 +2068,7 @@ function navPush(){
 // Intercept browser/phone back button
 window.addEventListener('popstate', ()=>{
   // If we're somewhere deep, go back one level
-  if(showingDismissed||showingProfile||role||showingHalted){
+  if(showingDismissed||showingProfile||role||showingHalted||atTest){
     doBack();
     // Re-push so the next back press also works
     history.pushState({qz:true}, '', location.href);

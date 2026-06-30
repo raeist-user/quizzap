@@ -187,22 +187,24 @@ function availTestsHTML(){
       const attemptedIds = new Set((myAttempts||[]).map(a=>(a.testId?._id||a.testId||'').toString()));
       return availTests.map(t=>{
         const isAttempted = attemptedIds.has(t._id.toString());
+        const isRejoin = !isAttempted && t.inProgress;
         const timerLabel = t.timerType==='total'?`⏱ ${Math.round(t.timerValue/60)} min total`
           :t.timerType==='perQuestion'?`⏱ ${t.timerValue}s / question`:'No timer';
-        return `<div class="at-card" data-test-id="${t._id}" style="${isAttempted?'filter:grayscale(1);opacity:.65;':''}">
+        return `<div class="at-card" data-test-id="${t._id}" style="${isAttempted?'filter:grayscale(1);opacity:.65;':''}${isRejoin?'border-color:#f59e0b;':''}">
           <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:8px">
             <div style="flex:1;min-width:0">
               <div style="font-weight:700;font-size:.9rem">${esc(t.title)}</div>
               ${t.subject?`<div style="font-size:.75rem;color:var(--mid);margin-top:1px">📚 ${esc(t.subject)}</div>`:''}
             </div>
-            <button class="btn btn-sm at-start-btn" data-test-id="${t._id}" style="flex-shrink:0;padding:5px 14px;font-size:.78rem;${isAttempted?'background:#9ca3af;border-color:#9ca3af;color:#fff;cursor:pointer;':'background:#4338ca;border-color:#4338ca;color:#fff;'}">
-              ${isAttempted?'Re-attempt':'Start →'}
+            <button class="btn btn-sm at-start-btn" data-test-id="${t._id}" style="flex-shrink:0;padding:5px 14px;font-size:.78rem;${isAttempted?'background:#9ca3af;border-color:#9ca3af;color:#fff;cursor:pointer;':isRejoin?'background:#f59e0b;border-color:#f59e0b;color:#fff;':'background:#4338ca;border-color:#4338ca;color:#fff;'}">
+              ${isAttempted?'Re-attempt':isRejoin?'↻ Rejoin':'Start →'}
             </button>
           </div>
           <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
             <span style="font-size:.72rem;background:var(--faint);padding:2px 8px;border-radius:20px;color:var(--mid)">${timerLabel}</span>
             <span style="font-size:.72rem;background:var(--faint);padding:2px 8px;border-radius:20px;color:var(--mid)">📝 ${t.questionCount||0} questions</span>
             ${isAttempted?`<span style="font-size:.72rem;background:#f3f4f6;padding:2px 8px;border-radius:20px;color:#6b7280;font-weight:600">✓ Submitted</span>`:''}
+            ${isRejoin?`<span style="font-size:.72rem;background:#fef3c7;padding:2px 8px;border-radius:20px;color:#92400e;font-weight:600">⏳ In progress — clock is still running</span>`:''}
           </div>
         </div>`;
       }).join('');
@@ -257,6 +259,10 @@ function availTestsHTML(){
 }
 
 /* ── Test Taking Interface ──────────────────────────────────────────────────── */
+// NOTE: this is a real test, not a live quiz — correctness is never disclosed
+// mid-attempt. Selecting an option locks it in and shows a neutral "locked"
+// notice for 3 s (report button stays visible the whole time) before the
+// question advances. See atAdvanceQuestion / atPersistProgress below.
 function atTestHTML(){
   if(!atTest) return '';
   const q          = atTest.questions[atQIdx];
@@ -264,32 +270,23 @@ function atTestHTML(){
   const answered   = atAnswers.filter(a=>a!==null&&a!==undefined).length;
   const myAnswer   = atAnswers[atQIdx]??null;
   const effectiveAnswered = myAnswer !== null;
-  const revealed   = !!atRevealData;
-  const correct    = revealed ? atRevealData.correct : -1;
 
-  // Options — identical class logic to live quiz questionViewHTML
   const opts = q.options.map((o,i)=>{
     let cls = 'opt-card';
-    if(revealed){
-      cls += ' locked';
-      if(i===myAnswer){ cls += (i===correct?' correct':' wrong-chosen'); }
-    } else if(effectiveAnswered){
+    if(effectiveAnswered){
       cls += ' locked';
       if(i===myAnswer) cls += ' chosen';
     }
     return `<div class="${cls}" data-at-opt="${i}"><div class="opt-key">${'ABCD'[i]}</div><span class="${urduCls(q)}">${renderMath(o)}</span></div>`;
   }).join('');
 
-  // Notice — identical to live quiz
   let notice = '';
-  if(revealed && effectiveAnswered){
-    const ok = myAnswer === correct;
-    notice = `<div class="notice ${ok?'n-good':'n-bad'} mt3">${ok ? '✓ Correct!' : `✗ Wrong. Correct: ${esc(q.options[correct]??'')}` }</div>`;
-  } else if(effectiveAnswered && !revealed){
+  if(effectiveAnswered){
     notice = `<div class="notice n-neutral mt3">Answer locked — moving to next question…</div>`;
   }
 
-  // Report button — same style as live quiz, always below options
+  // Report button — same style as live quiz, always below options, and always
+  // visible (including during the 3 s locked/advance window).
   const reportRow = `<div style="text-align:center;margin-top:14px">
     <button class="btn btn-ghost btn-sm at-report-btn" data-q-idx="${atQIdx}"
       style="color:var(--mid);font-size:.73rem;gap:5px;padding:5px 13px;border-color:var(--line)">
@@ -339,6 +336,51 @@ function atTestHTML(){
       ${reportRow}
     </div>
   </div>`;
+}
+
+// Moves from the current question to the next (or submits, if this was the
+// last one). Shared by: the 3 s post-answer pause, and a per-question timer
+// running out with nothing chosen.
+function atAdvanceQuestion(){
+  if(!atTest) return; // attempt may have already been auto-submitted server-side
+  atAutoAdvancing = false;
+  atRevealData = null;
+  atBeepedSeconds.clear();
+  const total = atTest.questions.length;
+  if(atQIdx < total-1){
+    atQIdx++;
+    atQStartTime = Date.now();
+    render();
+  } else {
+    render();
+    doSubmitTest();
+  }
+}
+
+// Fire-and-forget save of one answer to the server-side attempt. This is what
+// makes rejoining work: even if the student vanishes immediately after, the
+// server already knows this question is done. If the server reports the
+// attempt was auto-submitted in the meantime (time ran out), the test is
+// closed out locally too instead of carrying on against a dead attempt.
+function atPersistProgress(qIdx, answer){
+  if(!atTest || !atAttemptId) return;
+  fetch('/api/tests/'+atTest._id+'/progress',{
+    method:'POST',
+    headers:{'Content-Type':'application/json','Authorization':'Bearer '+authToken},
+    body:JSON.stringify({questionIdx:qIdx, answer:(answer===undefined?null:answer)})
+  }).then(async r=>{
+    if(r.status===409){
+      const d = await r.json().catch(()=>({}));
+      if(atTimerHandle){ clearInterval(atTimerHandle); atTimerHandle=null; }
+      window.removeEventListener('beforeunload', window._atUnloadGuard);
+      atTest=null; atAttemptId=null; atAnswers=[]; atRevealData=null; atAutoAdvancing=false; atBeepedSeconds=new Set();
+      showToast(`⏱ Time ran out — test was auto-submitted. Score: ${d.result?.score??'?'}/${d.result?.total??'?'}`,'neutral');
+      availTestsTab='attempted';
+      fetchMyAttempts();
+      fetchAvailTests();
+      render();
+    }
+  }).catch(()=>{}); // best-effort — local state already has the answer either way
 }
 /* ══════════════════════════════════════
    HALTED SCREEN
@@ -2890,27 +2932,53 @@ function attach(){
     availTestsOpen=true; availTestsTab='available'; availTests=null; myAttempts=null; render();
     fetchAvailTests(); fetchMyAttempts();
   });
-  on('btn-avail-tests-close', ()=>{ availTestsOpen=false; atTest=null; atAnswers=[]; if(atTimerHandle){clearInterval(atTimerHandle);atTimerHandle=null;} render(); });
+  on('btn-avail-tests-close', ()=>{ availTestsOpen=false; atTest=null; atAttemptId=null; atAnswers=[]; if(atTimerHandle){clearInterval(atTimerHandle);atTimerHandle=null;} render(); });
   on('btn-at-tab-available', ()=>{ availTestsTab='available'; render(); });
   on('btn-at-tab-attempted', ()=>{ availTestsTab='attempted'; render(); });
 
-  // ── Start a test ─────────────────────────────────────────────────────────
+  // ── Start / Rejoin a test ───────────────────────────────────────────────────
+  // The server always returns the SAME in-progress attempt for a given
+  // student+test (created on first Start, found again on every later tap of
+  // the now-renamed "Rejoin" button) — so closing the app, losing signal, or
+  // switching devices can never reset the clock or wipe answers already given.
   document.querySelectorAll('.at-start-btn').forEach(btn=>btn.addEventListener('click',async()=>{
     const testId = btn.dataset.testId;
     try{
       const r = await fetch('/api/tests/'+testId+'/take', {headers:{Authorization:'Bearer '+authToken}});
       const data = await r.json();
-      // 409 with a test object = re-attempt in progress; 409 without = already submitted fresh
-      if(r.status===409 && !data.test){ showToast('Already submitted','neutral'); return; }
-      const test = data.test;
-      atTest=test; atQIdx=0;
-      atAnswers=new Array(test.questions.length).fill(null);
+      if(r.status===409){
+        if(data.autoSubmitted){
+          showToast(`⏱ Time ran out while you were away — auto-submitted. Score: ${data.result?.score??'?'}/${data.result?.total??'?'}`,'neutral');
+          availTestsTab='attempted'; await fetchMyAttempts(); await fetchAvailTests();
+        } else {
+          showToast('Already submitted','neutral');
+        }
+        return;
+      }
+      const test = data.test, attempt = data.attempt;
+      atTest=test; atAttemptId=attempt.id;
+      atAnswers = test.questions.map((_,i)=> attempt.answers[i] ?? null);
       atReportOpen=-1; atAutoAdvancing=false; atRevealData=null;
       atBeepedSeconds=new Set();
 
-      // Server-backed anchor: prefer server's startedAt, fallback to now
-      atStartTime  = test.startedAt ? new Date(test.startedAt).getTime() : Date.now();
-      atQStartTime = Date.now();
+      // Server-backed anchor — identical on every rejoin, so the deadline never moves.
+      atStartTime = new Date(attempt.startedAt).getTime();
+
+      // Resume at the furthest question the server has on record. For a
+      // per-question timer, also catch up to wherever real elapsed time says
+      // we should be — this is what keeps questions "flipping" forward even
+      // if the student was gone for several question-slots' worth of time.
+      let startIdx = attempt.currentQIdx || 0;
+      if(test.timerType==='perQuestion' && test.timerValue>0){
+        const elapsedSlots = Math.floor((Date.now()-atStartTime)/1000/test.timerValue);
+        startIdx = Math.max(startIdx, elapsedSlots);
+      }
+      atQIdx = Math.min(Math.max(startIdx,0), test.questions.length-1);
+      atQStartTime = (test.timerType==='perQuestion')
+        ? atStartTime + atQIdx*test.timerValue*1000
+        : Date.now();
+
+      if(data.resuming) showToast('↻ Rejoined — picking up where you left off. The clock kept running.', 'neutral');
 
       // Prevent navigation / refresh while test is active
       window._atUnloadGuard = e=>{ e.preventDefault(); e.returnValue=''; return ''; };
@@ -2950,14 +3018,10 @@ function attach(){
               playBeep(s===1?1200:880, s===1?0.25:0.15);
             }
           }
-          if(rem <= 0){
-            atBeepedSeconds.clear(); // reset for next question
-            if(atAnswers[atQIdx]===null) atAnswers[atQIdx]=undefined; // mark skipped
-            if(atQIdx < atTest.questions.length-1){
-              atQIdx++; atQStartTime=Date.now(); render();
-            } else {
-              clearInterval(atTimerHandle); atTimerHandle=null; doSubmitTest();
-            }
+          if(rem <= 0 && !atAutoAdvancing){
+            atAutoAdvancing = true; // guard against double-fire
+            atPersistProgress(atQIdx, atAnswers[atQIdx] ?? null);
+            atAdvanceQuestion();
           }
         }, 500);
       }
@@ -2969,38 +3033,21 @@ function attach(){
     }catch(e){ showToast('Failed to load test','bad'); }
   }));
 
-  // ── Option tap — instant correct/wrong reveal for 2 s then auto-advance ──
-  document.querySelectorAll('.at-opt').forEach(el=>el.addEventListener('click',()=>{
-    if(atAutoAdvancing || atRevealData) return;
+  // ── Option tap — lock the answer, NO reveal, wait 3 s (report button stays
+  //    visible the whole time) then auto-advance. This is a test, not a live
+  //    quiz, so correctness is never disclosed mid-attempt. ──────────────────
+  document.querySelectorAll('.opt-card[data-at-opt]').forEach(el=>el.addEventListener('click',()=>{
+    if(!atTest || atAutoAdvancing) return;
     const chosen = parseInt(el.dataset.atOpt);
     if(isNaN(chosen)) return;
+    if(atAnswers[atQIdx]!==null && atAnswers[atQIdx]!==undefined) return; // already locked in
+
     atAnswers[atQIdx] = chosen;
-
-    // Find correct answer from question data
-    const q = atTest.questions[atQIdx];
-    const correct = q.answer ?? q.correct ?? q.correctAnswer ?? -1;
-    const isCorrect = chosen === correct;
-
-    atRevealData = {chosen, correct, isCorrect};
-    atAutoAdvancing = true;
+    atAutoAdvancing = true; // locks the UI + shows "Answer locked" notice + report button stays visible
+    atPersistProgress(atQIdx, chosen);
     render();
 
-    // After 2 s advance
-    setTimeout(()=>{
-      atRevealData = null;
-      atAutoAdvancing = false;
-      atBeepedSeconds.clear(); // reset per-Q beeps on advance
-      const total = atTest?.questions?.length||0;
-      if(atQIdx < total-1){
-        atQIdx++;
-        atQStartTime = Date.now();
-        render();
-      } else {
-        // Last question — auto-submit immediately
-        render();
-        doSubmitTest();
-      }
-    }, 2000);
+    setTimeout(atAdvanceQuestion, 3000);
   }));
 
   // ── Inline report — no modal, no confirmation, instant send ──────────────
@@ -3021,7 +3068,7 @@ function attach(){
   window._atCleanupTimer = ()=>{
     if(atTimerHandle){ clearInterval(atTimerHandle); atTimerHandle=null; }
     window.removeEventListener('beforeunload', window._atUnloadGuard);
-    atTest=null; atRevealData=null; atAutoAdvancing=false; atBeepedSeconds=new Set();
+    atTest=null; atAttemptId=null; atAnswers=[]; atRevealData=null; atAutoAdvancing=false; atBeepedSeconds=new Set();
   };
   on('go-join',  ()=>{
     role='participant';
@@ -3669,6 +3716,13 @@ function doLogout(){ clearAuth(); role=null; myPid=null; myName=null; hostAuthed
 
 /* Shared back navigation */
 function doBack(){
+  if(atTest){
+    if(!confirm('Your test is in progress — leaving now does NOT stop the timer. You can rejoin and pick up right where you left off, but any time that passes while you\'re away is still spent. Leave the test?')) return;
+    if(atTimerHandle){ clearInterval(atTimerHandle); atTimerHandle=null; }
+    window.removeEventListener('beforeunload', window._atUnloadGuard);
+    atTest=null; atAttemptId=null; atAnswers=[]; atRevealData=null; atAutoAdvancing=false; atBeepedSeconds=new Set();
+    render(); return;
+  }
   if(showingDismissed){ doDismissHome(); return; }
   if(inspectingUser){ inspectingUser=null; inspectTab='overview'; inspectCache=null; render(); return; }
   if(showingProfile){
