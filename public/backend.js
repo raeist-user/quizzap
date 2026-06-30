@@ -97,6 +97,16 @@ function playBeep(freq=880, dur=0.18){
   }catch(e){}
 }
 
+// ── Result sound: cheerful two-note chime for correct, single low buzz for wrong
+function playResultSound(isCorrect){
+  if(isCorrect){
+    playBeep(1046, 0.14);
+    setTimeout(()=>playBeep(1568, 0.18), 90);
+  } else {
+    playBeep(220, 0.35);
+  }
+}
+
 // ── Smooth timer RAF loop ─────────────────────────────────────────────────
 // Updates the timer bar + label at ~60 fps without a full re-render.
 function atTimerRAF(){

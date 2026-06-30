@@ -259,10 +259,10 @@ function availTestsHTML(){
 }
 
 /* ── Test Taking Interface ──────────────────────────────────────────────────── */
-// NOTE: this is a real test, not a live quiz — correctness is never disclosed
-// mid-attempt. Selecting an option locks it in and shows a neutral "locked"
-// notice for 3 s (report button stays visible the whole time) before the
-// question advances. See atAdvanceQuestion / atPersistProgress below.
+// Selecting an option immediately reveals correct/wrong (green/red + a sound),
+// matching live-quiz style. The report button stays visible the whole time,
+// including during the 3 s pause before the next question loads automatically.
+// See atAdvanceQuestion / atPersistProgress below.
 function atTestHTML(){
   if(!atTest) return '';
   const q          = atTest.questions[atQIdx];
@@ -270,10 +270,16 @@ function atTestHTML(){
   const answered   = atAnswers.filter(a=>a!==null&&a!==undefined).length;
   const myAnswer   = atAnswers[atQIdx]??null;
   const effectiveAnswered = myAnswer !== null;
+  const revealed   = !!atRevealData;
+  const correctIdx = revealed ? atRevealData.correct : -1;
 
   const opts = q.options.map((o,i)=>{
     let cls = 'opt-card';
-    if(effectiveAnswered){
+    if(revealed){
+      cls += ' locked';
+      if(i===myAnswer){ cls += (i===correctIdx?' correct':' wrong-chosen'); }
+      else if(i===correctIdx){ cls += ' correct'; }
+    } else if(effectiveAnswered){
       cls += ' locked';
       if(i===myAnswer) cls += ' chosen';
     }
@@ -281,8 +287,10 @@ function atTestHTML(){
   }).join('');
 
   let notice = '';
-  if(effectiveAnswered){
-    notice = `<div class="notice n-neutral mt3">Answer locked — moving to next question…</div>`;
+  if(revealed){
+    notice = `<div class="notice ${atRevealData.isCorrect?'n-good':'n-bad'} mt3">${atRevealData.isCorrect ? '✓ Correct!' : `✗ Wrong. Correct: ${esc(q.options[correctIdx]??'')}` }</div>`;
+  } else if(effectiveAnswered){
+    notice = `<div class="notice n-neutral mt3">Checking…</div>`;
   }
 
   // Report button — same style as live quiz, always below options, and always
@@ -357,18 +365,21 @@ function atAdvanceQuestion(){
   }
 }
 
-// Fire-and-forget save of one answer to the server-side attempt. This is what
-// makes rejoining work: even if the student vanishes immediately after, the
-// server already knows this question is done. If the server reports the
-// attempt was auto-submitted in the meantime (time ran out), the test is
-// closed out locally too instead of carrying on against a dead attempt.
-function atPersistProgress(qIdx, answer){
-  if(!atTest || !atAttemptId) return;
-  fetch('/api/tests/'+atTest._id+'/progress',{
-    method:'POST',
-    headers:{'Content-Type':'application/json','Authorization':'Bearer '+authToken},
-    body:JSON.stringify({questionIdx:qIdx, answer:(answer===undefined?null:answer)})
-  }).then(async r=>{
+// Saves one answer to the server-side attempt AND returns the server's
+// correctness verdict for it (used to drive the immediate green/red reveal).
+// This is also what makes rejoining work: even if the student vanishes right
+// after answering, the server already has this question recorded. If the
+// server reports the attempt was auto-submitted in the meantime (time ran
+// out), the test is closed out locally too instead of carrying on against a
+// dead attempt — in that case this resolves to null.
+async function atPersistProgress(qIdx, answer){
+  if(!atTest || !atAttemptId) return null;
+  try{
+    const r = await fetch('/api/tests/'+atTest._id+'/progress',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+authToken},
+      body:JSON.stringify({questionIdx:qIdx, answer:(answer===undefined?null:answer)})
+    });
     if(r.status===409){
       const d = await r.json().catch(()=>({}));
       if(atTimerHandle){ clearInterval(atTimerHandle); atTimerHandle=null; }
@@ -379,8 +390,11 @@ function atPersistProgress(qIdx, answer){
       fetchMyAttempts();
       fetchAvailTests();
       render();
+      return null;
     }
-  }).catch(()=>{}); // best-effort — local state already has the answer either way
+    const d = await r.json().catch(()=>({}));
+    return d.reveal || null;
+  }catch(e){ return null; } // network hiccup — local state still has the answer either way
 }
 /* ══════════════════════════════════════
    HALTED SCREEN
@@ -3033,18 +3047,25 @@ function attach(){
     }catch(e){ showToast('Failed to load test','bad'); }
   }));
 
-  // ── Option tap — lock the answer, NO reveal, wait 3 s (report button stays
-  //    visible the whole time) then auto-advance. This is a test, not a live
-  //    quiz, so correctness is never disclosed mid-attempt. ──────────────────
-  document.querySelectorAll('.opt-card[data-at-opt]').forEach(el=>el.addEventListener('click',()=>{
+  // ── Option tap — immediate green/red reveal + sound, then a 3 s pause
+  //    (report button stays visible the whole time) before auto-advancing. ──
+  document.querySelectorAll('.opt-card[data-at-opt]').forEach(el=>el.addEventListener('click', async ()=>{
     if(!atTest || atAutoAdvancing) return;
     const chosen = parseInt(el.dataset.atOpt);
     if(isNaN(chosen)) return;
     if(atAnswers[atQIdx]!==null && atAnswers[atQIdx]!==undefined) return; // already locked in
 
     atAnswers[atQIdx] = chosen;
-    atAutoAdvancing = true; // locks the UI + shows "Answer locked" notice + report button stays visible
-    atPersistProgress(atQIdx, chosen);
+    atAutoAdvancing = true; // lock the UI while we wait for the server's verdict
+    render();
+
+    const reveal = await atPersistProgress(atQIdx, chosen);
+    if(!atTest) return; // attempt got closed out (e.g. time ran out) while we were waiting
+
+    if(reveal){
+      atRevealData = {chosen, correct:reveal.correctIndex, isCorrect:reveal.isCorrect};
+      playResultSound(reveal.isCorrect);
+    }
     render();
 
     setTimeout(atAdvanceQuestion, 3000);
