@@ -740,8 +740,13 @@ function initRoutes(app) {
       const existingDone = await TestAttempt.findOne({ testId: req.params.id, userId: req.user.id, completed: true });
       if (existingDone) return res.status(409).json({ error: 'Already submitted', attemptId: existingDone._id });
 
-      // Strip correct answers — never sent to student
-      const questions = test.questions.map(q => ({ text: q.text, options: q.options }));
+      // Correct answers are now sent along with the test so the client can
+      // reveal right/wrong the instant a student taps an option, with no
+      // network round-trip in between. This is purely cosmetic feedback —
+      // the score that actually counts is always recomputed server-side
+      // from the saved answers when the attempt is finalized (see
+      // finalizeAttempt), so a tampered client display can't change a grade.
+      const questions = test.questions;
 
       let attempt = await TestAttempt.findOne({ testId: req.params.id, userId: req.user.id, completed: false });
 
@@ -798,14 +803,7 @@ function initRoutes(app) {
       }
       attempt.currentQIdx = Math.max(attempt.currentQIdx, questionIdx + 1);
       await attempt.save();
-
-      // Reveal correctness for THIS question only, now that the student has
-      // committed to an answer — never sent for unanswered/future questions.
-      const q = test ? test.questions[questionIdx] : null;
-      const reveal = (q && answer !== null && answer !== undefined)
-        ? { isCorrect: answer === q.correct, correctIndex: q.correct }
-        : null;
-      res.json({ ok: true, reveal });
+      res.json({ ok: true });
     } catch (e) { res.status(500).json({ error: e.message }); }
   });
 
