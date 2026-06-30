@@ -147,6 +147,12 @@ const testAttemptSchema = new mongoose.Schema({
   startedAt:  { type: Date, default: Date.now },
   submittedAt:{ type: Date, default: null },
   completed:  { type: Boolean, default: false },
+  // Tracks furthest question reached — lets a rejoining student resume exactly
+  // where they left off, and lets the server know how far the clock has run.
+  currentQIdx:{ type: Number, default: 0 },
+  // True once an attempt was closed out automatically by the server because
+  // its time budget ran out while the student was away (no exit loophole).
+  autoSubmitted: { type: Boolean, default: false },
   // Question-level reports submitted during this attempt
   reports:    [{
     questionIdx: Number,
@@ -155,6 +161,9 @@ const testAttemptSchema = new mongoose.Schema({
     ts: { type: Date, default: Date.now },
   }],
 });
+// One in-progress (or completed) attempt per student per test — fast lookup
+// for resume/rejoin checks on the available-tests list and on /take.
+testAttemptSchema.index({ testId: 1, userId: 1 });
 const TestAttempt = mongoose.model('TestAttempt', testAttemptSchema);
 
 // ── QUESTION REPORTS ──────────────────────────────────────────────────────────

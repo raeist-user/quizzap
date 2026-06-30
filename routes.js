@@ -31,8 +31,67 @@ function requireHost(req, res, next) {
   } catch { res.status(401).json({ error: 'Invalid token' }); }
 }
 
+// ── PLANNED TEST HELPERS ──────────────────────────────────────────────────────
+// Returns the wall-clock timestamp (ms) at which an attempt must be auto-closed,
+// or null if the test has no time limit. Anchored to the attempt's original
+// startedAt so leaving/rejoining can never extend the clock.
+function attemptDeadline(test, startedAt) {
+  const started = new Date(startedAt).getTime();
+  if (test.timerType === 'total') return started + (test.timerValue || 0) * 1000;
+  if (test.timerType === 'perQuestion') return started + (test.timerValue || 0) * (test.questions?.length || 0) * 1000;
+  return null; // 'none' — no deadline
+}
+
+// Scores whatever answers are on the attempt and marks it completed. Used both
+// for normal submissions and for server-side auto-submission of attempts whose
+// time ran out while the student was disconnected.
+async function finalizeAttempt(attempt, test, { auto = false } = {}) {
+  let correct = 0, incorrect = 0, skipped = 0;
+  test.questions.forEach((q, i) => {
+    const a = attempt.answers[i];
+    if (a === null || a === undefined) skipped++;
+    else if (a === q.correct) correct++;
+    else incorrect++;
+  });
+  attempt.correct = correct;
+  attempt.incorrect = incorrect;
+  attempt.skipped = skipped;
+  attempt.score = correct;
+  attempt.completed = true;
+  attempt.submittedAt = new Date();
+  attempt.autoSubmitted = auto;
+  await attempt.save();
+  return { correct, incorrect, skipped, score: correct, total: test.questions.length };
+}
+
+// Periodic sweep: closes out any in-progress attempt whose time budget has
+// expired, even if the student never reopens the app. This is what makes the
+// "leave and the test just sits there" loophole impossible — the clock keeps
+// running and the test gets force-submitted on schedule regardless of presence.
+async function sweepExpiredAttempts() {
+  try {
+    const inProgress = await TestAttempt.find({ completed: false }).lean();
+    if (!inProgress.length) return;
+    const testIds = [...new Set(inProgress.map(a => a.testId.toString()))];
+    const tests = await PlannedTest.find({ _id: { $in: testIds } }).lean();
+    const testMap = new Map(tests.map(t => [t._id.toString(), t]));
+    for (const a of inProgress) {
+      const test = testMap.get(a.testId.toString());
+      if (!test) continue;
+      const deadline = attemptDeadline(test, a.startedAt);
+      if (deadline !== null && Date.now() > deadline) {
+        const doc = await TestAttempt.findById(a._id);
+        if (doc && !doc.completed) await finalizeAttempt(doc, test, { auto: true });
+      }
+    }
+  } catch (e) { console.warn('[Tests] sweep error:', e.message); }
+}
+
 // ── ROUTE REGISTRATION ────────────────────────────────────────────────────────
 function initRoutes(app) {
+  // Run every 20 s — frequent enough that a student can never sit on an
+  // expired/unattended test for long, cheap enough not to matter at this scale.
+  setInterval(sweepExpiredAttempts, 20 * 1000);
 
   // ── AUTH ────────────────────────────────────────────────────────────────────
 
@@ -651,22 +710,95 @@ function initRoutes(app) {
       const tests = await PlannedTest.find({ status: 'active' })
         .select('title subject timerType timerValue questions createdAt sourceRepo')
         .lean();
-      const questionCounts = tests.map(t => ({ ...t, questionCount: t.questions?.length || 0, questions: undefined }));
+      // Which of these does this student already have an unfinished attempt on?
+      // Drives the Start → Rejoin button swap on the client.
+      const myAttempts = await TestAttempt.find({
+        userId: req.user.id, completed: false, testId: { $in: tests.map(t => t._id) },
+      }).select('testId').lean();
+      const inProgressSet = new Set(myAttempts.map(a => a.testId.toString()));
+      const questionCounts = tests.map(t => ({
+        ...t,
+        questionCount: t.questions?.length || 0,
+        questions: undefined,
+        inProgress: inProgressSet.has(t._id.toString()),
+      }));
       res.json({ tests: questionCounts });
     } catch (e) { res.status(500).json({ error: e.message }); }
   });
 
-  // ── Student: start / get a test to attempt ────────────────────────────────
+  // ── Student: start / resume a test ─────────────────────────────────────────
+  // Idempotent: calling this again for a test the student already started
+  // (rejoin after closing the browser, switching apps, losing connection, etc.)
+  // returns the SAME attempt — same startedAt, same saved answers — so the
+  // clock can never be reset and progress is never lost. If the time budget
+  // ran out while they were away, it is auto-submitted here instead.
   app.get('/api/tests/:id/take', requireAuth, async (req, res) => {
     try {
       const test = await PlannedTest.findById(req.params.id).lean();
       if (!test || test.status !== 'active') return res.status(404).json({ error: 'Test not available' });
-      // Check if already completed
-      const existing = await TestAttempt.findOne({ testId: req.params.id, userId: req.user.id, completed: true });
-      if (existing) return res.status(409).json({ error: 'Already submitted', attemptId: existing._id });
+
+      const existingDone = await TestAttempt.findOne({ testId: req.params.id, userId: req.user.id, completed: true });
+      if (existingDone) return res.status(409).json({ error: 'Already submitted', attemptId: existingDone._id });
+
       // Strip correct answers — never sent to student
       const questions = test.questions.map(q => ({ text: q.text, options: q.options }));
-      res.json({ test: { ...test, questions } });
+
+      let attempt = await TestAttempt.findOne({ testId: req.params.id, userId: req.user.id, completed: false });
+
+      if (attempt) {
+        const deadline = attemptDeadline(test, attempt.startedAt);
+        if (deadline !== null && Date.now() > deadline) {
+          const result = await finalizeAttempt(attempt, test, { auto: true });
+          return res.status(409).json({ error: 'Time ran out while you were away — test was auto-submitted', autoSubmitted: true, result });
+        }
+        // Resume exactly where they left off.
+        return res.json({
+          test: { ...test, questions },
+          attempt: { id: attempt._id, startedAt: attempt.startedAt, answers: attempt.answers, currentQIdx: attempt.currentQIdx },
+          resuming: true,
+        });
+      }
+
+      attempt = await TestAttempt.create({
+        testId: req.params.id,
+        userId: req.user.id,
+        userName: req.user.name,
+        answers: new Array(test.questions.length).fill(null),
+        startedAt: new Date(),
+        currentQIdx: 0,
+        completed: false,
+      });
+      res.json({
+        test: { ...test, questions },
+        attempt: { id: attempt._id, startedAt: attempt.startedAt, answers: attempt.answers, currentQIdx: attempt.currentQIdx },
+        resuming: false,
+      });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+  });
+
+  // ── Student: save progress on one question (locks in answer, marks furthest
+  //    question reached) — called after every answer so a rejoin can resume
+  //    mid-test even if the student never gets to hit Submit themselves. ──────
+  app.post('/api/tests/:id/progress', requireAuth, async (req, res) => {
+    try {
+      const { questionIdx, answer } = req.body;
+      if (typeof questionIdx !== 'number') return res.status(400).json({ error: 'questionIdx required' });
+      const attempt = await TestAttempt.findOne({ testId: req.params.id, userId: req.user.id, completed: false });
+      if (!attempt) return res.status(404).json({ error: 'No active attempt' });
+      const test = await PlannedTest.findById(req.params.id).lean();
+      if (test) {
+        const deadline = attemptDeadline(test, attempt.startedAt);
+        if (deadline !== null && Date.now() > deadline) {
+          const result = await finalizeAttempt(attempt, test, { auto: true });
+          return res.status(409).json({ error: 'Time ran out — test was auto-submitted', autoSubmitted: true, result });
+        }
+      }
+      if (questionIdx >= 0 && questionIdx < attempt.answers.length) {
+        attempt.answers[questionIdx] = (answer === null || answer === undefined) ? null : answer;
+      }
+      attempt.currentQIdx = Math.max(attempt.currentQIdx, questionIdx + 1);
+      await attempt.save();
+      res.json({ ok: true });
     } catch (e) { res.status(500).json({ error: e.message }); }
   });
 
@@ -675,31 +807,30 @@ function initRoutes(app) {
     try {
       const test = await PlannedTest.findById(req.params.id).lean();
       if (!test || test.status !== 'active') return res.status(404).json({ error: 'Test not available' });
-      const existing = await TestAttempt.findOne({ testId: req.params.id, userId: req.user.id, completed: true });
-      if (existing) return res.status(409).json({ error: 'Already submitted' });
+
+      let attempt = await TestAttempt.findOne({ testId: req.params.id, userId: req.user.id, completed: false });
+      const existingDone = await TestAttempt.findOne({ testId: req.params.id, userId: req.user.id, completed: true });
+      if (existingDone) return res.status(409).json({ error: 'Already submitted' });
 
       const { answers } = req.body; // array of number|null, length == questions.length
       if (!Array.isArray(answers) || answers.length !== test.questions.length)
         return res.status(400).json({ error: 'Answers array length mismatch' });
 
-      let correct = 0, incorrect = 0, skipped = 0;
-      test.questions.forEach((q, i) => {
-        if (answers[i] === null || answers[i] === undefined) { skipped++; }
-        else if (answers[i] === q.correct) { correct++; }
-        else { incorrect++; }
-      });
+      // Normally an attempt was created on /take and tracked via /progress —
+      // finalize that same record so the original startedAt (and the time
+      // limit anchored to it) is preserved. Only fabricate a new one as a
+      // defensive fallback if somehow no attempt record exists.
+      if (!attempt) {
+        attempt = await TestAttempt.create({
+          testId: req.params.id, userId: req.user.id, userName: req.user.name,
+          answers, startedAt: new Date(), currentQIdx: test.questions.length, completed: false,
+        });
+      } else {
+        attempt.answers = answers;
+      }
 
-      const attempt = await TestAttempt.create({
-        testId: req.params.id,
-        userId: req.user.id,
-        userName: req.user.name,
-        answers,
-        correct, incorrect, skipped,
-        score: correct,
-        submittedAt: new Date(),
-        completed: true,
-      });
-      res.json({ ok: true, result: { correct, incorrect, skipped, score: correct, total: test.questions.length } });
+      const result = await finalizeAttempt(attempt, test, { auto: false });
+      res.json({ ok: true, result });
     } catch (e) { res.status(500).json({ error: e.message }); }
   });
 
