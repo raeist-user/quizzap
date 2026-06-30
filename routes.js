@@ -798,7 +798,14 @@ function initRoutes(app) {
       }
       attempt.currentQIdx = Math.max(attempt.currentQIdx, questionIdx + 1);
       await attempt.save();
-      res.json({ ok: true });
+
+      // Reveal correctness for THIS question only, now that the student has
+      // committed to an answer — never sent for unanswered/future questions.
+      const q = test ? test.questions[questionIdx] : null;
+      const reveal = (q && answer !== null && answer !== undefined)
+        ? { isCorrect: answer === q.correct, correctIndex: q.correct }
+        : null;
+      res.json({ ok: true, reveal });
     } catch (e) { res.status(500).json({ error: e.message }); }
   });
 
