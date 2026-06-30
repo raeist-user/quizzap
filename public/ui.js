@@ -363,15 +363,15 @@ function atAdvanceQuestion(){
   }
 }
 
-// Saves one answer to the server-side attempt AND returns the server's
-// correctness verdict for it (used to drive the immediate green/red reveal).
-// This is also what makes rejoining work: even if the student vanishes right
-// after answering, the server already has this question recorded. If the
-// server reports the attempt was auto-submitted in the meantime (time ran
-// out), the test is closed out locally too instead of carrying on against a
-// dead attempt — in that case this resolves to null.
+// Saves one answer to the server-side attempt in the background — this is
+// what makes rejoining work, since even if the student vanishes right after
+// answering, the server already has this question recorded. Reveal itself is
+// computed locally and instantly (see the click handler above); this call
+// doesn't gate it. If the server reports the attempt was auto-submitted in
+// the meantime (time ran out), the test is closed out locally too instead of
+// carrying on against a dead attempt.
 async function atPersistProgress(qIdx, answer){
-  if(!atTest || !atAttemptId) return null;
+  if(!atTest || !atAttemptId) return;
   try{
     const r = await fetch('/api/tests/'+atTest._id+'/progress',{
       method:'POST',
@@ -388,11 +388,8 @@ async function atPersistProgress(qIdx, answer){
       fetchMyAttempts();
       fetchAvailTests();
       render();
-      return null;
     }
-    const d = await r.json().catch(()=>({}));
-    return d.reveal || null;
-  }catch(e){ return null; } // network hiccup — local state still has the answer either way
+  }catch(e){ /* network hiccup — best effort; server sweep + next progress call will catch up */ }
 }
 /* ══════════════════════════════════════
    HALTED SCREEN
@@ -3045,26 +3042,25 @@ function attach(){
     }catch(e){ showToast('Failed to load test','bad'); }
   }));
 
-  // ── Option tap — immediate green/red reveal + sound, then a 3 s pause
-  //    (report button stays visible the whole time) before auto-advancing. ──
-  document.querySelectorAll('.opt-card[data-at-opt]').forEach(el=>el.addEventListener('click', async ()=>{
+  // ── Option tap — instant green/red reveal + sound (no network wait), then
+  //    a 3 s pause (report button stays visible) before auto-advancing. ──────
+  document.querySelectorAll('.opt-card[data-at-opt]').forEach(el=>el.addEventListener('click', ()=>{
     if(!atTest || atAutoAdvancing) return;
     const chosen = parseInt(el.dataset.atOpt);
     if(isNaN(chosen)) return;
     if(atAnswers[atQIdx]!==null && atAnswers[atQIdx]!==undefined) return; // already locked in
 
+    const q = atTest.questions[atQIdx];
+    const correctIdx = q.correct;
+    const isCorrect = chosen === correctIdx;
+
     atAnswers[atQIdx] = chosen;
-    atAutoAdvancing = true; // lock the UI while we wait for the server's verdict
+    atAutoAdvancing = true;
+    atRevealData = {chosen, correct:correctIdx, isCorrect};
     render();
+    playResultSound(isCorrect);
 
-    const reveal = await atPersistProgress(atQIdx, chosen);
-    if(!atTest) return; // attempt got closed out (e.g. time ran out) while we were waiting
-
-    if(reveal){
-      atRevealData = {chosen, correct:reveal.correctIndex, isCorrect:reveal.isCorrect};
-      playResultSound(reveal.isCorrect);
-    }
-    render();
+    atPersistProgress(atQIdx, chosen); // saves in the background — doesn't block the reveal
 
     setTimeout(atAdvanceQuestion, 3000);
   }));
