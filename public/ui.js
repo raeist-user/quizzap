@@ -283,7 +283,7 @@ function atTestHTML(){
       cls += ' locked';
       if(i===myAnswer) cls += ' chosen';
     }
-    return `<div class="${cls}" data-at-opt="${i}"><div class="opt-key">${'ABCD'[i]}</div><span class="${urduCls(q)}">${renderMath(o)}</span></div>`;
+    return `<div class="${cls}" data-at-opt="${i}"><div class="opt-key">${'ABCD'[i]}</div><span class="${''+urduCls(q)}">${renderMath(o)}</span></div>`;
   }).join('');
 
   let notice = '';
@@ -2799,7 +2799,8 @@ function attach(){
   on('btn-tb-tab-history', ()=>{ testBoardTab='history'; render(); });
 
   // Create Test form inputs — use 'input' so state syncs while typing (fixes publish always-disabled bug)
-  document.getElementById('tc-title')?.addEventListener('input', e=>{ tcTitle=e.target.value; render(); });
+  document.getElementById('tc-title')?.addEventListener('input', e=>{ tcTitle=e.target.value; /* no render() — avoids destroying the input mid-type */ });
+  document.getElementById('tc-title')?.addEventListener('blur',  ()=>render());
   document.getElementById('tc-subject')?.addEventListener('input', e=>{ tcSubject=e.target.value; });
   document.querySelectorAll('.tc-timer-type').forEach(b=>b.addEventListener('click',()=>{
     // Preserve whatever value was typed before the re-render wipes the input

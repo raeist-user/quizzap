@@ -97,14 +97,11 @@ function playBeep(freq=880, dur=0.18){
   }catch(e){}
 }
 
-// ── Result sound: cheerful two-note chime for correct, single low buzz for wrong
+// ── Result sound for tests: use the exact same playCorrect / playWrong
+//    that the live-quiz session uses — defined in function.js, always loaded.
 function playResultSound(isCorrect){
-  if(isCorrect){
-    playBeep(1046, 0.14);
-    setTimeout(()=>playBeep(1568, 0.18), 90);
-  } else {
-    playBeep(220, 0.35);
-  }
+  if(isCorrect) playCorrect();
+  else          playWrong();
 }
 
 // ── Smooth timer RAF loop ─────────────────────────────────────────────────
