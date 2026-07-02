@@ -283,7 +283,7 @@ function atTestHTML(){
       cls += ' locked';
       if(i===myAnswer) cls += ' chosen';
     }
-    return `<div class="${cls}" data-at-opt="${i}"><div class="opt-key">${'ABCD'[i]}</div><span class="${''+urduCls(q)}">${renderMath(o)}</span></div>`;
+    return `<div class="${cls}" data-at-opt="${i}"><div class="opt-key">${'ABCD'[i]}</div><span class="${''+urduCls(atTest)}">${renderMath(o)}</span></div>`;
   }).join('');
 
   let notice = '';
@@ -310,8 +310,10 @@ function atTestHTML(){
       initPct=rem/(atTest.timerValue||1)*100;
       const mm=Math.floor(rem/60),ss=Math.floor(rem%60);
       initSecs=`${mm}:${String(ss).padStart(2,'0')}`;
-    } else if(atTest.timerType==='perQuestion' && atQStartTime){
-      const rem=Math.max(0,(atTest.timerValue||0)-(Date.now()-atQStartTime)/1000);
+    } else if(atTest.timerType==='perQuestion' && atStartTime){
+      // Always server-anchored — same formula as the interval and RAF use
+      const qStart = atStartTime + atQIdx * (atTest.timerValue||0) * 1000;
+      const rem=Math.max(0,(atTest.timerValue||0)-(Date.now()-qStart)/1000);
       initPct=rem/(atTest.timerValue||1)*100;
       initSecs=`${Math.ceil(rem)}s`;
     }
@@ -336,7 +338,7 @@ function atTestHTML(){
     </div>
     ${timerSection}
     <div class="page" style="overflow-y:auto;-webkit-overflow-scrolling:touch;flex:1">
-      <h2 class="mb3 ${urduCls(q)}" style="user-select:none;-webkit-user-select:none">${renderMath(q.text)}</h2>
+      <h2 class="mb3${urduCls(atTest)}" style="user-select:none;-webkit-user-select:none">${renderMath(q.text)}</h2>
       <div class="opt-grid" style="user-select:none;-webkit-user-select:none">${opts}</div>
       ${notice}
       ${reportRow}
@@ -356,7 +358,9 @@ function atAdvanceQuestion(){
   const total = atTest.questions.length;
   if(atQIdx < total-1){
     atQIdx++;
-    atQStartTime = Date.now(); // fresh anchor for new question
+    // atQStartTime is not used for per-question timing anymore — the interval
+    // and RAF both derive qStart as atStartTime + atQIdx * timerValue * 1000,
+    // so it is always server-anchored and survives any refresh or rejoin.
     render();
   } else {
     render();
@@ -2985,9 +2989,9 @@ function attach(){
         startIdx = Math.max(startIdx, elapsedSlots);
       }
       atQIdx = Math.min(Math.max(startIdx,0), test.questions.length-1);
-      atQStartTime = (test.timerType==='perQuestion')
-        ? atStartTime + atQIdx*test.timerValue*1000
-        : Date.now();
+      // atQStartTime is no longer used — per-question timing is always computed
+      // as atStartTime + atQIdx * timerValue * 1000 everywhere (interval, RAF, click).
+      atQPausedElapsed = 0;
 
       if(data.resuming) showToast('↻ Rejoined — picking up where you left off. The clock kept running.', 'neutral');
 
@@ -3019,9 +3023,11 @@ function attach(){
       } else if(test.timerType==='perQuestion'){
         atTimerHandle = setInterval(()=>{
           if(!atTest){ clearInterval(atTimerHandle); return; }
+          // Derive question start purely from server anchor — survives any refresh/rejoin
+          const qStart = atStartTime + atQIdx * (test.timerValue||0) * 1000;
           const elapsed = atAutoAdvancing
-            ? atQPausedElapsed / 1000          // frozen — answer selected, 3 s reveal in progress
-            : (Date.now()-atQStartTime)/1000;  // live countdown
+            ? atQPausedElapsed / 1000          // frozen during 3 s reveal
+            : (Date.now()-qStart)/1000;
           const rem = Math.max(0,(test.timerValue||0)-elapsed);
           atPerQLeft = Math.ceil(rem);
           if(rem <= 3 && rem > 0){
@@ -3032,7 +3038,7 @@ function attach(){
             }
           }
           if(rem <= 0 && !atAutoAdvancing){
-            atAutoAdvancing = true; // guard against double-fire
+            atAutoAdvancing = true;
             atPersistProgress(atQIdx, atAnswers[atQIdx] ?? null);
             atAdvanceQuestion();
           }
@@ -3060,7 +3066,10 @@ function attach(){
 
     atAnswers[atQIdx] = chosen;
     atAutoAdvancing = true;
-    atQPausedElapsed = Date.now() - atQStartTime; // snapshot elapsed so interval reads a frozen value
+    // Snapshot elapsed against the server-anchored question start so the freeze
+    // value is consistent with what the interval/RAF compute when unfrozen.
+    const qStart = atStartTime + atQIdx * (atTest.timerValue||0) * 1000;
+    atQPausedElapsed = Date.now() - qStart;
     atRevealData = {chosen, correct:correctIdx, isCorrect};
     render();
     playResultSound(isCorrect);
