@@ -120,8 +120,12 @@ function atTimerRAF(){
     col=pct>33?'#6366f1':pct>15?'#f59e0b':'#ef4444';
     const mm=Math.floor(rem/60), ss=Math.floor(rem%60);
     label=`${mm}:${String(ss).padStart(2,'0')}`;
-  } else if(atTest.timerType==='perQuestion' && atQStartTime){
-    const elapsed=(Date.now()-atQStartTime)/1000;
+  } else if(atTest.timerType==='perQuestion' && atStartTime){
+    // Always derive from server anchor — never from a local Date.now() snapshot
+    const qStart = atStartTime + atQIdx * (atTest.timerValue||0) * 1000;
+    const elapsed = atAutoAdvancing
+      ? atQPausedElapsed / 1000          // frozen during 3 s reveal
+      : (Date.now()-qStart)/1000;
     const rem=Math.max(0,(atTest.timerValue||0)-elapsed);
     pct=rem/(atTest.timerValue||1)*100;
     col=pct>33?'#6366f1':pct>15?'#f59e0b':'#ef4444';
