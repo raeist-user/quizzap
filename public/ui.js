@@ -348,14 +348,15 @@ function atTestHTML(){
 // last one). Shared by: the 3 s post-answer pause, and a per-question timer
 // running out with nothing chosen.
 function atAdvanceQuestion(){
-  if(!atTest) return; // attempt may have already been auto-submitted server-side
+  if(!atTest) return;
   atAutoAdvancing = false;
+  atQPausedElapsed = 0;
   atRevealData = null;
   atBeepedSeconds.clear();
   const total = atTest.questions.length;
   if(atQIdx < total-1){
     atQIdx++;
-    atQStartTime = Date.now();
+    atQStartTime = Date.now(); // fresh anchor for new question
     render();
   } else {
     render();
@@ -3018,7 +3019,9 @@ function attach(){
       } else if(test.timerType==='perQuestion'){
         atTimerHandle = setInterval(()=>{
           if(!atTest){ clearInterval(atTimerHandle); return; }
-          const elapsed = (Date.now()-atQStartTime)/1000;
+          const elapsed = atAutoAdvancing
+            ? atQPausedElapsed / 1000          // frozen — answer selected, 3 s reveal in progress
+            : (Date.now()-atQStartTime)/1000;  // live countdown
           const rem = Math.max(0,(test.timerValue||0)-elapsed);
           atPerQLeft = Math.ceil(rem);
           if(rem <= 3 && rem > 0){
@@ -3057,6 +3060,7 @@ function attach(){
 
     atAnswers[atQIdx] = chosen;
     atAutoAdvancing = true;
+    atQPausedElapsed = Date.now() - atQStartTime; // snapshot elapsed so interval reads a frozen value
     atRevealData = {chosen, correct:correctIdx, isCorrect};
     render();
     playResultSound(isCorrect);

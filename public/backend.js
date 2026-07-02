@@ -78,8 +78,9 @@ let atTimerHandle  = null;
 let atReportOpen   = -1;
 let atStartTime    = 0;            // ms anchor — server startedAt
 let atQStartTime   = 0;            // ms anchor — current question start
+let atQPausedElapsed = 0;          // ms elapsed when timer was paused (answer selected)
 let atAutoAdvancing= false;        // blocks input during reveal+advance
-let atRevealData   = null;         // {chosen, correct, isCorrect} during 2 s reveal
+let atRevealData   = null;         // {chosen, correct, isCorrect} during reveal
 let atBeepedSeconds= new Set();    // which countdown seconds have been beeped
 
 // ── Beep: Web Audio API ───────────────────────────────────────────────────

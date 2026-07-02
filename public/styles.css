@@ -65,7 +65,7 @@
 
     html,body{height:100%;scroll-behavior:smooth}
     body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
-    .urdu{font-family:'Noto Nastaliq Urdu',serif;direction:rtl;line-height:2.2;text-align:right;unicode-bidi:embed}
+    .urdu{font-family:'Noto Nastaliq Urdu','Jameel Noori Nastaleeq','Jameel Noori Nastaliq',serif;direction:rtl;line-height:2.2;text-align:right;unicode-bidi:embed}
 
     /* NAV */
     nav{display:flex;align-items:center;justify-content:space-between;padding:0 20px;height:58px;border-bottom:1px solid var(--line);background:rgba(255,255,255,.92);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);position:sticky;top:0;z-index:200;gap:12px;}
@@ -231,6 +231,7 @@
     /* PARTICIPANT OPTIONS */
     .opt-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
     .opt-card{display:flex;align-items:center;gap:11px;padding:15px 13px;border:1.5px solid var(--line);border-radius:var(--r-lg);cursor:pointer;background:var(--white);transition:all var(--t-fast);font-size:.86rem;position:relative;overflow:hidden}
+    .opt-card .urdu{font-family:'Noto Nastaliq Urdu','Jameel Noori Nastaleeq','Jameel Noori Nastaliq',serif!important;direction:rtl;text-align:right;width:100%}
     .opt-card:not(.locked):hover{border-color:var(--ink);transform:translateY(-2px)}
     .opt-card:not(.locked):active{transform:scale(.98) translateY(0)}
     .opt-card.chosen{border-color:var(--ink);background:#f5f5f3}
