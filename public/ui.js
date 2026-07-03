@@ -283,7 +283,7 @@ function atTestHTML(){
       cls += ' locked';
       if(i===myAnswer) cls += ' chosen';
     }
-    return `<div class="${cls}" data-at-opt="${i}"><div class="opt-key">${'ABCD'[i]}</div><span class="${''+urduCls(atTest)}">${renderMath(o)}</span></div>`;
+    return `<div class="${cls}" data-at-opt="${i}" style="font-size:.86rem"><div class="opt-key">${'ABCD'[i]}</div><span class="${''+urduCls(atTest)}" style="font-size:.86rem">${renderMath(o)}</span></div>`;
   }).join('');
 
   let notice = '';
@@ -338,7 +338,7 @@ function atTestHTML(){
     </div>
     ${timerSection}
     <div class="page" style="overflow-y:auto;-webkit-overflow-scrolling:touch;flex:1">
-      <h2 class="mb3${urduCls(atTest)}" style="user-select:none;-webkit-user-select:none">${renderMath(q.text)}</h2>
+      <h2 class="mb3${urduCls(atTest)}" style="font-size:1.35rem;font-weight:600;line-height:1.2;letter-spacing:-.02em;user-select:none;-webkit-user-select:none">${renderMath(q.text)}</h2>
       <div class="opt-grid" style="user-select:none;-webkit-user-select:none">${opts}</div>
       ${notice}
       ${reportRow}
