@@ -457,12 +457,17 @@ function haltedHTML(){
    DISMISSED SCREEN
 ══════════════════════════════════════ */
 function studentDismissedHTML(){
-  const exiledSet=new Set(S.exiledPids||[]);
-  const amIExiledD=exiledSet.has(myPid);
   const allSorted=sortParticipants(haltedSnapshot);
+  // Prefer the exile flag baked into the final leaderboard snapshot itself — by the time
+  // this screen renders, S.exiledPids has already been reset server-side (exile is
+  // session-scoped), so it can no longer be trusted to split the two leaderboards.
+  const hasExiledFlags = allSorted.some(p=>'exiled' in p);
+  const exiledSet=new Set(S.exiledPids||[]);
+  const isExiled = p => hasExiledFlags ? !!p.exiled : exiledSet.has(p.id);
+  const amIExiledD = isExiled({id:myPid, exiled:(allSorted.find(p=>p.id===myPid)||{}).exiled});
   const sorted=amIExiledD
-    ? allSorted.filter(p=>exiledSet.has(p.id))
-    : allSorted.filter(p=>!exiledSet.has(p.id));
+    ? allSorted.filter(p=>isExiled(p))
+    : allSorted.filter(p=>!isExiled(p));
   const medals=['🥇','🥈','🥉'];
   const myP=sorted.find(p=>p.id===myPid);
   const myRank=sorted.findIndex(p=>p.id===myPid)+1;
@@ -496,7 +501,7 @@ function studentDismissedHTML(){
         <button class="btn btn-dark" id="btn-dismissed-home" style="gap:7px;padding:9px 22px">🏠 Go Home Now</button>
       </div>
     </div>
-    <div style="font-size:.67rem;text-align:center;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--mid);margin-bottom:6px;flex-shrink:0">🏆 Final Leaderboard</div>
+    <div style="font-size:.67rem;text-align:center;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:${amIExiledD?'#991b1b':'var(--mid)'};margin-bottom:6px;flex-shrink:0">${amIExiledD?'🚫 Exiled Leaderboard':'🏆 Final Leaderboard'}</div>
     <div class="lb-panel" style="flex:1;overflow:hidden;display:flex;flex-direction:column;margin-top:0">
       <div class="lb-head"><span style="font-size:.82rem;font-weight:600">Final Standings</span><span class="small muted">${sorted.length} student${sorted.length!==1?'s':''}</span></div>
       <div style="overflow-y:auto;flex:1">${rows}</div>

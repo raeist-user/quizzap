@@ -54,7 +54,14 @@ function sortParticipants(parts){
 
 function scoreBannerHTML(){
   if(!myPid||(S.status!=='question'&&S.status!=='revealed')) return '';
-  const sorted=sortParticipants(S.participants||[]);
+  const exiledSet=new Set(S.exiledPids||[]);
+  const amIExiled=exiledSet.has(myPid);
+  const allSorted=sortParticipants(S.participants||[]);
+  // Exiled students should only ever see other exiled students here, and vice versa —
+  // otherwise the banner leaks exiled participants (and their scores) to everyone.
+  const sorted=amIExiled
+    ? allSorted.filter(p=>exiledSet.has(p.id))
+    : allSorted.filter(p=>!exiledSet.has(p.id));
   if(!sorted.length) return '';
   const medals=['🥇','🥈','🥉'];
   const myRank=sorted.findIndex(p=>p.id===myPid)+1;
