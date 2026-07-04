@@ -521,9 +521,19 @@ function initWS(server) {
         case 'shutdown':
           if (client.role !== 'host') break;
           frozenPids.clear(); // clear on full shutdown too
-          exiledPids.clear();
-          bankGameScores();
           {
+            // Capture which gameScores keys belong to currently-exiled participants
+            // BEFORE exiledPids is cleared (exile is session-scoped and resets here),
+            // so the final leaderboard sent to students can still be split correctly.
+            const exiledKeysAtShutdown = new Set();
+            Object.values(state.participants).forEach((p) => {
+              if (exiledPids.has(p.id)) {
+                const key = p.userId ? `user_${p.userId}` : p.id;
+                exiledKeysAtShutdown.add(key);
+              }
+            });
+            exiledPids.clear();
+            bankGameScores();
             const seenUserIds = new Set();
             const finalLeaderboard = Object.entries(gameScores)
               .filter(([pid, g]) => {
@@ -533,7 +543,7 @@ function initWS(server) {
                 seenUserIds.add(uid);
                 return true;
               })
-              .map(([pid, g]) => ({ id: pid, name: g.name, userId: g.userId, score: g.total }))
+              .map(([pid, g]) => ({ id: pid, name: g.name, userId: g.userId, score: g.total, exiled: exiledKeysAtShutdown.has(pid) }))
               .sort((a, b) => b.score - a.score);
             persistLeaderboard(finalLeaderboard);
             // grandTotalPushed includes the current sub-session's pushedCount too
