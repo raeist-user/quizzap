@@ -163,7 +163,8 @@ let pushing=false, pushTimeout=null;
 let showingHalted=false, haltedIsPreview=false, haltedCountdown=0, haltedTimer=null, haltedSnapshot=[];
 let haltedTotalQuestions=0;   // total questions asked in the session (for score/total display)
 let haltedTotalLabel='';      // denominator label for final leaderboard: 'all' or specific count string
-let hostShutdownLeaderboard=null; // captured final leaderboard shown to host after Stop & Dismiss
+let hostShutdownLeaderboard=null; // captured final leaderboard shown to host after Stop & Dismiss — {public:[], exiled:[], totalQ}
+let hostShutdownLbTab='public';   // 'public' | 'exiled' — toggle on the post-halt final leaderboard screen
 
 // ── QUESTION REPORT STATE ────────────────────────────────────────────────────
 let receivedReports=[];          // [{rid,question,correct,reportedAnswer,reporterName,ts,count}]

@@ -992,9 +992,12 @@ function backupRestoreOverlayHTML(){
 
 function hostFinalLeaderboardHTML(){
   if(!hostShutdownLeaderboard) return '';
-  const entries=hostShutdownLeaderboard;
+  const lb=hostShutdownLeaderboard;
+  const publicList=lb.public||[];
+  const exiledList=lb.exiled||[];
+  const entries = hostShutdownLbTab==='exiled' ? exiledList : publicList;
   const medals=['🥇','🥈','🥉'];
-  const totalQ=hostShutdownLeaderboard._totalQ||0;
+  const totalQ=lb.totalQ||0;
   const totalStr=totalQ>0?String(totalQ):'?';
   const rows=entries.length
     ?entries.map((p,i)=>`
@@ -1004,14 +1007,20 @@ function hostFinalLeaderboardHTML(){
         <div class="score-pts"><span style="font-weight:700">${p.score||0}</span><span style="font-size:.7rem;color:var(--mid);font-weight:400">/${totalStr}</span></div>
       </div>`).join('')
     :`<div style="padding:20px;text-align:center;color:var(--mid)">No scores to display.</div>`;
+  const toggleBtns=(publicList.length||exiledList.length)?`<div style="display:flex;gap:6px;margin-bottom:12px;flex-shrink:0">
+    <button class="btn btn-sm" id="btn-shutdown-lb-tab-public" style="flex:1;justify-content:center;font-size:.8rem;${hostShutdownLbTab==='exiled'?'color:var(--mid);border-color:var(--line)':'background:#1d1d22;color:#fff;border-color:#1d1d22'}">🏆 Public (${publicList.length})</button>
+    <button class="btn btn-sm" id="btn-shutdown-lb-tab-exiled" style="flex:1;justify-content:center;font-size:.8rem;${hostShutdownLbTab==='exiled'?'background:#dc2626;color:#fff;border-color:#dc2626':'color:#991b1b;border-color:#fca5a5'}">🚫 Exiled (${exiledList.length})</button>
+  </div>`:'';
+  const modeLabel = hostShutdownLbTab==='exiled' ? 'Exiled' : 'Public';
   return `<div style="display:flex;flex-direction:column;height:calc(100vh - 54px);overflow:hidden;padding:16px 20px;max-width:520px;margin:0 auto">
     <div style="text-align:center;padding:20px 0 16px;flex-shrink:0">
       <div style="font-size:2.4rem;margin-bottom:10px">🏆</div>
       <h2 style="margin-bottom:6px">Final Leaderboard</h2>
-      <p class="muted small">${entries.length} student${entries.length!==1?'s':''} &nbsp;·&nbsp; ${totalStr} question${totalQ!==1?'s':''}</p>
+      <p class="muted small">${entries.length} student${entries.length!==1?'s':''} &nbsp;·&nbsp; ${totalStr} question${totalQ!==1?'s':''} &nbsp;·&nbsp; ${modeLabel}</p>
     </div>
+    ${toggleBtns}
     <div class="lb-panel" style="flex:1;overflow:hidden;display:flex;flex-direction:column">
-      <div class="lb-head"><span style="font-size:.82rem;font-weight:600">🏁 Final Standings</span><span class="small muted">${entries.length} student${entries.length!==1?'s':''}</span></div>
+      <div class="lb-head"><span style="font-size:.82rem;font-weight:600">🏁 ${modeLabel} Standings</span><span class="small muted">${entries.length} student${entries.length!==1?'s':''}</span></div>
       <div style="overflow-y:auto;flex:1">${rows}</div>
     </div>
     <div style="padding:14px 0 8px;flex-shrink:0;display:flex;flex-direction:column;gap:8px">
@@ -1651,6 +1660,18 @@ function hostSettingsOverlayHTML(){
 /* ══════════════════════════════════════
    REPORTS OVERLAY (host)
 ══════════════════════════════════════ */
+// Open ChatGPT / Claude in a new tab pre-filled with the question + options,
+// mirroring the "Ask GPT / Ask Claude" buttons on the self-test screen.
+function openAiSearch(kind, q){
+  if(!q){ showToast('No question available.','bad'); return; }
+  const opts=['A','B','C','D'].map((l,i)=>`${l}) ${(q.options||[])[i]||''}`).join(', ');
+  const prompt=`${q.text||''}\n\nOptions: ${opts}\n\nWhat is the correct answer and why?`;
+  const url = kind==='gpt'
+    ? 'https://chatgpt.com/?q='+encodeURIComponent(prompt)
+    : 'https://claude.ai/new?q='+encodeURIComponent(prompt);
+  window.open(url,'_blank','noopener');
+}
+
 function reportsOverlayHTML(){
   if(!reportsOverlayOpen) return '';
   const reports=receivedReports;
@@ -1736,7 +1757,17 @@ function reportsOverlayHTML(){
         }).join('');
         bodyH=`<div class="report-expand-body" style="padding:12px 14px">
           <div style="margin-bottom:10px">
-            <div style="font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--mid);margin-bottom:5px">Question${q&&q.subject?' &middot; '+esc(q.subject):''}${q&&q.chapter?' / '+esc(q.chapter):''}</div>
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:5px">
+              <div style="font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--mid)">Question${q&&q.subject?' &middot; '+esc(q.subject):''}${q&&q.chapter?' / '+esc(q.chapter):''}</div>
+              <div style="display:flex;gap:5px;flex-shrink:0">
+                <button class="btn btn-sm" data-r-ask-gpt="${r.rid}" title="Ask ChatGPT about this question" style="display:flex;align-items:center;gap:4px;padding:3px 8px;background:#f0f0f0;border:1px solid #d0d0d0;border-radius:6px;font-size:.7rem;font-weight:600;color:#111">
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>GPT
+                </button>
+                <button class="btn btn-sm" data-r-ask-claude="${r.rid}" title="Ask Claude about this question" style="display:flex;align-items:center;gap:4px;padding:3px 8px;background:#f0f0f0;border:1px solid #d0d0d0;border-radius:6px;font-size:.7rem;font-weight:600;color:#111">
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>Claude
+                </button>
+              </div>
+            </div>
             <div class="${uc?'urdu':''}" style="font-size:.85rem;line-height:${uc?'2.2':'1.5'};padding:9px 11px;background:var(--faint);border:1px solid var(--line);border-radius:6px">${renderMath(q&&q.text||'')}</div>
           </div>
           <div style="margin-bottom:10px">${optR}</div>
@@ -3411,26 +3442,32 @@ function attach(){
       showingHaltBomb=false; haltBombTimer=null;
       // Deduplicate by userId so leave/rejoin after reset doesn't double-count scores
       const gcores=S.gameScores||[], parts=S.participants||[];
+      const exiledSet=new Set(S.exiledPids||[]);
       const mergedByKey={}, pidToKey={};
       gcores.forEach(g=>{
         const key=g.userId?'u_'+g.userId:'p_'+g.id;
-        if(!mergedByKey[key]) mergedByKey[key]={name:g.name,score:g.total};
+        if(!mergedByKey[key]) mergedByKey[key]={name:g.name,score:g.total,exiled:false};
         pidToKey[g.id]=key;
       });
       parts.forEach(p=>{
         const key=p.userId?'u_'+p.userId:'p_'+p.id;
+        const isExiled=exiledSet.has(p.id);
         if(mergedByKey[key]){
           // Only add live score for this pid if it's the canonical key (not a stale banked pid)
           if(!pidToKey[p.id]||pidToKey[p.id]===key) mergedByKey[key].score+=(p.score||0);
           mergedByKey[key].name=p.name;
+          if(isExiled) mergedByKey[key].exiled=true;
         } else {
-          mergedByKey[key]={name:p.name,score:p.score||0};
+          mergedByKey[key]={name:p.name,score:p.score||0,exiled:isExiled};
         }
       });
-      const finalList=Object.values(mergedByKey).map(g=>({name:g.name,score:g.score})).sort((a,b)=>b.score-a.score);
+      const allList=Object.values(mergedByKey);
+      const publicList=allList.filter(g=>!g.exiled).map(g=>({name:g.name,score:g.score})).sort((a,b)=>b.score-a.score);
+      const exiledList=allList.filter(g=>g.exiled).map(g=>({name:g.name,score:g.score})).sort((a,b)=>b.score-a.score);
       // Use grandTotalPushed (includes sub-sessions) + current pushedCount as the true total
-      finalList._totalQ=(S.grandTotalPushed||0)+(S.pushedCount||0);
-      hostShutdownLeaderboard=finalList;
+      const totalQ=(S.grandTotalPushed||0)+(S.pushedCount||0);
+      hostShutdownLeaderboard={public:publicList, exiled:exiledList, totalQ};
+      hostShutdownLbTab='public';
       send({type:'shutdown'}); render();
     }, 2000);
   });
@@ -3477,13 +3514,20 @@ function attach(){
     render();
   });
 
-  on('btn-host-lb-close',()=>{ hostShutdownLeaderboard=null; render(); });
+  on('btn-host-lb-close',()=>{ hostShutdownLeaderboard=null; hostShutdownLbTab='public'; render(); });
+
+  // Switch between Public / Exiled tabs on the post-halt final leaderboard
+  on('btn-shutdown-lb-tab-public',()=>{ hostShutdownLbTab='public'; render(); });
+  on('btn-shutdown-lb-tab-exiled',()=>{ hostShutdownLbTab='exiled'; render(); });
 
   // Screenshot: open a long printable HTML page of the final leaderboard in a new tab
   on('btn-host-lb-export',()=>{
-    const entries = hostShutdownLeaderboard;
-    if(!entries||!entries.length){ showToast('No leaderboard data to export.','bad'); return; }
-    const totalQ = (entries._totalQ) || S.grandTotalPushed || S.pushedCount || 0;
+    const lb = hostShutdownLeaderboard;
+    if(!lb){ showToast('No leaderboard data to export.','bad'); return; }
+    const modeLabel = hostShutdownLbTab==='exiled' ? 'Exiled' : 'Public';
+    const entries = hostShutdownLbTab==='exiled' ? (lb.exiled||[]) : (lb.public||[]);
+    if(!entries.length){ showToast('No '+modeLabel.toLowerCase()+' leaderboard data to export.','bad'); return; }
+    const totalQ = lb.totalQ || S.grandTotalPushed || S.pushedCount || 0;
     const totalStr = totalQ>0?String(totalQ):'?';
     const dateStr = new Date().toLocaleString('en-IN',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
     const medals = ['🥇','🥈','🥉'];
@@ -3497,7 +3541,7 @@ function attach(){
       </tr>`;
     }).join('');
     const html=`<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"/>
-<title>SCC Final Leaderboard</title>
+<title>SCC Final Leaderboard — ${modeLabel}</title>
 <style>
   *{box-sizing:border-box;margin:0;padding:0}
   body{font-family:'Segoe UI',Arial,sans-serif;background:#fff;color:#111;padding:32px 24px;max-width:680px;margin:0 auto}
@@ -3515,7 +3559,7 @@ function attach(){
   td.pct{color:#555;font-size:.8rem}
   @media print{body{padding:12px}button{display:none!important}}
 </style></head><body>
-<h1>🏆 Final Leaderboard</h1>
+<h1>🏆 Final Leaderboard <span style="font-size:1rem;font-weight:600;color:${modeLabel==='Exiled'?'#dc2626':'#666'}">(${modeLabel})</span></h1>
 <div class="meta">Shadab Coaching Centre &nbsp;·&nbsp; ${dateStr} &nbsp;·&nbsp; ${entries.length} student${entries.length!==1?'s':''} &nbsp;·&nbsp; ${totalStr} question${totalQ!==1?'s':''}</div>
 <table>
   <thead><tr><th>Rank</th><th>Student</th><th>Score</th><th>%</th></tr></thead>
@@ -3599,7 +3643,7 @@ function attach(){
   // Expand/collapse individual report card
   document.querySelectorAll('[data-r-expand]').forEach(el=>{
     el.addEventListener('click', e=>{
-      if(e.target.closest('[data-r-dismiss]')||e.target.closest('[data-r-edit]')||e.target.closest('[data-r-delete]')) return;
+      if(e.target.closest('[data-r-dismiss]')||e.target.closest('[data-r-edit]')||e.target.closest('[data-r-delete]')||e.target.closest('[data-r-ask-gpt]')||e.target.closest('[data-r-ask-claude]')) return;
       const rid=+el.dataset.rExpand;
       if(expandedReportRid===rid){ expandedReportRid=null; editingReportRid=null; editReportDraft={}; }
       else { expandedReportRid=rid; editingReportRid=null; editReportDraft={}; }
@@ -3642,6 +3686,24 @@ function attach(){
         if(msgEl){ msgEl.style.color='var(--bad)'; msgEl.textContent='Delete failed: '+(result.error||'Unknown error'); }
         showToast('❌ Delete failed: '+(result.error||'Unknown error'),'bad');
       }
+    });
+  });
+
+  // Ask ChatGPT / Ask Claude about a reported question
+  document.querySelectorAll('[data-r-ask-gpt]').forEach(el=>{
+    el.addEventListener('click', e=>{
+      e.stopPropagation();
+      const rid=+el.dataset.rAskGpt;
+      const rep=receivedReports.find(r=>r.rid===rid);
+      openAiSearch('gpt', rep&&rep.question);
+    });
+  });
+  document.querySelectorAll('[data-r-ask-claude]').forEach(el=>{
+    el.addEventListener('click', e=>{
+      e.stopPropagation();
+      const rid=+el.dataset.rAskClaude;
+      const rep=receivedReports.find(r=>r.rid===rid);
+      openAiSearch('claude', rep&&rep.question);
     });
   });
 
@@ -3761,7 +3823,7 @@ function doBack(){
   }
   if(role==='host'&&hostAuthed){
     if(!confirm('Leave host panel and go home?')) return;
-    role=null; hostAuthed=false; hostShutdownLeaderboard=null; showingHaltBomb=false; if(haltBombTimer){clearTimeout(haltBombTimer);haltBombTimer=null;} HOST_PASSWORD_INPUT=''; sessionStorage.removeItem('scc_hpw'); stopMic();
+    role=null; hostAuthed=false; hostShutdownLeaderboard=null; hostShutdownLbTab='public'; showingHaltBomb=false; if(haltBombTimer){clearTimeout(haltBombTimer);haltBombTimer=null;} HOST_PASSWORD_INPUT=''; sessionStorage.removeItem('scc_hpw'); stopMic();
     navPush(); render(); return;
   }
   if(role==='host'&&!hostAuthed){
