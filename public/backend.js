@@ -580,6 +580,10 @@ async function tcBrowserPickFile(filePath, displayName){
       render();
       return;
     }
+    // Tag each question with its source folder — same subject tag live quiz
+    // attaches (see generateQuiz) — so the test-taking view can pick the
+    // right font (e.g. Urdu) per question later, not just off the test title.
+    allQ.forEach(q=>{ q.subject=tcBrowserSubj||''; q.chapter=displayName.replace(/\.txt$/i,''); });
     _showTcRangeSelector(allQ, displayName);
   }catch(e){
     tcMsg='Load failed: '+e.message;
