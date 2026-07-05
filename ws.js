@@ -522,12 +522,14 @@ function initWS(server) {
           if (client.role !== 'host') break;
           frozenPids.clear(); // clear on full shutdown too
           {
-            // Capture which gameScores keys belong to currently-exiled participants
-            // BEFORE exiledPids is cleared (exile is session-scoped and resets here),
-            // so the final leaderboard sent to students can still be split correctly.
+            // Snapshot raw exiled pids BEFORE exiledPids is cleared (exile is session-scoped
+            // and resets on shutdown). We need this snapshot for two things below:
+            //  1) tagging each merged leaderboard entry with exiled:true/false
+            //  2) telling each student directly whether THEY were exiled
+            const exiledPidsSnapshot = new Set(exiledPids);
             const exiledKeysAtShutdown = new Set();
             Object.values(state.participants).forEach((p) => {
-              if (exiledPids.has(p.id)) {
+              if (exiledPidsSnapshot.has(p.id)) {
                 const key = p.userId ? `user_${p.userId}` : p.id;
                 exiledKeysAtShutdown.add(key);
               }
@@ -550,7 +552,10 @@ function initWS(server) {
             const finalTotalQ = grandTotalPushed + (state.pushedCount || 0);
             clients.forEach((c) => {
               if (c.role === 'participant') {
-                tx(c.ws, { type: 'kicked', payload: { finalLeaderboard, totalQuestions: finalTotalQ } });
+                // Tell this specific student directly whether they were exiled —
+                // far more reliable than reconstructing it client-side from merged keys.
+                const amIExiled = exiledPidsSnapshot.has(c.pid);
+                tx(c.ws, { type: 'kicked', payload: { finalLeaderboard, totalQuestions: finalTotalQ, amIExiled } });
                 c.role = null; c.pid = null;
               }
             });
