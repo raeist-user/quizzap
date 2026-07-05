@@ -6,7 +6,19 @@
 /* ══════════════════════════════════════
    PARSER
 ══════════════════════════════════════ */
-function urduCls(q){ return q?.subject?.toLowerCase().includes('urdu')?' urdu':''; }
+// Matches the Arabic-script Unicode block Urdu text is written in — same
+// regex selfquiz.html already uses to reliably auto-detect Urdu content.
+// Checking the subject label first is just a fast path; the real signal
+// is the text itself, so this works even for tests/questions saved before
+// per-question subject tagging existed, or where the subject was never
+// labeled "Urdu" at all.
+const URDU_SCRIPT_RE = /[\u0600-\u06FF]/;
+function urduCls(q){
+  if(!q) return '';
+  if(q.subject && q.subject.toLowerCase().includes('urdu')) return ' urdu';
+  const sample = (q.text||'') + (Array.isArray(q.options)?q.options.join(''):'');
+  return URDU_SCRIPT_RE.test(sample) ? ' urdu' : '';
+}
 
 function parseQuestions(text){
   const out=[],lines=text.split('\n').map(l=>l.trim()).filter(Boolean);
