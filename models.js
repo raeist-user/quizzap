@@ -150,6 +150,11 @@ const testAttemptSchema = new mongoose.Schema({
   // Tracks furthest question reached — lets a rejoining student resume exactly
   // where they left off, and lets the server know how far the clock has run.
   currentQIdx:{ type: Number, default: 0 },
+  // Real-world anchor for the CURRENT question's own timer (perQuestion mode).
+  // Updated only at the moment a question actually becomes visible to the
+  // student, so unused time on a question never bleeds into the next one —
+  // every question gets exactly timerValue seconds, no more, no less.
+  questionStartedAt: { type: Date, default: Date.now },
   // True once an attempt was closed out automatically by the server because
   // its time budget ran out while the student was away (no exit loophole).
   autoSubmitted: { type: Boolean, default: false },

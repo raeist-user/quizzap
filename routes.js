@@ -32,14 +32,38 @@ function requireHost(req, res, next) {
 }
 
 // ── PLANNED TEST HELPERS ──────────────────────────────────────────────────────
-// Returns the wall-clock timestamp (ms) at which an attempt must be auto-closed,
-// or null if the test has no time limit. Anchored to the attempt's original
-// startedAt so leaving/rejoining can never extend the clock.
+// Returns the wall-clock timestamp (ms) at which a 'total' timer attempt must
+// be auto-closed, or null if not applicable. Anchored to the attempt's
+// original startedAt so leaving/rejoining can never extend the clock.
+// (perQuestion timing is handled separately by perQuestionCatchup below —
+// each question gets its own fixed budget instead of one lump total.)
 function attemptDeadline(test, startedAt) {
   const started = new Date(startedAt).getTime();
   if (test.timerType === 'total') return started + (test.timerValue || 0) * 1000;
-  if (test.timerType === 'perQuestion') return started + (test.timerValue || 0) * (test.questions?.length || 0) * 1000;
-  return null; // 'none' — no deadline
+  return null; // 'none' / 'perQuestion' — no single deadline
+}
+
+// Advances a perQuestion attempt's question pointer to wherever it should be
+// given real elapsed wall-clock time — e.g. if the student closed the app
+// mid-question, this fast-forwards through every fully-elapsed question slot.
+// Each question's timer is anchored to the moment it actually became visible
+// (questionStartedAt), never to a fixed multiple of the test start time, so
+// unused time on an earlier question never extends a later one.
+// Returns { idx, qStart, expired } — expired=true means the whole question
+// budget has been used up (including the last question) and the attempt
+// should be auto-submitted.
+function perQuestionCatchup(test, attempt) {
+  const tv = (test.timerValue || 0) * 1000;
+  const total = test.questions?.length || 0;
+  let idx = attempt.currentQIdx || 0;
+  let qStart = new Date(attempt.questionStartedAt || attempt.startedAt).getTime();
+  if (!tv || !total) return { idx, qStart, expired: false };
+  while (Date.now() - qStart >= tv) {
+    if (idx >= total - 1) return { idx, qStart, expired: true };
+    qStart += tv;
+    idx += 1;
+  }
+  return { idx, qStart, expired: false };
 }
 
 // Scores whatever answers are on the attempt and marks it completed. Used both
@@ -78,6 +102,14 @@ async function sweepExpiredAttempts() {
     for (const a of inProgress) {
       const test = testMap.get(a.testId.toString());
       if (!test) continue;
+      if (test.timerType === 'perQuestion') {
+        const { expired } = perQuestionCatchup(test, a);
+        if (expired) {
+          const doc = await TestAttempt.findById(a._id);
+          if (doc && !doc.completed) await finalizeAttempt(doc, test, { auto: true });
+        }
+        continue;
+      }
       const deadline = attemptDeadline(test, a.startedAt);
       if (deadline !== null && Date.now() > deadline) {
         const doc = await TestAttempt.findById(a._id);
@@ -751,31 +783,50 @@ function initRoutes(app) {
       let attempt = await TestAttempt.findOne({ testId: req.params.id, userId: req.user.id, completed: false });
 
       if (attempt) {
-        const deadline = attemptDeadline(test, attempt.startedAt);
-        if (deadline !== null && Date.now() > deadline) {
-          const result = await finalizeAttempt(attempt, test, { auto: true });
-          return res.status(409).json({ error: 'Time ran out while you were away — test was auto-submitted', autoSubmitted: true, result });
+        if (test.timerType === 'perQuestion') {
+          // Fast-forward through any question slots that fully elapsed while
+          // the student was away, anchored to real per-question start times
+          // (not a fixed multiple of the test start) so no leftover time from
+          // an earlier question ever gets folded into a later one.
+          const { idx, qStart, expired } = perQuestionCatchup(test, attempt);
+          if (expired) {
+            const result = await finalizeAttempt(attempt, test, { auto: true });
+            return res.status(409).json({ error: 'Time ran out while you were away — test was auto-submitted', autoSubmitted: true, result });
+          }
+          if (idx !== attempt.currentQIdx || qStart !== new Date(attempt.questionStartedAt).getTime()) {
+            attempt.currentQIdx = idx;
+            attempt.questionStartedAt = new Date(qStart);
+            await attempt.save();
+          }
+        } else {
+          const deadline = attemptDeadline(test, attempt.startedAt);
+          if (deadline !== null && Date.now() > deadline) {
+            const result = await finalizeAttempt(attempt, test, { auto: true });
+            return res.status(409).json({ error: 'Time ran out while you were away — test was auto-submitted', autoSubmitted: true, result });
+          }
         }
         // Resume exactly where they left off.
         return res.json({
           test: { ...test, questions },
-          attempt: { id: attempt._id, startedAt: attempt.startedAt, answers: attempt.answers, currentQIdx: attempt.currentQIdx },
+          attempt: { id: attempt._id, startedAt: attempt.startedAt, answers: attempt.answers, currentQIdx: attempt.currentQIdx, questionStartedAt: attempt.questionStartedAt },
           resuming: true,
         });
       }
 
+      const now = new Date();
       attempt = await TestAttempt.create({
         testId: req.params.id,
         userId: req.user.id,
         userName: req.user.name,
         answers: new Array(test.questions.length).fill(null),
-        startedAt: new Date(),
+        startedAt: now,
         currentQIdx: 0,
+        questionStartedAt: now,
         completed: false,
       });
       res.json({
         test: { ...test, questions },
-        attempt: { id: attempt._id, startedAt: attempt.startedAt, answers: attempt.answers, currentQIdx: attempt.currentQIdx },
+        attempt: { id: attempt._id, startedAt: attempt.startedAt, answers: attempt.answers, currentQIdx: attempt.currentQIdx, questionStartedAt: attempt.questionStartedAt },
         resuming: false,
       });
     } catch (e) { res.status(500).json({ error: e.message }); }
@@ -792,10 +843,18 @@ function initRoutes(app) {
       if (!attempt) return res.status(404).json({ error: 'No active attempt' });
       const test = await PlannedTest.findById(req.params.id).lean();
       if (test) {
-        const deadline = attemptDeadline(test, attempt.startedAt);
-        if (deadline !== null && Date.now() > deadline) {
-          const result = await finalizeAttempt(attempt, test, { auto: true });
-          return res.status(409).json({ error: 'Time ran out — test was auto-submitted', autoSubmitted: true, result });
+        if (test.timerType === 'perQuestion') {
+          const { expired } = perQuestionCatchup(test, attempt);
+          if (expired) {
+            const result = await finalizeAttempt(attempt, test, { auto: true });
+            return res.status(409).json({ error: 'Time ran out — test was auto-submitted', autoSubmitted: true, result });
+          }
+        } else {
+          const deadline = attemptDeadline(test, attempt.startedAt);
+          if (deadline !== null && Date.now() > deadline) {
+            const result = await finalizeAttempt(attempt, test, { auto: true });
+            return res.status(409).json({ error: 'Time ran out — test was auto-submitted', autoSubmitted: true, result });
+          }
         }
       }
       if (questionIdx >= 0 && questionIdx < attempt.answers.length) {
@@ -804,6 +863,29 @@ function initRoutes(app) {
       attempt.currentQIdx = Math.max(attempt.currentQIdx, questionIdx + 1);
       await attempt.save();
       res.json({ ok: true });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+  });
+
+  // ── Student: mark the real moment a new question became visible ────────────
+  // Called exactly once, right as the client transitions to a new question
+  // (after any reveal pause) — this is what anchors that question's own
+  // fixed timer window server-side, so a rejoin/refresh mid-test resumes
+  // with the correct remaining time instead of re-granting a full slot or
+  // inheriting time left over from the previous question.
+  app.post('/api/tests/:id/qstart', requireAuth, async (req, res) => {
+    try {
+      const { questionIdx } = req.body;
+      if (typeof questionIdx !== 'number') return res.status(400).json({ error: 'questionIdx required' });
+      const attempt = await TestAttempt.findOne({ testId: req.params.id, userId: req.user.id, completed: false });
+      if (!attempt) return res.status(404).json({ error: 'No active attempt' });
+      // Ignore stale/out-of-order calls — only a call for the furthest
+      // question reached so far is allowed to move the anchor forward.
+      if (questionIdx >= attempt.currentQIdx) {
+        attempt.currentQIdx = questionIdx;
+        attempt.questionStartedAt = new Date();
+        await attempt.save();
+      }
+      res.json({ ok: true, questionStartedAt: attempt.questionStartedAt });
     } catch (e) { res.status(500).json({ error: e.message }); }
   });
 
