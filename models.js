@@ -121,6 +121,11 @@ const plannedTestSchema = new mongoose.Schema({
     text:    { type: String },
     options: [{ type: String }],
     correct: { type: Number },
+    // Source folder name (e.g. "10th Urdu") — same tag live quiz attaches to
+    // each question when loaded from GitHub. Lets the test-taking view pick
+    // the right font per question, exactly like the live quiz does, instead
+    // of guessing off the whole test's free-typed title/subject.
+    subject: { type: String, default: '' },
   }],
   // Source metadata (for display / audit)
   sourceRepo:   { type: String, default: '' },
