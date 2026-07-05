@@ -458,13 +458,15 @@ function haltedHTML(){
 ══════════════════════════════════════ */
 function studentDismissedHTML(){
   const allSorted=sortParticipants(haltedSnapshot);
-  // Prefer the exile flag baked into the final leaderboard snapshot itself — by the time
-  // this screen renders, S.exiledPids has already been reset server-side (exile is
+  // Prefer the exile flag baked into each entry of the final leaderboard snapshot — by the
+  // time this screen renders, S.exiledPids has already been reset server-side (exile is
   // session-scoped), so it can no longer be trusted to split the two leaderboards.
   const hasExiledFlags = allSorted.some(p=>'exiled' in p);
   const exiledSet=new Set(S.exiledPids||[]);
   const isExiled = p => hasExiledFlags ? !!p.exiled : exiledSet.has(p.id);
-  const amIExiledD = isExiled({id:myPid, exiled:(allSorted.find(p=>p.id===myPid)||{}).exiled});
+  // Whether *this* student was exiled comes straight from the server (authoritative —
+  // doesn't depend on matching myPid against a possibly-remapped leaderboard entry id).
+  const amIExiledD = dismissedAmIExiled;
   const sorted=amIExiledD
     ? allSorted.filter(p=>isExiled(p))
     : allSorted.filter(p=>!isExiled(p));
@@ -828,7 +830,7 @@ function questionViewHTML(){
     <div class="row between mb2">
       <div class="row gap2"><div id="mic-dot" class="mic-dot"></div><span class="small muted">Score: <strong>${S.myScore||0}</strong> pts</span></div>
       <div class="row gap2">
-        ${isSpeakingNow
+        ${(isSpeakingNow && !_micForcedByHost)
           ? `<button class="btn btn-sm" id="btn-end-speak" style="gap:4px;font-size:.78rem;background:#ede9fe;color:#4338ca;border-color:#a5b4fc">🎙️ Done Speaking</button>`
           : speakRequestPending
             ? `<button class="btn btn-ghost btn-sm" disabled style="gap:4px;font-size:.78rem;opacity:.6"><span style="display:inline-block;width:10px;height:10px;border:2px solid #a5b4fc;border-top-color:#6366f1;border-radius:50%;animation:spin .8s linear infinite"></span> Waiting…</button>`
@@ -3625,6 +3627,11 @@ function attach(){
     if(btn){ btn.disabled=true; btn.style.opacity='.5'; setTimeout(()=>{ btn.disabled=false; btn.style.opacity=''; },10000); }
   });
 
+  // ── STUDENT: Done Speaking button — ends own (non-forced) speaking turn ─
+  on('btn-end-speak', ()=>{
+    if(typeof srEndSelf==='function') srEndSelf();
+  });
+
   // ── STUDENT: Thumbs up button — notifies host with 👍 on their row ───────
   on('btn-thumbs-up', ()=>{
     send({type:'thumb_up', pid:myPid, name:myName||currentUser?.name||'Student'});
@@ -3797,7 +3804,7 @@ function on(id,fn){ document.getElementById(id)?.addEventListener('click',fn); }
 
 function doDismissHome(){
   if(dismissedTimer){clearInterval(dismissedTimer);dismissedTimer=null;}
-  showingDismissed=false; showingHalted=false; haltedSnapshot=[]; haltedTotalQuestions=0;
+  showingDismissed=false; showingHalted=false; haltedSnapshot=[]; haltedTotalQuestions=0; dismissedAmIExiled=false;
   role=null; myName=null; myPid=null; showingProfile=false; prevMyScore=0; scoreGain=0; myLastAnswerTime=null; localAnswerTimes={}; cumulativeAnswerTimes={}; sessionCorrectTimes=[]; startTimerDisplay._lastStart=null; studentQCount=0; haltedTotalLabel=''; haltedTotalQuestions=0;
   // Wipe all LB caches so scores are fresh the next time the user opens the leaderboard
   todayLB=null; weekLB=null; allTimeLB=null;

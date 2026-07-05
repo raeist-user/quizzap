@@ -176,6 +176,7 @@ let myReportedQuestions=new Set(); // track question texts reported by this stud
 
 // Dismissed flow
 let showingDismissed=false, dismissedCountdown=120, dismissedTimer=null;
+let dismissedAmIExiled=false; // set explicitly by the server on 'kicked' — authoritative, doesn't depend on id-matching
 
 // Answer timing (client-side — seconds taken to answer current question)
 let myLastAnswerTime=null;
@@ -939,6 +940,8 @@ function connect(){
         { const fl = m.payload?.finalLeaderboard;
           if(fl && fl.length) haltedSnapshot = fl;
           else { const fp = m.payload?.participants||S.participants||[]; if(fp.length) haltedSnapshot=[...fp]; }
+          // Authoritative flag from the server — avoids any id-matching issues client-side
+          dismissedAmIExiled = !!m.payload?.amIExiled;
           // totalQuestions comes from server (host's pushed question count) — authoritative
           haltedTotalQuestions = m.payload?.totalQuestions || S.pushedCount || 0;
           haltedTotalLabel = haltedTotalQuestions > 0 ? String(haltedTotalQuestions) : '?';
@@ -1133,6 +1136,16 @@ function connect(){
       }
       case 'speak_end': {
         if(role==='participant') srStop(true, m.forcedEnd||false);
+        break;
+      }
+      case 'speak_end_self': {
+        // A student ended their own (non-forced) speaking turn — clean up the host's side.
+        if(role==='host'&&(hlCid===m.fromCid||(m.pid&&hlPid===m.pid))){
+          const endedName=hlName;
+          hlCleanup(); removeActiveSpeakerBanner();
+          if(endedName) showToast(`🎙️ ${endedName} finished speaking.`,'neutral');
+          render();
+        }
         break;
       }
       case 'rtc_speaker_offer': {
@@ -1487,6 +1500,16 @@ function srStop(notify=true,forcedEnd=false){
   // Only re-render when the student was actively speaking (shows/hides the speaking UI)
   // When force-mic ends silently, the DOM is already showing the normal button — no render needed
   if(!wasForced) render();
+}
+
+// Student clicks "Done Speaking" to end their own (non-forced) turn.
+// Tells the host so their active-speaker banner clears too — previously this button
+// had no handler wired to it at all, so clicking it did nothing on either side.
+function srEndSelf(){
+  if(srForced) return; // safety guard — forced sessions can only be ended by the host
+  if(!srActive&&!srPending) return;
+  send({type:'speak_end_self'});
+  srStop(false); // clean up locally; skip the "host ended" toast since the student did this themselves
 }
 
 function srCleanup(){
