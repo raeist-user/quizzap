@@ -283,7 +283,7 @@ function atTestHTML(){
       cls += ' locked';
       if(i===myAnswer) cls += ' chosen';
     }
-    return `<div class="${cls}" data-at-opt="${i}" style="font-size:.86rem"><div class="opt-key">${'ABCD'[i]}</div><span class="${''+urduCls(atTest)}" style="font-size:.86rem">${renderMath(o)}</span></div>`;
+    return `<div class="${cls}" data-at-opt="${i}" style="font-size:.98rem"><div class="opt-key">${'ABCD'[i]}</div><span class="${''+urduCls(atTest)}" style="font-size:.98rem">${renderMath(o)}</span></div>`;
   }).join('');
 
   let notice = '';
@@ -310,10 +310,10 @@ function atTestHTML(){
       initPct=rem/(atTest.timerValue||1)*100;
       const mm=Math.floor(rem/60),ss=Math.floor(rem%60);
       initSecs=`${mm}:${String(ss).padStart(2,'0')}`;
-    } else if(atTest.timerType==='perQuestion' && atStartTime){
-      // Always server-anchored — same formula as the interval and RAF use
-      const qStart = atStartTime + atQIdx * (atTest.timerValue||0) * 1000;
-      const rem=Math.max(0,(atTest.timerValue||0)-(Date.now()-qStart)/1000);
+    } else if(atTest.timerType==='perQuestion' && atQStartTime){
+      // atQStartTime is the real moment this question became visible (server-
+      // anchored via questionStartedAt) — same value the interval and RAF use.
+      const rem=Math.max(0,(atTest.timerValue||0)-(Date.now()-atQStartTime)/1000);
       initPct=rem/(atTest.timerValue||1)*100;
       initSecs=`${Math.ceil(rem)}s`;
     }
@@ -338,7 +338,7 @@ function atTestHTML(){
     </div>
     ${timerSection}
     <div class="page" style="overflow-y:auto;-webkit-overflow-scrolling:touch;flex:1">
-      <h2 class="mb3${urduCls(atTest)}" style="font-size:1.35rem;font-weight:600;line-height:1.2;letter-spacing:-.02em;user-select:none;-webkit-user-select:none">${renderMath(q.text)}</h2>
+      <h2 class="mb3${urduCls(atTest)}" style="font-size:1.48rem;font-weight:600;line-height:1.25;letter-spacing:-.02em;user-select:none;-webkit-user-select:none">${renderMath(q.text)}</h2>
       <div class="opt-grid" style="user-select:none;-webkit-user-select:none">${opts}</div>
       ${notice}
       ${reportRow}
@@ -358,14 +358,36 @@ function atAdvanceQuestion(){
   const total = atTest.questions.length;
   if(atQIdx < total-1){
     atQIdx++;
-    // atQStartTime is not used for per-question timing anymore — the interval
-    // and RAF both derive qStart as atStartTime + atQIdx * timerValue * 1000,
-    // so it is always server-anchored and survives any refresh or rejoin.
+    // Anchor the new question's timer to right now — the exact moment it
+    // becomes visible — so it always gets its own full, fixed timerValue
+    // seconds, regardless of how much time was left over on the previous
+    // question. Synced to the server (best effort) so a refresh/rejoin
+    // resumes with the same anchor instead of a fresh or inherited one.
+    if(atTest.timerType==='perQuestion'){
+      atQStartTime = Date.now();
+      atSyncQuestionStart(atQIdx);
+    }
     render();
   } else {
     render();
     doSubmitTest();
   }
+}
+
+// Best-effort sync of the real per-question start anchor to the server —
+// fire-and-forget, same spirit as atPersistProgress. If it fails, the local
+// atQStartTime still drives the countdown correctly for this session; only a
+// refresh before the next successful sync would fall back to the server's
+// last-known anchor.
+async function atSyncQuestionStart(qIdx){
+  if(!atTest || !atAttemptId) return;
+  try{
+    await fetch('/api/tests/'+atTest._id+'/qstart',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+authToken},
+      body:JSON.stringify({questionIdx:qIdx})
+    });
+  }catch(e){ /* best effort */ }
 }
 
 // Saves one answer to the server-side attempt in the background — this is
@@ -1699,7 +1721,7 @@ function reportsOverlayHTML(){
   }
   const cards=reports.map(r=>{
     const isX=expandedReportRid===r.rid, isEd=editingReportRid===r.rid;
-    const q=r.question, uc=q&&q.subject&&q.subject.toLowerCase()==='urdu';
+    const q=r.question, uc=q&&q.subject&&q.subject.toLowerCase().includes('urdu');
     const s=Math.floor((Date.now()-r.ts)/1000);
     const ago=s<60?s+'s ago':s<3600?Math.floor(s/60)+'m ago':Math.floor(s/3600)+'h ago';
     const headH=`<div class="report-card-head" data-r-expand="${r.rid}">
@@ -3017,18 +3039,13 @@ function attach(){
       // Server-backed anchor — identical on every rejoin, so the deadline never moves.
       atStartTime = new Date(attempt.startedAt).getTime();
 
-      // Resume at the furthest question the server has on record. For a
-      // per-question timer, also catch up to wherever real elapsed time says
-      // we should be — this is what keeps questions "flipping" forward even
-      // if the student was gone for several question-slots' worth of time.
-      let startIdx = attempt.currentQIdx || 0;
-      if(test.timerType==='perQuestion' && test.timerValue>0){
-        const elapsedSlots = Math.floor((Date.now()-atStartTime)/1000/test.timerValue);
-        startIdx = Math.max(startIdx, elapsedSlots);
-      }
-      atQIdx = Math.min(Math.max(startIdx,0), test.questions.length-1);
-      // atQStartTime is no longer used — per-question timing is always computed
-      // as atStartTime + atQIdx * timerValue * 1000 everywhere (interval, RAF, click).
+      // Resume at the furthest question the server has on record. The server
+      // already fast-forwards currentQIdx/questionStartedAt past any fully
+      // elapsed question slots (see perQuestionCatchup in routes.js), so we
+      // just take its word for both — no re-deriving from a fixed formula
+      // that assumes every question used its full time budget.
+      atQIdx = Math.min(Math.max(attempt.currentQIdx||0,0), test.questions.length-1);
+      atQStartTime = attempt.questionStartedAt ? new Date(attempt.questionStartedAt).getTime() : Date.now();
       atQPausedElapsed = 0;
 
       if(data.resuming) showToast('↻ Rejoined — picking up where you left off. The clock kept running.', 'neutral');
@@ -3061,11 +3078,12 @@ function attach(){
       } else if(test.timerType==='perQuestion'){
         atTimerHandle = setInterval(()=>{
           if(!atTest){ clearInterval(atTimerHandle); return; }
-          // Derive question start purely from server anchor — survives any refresh/rejoin
-          const qStart = atStartTime + atQIdx * (test.timerValue||0) * 1000;
+          // atQStartTime is the real moment THIS question became visible —
+          // never a fixed multiple of the test start — so time left over
+          // from an earlier question can never extend this one.
           const elapsed = atAutoAdvancing
             ? atQPausedElapsed / 1000          // frozen during 3 s reveal
-            : (Date.now()-qStart)/1000;
+            : (Date.now()-atQStartTime)/1000;
           const rem = Math.max(0,(test.timerValue||0)-elapsed);
           atPerQLeft = Math.ceil(rem);
           if(rem <= 3 && rem > 0){
@@ -3104,10 +3122,9 @@ function attach(){
 
     atAnswers[atQIdx] = chosen;
     atAutoAdvancing = true;
-    // Snapshot elapsed against the server-anchored question start so the freeze
+    // Snapshot elapsed against this question's real start anchor so the freeze
     // value is consistent with what the interval/RAF compute when unfrozen.
-    const qStart = atStartTime + atQIdx * (atTest.timerValue||0) * 1000;
-    atQPausedElapsed = Date.now() - qStart;
+    atQPausedElapsed = Date.now() - atQStartTime;
     atRevealData = {chosen, correct:correctIdx, isCorrect};
     render();
     playResultSound(isCorrect);

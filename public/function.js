@@ -6,7 +6,7 @@
 /* ══════════════════════════════════════
    PARSER
 ══════════════════════════════════════ */
-function urduCls(q){ return q?.subject?.toLowerCase()==='urdu'?' urdu':''; }
+function urduCls(q){ return q?.subject?.toLowerCase().includes('urdu')?' urdu':''; }
 
 function parseQuestions(text){
   const out=[],lines=text.split('\n').map(l=>l.trim()).filter(Boolean);
