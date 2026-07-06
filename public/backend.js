@@ -51,6 +51,9 @@ let hostEndedTab='public';   // 'public' | 'exiled' — toggle on post-game resu
 let testBoardOpen = false;          // is Test Board overlay open?
 let testBoardTab  = 'create';       // 'create' | 'history'
 let testHistory   = null;           // fetched list of host's tests
+let testHistoryError = null;        // set when /api/tests/host fails — lets the UI
+                                     // show a real error + retry instead of a false
+                                     // "no tests created yet" whenever a fetch fails
 let testViewId    = null;           // currently inspected test in history
 let testViewAttempts = null;        // attempts for testViewId
 let testAttemptDetail = null;       // { attempt, questions } for per-student view
@@ -66,6 +69,7 @@ let tcMsg='';                       // error/success message
 let availTestsOpen = false;         // is Available Tests overlay open?
 let availTestsTab  = 'available';   // 'available' | 'attempted'
 let availTests     = null;          // fetched list of active tests
+let availCountdownHandle = null;    // ticks "Starts in …" labels on scheduled tests
 let myAttempts     = null;          // fetched list of my submitted attempts
 // Active attempt state
 let atTest         = null;
@@ -399,11 +403,16 @@ async function fetchHostSchedules(){
 /* ── PLANNED TEST helpers ─────────────────────────────────────────────────── */
 
 async function fetchTestHistory(){
+  testHistoryError=null;
   try{
     const r=await fetch('/api/tests/host',{headers:{Authorization:'Bearer '+authToken}});
-    const d=await r.json();
-    testHistory=d.tests||[];
-  }catch(e){ testHistory=[]; }
+    const d=await r.json().catch(()=>({}));
+    if(!r.ok) throw new Error(d?.error || `Failed to load tests (HTTP ${r.status})`);
+    testHistory=Array.isArray(d.tests) ? d.tests : [];
+  }catch(e){
+    testHistory=null;
+    testHistoryError = e.message || 'Failed to load tests — check your connection and try again.';
+  }
   render();
 }
 
@@ -414,6 +423,27 @@ async function fetchAvailTests(){
     availTests=d.tests||[];
   }catch(e){ availTests=[]; }
   render();
+  startAvailCountdownTicker();
+}
+
+// Patches each "Starts in …" button directly every second (no full re-render,
+// same lightweight approach the in-test timer uses) so scheduled tests count
+// down live. Once a countdown reaches zero it refetches the list once, which
+// swaps that card over to a real Start/Rejoin button server-side-verified.
+function startAvailCountdownTicker(){
+  if(availCountdownHandle) clearInterval(availCountdownHandle);
+  availCountdownHandle=setInterval(()=>{
+    const els=document.querySelectorAll('[data-countdown-label]');
+    if(!els.length){ clearInterval(availCountdownHandle); availCountdownHandle=null; return; }
+    let anyElapsed=false;
+    els.forEach(el=>{
+      const from=Number(el.dataset.availFrom);
+      const rem=from-Date.now();
+      if(rem<=0){ anyElapsed=true; return; }
+      el.textContent=formatCountdown(rem);
+    });
+    if(anyElapsed){ clearInterval(availCountdownHandle); availCountdownHandle=null; fetchAvailTests(); }
+  },1000);
 }
 
 async function fetchMyAttempts(){

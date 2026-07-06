@@ -65,7 +65,7 @@
 
     html,body{height:100%;scroll-behavior:smooth}
     body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
-    .urdu{font-family:'Noto Nastaliq Urdu','Jameel Noori Nastaleeq','Jameel Noori Nastaliq',serif;direction:rtl;line-height:2.2;text-align:right;unicode-bidi:embed}
+    .urdu{font-family:'Noto Nastaliq Urdu','Jameel Noori Nastaleeq','Jameel Noori Nastaliq',serif;direction:rtl;line-height:2.6;text-align:right;unicode-bidi:embed}
 
     /* NAV */
     nav{display:flex;align-items:center;justify-content:space-between;padding:0 20px;height:58px;border-bottom:1px solid var(--line);background:rgba(255,255,255,.92);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);position:sticky;top:0;z-index:200;gap:12px;}

@@ -188,23 +188,32 @@ function availTestsHTML(){
       return availTests.map(t=>{
         const isAttempted = attemptedIds.has(t._id.toString());
         const isRejoin = !isAttempted && t.inProgress;
+        const now = Date.now();
+        // Scheduled but not yet open — show a live "Starts in …" countdown
+        // instead of a Start button. Rejoining an already-started attempt is
+        // never gated by this, since the window only controls the first start.
+        const notYetOpen = !isAttempted && !isRejoin && t.availFrom && new Date(t.availFrom).getTime() > now;
         const timerLabel = t.timerType==='total'?`⏱ ${Math.round(t.timerValue/60)} min total`
           :t.timerType==='perQuestion'?`⏱ ${t.timerValue}s / question`:'No timer';
-        return `<div class="at-card" data-test-id="${t._id}" style="${isAttempted?'filter:grayscale(1);opacity:.65;':''}${isRejoin?'border-color:#f59e0b;':''}">
+        return `<div class="at-card" data-test-id="${t._id}" style="${isAttempted?'filter:grayscale(1);opacity:.65;':''}${isRejoin?'border-color:#f59e0b;':''}${notYetOpen?'border-color:#94a3b8;':''}">
           <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:8px">
             <div style="flex:1;min-width:0">
               <div style="font-weight:700;font-size:.9rem">${esc(t.title)}</div>
               ${t.subject?`<div style="font-size:.75rem;color:var(--mid);margin-top:1px">📚 ${esc(t.subject)}</div>`:''}
             </div>
-            <button class="btn btn-sm at-start-btn" data-test-id="${t._id}" style="flex-shrink:0;padding:5px 14px;font-size:.78rem;${isAttempted?'background:#9ca3af;border-color:#9ca3af;color:#fff;cursor:pointer;':isRejoin?'background:#f59e0b;border-color:#f59e0b;color:#fff;':'background:#4338ca;border-color:#4338ca;color:#fff;'}">
-              ${isAttempted?'Re-attempt':isRejoin?'↻ Rejoin':'Start →'}
-            </button>
+            ${notYetOpen
+              ? `<button class="btn btn-sm" disabled data-avail-from="${new Date(t.availFrom).getTime()}" data-countdown-label style="flex-shrink:0;padding:5px 14px;font-size:.78rem;background:#e2e8f0;border-color:#e2e8f0;color:#475569;cursor:default;min-width:92px;text-align:center">${formatCountdown(new Date(t.availFrom).getTime()-now)}</button>`
+              : `<button class="btn btn-sm at-start-btn" data-test-id="${t._id}" style="flex-shrink:0;padding:5px 14px;font-size:.78rem;${isAttempted?'background:#9ca3af;border-color:#9ca3af;color:#fff;cursor:pointer;':isRejoin?'background:#f59e0b;border-color:#f59e0b;color:#fff;':'background:#4338ca;border-color:#4338ca;color:#fff;'}">
+                  ${isAttempted?'Re-attempt':isRejoin?'↻ Rejoin':'Start →'}
+                </button>`
+            }
           </div>
           <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
             <span style="font-size:.72rem;background:var(--faint);padding:2px 8px;border-radius:20px;color:var(--mid)">${timerLabel}</span>
             <span style="font-size:.72rem;background:var(--faint);padding:2px 8px;border-radius:20px;color:var(--mid)">📝 ${t.questionCount||0} questions</span>
             ${isAttempted?`<span style="font-size:.72rem;background:#f3f4f6;padding:2px 8px;border-radius:20px;color:#6b7280;font-weight:600">✓ Submitted</span>`:''}
             ${isRejoin?`<span style="font-size:.72rem;background:#fef3c7;padding:2px 8px;border-radius:20px;color:#92400e;font-weight:600">⏳ In progress — clock is still running</span>`:''}
+            ${notYetOpen?`<span style="font-size:.72rem;background:#f1f5f9;padding:2px 8px;border-radius:20px;color:#475569;font-weight:600">🕒 Scheduled — starts ${new Date(t.availFrom).toLocaleString('en',{day:'numeric',month:'short',hour:'numeric',minute:'2-digit'})}</span>`:''}
           </div>
         </div>`;
       }).join('');
@@ -326,8 +335,10 @@ function atTestHTML(){
   // Progress bubbles
   const bubbles = Array.from({length:total},(_,i)=>{
     const isDone=atAnswers[i]!==null&&atAnswers[i]!==undefined;
+    const isCorrect=isDone && atAnswers[i]===atTest.questions[i].correct;
     const isCur=i===atQIdx;
-    return `<div style="width:${isCur?'9px':'6px'};height:${isCur?'9px':'6px'};border-radius:50%;background:${isDone?'#16a34a':isCur?'#6366f1':'var(--line)'};flex-shrink:0;transition:all .15s"></div>`;
+    const bg=isDone?(isCorrect?'#16a34a':'#ef4444'):isCur?'#6366f1':'var(--line)';
+    return `<div style="width:${isCur?'9px':'6px'};height:${isCur?'9px':'6px'};border-radius:50%;background:${bg};flex-shrink:0;transition:all .15s"></div>`;
   }).join('');
 
   return `<div style="position:fixed;inset:0;background:var(--white);z-index:500;display:flex;flex-direction:column;overflow:hidden">
@@ -340,7 +351,7 @@ function atTestHTML(){
     </div>
     ${timerSection}
     <div class="page" style="overflow-y:auto;-webkit-overflow-scrolling:touch;flex:1">
-      <h2 class="mb3${urduCls(q)}" style="font-size:1.48rem;font-weight:600;line-height:1.25;letter-spacing:-.02em;user-select:none;-webkit-user-select:none">${renderMath(q.text)}</h2>
+      <h2 class="mb3${urduCls(q)}" style="${urduCls(q)?'font-size:1.15rem;font-weight:600;letter-spacing:0':'font-size:1.48rem;font-weight:600;line-height:1.25;letter-spacing:-.02em'};user-select:none;-webkit-user-select:none">${renderMath(q.text)}</h2>
       <div class="opt-grid" style="user-select:none;-webkit-user-select:none">${opts}</div>
       ${notice}
       ${reportRow}
@@ -1226,6 +1237,7 @@ function testBoardHTML(){
   function historyTab(){
     if(testAttemptDetail) return attemptDetailView();
     if(testViewId && testViewAttempts) return testLeaderboardView();
+    if(testHistoryError) return `<div style="padding:40px;text-align:center;color:var(--mid)"><div style="font-size:2rem;margin-bottom:8px">⚠️</div><div style="font-size:.85rem;margin-bottom:12px">${esc(testHistoryError)}</div><button class="btn btn-dark btn-sm" id="btn-retry-history">Retry</button></div>`;
     if(!testHistory) return '<div style="padding:40px;text-align:center"><div class="spinner"></div></div>';
     if(!testHistory.length) return `<div style="padding:40px;text-align:center;color:var(--mid)"><div style="font-size:2rem;margin-bottom:8px">📋</div><div style="font-size:.85rem">No tests created yet.</div></div>`;
     return `<div style="padding:12px;display:flex;flex-direction:column;gap:8px">` +
@@ -1241,6 +1253,8 @@ function testBoardHTML(){
         </div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">
           ${t.timerType!=='none'?`<span style="font-size:.7rem;background:var(--faint);padding:2px 7px;border-radius:12px;color:var(--mid)">⏱ ${t.timerType==='total'?Math.round((t.timerValue||0)/60)+' min':t.timerValue+'s/Q'}</span>`:''}
+          ${t.availFrom?`<span style="font-size:.7rem;background:#eef2ff;padding:2px 7px;border-radius:12px;color:#4338ca">🕒 Opens ${new Date(t.availFrom).toLocaleString('en',{day:'numeric',month:'short',hour:'numeric',minute:'2-digit'})}</span>`:''}
+          ${t.availTo?`<span style="font-size:.7rem;background:#fef2f2;padding:2px 7px;border-radius:12px;color:#b91c1c">🔒 Closes ${new Date(t.availTo).toLocaleString('en',{day:'numeric',month:'short',hour:'numeric',minute:'2-digit'})}</span>`:''}
         </div>
         <div style="display:flex;gap:6px">
           <button class="btn btn-dark btn-sm tb-view-btn" data-test-id="${t._id}" style="flex:1;justify-content:center;font-size:.75rem">📊 View Results</button>
@@ -2855,7 +2869,7 @@ function attach(){
   // ── Test Board (host) ─────────────────────────────────────────────────────
   on('btn-test-board-open', ()=>{
     testBoardOpen=true; testBoardTab='create';
-    testHistory=null; testViewId=null; testViewAttempts=null; testAttemptDetail=null;
+    testHistory=null; testHistoryError=null; testViewId=null; testViewAttempts=null; testAttemptDetail=null;
     tcTitle=''; tcSubject=''; tcTimerType='none'; tcTimerValue=0;
     tcQSources=[]; tcRandomize=false; tcAvailFrom=''; tcAvailTo=''; tcMsg='';
     render();
@@ -2864,6 +2878,7 @@ function attach(){
   on('btn-test-board-close', ()=>{ testBoardOpen=false; render(); });
   on('btn-tb-tab-create', ()=>{ testBoardTab='create'; render(); });
   on('btn-tb-tab-history', ()=>{ testBoardTab='history'; render(); });
+  on('btn-retry-history', ()=>{ fetchTestHistory(); });
 
   // Create Test form inputs — use 'input' so state syncs while typing (fixes publish always-disabled bug)
   document.getElementById('tc-title')?.addEventListener('input', e=>{ tcTitle=e.target.value; /* no render() — avoids destroying the input mid-type */ });
@@ -2945,13 +2960,19 @@ function attach(){
       const timerVal = tcTimerType==='total'
         ? (parseInt(timerEl?.value)||tcTimerValue)*60
         : (parseInt(timerEl?.value)||tcTimerValue);
+      // datetime-local inputs give a timezone-less string (e.g. "2026-07-10T14:30").
+      // Resolve it using the BROWSER's own timezone (new Date() on a bare
+      // datetime-local string is parsed as local time) and convert to a real
+      // UTC ISO string before sending, so the server — which may run in a
+      // different timezone — parses the exact same moment the host picked.
+      const toUtcIso = v => v ? new Date(v).toISOString() : null;
       await apiPost('/api/tests',{
         title:titleVal, subject:subjectVal,
         timerType:tcTimerType, timerValue:timerVal,
         questions:allQs,
         randomize:tcRandomize,
-        availFrom:tcAvailFrom||null,
-        availTo:tcAvailTo||null,
+        availFrom:toUtcIso(tcAvailFrom),
+        availTo:toUtcIso(tcAvailTo),
         sourceRepo:tcQSources[0]?.repo||'',
         sourceFiles:tcQSources.flatMap(s=>s.files||[]),
         sourceStart:tcQSources[0]?.start||0,
@@ -3009,7 +3030,7 @@ function attach(){
     availTestsOpen=true; availTestsTab='available'; availTests=null; myAttempts=null; render();
     fetchAvailTests(); fetchMyAttempts();
   });
-  on('btn-avail-tests-close', ()=>{ availTestsOpen=false; atTest=null; atAttemptId=null; atAnswers=[]; if(atTimerHandle){clearInterval(atTimerHandle);atTimerHandle=null;} render(); });
+  on('btn-avail-tests-close', ()=>{ availTestsOpen=false; atTest=null; atAttemptId=null; atAnswers=[]; if(atTimerHandle){clearInterval(atTimerHandle);atTimerHandle=null;} if(availCountdownHandle){clearInterval(availCountdownHandle);availCountdownHandle=null;} render(); });
   on('btn-at-tab-available', ()=>{ availTestsTab='available'; render(); });
   on('btn-at-tab-attempted', ()=>{ availTestsTab='attempted'; render(); });
 
@@ -3019,10 +3040,16 @@ function attach(){
   // the now-renamed "Rejoin" button) — so closing the app, losing signal, or
   // switching devices can never reset the clock or wipe answers already given.
   document.querySelectorAll('.at-start-btn').forEach(btn=>btn.addEventListener('click',async()=>{
+    if(btn.disabled) return;
     const testId = btn.dataset.testId;
     try{
       const r = await fetch('/api/tests/'+testId+'/take', {headers:{Authorization:'Bearer '+authToken}});
       const data = await r.json();
+      if(r.status===403){
+        showToast(data.error||'This test is not available right now','neutral');
+        await fetchAvailTests();
+        return;
+      }
       if(r.status===409){
         if(data.autoSubmitted){
           showToast(`⏱ Time ran out while you were away — auto-submitted. Score: ${data.result?.score??'?'}/${data.result?.total??'?'}`,'neutral');
@@ -3141,13 +3168,15 @@ function attach(){
     const qIdx = parseInt(btn.dataset.qIdx??atQIdx);
     btn.disabled=true; btn.textContent='Sending…';
     try{
-      await fetch('/api/tests/'+atTest._id+'/report',{
+      const r = await fetch('/api/tests/'+atTest._id+'/report',{
         method:'POST',
         headers:{'Content-Type':'application/json','Authorization':'Bearer '+authToken},
         body:JSON.stringify({questionIdx:qIdx, reportedAnswer:atAnswers[qIdx]??null, note:''})
       });
+      const data = await r.json().catch(()=>({}));
+      if(!r.ok) throw new Error(data?.error || `HTTP ${r.status}`);
       showToast('🚩 Question reported — thanks!','good');
-    }catch(e){ showToast('Failed to send report','bad'); btn.disabled=false; btn.textContent='Report this question'; }
+    }catch(e){ showToast('Failed to send report — please try again','bad'); btn.disabled=false; btn.textContent='Report this question'; }
   }));
 
   // Cleanup helper (called by doSubmitTest)

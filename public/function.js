@@ -20,6 +20,19 @@ function urduCls(q){
   return URDU_SCRIPT_RE.test(sample) ? ' urdu' : '';
 }
 
+// Formats a millisecond duration as a compact countdown label, e.g.
+// "2d 3h", "4h 12m", "12m 05s", "08s" — used to show "Starts in …" on a
+// scheduled test until its availFrom time arrives.
+function formatCountdown(ms){
+  if(ms<=0) return '0s';
+  const s=Math.floor(ms/1000);
+  const d=Math.floor(s/86400), h=Math.floor((s%86400)/3600), m=Math.floor((s%3600)/60), sec=s%60;
+  if(d>0) return `${d}d ${h}h`;
+  if(h>0) return `${h}h ${m}m`;
+  if(m>0) return `${m}m ${String(sec).padStart(2,'0')}s`;
+  return `${sec}s`;
+}
+
 function parseQuestions(text){
   const out=[],lines=text.split('\n').map(l=>l.trim()).filter(Boolean);
   for(let i=0;i<lines.length;i++){
