@@ -663,13 +663,20 @@ function initRoutes(app) {
   app.post('/api/tests', requireHost, async (req, res) => {
     try {
       const { title, subject, timerType, timerValue, questions,
-              sourceRepo, sourceFiles, sourceStart, sourceCount } = req.body;
+              sourceRepo, sourceFiles, sourceStart, sourceCount,
+              availFrom, availTo } = req.body;
       if (!title?.trim()) return res.status(400).json({ error: 'Title required' });
       if (!questions?.length) return res.status(400).json({ error: 'No questions provided' });
+      const from = availFrom ? new Date(availFrom) : null;
+      const to   = availTo   ? new Date(availTo)   : null;
+      if (from && isNaN(from.getTime())) return res.status(400).json({ error: 'Invalid start time' });
+      if (to && isNaN(to.getTime()))     return res.status(400).json({ error: 'Invalid end time' });
+      if (from && to && from >= to)      return res.status(400).json({ error: 'Start time must be before end time' });
       const test = await PlannedTest.create({
         title: title.trim(), subject: (subject||'').trim(),
         timerType: timerType||'none', timerValue: timerValue||0,
         questions, sourceRepo, sourceFiles, sourceStart, sourceCount,
+        availFrom: from, availTo: to,
         createdBy: req.user.id,
       });
       res.json({ ok: true, test });
@@ -682,7 +689,10 @@ function initRoutes(app) {
       const tests = await PlannedTest.find({ createdBy: req.user.id })
         .select('-questions').sort({ createdAt: -1 }).lean();
       res.json({ tests });
-    } catch (e) { res.status(500).json({ error: e.message }); }
+    } catch (e) {
+      console.error('/api/tests/host error:', e);
+      res.status(500).json({ error: e.message });
+    }
   });
 
   // ── Host: get one test with full questions ─────────────────────────────────
@@ -739,8 +749,14 @@ function initRoutes(app) {
   // ── Student: list available (active) tests ────────────────────────────────
   app.get('/api/tests', requireAuth, async (req, res) => {
     try {
-      const tests = await PlannedTest.find({ status: 'active' })
-        .select('title subject timerType timerValue questions createdAt sourceRepo')
+      const now = new Date();
+      const tests = await PlannedTest.find({
+        status: 'active',
+        // Still show tests scheduled to start in the future (so the client can
+        // render a countdown) — only fully hide ones whose end time has passed.
+        $or: [{ availTo: null }, { availTo: { $gte: now } }],
+      })
+        .select('title subject timerType timerValue questions createdAt sourceRepo availFrom availTo')
         .lean();
       // Which of these does this student already have an unfinished attempt on?
       // Drives the Start → Rejoin button swap on the client.
@@ -814,6 +830,12 @@ function initRoutes(app) {
       }
 
       const now = new Date();
+      if (test.availFrom && now < new Date(test.availFrom)) {
+        return res.status(403).json({ error: 'This test hasn\'t started yet', availFrom: test.availFrom });
+      }
+      if (test.availTo && now > new Date(test.availTo)) {
+        return res.status(403).json({ error: 'This test has closed' });
+      }
       attempt = await TestAttempt.create({
         testId: req.params.id,
         userId: req.user.id,
@@ -938,10 +960,15 @@ function initRoutes(app) {
       if (!test) return res.status(404).json({ error: 'Test not found' });
       const q = test.questions[questionIdx];
       if (!q) return res.status(400).json({ error: 'Invalid question index' });
-      // Also save to the main ReportDB so host sees it in the reports panel
-      const nextRid = (await ReportDB.countDocuments()) + 1;
-      await ReportDB.create({
-        rid: nextRid,
+      // Uses the same shared, monotonically-increasing counter as the live-quiz
+      // and self-quiz report paths (seeded from the DB's max rid at startup).
+      // The previous countDocuments()+1 scheme broke the moment any report was
+      // ever deleted (e.g. host dismissing one via the live reports panel) —
+      // count() no longer matched the true max rid, so the next report's id
+      // could collide with an existing document and fail the unique index,
+      // throwing a 500 that the client silently swallowed as "sent".
+      const newRep = {
+        rid: ++shared.reportCounter,
         question: { text: q.text, options: q.options },
         correct: q.correct,
         reportedAnswer: reportedAnswer ?? null,
@@ -951,9 +978,18 @@ function initRoutes(app) {
         source: 'test',
         ts: Date.now(),
         count: 1,
-      });
+      };
+      // Also add to the in-memory list the host's live reports panel/badge
+      // actually reads from — writing to Mongo alone (as before) never
+      // surfaced test reports there at all, live or on reload.
+      shared.questionReports.push(newRep);
+      txHost({ type: 'report_received', reports: shared.questionReports });
+      await ReportDB.create(newRep);
       res.json({ ok: true });
-    } catch (e) { res.status(500).json({ error: e.message }); }
+    } catch (e) {
+      console.error('/api/tests/:testId/report error:', e.message);
+      res.status(500).json({ error: e.message });
+    }
   });
 }
 

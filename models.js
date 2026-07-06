@@ -133,6 +133,11 @@ const plannedTestSchema = new mongoose.Schema({
   sourceStart:  { type: Number, default: 0 },         // nth question start index
   sourceCount:  { type: Number, default: 0 },
   status:       { type: String, enum: ['active','closed'], default: 'active' },
+  // Scheduling window — test is only startable once availFrom has passed
+  // (if set) and before availTo (if set). Null means no restriction on that
+  // side. The student-facing list shows a live countdown until availFrom.
+  availFrom:    { type: Date, default: null },
+  availTo:      { type: Date, default: null },
   createdBy:    { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   createdAt:    { type: Date, default: Date.now },
 });
