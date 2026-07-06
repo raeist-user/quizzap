@@ -230,7 +230,7 @@
 
     /* PARTICIPANT OPTIONS */
     .opt-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-    .opt-card{display:flex;align-items:center;gap:11px;padding:16px 14px;border:1.5px solid var(--line);border-radius:var(--r-lg);cursor:pointer;background:var(--white);transition:all var(--t-fast);font-size:.98rem;position:relative;overflow:hidden}
+    .opt-card{display:flex;align-items:center;gap:11px;padding:17px 14px;border:1.5px solid var(--line);border-radius:var(--r-lg);cursor:pointer;background:var(--white);transition:all var(--t-fast);font-size:1.08rem;position:relative;overflow:hidden}
     .opt-card .urdu{font-family:'Noto Nastaliq Urdu','Jameel Noori Nastaleeq','Jameel Noori Nastaliq',serif!important;direction:rtl;text-align:right;width:100%}
     .opt-card:not(.locked):hover{border-color:var(--ink);transform:translateY(-2px)}
     .opt-card:not(.locked):active{transform:scale(.98) translateY(0)}

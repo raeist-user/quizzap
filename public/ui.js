@@ -283,7 +283,7 @@ function atTestHTML(){
       cls += ' locked';
       if(i===myAnswer) cls += ' chosen';
     }
-    return `<div class="${cls}" data-at-opt="${i}" style="font-size:.98rem"><div class="opt-key">${'ABCD'[i]}</div><span class="${''+urduCls(q)}" style="font-size:.98rem">${renderMath(o)}</span></div>`;
+    return `<div class="${cls}" data-at-opt="${i}" style="font-size:1.08rem"><div class="opt-key">${'ABCD'[i]}</div><span class="${''+urduCls(q)}" style="font-size:1.08rem">${renderMath(o)}</span></div>`;
   }).join('');
 
   let notice = '';
@@ -317,7 +317,7 @@ function atTestHTML(){
       initPct=rem/(atTest.timerValue||1)*100;
       initSecs=`${Math.ceil(rem)}s`;
     }
-    timerSection=`<div class="timer-wrap">
+    timerSection=`<div class="timer-wrap" style="padding:0 16px;margin-top:12px">
       <div class="timer-bar-track"><div id="at-timer-bar" class="timer-bar-fill" style="width:${Math.max(0,Math.min(100,initPct))}%"></div></div>
       <div id="at-timer-lbl" class="timer-digits">${initSecs}</div>
     </div>`;
@@ -331,10 +331,12 @@ function atTestHTML(){
   }).join('');
 
   return `<div style="position:fixed;inset:0;background:var(--white);z-index:500;display:flex;flex-direction:column;overflow:hidden">
-    <div style="display:flex;align-items:center;justify-content:space-between;padding:7px 13px;border-bottom:1.5px solid var(--line);background:var(--faint);flex-shrink:0">
-      <span class="small muted">Q${atQIdx+1}/${total}</span>
-      <div style="display:flex;gap:3px;align-items:center">${bubbles}</div>
-      <span class="small muted">Answered: <strong style="color:${answered===total?'#16a34a':'var(--ink)'}">${answered}/${total}</strong></span>
+    <div style="flex-shrink:0;border-bottom:1.5px solid var(--line);background:var(--faint);padding:7px 13px">
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <span class="small muted">Q${atQIdx+1}/${total}</span>
+        <span class="small muted">Answered: <strong style="color:${answered===total?'#16a34a':'var(--ink)'}">${answered}/${total}</strong></span>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;justify-content:center;gap:4px;margin-top:6px">${bubbles}</div>
     </div>
     ${timerSection}
     <div class="page" style="overflow-y:auto;-webkit-overflow-scrolling:touch;flex:1">
