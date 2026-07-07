@@ -686,7 +686,14 @@ function initRoutes(app) {
   // ── Host: list all tests ───────────────────────────────────────────────────
   app.get('/api/tests/host', requireHost, async (req, res) => {
     try {
-      const tests = await PlannedTest.find({ createdBy: req.user.id })
+      // Not scoped to createdBy: this is a single-admin app (one 'host' role,
+      // not per-teacher isolation — see /api/tests/:id/host below, which
+      // already has no such restriction). Filtering the list by createdBy
+      // meant a test became permanently invisible in history the moment it
+      // was created under a different host session/account than whichever
+      // one is currently logged in — even though it's still fully active
+      // and students can take it. Every host should see every test.
+      const tests = await PlannedTest.find({})
         .select('-questions').sort({ createdAt: -1 }).lean();
       res.json({ tests });
     } catch (e) {
@@ -710,7 +717,7 @@ function initRoutes(app) {
       const { status } = req.body;
       if (!['active','closed'].includes(status)) return res.status(400).json({ error: 'Invalid status' });
       const test = await PlannedTest.findOneAndUpdate(
-        { _id: req.params.id, createdBy: req.user.id },
+        { _id: req.params.id },
         { status }, { new: true }
       );
       if (!test) return res.status(404).json({ error: 'Not found' });
@@ -721,7 +728,7 @@ function initRoutes(app) {
   // ── Host: delete a test ───────────────────────────────────────────────────
   app.delete('/api/tests/:id', requireHost, async (req, res) => {
     try {
-      await PlannedTest.findOneAndDelete({ _id: req.params.id, createdBy: req.user.id });
+      await PlannedTest.findOneAndDelete({ _id: req.params.id });
       await TestAttempt.deleteMany({ testId: req.params.id });
       res.json({ ok: true });
     } catch (e) { res.status(500).json({ error: e.message }); }
@@ -969,7 +976,7 @@ function initRoutes(app) {
       // throwing a 500 that the client silently swallowed as "sent".
       const newRep = {
         rid: ++shared.reportCounter,
-        question: { text: q.text, options: q.options },
+        question: { text: q.text, options: q.options, subject: q.subject||'', chapter: q.chapter||'' },
         correct: q.correct,
         reportedAnswer: reportedAnswer ?? null,
         reporterName: req.user.name,

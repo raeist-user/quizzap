@@ -126,6 +126,10 @@ const plannedTestSchema = new mongoose.Schema({
     // the right font per question, exactly like the live quiz does, instead
     // of guessing off the whole test's free-typed title/subject.
     subject: { type: String, default: '' },
+    // Source filename (without .txt) — together with subject this is what
+    // the host's "Save & Fix" / delete-from-GitHub tools need to locate the
+    // original question in its source file.
+    chapter: { type: String, default: '' },
   }],
   // Source metadata (for display / audit)
   sourceRepo:   { type: String, default: '' },
