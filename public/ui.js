@@ -2877,7 +2877,7 @@ function attach(){
   });
   on('btn-test-board-close', ()=>{ testBoardOpen=false; render(); });
   on('btn-tb-tab-create', ()=>{ testBoardTab='create'; render(); });
-  on('btn-tb-tab-history', ()=>{ testBoardTab='history'; render(); });
+  on('btn-tb-tab-history', ()=>{ testBoardTab='history'; render(); fetchTestHistory(); });
   on('btn-retry-history', ()=>{ fetchTestHistory(); });
 
   // Create Test form inputs — use 'input' so state syncs while typing (fixes publish always-disabled bug)
