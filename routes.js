@@ -960,38 +960,61 @@ function initRoutes(app) {
   });
 
   // ── Student: submit a question report during a test ───────────────────────
+  // Mirrors ws.js's 'report_question' handler for live quiz exactly: same
+  // student can't double-report the same question, and a second student
+  // reporting an already-reported question merges into it (count++,
+  // reporterPids) instead of spawning a duplicate entry.
   app.post('/api/tests/:testId/report', requireAuth, async (req, res) => {
     try {
       const { questionIdx, reportedAnswer, note } = req.body;
       const test = await PlannedTest.findById(req.params.testId).lean();
       if (!test) return res.status(404).json({ error: 'Test not found' });
       const q = test.questions[questionIdx];
-      if (!q) return res.status(400).json({ error: 'Invalid question index' });
-      // Uses the same shared, monotonically-increasing counter as the live-quiz
-      // and self-quiz report paths (seeded from the DB's max rid at startup).
-      // The previous countDocuments()+1 scheme broke the moment any report was
-      // ever deleted (e.g. host dismissing one via the live reports panel) —
-      // count() no longer matched the true max rid, so the next report's id
-      // could collide with an existing document and fail the unique index,
-      // throwing a 500 that the client silently swallowed as "sent".
-      const newRep = {
-        rid: ++shared.reportCounter,
-        question: { text: q.text, options: q.options, subject: q.subject||'', chapter: q.chapter||'' },
-        correct: q.correct,
-        reportedAnswer: reportedAnswer ?? null,
-        reporterName: req.user.name,
-        reporterPids: [],
-        note: note || '',
-        source: 'test',
-        ts: Date.now(),
-        count: 1,
-      };
-      // Also add to the in-memory list the host's live reports panel/badge
-      // actually reads from — writing to Mongo alone (as before) never
-      // surfaced test reports there at all, live or on reload.
-      shared.questionReports.push(newRep);
+      if (!q || !q.text) return res.status(400).json({ error: 'Invalid question index' });
+
+      const reporterId = req.user.id.toString();
+
+      const existingRep = shared.questionReports.find(r =>
+        r.question.text === q.text && r.reporterPids.includes(reporterId)
+      );
+      if (existingRep) return res.json({ ok: true, alreadyReported: true });
+
+      const dupRep = shared.questionReports.find(r => r.question.text === q.text);
+      if (dupRep) {
+        dupRep.count += 1;
+        dupRep.reporterPids.push(reporterId);
+        await ReportDB.findOneAndUpdate(
+          { rid: dupRep.rid },
+          { $set: { count: dupRep.count, reporterPids: dupRep.reporterPids } }
+        );
+      } else {
+        // Uses the same shared, monotonically-increasing counter as the
+        // live-quiz and self-quiz report paths (seeded from the DB's max rid
+        // at startup). The previous countDocuments()+1 scheme broke the
+        // moment any report was ever deleted (e.g. host dismissing one via
+        // the live reports panel) — count() no longer matched the true max
+        // rid, so the next report's id could collide with an existing
+        // document and fail the unique index, throwing a 500 that the client
+        // silently swallowed as "sent".
+        const newRep = {
+          rid: ++shared.reportCounter,
+          question: { text: q.text, options: q.options, subject: q.subject||'', chapter: q.chapter||'' },
+          correct: q.correct,
+          reportedAnswer: reportedAnswer ?? null,
+          reporterName: req.user.name,
+          reporterPids: [reporterId],
+          note: note || '',
+          source: 'test',
+          ts: Date.now(),
+          count: 1,
+        };
+        // Also add to the in-memory list the host's live reports panel/badge
+        // actually reads from — writing to Mongo alone (as before) never
+        // surfaced test reports there at all, live or on reload.
+        shared.questionReports.push(newRep);
+        await ReportDB.create(newRep);
+      }
       txHost({ type: 'report_received', reports: shared.questionReports });
-      await ReportDB.create(newRep);
       res.json({ ok: true });
     } catch (e) {
       console.error('/api/tests/:testId/report error:', e.message);
