@@ -593,6 +593,10 @@ async function tcBrowserDrillSubject(name){
 
 // Step 3: user tapped a file — fetch it, parse questions, open range selector
 async function tcBrowserPickFile(filePath, displayName){
+  // Capture BEFORE resetting below — tcBrowserSubj gets nulled out on the very
+  // next line to close the browser UI, so reading it later in this function
+  // (after that reset) would always yield an empty subject tag.
+  const subjName = tcBrowserSubj;
   // Collapse browser immediately so the overlay stays visible (with loading state)
   tcBrowserOpen=false; tcBrowserSubj=null; tcBrowserFiles=null; tcBrowserErr='';
   testBoardOpen=true; testBoardTab='create';
@@ -613,7 +617,7 @@ async function tcBrowserPickFile(filePath, displayName){
     // Tag each question with its source folder — same subject tag live quiz
     // attaches (see generateQuiz) — so the test-taking view can pick the
     // right font (e.g. Urdu) per question later, not just off the test title.
-    allQ.forEach(q=>{ q.subject=tcBrowserSubj||''; q.chapter=displayName.replace(/\.txt$/i,''); });
+    allQ.forEach(q=>{ q.subject=subjName||''; q.chapter=displayName.replace(/\.txt$/i,''); });
     _showTcRangeSelector(allQ, displayName);
   }catch(e){
     tcMsg='Load failed: '+e.message;

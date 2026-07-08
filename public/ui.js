@@ -1765,6 +1765,13 @@ function reportsOverlayHTML(){
             <div style="font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--mid);margin-bottom:5px">Question text</div>
             <textarea id="r-edit-qtext" style="width:100%;padding:8px 10px;border:1.5px solid var(--ink);border-radius:var(--r);font-family:${uc?'Noto Nastaliq Urdu,serif':'var(--sans)'};font-size:.83rem;line-height:${uc?'2.2':'1.45'};resize:vertical;outline:none;min-height:54px;box-sizing:border-box;${uc?'direction:rtl;text-align:right;':''}">${esc(d.text||'')}</textarea>
           </div>
+          ${(!d.subject||!d.chapter)?`<div style="margin-bottom:10px;padding:9px 10px;background:#fffbeb;border:1px solid #fde68a;border-radius:var(--r)">
+            <div style="font-size:.7rem;color:#92400e;margin-bottom:7px">⚠️ This report predates source tracking — enter where this question lives on GitHub to enable Save &amp; Fix.</div>
+            <div style="display:flex;gap:6px">
+              <input id="r-edit-subject" class="form-input" placeholder="Subject folder (e.g. 10th Urdu)" value="${esc(d.subject||'')}" style="flex:1;font-size:.78rem;padding:6px 8px"/>
+              <input id="r-edit-chapter" class="form-input" placeholder="File name (no .txt)" value="${esc(d.chapter||'')}" style="flex:1;font-size:.78rem;padding:6px 8px"/>
+            </div>
+          </div>`:''}
           <div style="margin-bottom:10px">
             <div style="font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--mid);margin-bottom:6px">Options</div>
             <div style="display:flex;flex-direction:column;gap:5px">
@@ -3779,6 +3786,8 @@ function attach(){
         text: rep.question?.text||'',
         options: (rep.question?.options||[]).slice(),
         correct: rep.correct??0,
+        subject: rep.question?.subject||'',
+        chapter: rep.question?.chapter||'',
         rid,
       };
       render();
@@ -3808,11 +3817,22 @@ function attach(){
     const ta=document.getElementById('r-edit-qtext');
     if(ta) editReportDraft.text=ta.value;
     document.querySelectorAll('[data-r-opt]').forEach(inp=>{ editReportDraft.options[+inp.dataset.rOpt]=inp.value; });
+    const subjInp=document.getElementById('r-edit-subject');
+    const chapInp=document.getElementById('r-edit-chapter');
+    if(subjInp) editReportDraft.subject=subjInp.value.trim();
+    if(chapInp) editReportDraft.chapter=chapInp.value.trim();
     if(!editReportDraft.text?.trim()){ if(msg){msg.textContent='Question text cannot be empty';msg.style.color='var(--bad)';}return; }
     const rep=receivedReports.find(r=>r.rid===editReportDraft.rid);
     if(!rep){ if(msg){msg.textContent='Report not found';msg.style.color='var(--bad)';}return; }
+    // Merge any manually-entered subject/chapter (for reports that predate
+    // automatic source tracking) into the question before locating the file.
+    const questionForFix = {
+      ...rep.question,
+      subject: editReportDraft.subject || rep.question?.subject || '',
+      chapter: editReportDraft.chapter || rep.question?.chapter || '',
+    };
     const result=await updateReportedQuestionInGitHub(
-      rep.question,
+      questionForFix,
       editReportDraft.text,
       editReportDraft.options,
       editReportDraft.correct
@@ -3820,7 +3840,7 @@ function attach(){
     if(result.ok){
       // ── Update the live questions array instantly ──────────────────────────
       const fixedQ={
-        ...rep.question,
+        ...questionForFix,
         text: editReportDraft.text.trim(),
         options: editReportDraft.options.slice(),
         correct: editReportDraft.correct,
