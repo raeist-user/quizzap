@@ -3167,7 +3167,7 @@ function attach(){
 
     atPersistProgress(atQIdx, chosen); // saves in the background — doesn't block the reveal
 
-    setTimeout(atAdvanceQuestion, 3000);
+    setTimeout(atAdvanceQuestion, 7000);
   }));
 
   // ── Inline report — no modal, no confirmation, instant send ──────────────
