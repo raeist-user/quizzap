@@ -1352,6 +1352,7 @@ async function submitReport(){
       body:JSON.stringify({
         question:{text:q.text,options:q.options,subject:currentFolder,chapter:(currentFile||'').replace(/\.txt$/i,'')},
         correct:q.correct??null,
+        reportedAnswer:userAnswers[currentIdx]??null,
         reporterName:'Host (Self Quiz)',
         note
       })

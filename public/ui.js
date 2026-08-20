@@ -1822,6 +1822,10 @@ function reportsOverlayHTML(){
             </div>
             <div class="${uc?'urdu':''}" style="font-size:.85rem;line-height:${uc?'2.2':'1.5'};padding:9px 11px;background:var(--faint);border:1px solid var(--line);border-radius:6px">${renderMath(q&&q.text||'')}</div>
           </div>
+          ${r.note?`<div style="margin-bottom:10px">
+            <div style="font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--mid);margin-bottom:5px">&#128172; Reporter's note</div>
+            <div style="font-size:.8rem;line-height:1.5;padding:9px 11px;background:#fffbeb;border:1px solid #fde68a;border-radius:6px;color:#78350f">${esc(r.note)}</div>
+          </div>`:''}
           <div style="margin-bottom:10px">${optR}</div>
           <div style="display:flex;gap:7px;flex-wrap:wrap">
             <button class="btn btn-dark btn-sm" data-r-edit="${r.rid}" style="gap:5px;font-size:.78rem">
