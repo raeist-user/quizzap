@@ -585,7 +585,7 @@ function initRoutes(app) {
 
   app.post('/api/selfquiz/report', async (req, res) => {
     try {
-      const { question, correct, reporterName, note } = req.body;
+      const { question, correct, reportedAnswer, reporterName, note } = req.body;
       if (!question?.text) return res.status(400).json({ error: 'question.text required' });
 
       const existing = shared.questionReports.find(r => r.question.text === question.text);
@@ -593,17 +593,22 @@ function initRoutes(app) {
         existing.count += 1;
         existing.note   = note || existing.note;
         existing.ts     = Date.now();
+        // Fill in the wrong answer if we didn't already have one — keeps the
+        // first concrete example rather than clobbering it with a later null.
+        if (existing.reportedAnswer === null && reportedAnswer !== null && reportedAnswer !== undefined) {
+          existing.reportedAnswer = reportedAnswer;
+        }
         // Sync update to DB
         ReportDB.findOneAndUpdate(
           { rid: existing.rid },
-          { $set: { count: existing.count, note: existing.note, ts: existing.ts } }
+          { $set: { count: existing.count, note: existing.note, ts: existing.ts, reportedAnswer: existing.reportedAnswer } }
         ).catch(() => {});
       } else {
         const newRep = {
           rid:            ++shared.reportCounter,
           question,
           correct:        correct ?? null,
-          reportedAnswer: null,
+          reportedAnswer: reportedAnswer ?? null,
           reporterName:   (reporterName || 'Host (Self Quiz)').slice(0, 40),
           reporterPids:   ['selfquiz'],
           note:           note || '',
