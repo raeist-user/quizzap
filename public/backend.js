@@ -57,6 +57,12 @@ let testHistoryError = null;        // set when /api/tests/host fails — lets t
 let testViewId    = null;           // currently inspected test in history
 let testViewAttempts = null;        // attempts for testViewId
 let testAttemptDetail = null;       // { attempt, questions } for per-student view
+// Reschedule modal (edit availFrom/availTo on an already-created test)
+let testRescheduleId   = null;      // _id of test being rescheduled, or null when closed
+let testRescheduleFrom = '';        // datetime-local string
+let testRescheduleTo   = '';        // datetime-local string
+let testRescheduleMsg  = '';        // error message shown in the modal
+let testRescheduleBusy = false;     // true while the PUT request is in flight
 // Create-test form state
 let tcTitle='', tcSubject='', tcTimerType='none', tcTimerValue=0;
 let tcQSources=[];                  // [{ repo, files, start, count, questions, label }]

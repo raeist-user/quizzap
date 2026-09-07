@@ -1256,12 +1256,42 @@ function testBoardHTML(){
           ${t.availFrom?`<span style="font-size:.7rem;background:#eef2ff;padding:2px 7px;border-radius:12px;color:#4338ca">🕒 Opens ${new Date(t.availFrom).toLocaleString('en',{day:'numeric',month:'short',hour:'numeric',minute:'2-digit'})}</span>`:''}
           ${t.availTo?`<span style="font-size:.7rem;background:#fef2f2;padding:2px 7px;border-radius:12px;color:#b91c1c">🔒 Closes ${new Date(t.availTo).toLocaleString('en',{day:'numeric',month:'short',hour:'numeric',minute:'2-digit'})}</span>`:''}
         </div>
-        <div style="display:flex;gap:6px">
-          <button class="btn btn-dark btn-sm tb-view-btn" data-test-id="${t._id}" style="flex:1;justify-content:center;font-size:.75rem">📊 View Results</button>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <button class="btn btn-dark btn-sm tb-view-btn" data-test-id="${t._id}" style="flex:1;min-width:110px;justify-content:center;font-size:.75rem">📊 View Results</button>
+          <button class="btn btn-ghost btn-sm tb-resched-btn" data-test-id="${t._id}" data-from="${t.availFrom||''}" data-to="${t.availTo||''}" style="font-size:.75rem">🕒 Reschedule</button>
           <button class="btn btn-ghost btn-sm tb-toggle-btn" data-test-id="${t._id}" data-status="${t.status}" style="font-size:.75rem">${t.status==='active'?'Close':'Reopen'}</button>
           <button class="btn btn-ghost btn-sm tb-del-btn" data-test-id="${t._id}" style="font-size:.75rem;color:#be123c;border-color:#fecdd3">🗑</button>
         </div>
       </div>`).join('') + '</div>';
+  }
+
+  // ── Reschedule modal (edit availFrom/availTo on an already-published test) ─
+  function rescheduleOverlayHTML(){
+    if(!testRescheduleId) return '';
+    const t = testHistory?.find(x=>x._id===testRescheduleId)||{};
+    return `<div style="position:fixed;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:flex-end;justify-content:center;z-index:700;backdrop-filter:blur(3px)">
+      <div style="background:var(--white);border-radius:20px 20px 0 0;width:100%;max-width:480px;padding:18px 20px 24px;animation:slideUp .22s ease">
+        <div style="width:36px;height:4px;background:var(--line);border-radius:2px;margin:0 auto 14px"></div>
+        <div style="font-weight:700;font-size:1rem;margin-bottom:2px">🕒 Reschedule Test</div>
+        <div style="font-size:.78rem;color:var(--mid);margin-bottom:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(t.title||'')}</div>
+        <div style="display:flex;gap:8px;margin-bottom:6px">
+          <div style="flex:1">
+            <div style="font-size:.7rem;color:var(--mid);margin-bottom:3px">Opens</div>
+            <input class="form-input" type="datetime-local" id="tr-avail-from" value="${esc(testRescheduleFrom)}" style="font-size:.8rem"/>
+          </div>
+          <div style="flex:1">
+            <div style="font-size:.7rem;color:var(--mid);margin-bottom:3px">Closes</div>
+            <input class="form-input" type="datetime-local" id="tr-avail-to" value="${esc(testRescheduleTo)}" style="font-size:.8rem"/>
+          </div>
+        </div>
+        <div style="font-size:.7rem;color:var(--mid);margin-bottom:12px">Leave a field blank to keep the test open on that side indefinitely</div>
+        ${testRescheduleMsg?`<div style="font-size:.78rem;color:${testRescheduleMsg.startsWith('✓')?'#16a34a':'#dc2626'};margin-bottom:10px">${esc(testRescheduleMsg)}</div>`:''}
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <button class="btn btn-good btn-lg" id="btn-tr-save" style="justify-content:center" ${testRescheduleBusy?'disabled':''}>${testRescheduleBusy?'Saving…':'✓ Save New Schedule'}</button>
+          <button class="btn btn-ghost btn-sm" id="btn-tr-cancel" style="justify-content:center">Cancel</button>
+        </div>
+      </div>
+    </div>`;
   }
 
   // ── Test leaderboard (attempts list) ──────────────────────────────────────
@@ -1290,6 +1320,7 @@ function testBoardHTML(){
           <div style="font-weight:700;font-size:.82rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(test.title||'Test')}</div>
           <div style="font-size:.7rem;color:var(--mid)">${attempts.length} attempt${attempts.length!==1?'s':''}</div>
         </div>
+        <button class="btn btn-dark btn-sm" id="btn-tb-lb-export" ${attempts.length?'':'disabled'} style="padding:5px 10px;font-size:.72rem;flex-shrink:0">📸 Screenshot</button>
       </div>
       <div style="flex:1;overflow-y:auto">${rows}</div>
     </div>`;
@@ -1344,6 +1375,7 @@ function testBoardHTML(){
     </div>
     <div style="flex:1;overflow-y:auto;${testBoardTab==='history'&&(testViewId||testAttemptDetail)?'overflow:hidden;display:flex;flex-direction:column':''}">
       ${testBoardTab==='create' ? createTab() : historyTab()}
+      ${rescheduleOverlayHTML()}
     </div>
   </div>`;
 }
@@ -2886,7 +2918,7 @@ function attach(){
     render();
     fetchTestHistory();
   });
-  on('btn-test-board-close', ()=>{ testBoardOpen=false; render(); });
+  on('btn-test-board-close', ()=>{ testBoardOpen=false; testRescheduleId=null; testRescheduleMsg=''; render(); });
   on('btn-tb-tab-create', ()=>{ testBoardTab='create'; render(); });
   on('btn-tb-tab-history', ()=>{ testBoardTab='history'; render(); fetchTestHistory(); });
   on('btn-retry-history', ()=>{ fetchTestHistory(); });
@@ -3008,6 +3040,49 @@ function attach(){
     }catch(e){ testViewAttempts=[]; }
     render();
   }));
+  // Reschedule: open modal pre-filled with the test's current window
+  function toDatetimeLocal(iso){
+    if(!iso) return '';
+    const d=new Date(iso);
+    if(isNaN(d.getTime())) return '';
+    const pad=n=>String(n).padStart(2,'0');
+    return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  }
+  document.querySelectorAll('.tb-resched-btn').forEach(b=>b.addEventListener('click',()=>{
+    testRescheduleId=b.dataset.testId;
+    testRescheduleFrom=toDatetimeLocal(b.dataset.from);
+    testRescheduleTo=toDatetimeLocal(b.dataset.to);
+    testRescheduleMsg='';
+    testRescheduleBusy=false;
+    render();
+  }));
+  document.getElementById('tr-avail-from')?.addEventListener('change',e=>{ testRescheduleFrom=e.target.value; });
+  document.getElementById('tr-avail-to')?.addEventListener('change',e=>{ testRescheduleTo=e.target.value; });
+  on('btn-tr-cancel', ()=>{ testRescheduleId=null; testRescheduleMsg=''; render(); });
+  on('btn-tr-save', async()=>{
+    const toUtcIso = v => v ? new Date(v).toISOString() : null;
+    const fromVal = document.getElementById('tr-avail-from')?.value ?? testRescheduleFrom;
+    const toVal   = document.getElementById('tr-avail-to')?.value   ?? testRescheduleTo;
+    testRescheduleBusy=true; testRescheduleMsg=''; render();
+    try{
+      const r=await fetch('/api/tests/'+testRescheduleId+'/schedule',{
+        method:'PUT',
+        headers:{'Content-Type':'application/json','Authorization':'Bearer '+authToken},
+        body:JSON.stringify({ availFrom:toUtcIso(fromVal), availTo:toUtcIso(toVal) })
+      });
+      const d=await r.json();
+      if(!r.ok) throw new Error(d.error||'Failed to reschedule');
+      testRescheduleBusy=false;
+      testRescheduleId=null;
+      await fetchTestHistory();
+      showToast('✓ Test rescheduled','good');
+    }catch(e){
+      testRescheduleBusy=false;
+      testRescheduleMsg=e.message||'Failed to reschedule';
+    }
+    render();
+  });
+
   document.querySelectorAll('.tb-toggle-btn').forEach(b=>b.addEventListener('click',async()=>{
     const newStatus=b.dataset.status==='active'?'closed':'active';
     try{
@@ -3024,6 +3099,57 @@ function attach(){
     }catch(e){}
     render();
   }));
+  // Screenshot: same printable-HTML-in-new-tab approach as the live quiz's
+  // final leaderboard export (btn-host-lb-export), applied to a planned
+  // test's attempts (its "aftermath") instead of the live session's scores.
+  on('btn-tb-lb-export', ()=>{
+    const test = testHistory?.find(t=>t._id===testViewId)||{};
+    const attempts = testViewAttempts||[];
+    if(!attempts.length){ showToast('No results to export.','bad'); return; }
+    const dateStr = new Date().toLocaleString('en-IN',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
+    const medals = ['🥇','🥈','🥉'];
+    const rows = attempts.map((a,i)=>{
+      const total=(a.correct||0)+(a.incorrect||0)+(a.skipped||0);
+      const pct = total>0 ? ((a.score||0)/total*100).toFixed(1)+'%' : '';
+      return `<tr class="${i<3?'top'+i:''}">
+        <td class="rank">${medals[i]||('#'+(i+1))}</td>
+        <td class="name">${esc(a.userName||'Anonymous')}</td>
+        <td class="score">${a.score||0}<span class="total">/${total||'?'}</span></td>
+        <td class="pct">${pct}</td>
+      </tr>`;
+    }).join('');
+    const html=`<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"/>
+<title>SCC ${esc(test.title||'Test')} — Results</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Segoe UI',Arial,sans-serif;background:#fff;color:#111;padding:32px 24px;max-width:680px;margin:0 auto}
+  h1{font-size:1.7rem;font-weight:800;margin-bottom:4px;text-align:center}
+  .meta{text-align:center;font-size:.85rem;color:#666;margin-bottom:28px}
+  table{width:100%;border-collapse:collapse;margin-top:8px}
+  th{background:#111;color:#fff;padding:10px 14px;text-align:left;font-size:.8rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em}
+  td{padding:9px 14px;border-bottom:1px solid #e5e5e5;font-size:.9rem;vertical-align:middle}
+  tr.top0 td{background:#fffbeb;font-weight:700}
+  tr.top1 td{background:#f8f8f8;font-weight:600}
+  tr.top2 td{background:#f9f5ff;font-weight:600}
+  td.rank{font-size:1.1rem;width:52px}
+  td.score{font-weight:700;white-space:nowrap}
+  span.total{font-weight:400;font-size:.75rem;color:#888;margin-left:2px}
+  td.pct{color:#555;font-size:.8rem}
+  @media print{body{padding:12px}button{display:none!important}}
+</style></head><body>
+<h1>📋 ${esc(test.title||'Test')} <span style="font-size:1rem;font-weight:600;color:#666">— Results</span></h1>
+<div class="meta">Shadab Coaching Centre &nbsp;·&nbsp; ${dateStr} &nbsp;·&nbsp; ${attempts.length} student${attempts.length!==1?'s':''}${test.subject?` &nbsp;·&nbsp; ${esc(test.subject)}`:''}</div>
+<table>
+  <thead><tr><th>Rank</th><th>Student</th><th>Score</th><th>%</th></tr></thead>
+  <tbody>${rows}</tbody>
+</table>
+<div style="margin-top:24px;text-align:center"><button onclick="window.print()" style="padding:10px 28px;background:#111;color:#fff;border:none;border-radius:8px;font-size:.9rem;font-weight:700;cursor:pointer">🖨️ Print / Save as PDF</button></div>
+</body></html>`;
+    const win=window.open('','_blank');
+    if(win){ win.document.write(html); win.document.close(); setTimeout(()=>win.print(),400); }
+    else showToast('Pop-up blocked — please allow pop-ups and try again.','bad');
+  });
+
   on('btn-tb-back-list', ()=>{ testViewId=null; testViewAttempts=null; testAttemptDetail=null; render(); });
   on('btn-tb-back-attempts', ()=>{ testAttemptDetail=null; render(); });
 
