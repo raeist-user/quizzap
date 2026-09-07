@@ -730,6 +730,25 @@ function initRoutes(app) {
     } catch (e) { res.status(500).json({ error: e.message }); }
   });
 
+  // ── Host: reschedule (update availability window) ─────────────────────────
+  app.put('/api/tests/:id/schedule', requireHost, async (req, res) => {
+    try {
+      const { availFrom, availTo } = req.body;
+      const from = availFrom ? new Date(availFrom) : null;
+      const to   = availTo   ? new Date(availTo)   : null;
+      if (availFrom && isNaN(from.getTime())) return res.status(400).json({ error: 'Invalid start time' });
+      if (availTo && isNaN(to.getTime()))     return res.status(400).json({ error: 'Invalid end time' });
+      if (from && to && from >= to)           return res.status(400).json({ error: 'Start time must be before end time' });
+      const test = await PlannedTest.findOneAndUpdate(
+        { _id: req.params.id },
+        { availFrom: from, availTo: to },
+        { new: true }
+      );
+      if (!test) return res.status(404).json({ error: 'Not found' });
+      res.json({ ok: true, test });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+  });
+
   // ── Host: delete a test ───────────────────────────────────────────────────
   app.delete('/api/tests/:id', requireHost, async (req, res) => {
     try {
