@@ -3965,7 +3965,11 @@ function attach(){
       questionForFix,
       editReportDraft.text,
       editReportDraft.options,
-      editReportDraft.correct
+      editReportDraft.correct,
+      (attempt,total)=>{ // GitHub is still syncing a just-landed commit — keep the host informed while we retry
+        const m=document.getElementById('report-edit-msg');
+        if(m){ m.textContent=`Saving… GitHub is still syncing the last change (retry ${attempt}/${total})`; m.style.color='var(--mid)'; }
+      }
     );
     if(result.ok){
       // ── Update the live questions array instantly ──────────────────────────

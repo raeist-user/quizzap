@@ -2053,6 +2053,31 @@ async function generateQuiz(){
    Reads the source .txt file, removes the question line + its options line,
    renumbers remaining questions, then writes back to GitHub.
 ══════════════════════════════════════ */
+// GitHub's Contents API is eventually consistent: a GET for a file made
+// shortly after a write (to that file or elsewhere in the repo) can
+// transiently 404 for a short window — commonly under a minute — before
+// GitHub's read replicas catch up with the just-landed commit. This is a
+// documented GitHub quirk, not a bug in our data. Without a retry, editing
+// two reports back-to-back means the second edit's read races the first
+// edit's write and fails with a 404 that only clears once GitHub catches up
+// (which is exactly the "works after ~52 seconds" symptom). We retry with
+// backoff so that resolves automatically instead of surfacing an error.
+async function ghGetContentWithRetry(apiUrl, onRetry){
+  const delays=[1500,2500,4000,6500,10000,15000,20000]; // ~60s total worst case
+  let lastStatus=0;
+  for(let i=0;i<=delays.length;i++){
+    const res=await fetch(apiUrl,{headers:ghHeaders(),cache:'no-store'});
+    if(res.ok) return {ok:true,data:await res.json()};
+    lastStatus=res.status;
+    // Only 404 is worth retrying — it's the eventual-consistency case.
+    // Auth/permission errors (401/403) or anything else won't fix itself.
+    if(res.status!==404 || i===delays.length) break;
+    if(onRetry) onRetry(i+1, delays.length+1);
+    await new Promise(r=>setTimeout(r,delays[i]));
+  }
+  return {ok:false,status:lastStatus};
+}
+
 async function deleteQuestionFromGitHub(q){
   if(!q||!q.subject||!q.chapter) return {ok:false,error:'No subject/chapter info on question'};
   if(!isValidToken())             return {ok:false,error:'No GitHub token configured'};
@@ -2061,9 +2086,9 @@ async function deleteQuestionFromGitHub(q){
   const encF=encodeURIComponent(fileName);
   const apiUrl=`https://api.github.com/repos/${GITHUB_REPO}/contents/resources/${encS}/${encF}?ref=${GITHUB_BRANCH}`;
   try{
-    const res=await fetch(apiUrl,{headers:ghHeaders()});
-    if(!res.ok) throw new Error(`Cannot read file (HTTP ${res.status})`);
-    const data=await res.json();
+    const got=await ghGetContentWithRetry(apiUrl);
+    if(!got.ok) throw new Error(`Cannot read file (HTTP ${got.status})`);
+    const data=got.data;
     const bytes=Uint8Array.from(atob(data.content.replace(/\n/g,'')),c=>c.charCodeAt(0));
     const fileText=new TextDecoder('utf-8').decode(bytes);
     const lines=fileText.split('\n');
@@ -2098,7 +2123,7 @@ async function deleteQuestionFromGitHub(q){
   }catch(e){ return {ok:false,error:e.message}; }
 }
 
-async function updateReportedQuestionInGitHub(q, newText, newOptions, newCorrect){
+async function updateReportedQuestionInGitHub(q, newText, newOptions, newCorrect, onRetry){
   if(!q||!q.subject||!q.chapter) return {ok:false,error:'No subject/chapter info on question'};
   if(!isValidToken())             return {ok:false,error:'No GitHub token configured'};
   const fileName=q.chapter+'.txt';
@@ -2106,9 +2131,9 @@ async function updateReportedQuestionInGitHub(q, newText, newOptions, newCorrect
   const encF=encodeURIComponent(fileName);
   const apiUrl=`https://api.github.com/repos/${GITHUB_REPO}/contents/resources/${encS}/${encF}?ref=${GITHUB_BRANCH}`;
   try{
-    const res=await fetch(apiUrl,{headers:ghHeaders()});
-    if(!res.ok) throw new Error(`Cannot read file (HTTP ${res.status})`);
-    const data=await res.json();
+    const got=await ghGetContentWithRetry(apiUrl, onRetry);
+    if(!got.ok) throw new Error(`Cannot read file (HTTP ${got.status})`);
+    const data=got.data;
     const bytes=Uint8Array.from(atob(data.content.replace(/\n/g,'')),c=>c.charCodeAt(0));
     const fileText=new TextDecoder('utf-8').decode(bytes);
     const lines=fileText.split('\n');
