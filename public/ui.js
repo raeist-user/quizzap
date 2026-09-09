@@ -247,6 +247,7 @@ function availTestsHTML(){
           <span>Score: <strong style="color:var(--ink)">${a.score||0}/${total}</strong> (${pct}%)</span>
           <span>${d}</span>
         </div>
+        <button class="btn btn-dark btn-sm attempt-lb-btn" data-test-id="${t._id}" style="width:100%;justify-content:center;margin-top:8px;font-size:.75rem">🏆 View Leaderboard</button>
         <div style="margin-top:8px;padding:6px 10px;background:var(--faint);border-radius:6px;font-size:.72rem;color:var(--mid);text-align:center">
           🔒 Detailed review · <em>Coming soon</em>
         </div>
@@ -264,6 +265,54 @@ function availTestsHTML(){
       <button class="btn" id="btn-at-tab-attempted" style="flex:1;border:none;border-radius:0;padding:10px;font-size:.82rem;font-weight:600;border-bottom:3px solid ${tab==='attempted'?'#6366f1':'transparent'};color:${tab==='attempted'?'#4338ca':'var(--mid)'}">📂 Attempted</button>
     </div>
     <div style="flex:1;overflow-y:auto;padding:12px">${cardBody()}</div>
+  </div>`;
+}
+
+/* ── Student-facing per-test leaderboard ──────────────────────────────────────
+   Compact, mobile-first rank list (no table/screenshot layout) — shown right
+   after a student submits a test, and re-openable anytime after from that
+   test's card in the "Attempted" tab via the 🏆 View Leaderboard button. */
+function testLbOverlayHTML(){
+  if(!testLbOpen) return '';
+  const medals=['🥇','🥈','🥉'];
+  let body;
+  if(testLbLoading){
+    body=`<div style="padding:50px 20px;text-align:center"><div class="spinner"></div></div>`;
+  } else if(testLbError){
+    body=`<div style="padding:40px 20px;text-align:center;color:var(--mid)">
+      <div style="font-size:2rem;margin-bottom:8px">⚠️</div>
+      <div style="font-size:.85rem">${esc(testLbError)}</div>
+    </div>`;
+  } else {
+    const attempts=testLbData?.attempts||[];
+    body=attempts.length ? attempts.map((a,i)=>{
+      const mine=a.userId===testLbData.myUserId;
+      const pct=a.total?Math.round(a.score/a.total*100):0;
+      return `<div style="display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:10px;margin-bottom:5px;background:${mine?'#eef2ff':'var(--white)'};border:1.5px solid ${mine?'#c7d2fe':'var(--line)'}">
+        <div style="width:30px;text-align:center;font-size:${i<3?'1.15rem':'.8rem'};font-weight:700;color:${i<3?'inherit':'var(--mid)'};flex-shrink:0">${medals[i]||('#'+(i+1))}</div>
+        <div style="flex:1;min-width:0;font-size:.85rem;font-weight:${mine?'700':'500'};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(a.userName||'Anonymous')}${mine?' <span style="color:#6366f1;font-weight:700">(You)</span>':''}</div>
+        <div style="text-align:right;flex-shrink:0">
+          <div style="font-size:.85rem;font-weight:700">${a.score}<span style="font-weight:400;color:var(--mid);font-size:.72rem">/${a.total}</span></div>
+          <div style="font-size:.65rem;color:var(--mid)">${pct}%</div>
+        </div>
+      </div>`;
+    }).join('') : `<div style="padding:40px 20px;text-align:center;color:var(--mid)">
+      <div style="font-size:2rem;margin-bottom:8px">🏆</div>
+      <div style="font-size:.85rem">No results yet.</div>
+    </div>`;
+  }
+  const title=testLbData?.test?.title||'Test';
+  const subject=testLbData?.test?.subject;
+  return `<div id="test-lb-overlay" style="position:fixed;inset:0;background:var(--white);z-index:550;display:flex;flex-direction:column;overflow:hidden">
+    <div style="padding:10px 14px;border-bottom:2px solid var(--line);background:var(--faint);flex-shrink:0">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+        <span style="font-weight:700;font-size:.95rem">🏆 Leaderboard</span>
+        <button class="btn btn-ghost btn-sm" id="btn-test-lb-close">✕ Close</button>
+      </div>
+      <div style="font-size:.78rem;font-weight:600;margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(title)}</div>
+      ${subject?`<div style="font-size:.7rem;color:var(--mid)">📚 ${esc(subject)}</div>`:''}
+    </div>
+    <div style="flex:1;overflow-y:auto;padding:10px 12px">${body}</div>
   </div>`;
 }
 
@@ -3168,6 +3217,12 @@ function attach(){
     fetchAvailTests(); fetchMyAttempts();
   });
   on('btn-avail-tests-close', ()=>{ availTestsOpen=false; atTest=null; atAttemptId=null; atAnswers=[]; if(atTimerHandle){clearInterval(atTimerHandle);atTimerHandle=null;} if(availCountdownHandle){clearInterval(availCountdownHandle);availCountdownHandle=null;} render(); });
+
+  // Student per-test leaderboard: open from an attempted-test card, close via ✕
+  document.querySelectorAll('.attempt-lb-btn').forEach(b=>b.addEventListener('click',()=>{
+    openTestLeaderboard(b.dataset.testId);
+  }));
+  on('btn-test-lb-close', closeTestLeaderboard);
   on('btn-at-tab-available', ()=>{ availTestsTab='available'; render(); });
   on('btn-at-tab-attempted', ()=>{ availTestsTab='attempted'; render(); });
 
@@ -4021,6 +4076,7 @@ function doLogout(){ clearAuth(); role=null; myPid=null; myName=null; hostAuthed
 
 /* Shared back navigation */
 function doBack(){
+  if(testLbOpen){ closeTestLeaderboard(); return; }
   if(atTest){
     if(!confirm('Your test is in progress — leaving now does NOT stop the timer. You can rejoin and pick up right where you left off, but any time that passes while you\'re away is still spent. Leave the test?')) return;
     if(atTimerHandle){ clearInterval(atTimerHandle); atTimerHandle=null; }

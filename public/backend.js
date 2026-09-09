@@ -77,6 +77,14 @@ let availTestsTab  = 'available';   // 'available' | 'attempted'
 let availTests     = null;          // fetched list of active tests
 let availCountdownHandle = null;    // ticks "Starts in …" labels on scheduled tests
 let myAttempts     = null;          // fetched list of my submitted attempts
+// Per-test leaderboard, shown to a student for a test they've completed —
+// either auto-opened right after submit, or re-opened later from the
+// "Attempted" tab. Same data shape either way: {test:{title,subject},
+// myUserId, attempts:[{userId,userName,score,total}]}
+let testLbOpen    = false;          // is the leaderboard overlay visible?
+let testLbLoading = false;          // fetch in flight
+let testLbError   = '';             // fetch error message, if any
+let testLbData    = null;           // the fetched leaderboard payload
 // Active attempt state
 let atTest         = null;
 let atAttemptId    = null;        // server-side TestAttempt._id backing the current attempt — lets a rejoin resume the SAME attempt
@@ -461,8 +469,29 @@ async function fetchMyAttempts(){
   render();
 }
 
+// Open the leaderboard overlay for one test (by testId) and fetch its data.
+async function openTestLeaderboard(testId){
+  testLbOpen=true; testLbLoading=true; testLbError=''; testLbData=null;
+  render();
+  try{
+    const r=await fetch('/api/tests/'+testId+'/leaderboard',{headers:{Authorization:'Bearer '+authToken}});
+    const d=await r.json();
+    if(!r.ok) throw new Error(d.error||'Could not load leaderboard');
+    testLbData=d;
+  }catch(e){
+    testLbError=e.message||'Could not load leaderboard';
+  }
+  testLbLoading=false;
+  render();
+}
+function closeTestLeaderboard(){
+  testLbOpen=false; testLbLoading=false; testLbError=''; testLbData=null;
+  render();
+}
+
 async function doSubmitTest(){
   if(!atTest) return;
+  const submittedTestId=atTest._id;
   // Clean up timer interval and beforeunload guard
   if(atTimerHandle){ clearInterval(atTimerHandle); atTimerHandle=null; }
   window.removeEventListener('beforeunload', window._atUnloadGuard);
@@ -479,6 +508,7 @@ async function doSubmitTest(){
     atTest=null; atAttemptId=null; atAnswers=[];
     availTestsTab='attempted';
     await fetchMyAttempts();
+    openTestLeaderboard(submittedTestId); // surface class rankings right away
   }catch(e){
     showToast(e.message||'Submission failed','bad');
   }
@@ -934,6 +964,7 @@ function _injectTestOverlays(){
   syncEl('test-board-overlay-wrap', testBoardHTML());
   syncEl('avail-tests-overlay-wrap', availTestsHTML());
   syncEl('at-test-wrap', atTest?atTestHTML():'');
+  syncEl('test-lb-overlay-wrap', testLbOverlayHTML());
 }
 
 function _paintView(html){
@@ -2174,7 +2205,7 @@ function navPush(){
 // Intercept browser/phone back button
 window.addEventListener('popstate', ()=>{
   // If we're somewhere deep, go back one level
-  if(showingDismissed||showingProfile||role||showingHalted||atTest){
+  if(showingDismissed||showingProfile||role||showingHalted||atTest||testLbOpen){
     doBack();
     // Re-push so the next back press also works
     history.pushState({qz:true}, '', location.href);
