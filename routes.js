@@ -983,6 +983,30 @@ function initRoutes(app) {
     } catch (e) { res.status(500).json({ error: e.message }); }
   });
 
+  // ── Student: class leaderboard for one test — name + score only, no
+  //    answers or per-question detail. Gated behind the requester having
+  //    a completed attempt on that test, so it can't be used to peek at a
+  //    test before taking it or scrape another test's results. ───────────
+  app.get('/api/tests/:id/leaderboard', requireAuth, async (req, res) => {
+    try {
+      const mine = await TestAttempt.findOne({ testId: req.params.id, userId: req.user.id, completed: true }).lean();
+      if (!mine) return res.status(403).json({ error: 'Submit this test to view its leaderboard' });
+      const test = await PlannedTest.findById(req.params.id).select('title subject').lean();
+      if (!test) return res.status(404).json({ error: 'Test not found' });
+      const attempts = await TestAttempt.find({ testId: req.params.id, completed: true })
+        .select('userId userName score correct incorrect skipped submittedAt')
+        .sort({ score: -1, submittedAt: 1 }).lean();
+      res.json({
+        test: { title: test.title, subject: test.subject },
+        myUserId: req.user.id,
+        attempts: attempts.map(a => ({
+          userId: a.userId, userName: a.userName, score: a.score || 0,
+          total: (a.correct || 0) + (a.incorrect || 0) + (a.skipped || 0),
+        })),
+      });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+  });
+
   // ── Student: submit a question report during a test ───────────────────────
   // Mirrors ws.js's 'report_question' handler for live quiz exactly: same
   // student can't double-report the same question, and a second student
