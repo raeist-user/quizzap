@@ -77,7 +77,7 @@
 (A) काँच की सिली, (B) उत्तल लेंस, (C) अवतल दर्पण, (D) प्रिज्म @
 
 किसी माध्यम के अपवर्तनांक का मान क्या होता है?
-(A) $\frac{\sin r}{\sin i}$, (B) $\sin i + \sin r$, (C) $\frac{\sin i}{\sin r}$ @, (D) $\frac{\sin i}{\sin r}$
+(A) $\frac{\sin r}{\sin i}$, (B) $\sin i + \sin r$, (C) $\frac{\sin i}{\sin r}$ @, (D) $\frac{\sin i}{\cos r}$
 
 अवतल लेंस का आवर्धन $m$ किसके बराबर होता है?
 (A) $u + v$, (B) $\frac{u}{v}$, (C) $\frac{v}{u}$ @, (D) $uv$
