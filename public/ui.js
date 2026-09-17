@@ -247,6 +247,7 @@ function availTestsHTML(){
           <span>Score: <strong style="color:var(--ink)">${a.score||0}/${total}</strong> (${pct}%)</span>
           <span>${d}</span>
         </div>
+        <button class="btn btn-sm" disabled style="width:100%;justify-content:center;margin-top:8px;font-size:.75rem;background:#e5e7eb;color:#9ca3af;border-color:#e5e7eb;cursor:not-allowed;pointer-events:none">🏆 View Leaderboard</button>
         <div style="margin-top:8px;padding:6px 10px;background:var(--faint);border-radius:6px;font-size:.72rem;color:var(--mid);text-align:center">
           🔒 Detailed review · <em>Coming soon</em>
         </div>
