@@ -247,7 +247,6 @@ function availTestsHTML(){
           <span>Score: <strong style="color:var(--ink)">${a.score||0}/${total}</strong> (${pct}%)</span>
           <span>${d}</span>
         </div>
-        <button class="btn btn-dark btn-sm attempt-lb-btn" data-test-id="${t._id}" style="width:100%;justify-content:center;margin-top:8px;font-size:.75rem">🏆 View Leaderboard</button>
         <div style="margin-top:8px;padding:6px 10px;background:var(--faint);border-radius:6px;font-size:.72rem;color:var(--mid);text-align:center">
           🔒 Detailed review · <em>Coming soon</em>
         </div>
@@ -3218,11 +3217,8 @@ function attach(){
   });
   on('btn-avail-tests-close', ()=>{ availTestsOpen=false; atTest=null; atAttemptId=null; atAnswers=[]; if(atTimerHandle){clearInterval(atTimerHandle);atTimerHandle=null;} if(availCountdownHandle){clearInterval(availCountdownHandle);availCountdownHandle=null;} render(); });
 
-  // Student per-test leaderboard: open from an attempted-test card, close via ✕
-  document.querySelectorAll('.attempt-lb-btn').forEach(b=>b.addEventListener('click',()=>{
-    openTestLeaderboard(b.dataset.testId);
-  }));
-  on('btn-test-lb-close', closeTestLeaderboard);
+  // Student per-test leaderboard has been removed — students now go straight
+  // to their own results in the Attempted tab, no leaderboard button/overlay.
   on('btn-at-tab-available', ()=>{ availTestsTab='available'; render(); });
   on('btn-at-tab-attempted', ()=>{ availTestsTab='attempted'; render(); });
 
@@ -4076,7 +4072,6 @@ function doLogout(){ clearAuth(); role=null; myPid=null; myName=null; hostAuthed
 
 /* Shared back navigation */
 function doBack(){
-  if(testLbOpen){ closeTestLeaderboard(); return; }
   if(atTest){
     if(!confirm('Your test is in progress — leaving now does NOT stop the timer. You can rejoin and pick up right where you left off, but any time that passes while you\'re away is still spent. Leave the test?')) return;
     if(atTimerHandle){ clearInterval(atTimerHandle); atTimerHandle=null; }

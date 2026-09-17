@@ -469,29 +469,14 @@ async function fetchMyAttempts(){
   render();
 }
 
-// Open the leaderboard overlay for one test (by testId) and fetch its data.
-async function openTestLeaderboard(testId){
-  testLbOpen=true; testLbLoading=true; testLbError=''; testLbData=null;
-  render();
-  try{
-    const r=await fetch('/api/tests/'+testId+'/leaderboard',{headers:{Authorization:'Bearer '+authToken}});
-    const d=await r.json();
-    if(!r.ok) throw new Error(d.error||'Could not load leaderboard');
-    testLbData=d;
-  }catch(e){
-    testLbError=e.message||'Could not load leaderboard';
-  }
-  testLbLoading=false;
-  render();
-}
-function closeTestLeaderboard(){
-  testLbOpen=false; testLbLoading=false; testLbError=''; testLbData=null;
-  render();
-}
+// Per-test student leaderboard has been disabled — students see their own
+// results only (Attempted tab). openTestLeaderboard/closeTestLeaderboard and
+// the testLbOpen/testLbData state above are intentionally no longer wired to
+// any UI. Host-side leaderboard (live quiz + final leaderboard, ws.js /
+// /api/leaderboard) is untouched.
 
 async function doSubmitTest(){
   if(!atTest) return;
-  const submittedTestId=atTest._id;
   // Clean up timer interval and beforeunload guard
   if(atTimerHandle){ clearInterval(atTimerHandle); atTimerHandle=null; }
   window.removeEventListener('beforeunload', window._atUnloadGuard);
@@ -507,8 +492,8 @@ async function doSubmitTest(){
     showToast(`✓ Submitted! Score: ${d.result?.score??'?'}/${d.result?.total??'?'}`,'good');
     atTest=null; atAttemptId=null; atAnswers=[];
     availTestsTab='attempted';
+    availTestsOpen=true; // student lands directly on their own result card, no leaderboard
     await fetchMyAttempts();
-    openTestLeaderboard(submittedTestId); // surface class rankings right away
   }catch(e){
     showToast(e.message||'Submission failed','bad');
   }
