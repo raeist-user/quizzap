@@ -990,7 +990,7 @@ function initRoutes(app) {
   //    leaking rankings. Host-side leaderboard functionality (live quiz /
   //    final leaderboard via ws.js, and /api/leaderboard) is unaffected. ──
   app.get('/api/tests/:id/leaderboard', requireAuth, async (req, res) => {
-    res.status(403).json({ error: 'Leaderboard viewing is disabled for students' });
+    res.status(403).json({ error: 'Not available' });
   });
 
   // ── Student: submit a question report during a test ───────────────────────
