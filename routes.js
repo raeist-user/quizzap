@@ -6,7 +6,7 @@ const mongoose = require('mongoose');
 const {
   User, PendingReg, UpdateReq, Notice, Schedule,
   LeaderboardEntry, ScoreLog, SessionEntry, ReportDB,
-  PlannedTest, TestAttempt,
+  PlannedTest, TestAttempt, TestPreset, SyllabusWindow,
 } = require('./models');
 const { shared, txHost, getBackupWindow } = require('./ws');
 const { SessionBackup } = require('./models');
@@ -29,6 +29,24 @@ function requireHost(req, res, next) {
     if (req.user.role !== 'host') return res.status(403).json({ error: 'Host access required' });
     next();
   } catch { res.status(401).json({ error: 'Invalid token' }); }
+}
+
+// ── SYLLABUS WINDOW HELPERS ───────────────────────────────────────────────────
+// fromTime/toTime are "HH:MM" 24h wall-clock strings (no date), compared
+// against the server's current local time-of-day. Wraps past midnight when
+// toTime <= fromTime (e.g. "19:00"–"00:00" or "22:00"–"02:00").
+function minutesOfDay(hhmm) {
+  const [h, m] = (hhmm || '0:0').split(':').map(n => parseInt(n, 10) || 0);
+  return h * 60 + m;
+}
+function isSyllabusWindowOpen(win, now = new Date()) {
+  if (!win || !win.fromTime || !win.toTime) return false;
+  const from = minutesOfDay(win.fromTime);
+  const to   = minutesOfDay(win.toTime);
+  const cur  = now.getHours() * 60 + now.getMinutes();
+  if (from === to) return true;         // 24h open, no gap
+  if (from < to)   return cur >= from && cur < to;
+  return cur >= from || cur < to;       // wraps past midnight
 }
 
 // ── PLANNED TEST HELPERS ──────────────────────────────────────────────────────
@@ -688,6 +706,137 @@ function initRoutes(app) {
     } catch (e) { res.status(500).json({ error: e.message }); }
   });
 
+  /* ════════════════════════════════════════════════════════════════════════
+     SYLLABUS TEST — presets, the global daily window, and publishing.
+     Entirely separate from the regular test flow above; nothing here alters
+     it. A TestPreset is a reusable template; Publish spins up a fresh
+     PlannedTest (type:'syllabus') from it without consuming the preset.
+     ══════════════════════════════════════════════════════════════════════ */
+
+  // ── Host: get / set the single global daily window ─────────────────────────
+  // Readable by any authenticated user (students need it to know when the
+  // Syllabus Test button is active); only a host can change it.
+  app.get('/api/syllabus-window', requireAuth, async (req, res) => {
+    try {
+      const win = await SyllabusWindow.findOne({}).lean();
+      res.json({
+        fromTime: win?.fromTime || null,
+        toTime: win?.toTime || null,
+        isOpen: isSyllabusWindowOpen(win),
+      });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+  });
+  app.post('/api/syllabus-window', requireHost, async (req, res) => {
+    try {
+      const { fromTime, toTime } = req.body;
+      const hhmm = /^([01]\d|2[0-3]):[0-5]\d$/;
+      if (!hhmm.test(fromTime||'') || !hhmm.test(toTime||''))
+        return res.status(400).json({ error: 'fromTime/toTime must be "HH:MM" 24h' });
+      const win = await SyllabusWindow.findOneAndUpdate(
+        {}, { fromTime, toTime, updatedAt: new Date() },
+        { upsert: true, new: true },
+      );
+      res.json({ ok: true, fromTime: win.fromTime, toTime: win.toTime, isOpen: isSyllabusWindowOpen(win) });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+  });
+
+  // ── Host: create a preset (template only — does not publish anything) ──────
+  app.post('/api/presets', requireHost, async (req, res) => {
+    try {
+      const { title, subject, timerType, timerValue, questions, randomize,
+              sourceRepo, sourceFiles, sourceStart, sourceCount } = req.body;
+      if (!title?.trim()) return res.status(400).json({ error: 'Title required' });
+      if (!questions?.length) return res.status(400).json({ error: 'No questions provided' });
+      const preset = await TestPreset.create({
+        title: title.trim(), subject: (subject||'').trim(),
+        timerType: timerType||'none', timerValue: timerValue||0,
+        questions, randomize: !!randomize,
+        sourceRepo, sourceFiles, sourceStart, sourceCount,
+        createdBy: req.user.id,
+      });
+      res.json({ ok: true, preset });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+  });
+
+  // ── Host: list all presets (with a lightweight publish count) ──────────────
+  app.get('/api/presets', requireHost, async (req, res) => {
+    try {
+      const presets = await TestPreset.find({}).select('-questions').sort({ createdAt: -1 }).lean();
+      const counts = await PlannedTest.aggregate([
+        { $match: { type: 'syllabus', presetId: { $in: presets.map(p => p._id) } } },
+        { $group: { _id: '$presetId', count: { $sum: 1 } } },
+      ]);
+      const countMap = Object.fromEntries(counts.map(c => [c._id.toString(), c.count]));
+      res.json({ presets: presets.map(p => ({ ...p, publishedCount: countMap[p._id.toString()] || 0 })) });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+  });
+
+  // ── Host: fetch one preset WITH its full baked-in questions — used to
+  //    prefill the edit form (the list route above strips questions to stay
+  //    light). ───────────────────────────────────────────────────────────────
+  app.get('/api/presets/:id', requireHost, async (req, res) => {
+    try {
+      const preset = await TestPreset.findById(req.params.id).lean();
+      if (!preset) return res.status(404).json({ error: 'Preset not found' });
+      res.json({ preset });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+  });
+
+  // ── Host: edit a preset's settings (does not touch already-published tests) ─
+  app.put('/api/presets/:id', requireHost, async (req, res) => {
+    try {
+      const { title, subject, timerType, timerValue, questions, randomize,
+              sourceRepo, sourceFiles, sourceStart, sourceCount } = req.body;
+      const preset = await TestPreset.findById(req.params.id);
+      if (!preset) return res.status(404).json({ error: 'Preset not found' });
+      if (title !== undefined) preset.title = title.trim();
+      if (subject !== undefined) preset.subject = subject.trim();
+      if (timerType !== undefined) preset.timerType = timerType;
+      if (timerValue !== undefined) preset.timerValue = timerValue;
+      if (Array.isArray(questions) && questions.length) preset.questions = questions;
+      if (randomize !== undefined) preset.randomize = !!randomize;
+      if (sourceRepo !== undefined) preset.sourceRepo = sourceRepo;
+      if (Array.isArray(sourceFiles)) preset.sourceFiles = sourceFiles;
+      if (sourceStart !== undefined) preset.sourceStart = sourceStart;
+      if (sourceCount !== undefined) preset.sourceCount = sourceCount;
+      await preset.save();
+      res.json({ ok: true, preset });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+  });
+
+  // ── Host: delete a preset (published tests from it are left intact) ────────
+  app.delete('/api/presets/:id', requireHost, async (req, res) => {
+    try {
+      const preset = await TestPreset.findByIdAndDelete(req.params.id);
+      if (!preset) return res.status(404).json({ error: 'Preset not found' });
+      res.json({ ok: true });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+  });
+
+  // ── Host: publish a preset — spins up a brand-new live syllabus test.
+  //    The preset itself is left untouched so it can be published again
+  //    later for a fresh round (e.g. tomorrow). ───────────────────────────────
+  app.post('/api/presets/:id/publish', requireHost, async (req, res) => {
+    try {
+      const preset = await TestPreset.findById(req.params.id).lean();
+      if (!preset) return res.status(404).json({ error: 'Preset not found' });
+      let questions = preset.questions;
+      if (preset.randomize) questions = questions.slice().sort(() => Math.random() - .5);
+      const test = await PlannedTest.create({
+        title: preset.title, subject: preset.subject,
+        timerType: preset.timerType, timerValue: preset.timerValue,
+        type: 'syllabus', presetId: preset._id,
+        questions,
+        sourceRepo: preset.sourceRepo, sourceFiles: preset.sourceFiles,
+        sourceStart: preset.sourceStart, sourceCount: preset.sourceCount,
+        // No availFrom/availTo — syllabus tests are gated by the single
+        // global daily window instead, checked at list/start time.
+        createdBy: req.user.id,
+      });
+      res.json({ ok: true, test });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+  });
+
   // ── Host: list all tests ───────────────────────────────────────────────────
   app.get('/api/tests/host', requireHost, async (req, res) => {
     try {
@@ -777,30 +926,42 @@ function initRoutes(app) {
     } catch (e) { res.status(500).json({ error: e.message }); }
   });
 
-  // ── Student: list available (active) tests ────────────────────────────────
+  // ── Student: list available (active) tests. ?type=regular|syllabus,
+  //    defaults to 'regular' so any existing client call is unaffected. ──────
   app.get('/api/tests', requireAuth, async (req, res) => {
     try {
       const now = new Date();
-      const tests = await PlannedTest.find({
-        status: 'active',
+      const type = req.query.type === 'syllabus' ? 'syllabus' : 'regular';
+      // Pre-existing tests created before this field existed have no `type`
+      // in the raw DB doc (schema defaults don't apply to .lean() reads), so
+      // match "regular" as "not syllabus" rather than an exact equality.
+      const query = { status: 'active', type: type === 'syllabus' ? 'syllabus' : { $ne: 'syllabus' } };
+      if (type === 'regular') {
         // Still show tests scheduled to start in the future (so the client can
         // render a countdown) — only fully hide ones whose end time has passed.
-        $or: [{ availTo: null }, { availTo: { $gte: now } }],
-      })
-        .select('title subject timerType timerValue questions createdAt sourceRepo availFrom availTo')
+        query.$or = [{ availTo: null }, { availTo: { $gte: now } }];
+      }
+      const tests = await PlannedTest.find(query)
+        .select('title subject timerType timerValue questions createdAt sourceRepo availFrom availTo type')
         .lean();
-      // Which of these does this student already have an unfinished attempt on?
-      // Drives the Start → Rejoin button swap on the client.
+      // Which of these does this student already have an attempt on?
+      // Regular: only unfinished ones matter (drives Start → Rejoin).
+      // Syllabus: a syllabus test disappears from this list entirely the
+      // moment the student completes it — full attempts are excluded below.
       const myAttempts = await TestAttempt.find({
-        userId: req.user.id, completed: false, testId: { $in: tests.map(t => t._id) },
-      }).select('testId').lean();
-      const inProgressSet = new Set(myAttempts.map(a => a.testId.toString()));
-      const questionCounts = tests.map(t => ({
-        ...t,
-        questionCount: t.questions?.length || 0,
-        questions: undefined,
-        inProgress: inProgressSet.has(t._id.toString()),
-      }));
+        userId: req.user.id, testId: { $in: tests.map(t => t._id) },
+        ...(type === 'syllabus' ? {} : { completed: false }),
+      }).select('testId completed').lean();
+      const completedSet   = new Set(myAttempts.filter(a => a.completed).map(a => a.testId.toString()));
+      const inProgressSet  = new Set(myAttempts.filter(a => !a.completed).map(a => a.testId.toString()));
+      const questionCounts = tests
+        .filter(t => type !== 'syllabus' || !completedSet.has(t._id.toString()))
+        .map(t => ({
+          ...t,
+          questionCount: t.questions?.length || 0,
+          questions: undefined,
+          inProgress: inProgressSet.has(t._id.toString()),
+        }));
       res.json({ tests: questionCounts });
     } catch (e) { res.status(500).json({ error: e.message }); }
   });
@@ -866,6 +1027,12 @@ function initRoutes(app) {
       }
       if (test.availTo && now > new Date(test.availTo)) {
         return res.status(403).json({ error: 'This test has closed' });
+      }
+      if (test.type === 'syllabus') {
+        const win = await SyllabusWindow.findOne({}).lean();
+        if (!isSyllabusWindowOpen(win, now)) {
+          return res.status(403).json({ error: 'Syllabus Test is closed right now', fromTime: win?.fromTime, toTime: win?.toTime });
+        }
       }
       attempt = await TestAttempt.create({
         testId: req.params.id,
@@ -978,7 +1145,7 @@ function initRoutes(app) {
   app.get('/api/my-attempts', requireAuth, async (req, res) => {
     try {
       const attempts = await TestAttempt.find({ userId: req.user.id, completed: true })
-        .select('-answers').populate('testId', 'title subject questionCount').sort({ submittedAt: -1 }).lean();
+        .select('-answers').populate('testId', 'title subject questionCount type').sort({ submittedAt: -1 }).lean();
       res.json({ attempts });
     } catch (e) { res.status(500).json({ error: e.message }); }
   });

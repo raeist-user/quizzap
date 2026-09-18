@@ -117,6 +117,11 @@ const plannedTestSchema = new mongoose.Schema({
   subject:     { type: String, trim: true, maxlength: 80, default: '' },
   timerType:   { type: String, enum: ['total','perQuestion','none'], default: 'none' },
   timerValue:  { type: Number, default: 0 },          // seconds (total) or seconds per Q
+  // 'regular' = the existing host-published, date-scheduled test flow.
+  // 'syllabus' = spun up from a TestPreset via Publish, gated by the single
+  // daily SyllabusWindow instead of per-test availFrom/availTo.
+  type:        { type: String, enum: ['regular','syllabus'], default: 'regular', index: true },
+  presetId:    { type: mongoose.Schema.Types.ObjectId, ref: 'TestPreset', default: null },
   questions:   [{                                       // baked-in at creation time
     text:    { type: String },
     options: [{ type: String }],
@@ -146,6 +151,45 @@ const plannedTestSchema = new mongoose.Schema({
   createdAt:    { type: Date, default: Date.now },
 });
 const PlannedTest = mongoose.model('PlannedTest', plannedTestSchema);
+
+// ── TEST PRESET (Syllabus Test) ────────────────────────────────────────────────
+// A reusable template a host builds once and can Publish repeatedly. Each
+// Publish spins up a brand-new PlannedTest (type:'syllabus') from the baked-in
+// questions here; the preset itself is never consumed and stays in the list
+// so it can be published again for a fresh round later.
+const testPresetSchema = new mongoose.Schema({
+  title:       { type: String, required: true, trim: true, maxlength: 100 },
+  subject:     { type: String, trim: true, maxlength: 80, default: '' },
+  timerType:   { type: String, enum: ['total','perQuestion','none'], default: 'none' },
+  timerValue:  { type: Number, default: 0 },
+  questions:   [{
+    text:    { type: String },
+    options: [{ type: String }],
+    correct: { type: Number },
+    subject: { type: String, default: '' },
+    chapter: { type: String, default: '' },
+  }],
+  randomize:   { type: Boolean, default: false }, // re-shuffled fresh on every Publish
+  sourceRepo:  { type: String, default: '' },
+  sourceFiles: [{ type: String }],
+  sourceStart: { type: Number, default: 0 },
+  sourceCount: { type: Number, default: 0 },
+  createdBy:   { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  createdAt:   { type: Date, default: Date.now },
+});
+const TestPreset = mongoose.model('TestPreset', testPresetSchema);
+
+// ── SYLLABUS WINDOW ───────────────────────────────────────────────────────────
+// Single global daily time-of-day gate for the whole Syllabus Test section
+// (not per-test, not per-date — just "HH:MM"–"HH:MM", every day). A single
+// singleton document; upserted in place whenever the host edits it. Wraps
+// past midnight when toTime <= fromTime (e.g. "19:00"–"00:00").
+const syllabusWindowSchema = new mongoose.Schema({
+  fromTime:  { type: String, default: null }, // "HH:MM" 24h, null = never set
+  toTime:    { type: String, default: null },
+  updatedAt: { type: Date, default: Date.now },
+});
+const SyllabusWindow = mongoose.model('SyllabusWindow', syllabusWindowSchema);
 
 // ── TEST ATTEMPT ──────────────────────────────────────────────────────────────
 const testAttemptSchema = new mongoose.Schema({
@@ -204,5 +248,5 @@ module.exports = {
   User, PendingReg, UpdateReq, Notice, Schedule,
   LeaderboardEntry, ScoreLog,
   SessionBackup, SessionEntry, ReportDB,
-  PlannedTest, TestAttempt,
+  PlannedTest, TestAttempt, TestPreset, SyllabusWindow,
 };
