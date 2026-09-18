@@ -49,7 +49,8 @@ let hostEndedTab='public';   // 'public' | 'exiled' — toggle on post-game resu
 ──────────────────────────────────────────────────────────────────────────── */
 // Host
 let testBoardOpen = false;          // is Test Board overlay open?
-let testBoardTab  = 'create';       // 'create' | 'history'
+let tbSection = 'chooser';          // 'chooser' | 'regular' | 'syllabus' — which screen inside the overlay
+let testBoardTab  = 'create';       // 'create' | 'history' (only meaningful when tbSection==='regular')
 let testHistory   = null;           // fetched list of host's tests
 let testHistoryError = null;        // set when /api/tests/host fails — lets the UI
                                      // show a real error + retry instead of a false
@@ -63,13 +64,34 @@ let testRescheduleFrom = '';        // datetime-local string
 let testRescheduleTo   = '';        // datetime-local string
 let testRescheduleMsg  = '';        // error message shown in the modal
 let testRescheduleBusy = false;     // true while the PUT request is in flight
-// Create-test form state
+// Create-test / Create-preset form state (shared — only one of these forms is
+// ever visible at a time, distinguished by tcMode).
+let tcMode='test';                  // 'test' | 'preset-new' | 'preset-edit' — who btn-tc-publish targets
 let tcTitle='', tcSubject='', tcTimerType='none', tcTimerValue=0;
 let tcQSources=[];                  // [{ repo, files, start, count, questions, label }]
 let tcRandomize=false;              // shuffle questions before publishing
-let tcAvailFrom='';                 // ISO datetime string — when test becomes available
-let tcAvailTo='';                   // ISO datetime string — when test closes
+let tcAvailFrom='';                 // ISO datetime string — when test becomes available (tcMode:'test' only)
+let tcAvailTo='';                   // ISO datetime string — when test closes (tcMode:'test' only)
 let tcMsg='';                       // error/success message
+
+// ── SYLLABUS TEST ────────────────────────────────────────────────────────────
+// A single global daily time-of-day window (shared setting, read by host +
+// student) gates the whole Syllabus Test section. Hosts build reusable
+// TestPreset templates and Publish them to spin up live rounds.
+let sylWindow = null;               // { fromTime, toTime, isOpen } from /api/syllabus-window
+let sylWindowEditing = false;       // host is editing the window right now
+let sylWindowDraftFrom = '19:00';
+let sylWindowDraftTo   = '00:00';
+let sylWindowMsg = '';
+// Host: presets
+let presets = null;                 // fetched list (host)
+let presetsError = null;
+let sylManageMode = false;          // pencil-toggle reveals Edit/Delete on every preset card
+let sylEditingPresetId = null;      // preset._id being edited via tcMode:'preset-edit', else null
+let sylPresetMsg = '';
+// Student: syllabus test list
+let atSection = 'chooser';          // 'chooser' | 'regular' | 'syllabus' — mirrors tbSection for students
+let sylTests = null;                // fetched list (student, type=syllabus)
 
 // Student
 let availTestsOpen = false;         // is Available Tests overlay open?
@@ -335,6 +357,14 @@ async function apiPost(path,body,withAuth){
   if(!r.ok) throw new Error(d.error||'Request failed');
   return d;
 }
+async function apiPut(path,body,withAuth){
+  const h={'Content-Type':'application/json'};
+  if(withAuth&&authToken) h['Authorization']='Bearer '+authToken;
+  const r=await fetch(path,{method:'PUT',headers:h,body:JSON.stringify(body)});
+  const d=await r.json();
+  if(!r.ok) throw new Error(d.error||'Request failed');
+  return d;
+}
 async function apiDel(path){
   const h={'Authorization':'Bearer '+authToken};
   const r=await fetch(path,{method:'DELETE',headers:h});
@@ -440,6 +470,42 @@ async function fetchAvailTests(){
   startAvailCountdownTicker();
 }
 
+// ── SYLLABUS TEST fetchers ───────────────────────────────────────────────────
+async function fetchSylWindow(){
+  try{
+    const r=await fetch('/api/syllabus-window',{headers:{Authorization:'Bearer '+authToken}});
+    const d=await r.json();
+    sylWindow={ fromTime:d.fromTime||null, toTime:d.toTime||null, isOpen:!!d.isOpen };
+  }catch(e){ sylWindow=sylWindow||{ fromTime:null, toTime:null, isOpen:false }; }
+  render();
+}
+async function fetchPresets(){
+  presetsError=null;
+  try{
+    const r=await fetch('/api/presets',{headers:{Authorization:'Bearer '+authToken}});
+    const d=await r.json().catch(()=>({}));
+    if(!r.ok) throw new Error(d?.error||'Failed to load presets');
+    presets=Array.isArray(d.presets)?d.presets:[];
+  }catch(e){ presets=null; presetsError=e.message||'Failed to load presets'; }
+  render();
+}
+async function fetchSylTests(){
+  try{
+    const r=await fetch('/api/tests?type=syllabus',{headers:{Authorization:'Bearer '+authToken}});
+    const d=await r.json();
+    sylTests=d.tests||[];
+  }catch(e){ sylTests=[]; }
+  render();
+}
+// "19:00" → "7:00 PM"
+function fmtTime12(hhmm){
+  if(!hhmm) return '';
+  const [h,m]=hhmm.split(':').map(Number);
+  const period=h>=12?'PM':'AM';
+  const h12=h%12===0?12:h%12;
+  return `${h12}:${String(m).padStart(2,'0')} ${period}`;
+}
+
 // Patches each "Starts in …" button directly every second (no full re-render,
 // same lightweight approach the in-test timer uses) so scheduled tests count
 // down live. Once a countdown reaches zero it refetches the list once, which
@@ -491,7 +557,7 @@ async function doSubmitTest(){
     if(!r.ok) throw new Error(d.error||'Submission failed');
     showToast(`✓ Submitted! Score: ${d.result?.score??'?'}/${d.result?.total??'?'}`,'good');
     atTest=null; atAttemptId=null; atAnswers=[];
-    availTestsTab='attempted';
+    atSection='regular'; availTestsTab='attempted';
     availTestsOpen=true; // student lands directly on their own result card, no leaderboard
     await fetchMyAttempts();
   }catch(e){

@@ -179,6 +179,67 @@ function availTestsHTML(){
   if(!availTestsOpen) return '';
   const tab = availTestsTab;
 
+  // ── Chooser screen: Regular Test / Syllabus Test ──────────────────────────
+  function chooserBody(){
+    const attemptedIds = new Set((myAttempts||[]).map(a=>(a.testId?._id||a.testId||'').toString()));
+    const regularBadge = (availTests||[]).filter(t=>{
+      if(attemptedIds.has(t._id.toString())) return false;
+      const notYetOpen = t.availFrom && new Date(t.availFrom).getTime() > Date.now();
+      return !notYetOpen;
+    }).length;
+    const winOpen = !!sylWindow?.isOpen;
+    return `<div style="padding:20px 16px;display:flex;gap:14px">
+      <button class="btn syl-chooser-btn" id="btn-at-open-regular" style="flex:1;aspect-ratio:1;position:relative;flex-direction:column;justify-content:center;align-items:center;gap:6px;background:#9ca3af;color:#fff;border:none;border-radius:14px;font-size:1.05rem;font-weight:700">
+        ${regularBadge?`<span style="position:absolute;top:-8px;right:-8px;background:#dc2626;color:#fff;min-width:26px;height:26px;border-radius:13px;display:flex;align-items:center;justify-content:center;font-size:.8rem;font-weight:800;padding:0 6px;box-shadow:0 1px 3px rgba(0,0,0,.3)">${regularBadge}</span>`:''}
+        Regular<br/>Test
+      </button>
+      <button class="btn syl-chooser-btn" id="btn-at-open-syllabus" style="flex:1;aspect-ratio:1;flex-direction:column;justify-content:center;align-items:center;gap:6px;background:${winOpen?'#4338ca':'#cbd5e1'};color:#fff;border:none;border-radius:14px;font-size:1.05rem;font-weight:700;cursor:pointer">
+        Syllabus<br/>Test
+        ${!winOpen?`<span style="font-size:.65rem;font-weight:600;opacity:.9">${sylWindow&&sylWindow.fromTime?`Opens ${fmtTime12(sylWindow.fromTime)}`:'Not scheduled yet'}</span>`:''}
+      </button>
+    </div>`;
+  }
+
+  // ── Syllabus Test (student) ────────────────────────────────────────────────
+  function syllabusBody(){
+    const winOpen = !!sylWindow?.isOpen;
+    if(!winOpen){
+      return `<div style="padding:50px 24px;text-align:center;color:var(--mid)">
+        <div style="font-size:2.2rem;margin-bottom:10px">🔒</div>
+        <div style="font-size:.9rem;font-weight:700;color:var(--ink);margin-bottom:4px">Syllabus Test is closed right now</div>
+        <div style="font-size:.8rem">${sylWindow&&sylWindow.fromTime&&sylWindow.toTime
+          ?`Opens daily ${fmtTime12(sylWindow.fromTime)} – ${fmtTime12(sylWindow.toTime)}`
+          :'The host hasn\'t scheduled a window yet.'}</div>
+      </div>`;
+    }
+    if(!sylTests) return '<div style="padding:40px;text-align:center"><div class="spinner"></div></div>';
+    if(!sylTests.length) return `<div style="padding:40px;text-align:center;color:var(--mid)"><div style="font-size:2rem;margin-bottom:8px">📋</div><div style="font-size:.85rem">No syllabus tests published right now.</div></div>`;
+    return `<div style="padding:12px">
+      <div class="notice n-accent" style="font-size:.76rem;margin-bottom:10px">🕒 Open now — ${fmtTime12(sylWindow.fromTime)} to ${fmtTime12(sylWindow.toTime)} daily</div>
+      ${sylTests.map(t=>{
+        const isRejoin = t.inProgress;
+        const timerLabel = t.timerType==='total'?`⏱ ${Math.round(t.timerValue/60)} min total`
+          :t.timerType==='perQuestion'?`⏱ ${t.timerValue}s / question`:'No timer';
+        return `<div class="at-card" data-test-id="${t._id}" style="${isRejoin?'border-color:#f59e0b;':''}margin-bottom:8px">
+          <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:8px">
+            <div style="flex:1;min-width:0">
+              <div style="font-weight:700;font-size:.9rem">${esc(t.title)}</div>
+              ${t.subject?`<div style="font-size:.75rem;color:var(--mid);margin-top:1px">📚 ${esc(t.subject)}</div>`:''}
+            </div>
+            <button class="btn btn-sm at-start-btn" data-test-id="${t._id}" style="flex-shrink:0;padding:5px 14px;font-size:.78rem;${isRejoin?'background:#f59e0b;border-color:#f59e0b;color:#fff;':'background:#4338ca;border-color:#4338ca;color:#fff;'}">
+              ${isRejoin?'↻ Rejoin':'Start →'}
+            </button>
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+            <span style="font-size:.72rem;background:var(--faint);padding:2px 8px;border-radius:20px;color:var(--mid)">${timerLabel}</span>
+            <span style="font-size:.72rem;background:var(--faint);padding:2px 8px;border-radius:20px;color:var(--mid)">📝 ${t.questionCount||0} questions</span>
+            ${isRejoin?`<span style="font-size:.72rem;background:#fef3c7;padding:2px 8px;border-radius:20px;color:#92400e;font-weight:600">⏳ In progress — clock is still running</span>`:''}
+          </div>
+        </div>`;
+      }).join('')}
+    </div>`;
+  }
+
   function cardBody(){
     if(tab==='available'){
       if(!availTests) return '<div style="padding:40px;text-align:center"><div class="spinner"></div></div>';
@@ -247,24 +308,27 @@ function availTestsHTML(){
           <span>Score: <strong style="color:var(--ink)">${a.score||0}/${total}</strong> (${pct}%)</span>
           <span>${d}</span>
         </div>
-        <button class="btn btn-sm" disabled style="width:100%;justify-content:center;margin-top:8px;font-size:.75rem;background:#e5e7eb;color:#9ca3af;border-color:#e5e7eb;cursor:not-allowed;pointer-events:none">🏆 View Leaderboard</button>
+        ${t.type!=='syllabus'?`<button class="btn btn-sm" disabled style="width:100%;justify-content:center;margin-top:8px;font-size:.75rem;background:#e5e7eb;color:#9ca3af;border-color:#e5e7eb;cursor:not-allowed;pointer-events:none">🏆 View Leaderboard</button>`:''}
         <div style="margin-top:8px;padding:6px 10px;background:var(--faint);border-radius:6px;font-size:.72rem;color:var(--mid);text-align:center">
           🔒 Detailed review · <em>Coming soon</em>
         </div>
       </div>`;
     }).join('');
-  }
-
-  return `<div id="avail-tests-overlay" style="position:fixed;inset:0;background:var(--white);z-index:500;display:flex;flex-direction:column;overflow:hidden">
+  }  return `<div id="avail-tests-overlay" style="position:fixed;inset:0;background:var(--white);z-index:500;display:flex;flex-direction:column;overflow:hidden">
     <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:2px solid var(--line);background:var(--faint);flex-shrink:0">
-      <span style="font-weight:700;font-size:.95rem">📋 Test</span>
+      <span style="font-weight:700;font-size:.95rem;display:flex;align-items:center;gap:8px">
+        ${atSection!=='chooser'?`<button class="btn btn-ghost btn-sm" id="btn-at-back-chooser" style="padding:3px 8px">←</button>`:''}
+        📋 Test${atSection==='regular'?' — Regular':atSection==='syllabus'?' — Syllabus':''}
+      </span>
       <button class="btn btn-ghost btn-sm" id="btn-avail-tests-close">✕ Close</button>
     </div>
-    <div style="display:flex;border-bottom:1.5px solid var(--line);flex-shrink:0">
+    ${atSection==='regular'?`<div style="display:flex;border-bottom:1.5px solid var(--line);flex-shrink:0">
       <button class="btn" id="btn-at-tab-available" style="flex:1;border:none;border-radius:0;padding:10px;font-size:.82rem;font-weight:600;border-bottom:3px solid ${tab==='available'?'#6366f1':'transparent'};color:${tab==='available'?'#4338ca':'var(--mid)'}">📝 Available</button>
       <button class="btn" id="btn-at-tab-attempted" style="flex:1;border:none;border-radius:0;padding:10px;font-size:.82rem;font-weight:600;border-bottom:3px solid ${tab==='attempted'?'#6366f1':'transparent'};color:${tab==='attempted'?'#4338ca':'var(--mid)'}">📂 Attempted</button>
+    </div>`:''}
+    <div style="flex:1;overflow-y:auto;${atSection==='regular'?'padding:12px':''}">
+      ${atSection==='chooser'?chooserBody():atSection==='syllabus'?syllabusBody():cardBody()}
     </div>
-    <div style="flex:1;overflow-y:auto;padding:12px">${cardBody()}</div>
   </div>`;
 }
 
@@ -1242,7 +1306,7 @@ function testBoardHTML(){
         </div>`:''}
       </div>
 
-      <div>
+      ${tcMode==='test'?`<div>
         <label style="font-size:.75rem;font-weight:600;color:var(--mid);display:block;margin-bottom:6px">AVAILABILITY WINDOW <span style="font-weight:400;text-transform:none">(optional)</span></label>
         <div style="display:flex;gap:8px">
           <div style="flex:1">
@@ -1255,7 +1319,7 @@ function testBoardHTML(){
           </div>
         </div>
         <div style="font-size:.7rem;color:var(--mid);margin-top:3px">Leave blank to keep test open indefinitely</div>
-      </div>
+      </div>`:''}
 
       <div>
         <label style="font-size:.75rem;font-weight:600;color:var(--mid);display:block;margin-bottom:6px">QUESTION SOURCES</label>
@@ -1268,7 +1332,7 @@ function testBoardHTML(){
       <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border:1.5px solid var(--line);border-radius:8px;background:var(--faint)">
         <div>
           <div style="font-size:.8rem;font-weight:600">🔀 Randomize question order</div>
-          <div style="font-size:.7rem;color:var(--mid)">Shuffle all questions before publishing</div>
+          <div style="font-size:.7rem;color:var(--mid)">${tcMode==='test'?'Shuffle all questions before publishing':'Shuffle questions fresh every time this preset is published'}</div>
         </div>
         <button id="btn-tc-randomize" style="width:44px;height:26px;border-radius:13px;border:2px solid ${tcRandomize?'#6366f1':'var(--line)'};background:${tcRandomize?'#6366f1':'var(--faint)'};cursor:pointer;position:relative;transition:background .15s,border-color .15s;flex-shrink:0">
           <div style="width:18px;height:18px;border-radius:9px;background:#fff;position:absolute;top:2px;transition:left .15s;left:${tcRandomize?'20px':'2px'};box-shadow:0 1px 3px rgba(0,0,0,.2)"></div>
@@ -1277,7 +1341,88 @@ function testBoardHTML(){
 
       ${tcMsg?`<div class="notice ${tcMsg.startsWith('✓')?'n-good':'n-bad'}" style="font-size:.8rem">${esc(tcMsg)}</div>`:''}
       <button class="btn btn-dark btn-sm" id="btn-tc-publish" style="width:100%;justify-content:center;padding:10px;font-size:.85rem;font-weight:700" ${!canPublish?'disabled':''}>
-        📤 Publish Test ${totalQs?`(${totalQs} question${totalQs!==1?'s':''})`:''} 
+        ${tcMode==='test'?`📤 Publish Test ${totalQs?`(${totalQs} question${totalQs!==1?'s':''})`:''}`
+         :tcMode==='preset-edit'?`💾 Save Preset Changes`
+         :`＋ Create Preset ${totalQs?`(${totalQs} question${totalQs!==1?'s':''})`:''}`}
+      </button>
+      ${tcMode!=='test'?`<button class="btn btn-ghost btn-sm" id="btn-pc-cancel" style="width:100%;justify-content:center;font-size:.78rem">Cancel</button>`:''}
+    </div>`;
+  }
+
+  // ── Syllabus Test (host): daily window bar + preset list / create-edit form ─
+  function windowBarHTML(){
+    const win = sylWindow;
+    const hasWindow = win && win.fromTime && win.toTime;
+    if(sylWindowEditing){
+      return `<div style="padding:12px 14px;border-bottom:1.5px solid var(--line);background:var(--faint)">
+        <label style="font-size:.72rem;font-weight:700;color:var(--mid);display:block;margin-bottom:6px">DAILY AVAILABILITY WINDOW</label>
+        <div style="display:flex;gap:8px;align-items:center">
+          <input class="form-input" type="time" id="syl-win-from" value="${esc(sylWindowDraftFrom)}" style="font-size:.85rem;flex:1"/>
+          <span style="color:var(--mid);font-size:.8rem">to</span>
+          <input class="form-input" type="time" id="syl-win-to" value="${esc(sylWindowDraftTo)}" style="font-size:.85rem;flex:1"/>
+        </div>
+        <div style="font-size:.7rem;color:var(--mid);margin-top:4px">Applies every day — e.g. 7:00 PM to 12:00 AM.</div>
+        ${sylWindowMsg?`<div class="notice ${sylWindowMsg.startsWith('✓')?'n-good':'n-bad'}" style="font-size:.78rem;margin-top:8px">${esc(sylWindowMsg)}</div>`:''}
+        <div style="display:flex;gap:8px;margin-top:10px">
+          <button class="btn btn-dark btn-sm" id="btn-syl-win-save" style="flex:1;justify-content:center">Save</button>
+          <button class="btn btn-ghost btn-sm" id="btn-syl-win-cancel" style="flex:1;justify-content:center">Cancel</button>
+        </div>
+      </div>`;
+    }
+    return `<div style="padding:10px 14px;border-bottom:1.5px solid var(--line);background:var(--faint);display:flex;align-items:center;justify-content:space-between;gap:8px">
+      <div>
+        <div style="font-size:.68rem;font-weight:700;color:var(--mid)">🕒 DAILY WINDOW</div>
+        <div style="font-size:.85rem;font-weight:700;margin-top:1px">${hasWindow?`${fmtTime12(win.fromTime)} – ${fmtTime12(win.toTime)}`:'Not set yet'}</div>
+      </div>
+      <button class="btn btn-ghost btn-sm" id="btn-syl-win-edit">${hasWindow?'✏️ Edit':'+ Set window'}</button>
+    </div>`;
+  }
+  function presetsListHTML(){
+    if(presetsError) return `<div style="padding:40px;text-align:center;color:var(--mid)"><div style="font-size:.85rem;margin-bottom:12px">${esc(presetsError)}</div><button class="btn btn-dark btn-sm" id="btn-syl-retry-presets">Retry</button></div>`;
+    if(!presets) return '<div style="padding:40px;text-align:center"><div class="spinner"></div></div>';
+    return `<div style="padding:12px">
+      <button class="btn btn-ghost btn-sm" id="btn-syl-create-open" style="width:100%;justify-content:center;padding:9px;border-style:dashed;font-size:.8rem;margin-bottom:10px">＋ Create Preset</button>
+      ${presets.length?`<div style="display:flex;justify-content:flex-end;margin-bottom:8px">
+        <button class="btn btn-ghost btn-sm" id="btn-syl-manage-toggle" style="font-size:.75rem">${sylManageMode?'✓ Done':'✏️ Manage presets'}</button>
+      </div>`:''}
+      ${!presets.length?`<div style="padding:30px 10px;text-align:center;color:var(--mid)"><div style="font-size:2rem;margin-bottom:8px">🗂️</div><div style="font-size:.85rem">No presets yet — create one to get started.</div></div>`:''}
+      <div style="display:flex;flex-direction:column;gap:8px">
+        ${presets.map(p=>`
+          <div style="border:1.5px solid var(--line);border-radius:10px;padding:10px 12px;background:var(--white)">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+              <div style="flex:1;min-width:0">
+                <div style="font-weight:700;font-size:.85rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(p.title)}</div>
+                <div style="font-size:.7rem;color:var(--mid)">${p.subject?esc(p.subject)+' · ':''}${p.questionCount||0} question${p.questionCount!==1?'s':''}${p.publishedCount?` · Published ${p.publishedCount}×`:''}</div>
+              </div>
+              <button class="btn btn-dark btn-sm btn-syl-publish" data-preset-id="${p._id}" style="flex-shrink:0;padding:5px 12px;font-size:.76rem">📤 Publish</button>
+            </div>
+            ${sylManageMode?`<div style="display:flex;gap:8px;margin-top:8px">
+              <button class="btn btn-ghost btn-sm btn-syl-edit-preset" data-preset-id="${p._id}" style="flex:1;justify-content:center;font-size:.75rem">✏️ Edit</button>
+              <button class="btn btn-ghost btn-sm btn-syl-delete-preset" data-preset-id="${p._id}" style="flex:1;justify-content:center;font-size:.75rem;color:#be123c;border-color:#fecdd3">🗑 Delete</button>
+            </div>`:''}
+          </div>`).join('')}
+      </div>
+      ${sylPresetMsg?`<div class="notice ${sylPresetMsg.startsWith('✓')?'n-good':'n-bad'}" style="font-size:.8rem;margin-top:10px">${esc(sylPresetMsg)}</div>`:''}
+    </div>`;
+  }
+  function syllabusSectionHTML(){
+    if(tcMode!=='test'){ // preset-new or preset-edit → reuse the create/edit form
+      return `<div>
+        <div style="padding:8px 14px 0"><button class="btn btn-ghost btn-sm" id="btn-pc-back-list" style="padding:4px 8px">← Back to presets</button></div>
+        ${createTab()}
+      </div>`;
+    }
+    return `<div>${windowBarHTML()}${presetsListHTML()}</div>`;
+  }
+
+  // ── Chooser: Regular Test / Syllabus Test ───────────────────────────────────
+  function chooserHTML(){
+    return `<div style="padding:20px 16px;display:flex;gap:14px">
+      <button class="btn" id="btn-tb-open-regular" style="flex:1;aspect-ratio:1;flex-direction:column;justify-content:center;align-items:center;gap:6px;background:#9ca3af;color:#fff;border:none;border-radius:14px;font-size:1.05rem;font-weight:700">
+        Regular<br/>Test
+      </button>
+      <button class="btn" id="btn-tb-open-syllabus" style="flex:1;aspect-ratio:1;flex-direction:column;justify-content:center;align-items:center;gap:6px;background:#4338ca;color:#fff;border:none;border-radius:14px;font-size:1.05rem;font-weight:700">
+        Syllabus<br/>Test
       </button>
     </div>`;
   }
@@ -1415,16 +1560,21 @@ function testBoardHTML(){
 
   return `<div id="test-board-overlay" style="position:fixed;inset:0;background:var(--white);z-index:500;display:flex;flex-direction:column;overflow:hidden">
     <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:2px solid var(--line);background:var(--faint);flex-shrink:0">
-      <span style="font-weight:700;font-size:.95rem">📋 Test Board</span>
+      <span style="font-weight:700;font-size:.95rem;display:flex;align-items:center;gap:8px">
+        ${tbSection!=='chooser'&&tcMode==='test'?`<button class="btn btn-ghost btn-sm" id="btn-tb-back-chooser" style="padding:3px 8px">←</button>`:''}
+        📋 Test Board${tbSection==='regular'?' — Regular':tbSection==='syllabus'?' — Syllabus':''}
+      </span>
       <button class="btn btn-ghost btn-sm" id="btn-test-board-close">✕ Close</button>
     </div>
-    <div style="display:flex;border-bottom:1.5px solid var(--line);flex-shrink:0">
+    ${tbSection==='regular'?`<div style="display:flex;border-bottom:1.5px solid var(--line);flex-shrink:0">
       <button class="btn" id="btn-tb-tab-create" style="flex:1;border:none;border-radius:0;padding:10px;font-size:.82rem;font-weight:600;border-bottom:3px solid ${testBoardTab==='create'?'#6366f1':'transparent'};color:${testBoardTab==='create'?'#4338ca':'var(--mid)'}">✏️ Create Test</button>
       <button class="btn" id="btn-tb-tab-history" style="flex:1;border:none;border-radius:0;padding:10px;font-size:.82rem;font-weight:600;border-bottom:3px solid ${testBoardTab==='history'?'#6366f1':'transparent'};color:${testBoardTab==='history'?'#4338ca':'var(--mid)'}">📚 History</button>
-    </div>
-    <div style="flex:1;overflow-y:auto;${testBoardTab==='history'&&(testViewId||testAttemptDetail)?'overflow:hidden;display:flex;flex-direction:column':''}">
-      ${testBoardTab==='create' ? createTab() : historyTab()}
-      ${rescheduleOverlayHTML()}
+    </div>`:''}
+    <div style="flex:1;overflow-y:auto;${tbSection==='regular'&&testBoardTab==='history'&&(testViewId||testAttemptDetail)?'overflow:hidden;display:flex;flex-direction:column':''}">
+      ${tbSection==='chooser' ? chooserHTML()
+        : tbSection==='syllabus' ? syllabusSectionHTML()
+        : (testBoardTab==='create' ? createTab() : historyTab())}
+      ${tbSection==='regular' ? rescheduleOverlayHTML() : ''}
     </div>
   </div>`;
 }
@@ -2960,17 +3110,94 @@ function attach(){
 
   // ── Test Board (host) ─────────────────────────────────────────────────────
   on('btn-test-board-open', ()=>{
-    testBoardOpen=true; testBoardTab='create';
+    testBoardOpen=true; tbSection='chooser'; testBoardTab='create';
     testHistory=null; testHistoryError=null; testViewId=null; testViewAttempts=null; testAttemptDetail=null;
-    tcTitle=''; tcSubject=''; tcTimerType='none'; tcTimerValue=0;
+    tcMode='test'; tcTitle=''; tcSubject=''; tcTimerType='none'; tcTimerValue=0;
     tcQSources=[]; tcRandomize=false; tcAvailFrom=''; tcAvailTo=''; tcMsg='';
     render();
-    fetchTestHistory();
+    fetchSylWindow();
   });
   on('btn-test-board-close', ()=>{ testBoardOpen=false; testRescheduleId=null; testRescheduleMsg=''; render(); });
   on('btn-tb-tab-create', ()=>{ testBoardTab='create'; render(); });
   on('btn-tb-tab-history', ()=>{ testBoardTab='history'; render(); fetchTestHistory(); });
   on('btn-retry-history', ()=>{ fetchTestHistory(); });
+
+  on('btn-tb-open-regular', ()=>{ tbSection='regular'; testBoardTab='create'; render(); fetchTestHistory(); });
+  on('btn-tb-open-syllabus', ()=>{
+    tbSection='syllabus'; presets=null; presetsError=null; sylManageMode=false; sylWindowEditing=false;
+    render();
+    fetchPresets(); fetchSylWindow();
+  });
+  on('btn-tb-back-chooser', ()=>{ tbSection='chooser'; sylWindowEditing=false; render(); });
+
+  // ── Syllabus window (host) ──────────────────────────────────────────────────
+  on('btn-syl-win-edit', ()=>{
+    sylWindowDraftFrom = sylWindow?.fromTime || '19:00';
+    sylWindowDraftTo   = sylWindow?.toTime   || '00:00';
+    sylWindowMsg=''; sylWindowEditing=true; render();
+  });
+  on('btn-syl-win-cancel', ()=>{ sylWindowEditing=false; sylWindowMsg=''; render(); });
+  on('btn-syl-win-save', async ()=>{
+    const from = document.getElementById('syl-win-from')?.value || sylWindowDraftFrom;
+    const to   = document.getElementById('syl-win-to')?.value   || sylWindowDraftTo;
+    if(!from || !to){ sylWindowMsg='Both times are required'; render(); return; }
+    sylWindowMsg='Saving…'; render();
+    try{
+      await apiPost('/api/syllabus-window', { fromTime: from, toTime: to }, true);
+      sylWindowEditing=false; sylWindowMsg='';
+      await fetchSylWindow();
+    }catch(e){ sylWindowMsg=e.message||'Failed to save'; render(); }
+  });
+
+  // ── Presets (host) ──────────────────────────────────────────────────────────
+  on('btn-syl-retry-presets', ()=>{ fetchPresets(); });
+  on('btn-syl-manage-toggle', ()=>{ sylManageMode=!sylManageMode; render(); });
+  on('btn-syl-create-open', ()=>{
+    tcMode='preset-new'; sylEditingPresetId=null;
+    tcTitle=''; tcSubject=''; tcTimerType='none'; tcTimerValue=0;
+    tcQSources=[]; tcRandomize=false; tcMsg='';
+    render();
+  });
+  on('btn-pc-back-list', ()=>{ tcMode='test'; sylEditingPresetId=null; tcMsg=''; render(); });
+  on('btn-pc-cancel', ()=>{ tcMode='test'; sylEditingPresetId=null; tcMsg=''; render(); });
+
+  document.querySelectorAll('.btn-syl-publish').forEach(b=>b.addEventListener('click', async ()=>{
+    const id=b.dataset.presetId;
+    sylPresetMsg='Publishing…'; render();
+    try{
+      await apiPost('/api/presets/'+id+'/publish', {}, true);
+      sylPresetMsg='✓ Published — live now for the daily window.';
+      await fetchPresets();
+    }catch(e){ sylPresetMsg=e.message||'Failed to publish'; render(); }
+  }));
+  document.querySelectorAll('.btn-syl-delete-preset').forEach(b=>b.addEventListener('click', async ()=>{
+    if(!confirm('Delete this preset? Already-published tests from it are unaffected.')) return;
+    const id=b.dataset.presetId;
+    try{
+      await apiDel('/api/presets/'+id);
+      await fetchPresets();
+    }catch(e){ sylPresetMsg=e.message||'Failed to delete'; render(); }
+  }));
+  document.querySelectorAll('.btn-syl-edit-preset').forEach(b=>b.addEventListener('click', async ()=>{
+    const id=b.dataset.presetId;
+    try{
+      const r=await fetch('/api/presets/'+id,{headers:{Authorization:'Bearer '+authToken}});
+      const d=await r.json();
+      if(!r.ok) throw new Error(d.error||'Failed to load preset');
+      const full=d.preset;
+      tcMode='preset-edit'; sylEditingPresetId=id;
+      tcTitle=full.title||''; tcSubject=full.subject||'';
+      tcTimerType=full.timerType||'none'; tcTimerValue=full.timerValue||0;
+      tcRandomize=!!full.randomize; tcMsg='';
+      // Preset editing keeps whatever question sources are already baked in —
+      // re-picking from GitHub replaces them, same as regular test creation.
+      tcQSources = full.questions?.length ? [{
+        repo: full.sourceRepo||'', files: full.sourceFiles||[], start: full.sourceStart||0,
+        count: full.questions.length, questions: full.questions, label: full.sourceFiles?.join(', ')||'Existing questions',
+      }] : [];
+      render();
+    }catch(e){ sylPresetMsg=e.message||'Failed to load preset for editing'; render(); }
+  }));
 
   // Create Test form inputs — use 'input' so state syncs while typing (fixes publish always-disabled bug)
   document.getElementById('tc-title')?.addEventListener('input', e=>{ tcTitle=e.target.value; /* no render() — avoids destroying the input mid-type */ });
@@ -3042,41 +3269,63 @@ function attach(){
     const subjectVal=(document.getElementById('tc-subject')?.value||tcSubject).trim();
     if(!titleVal){ tcMsg='Title is required'; render(); return; }
     if(!tcQSources.length){ tcMsg='No questions selected'; render(); return; }
-    // Merge all sources in order
+    // Merge all sources in order. Regular tests bake in a one-time shuffle
+    // now; presets keep the original order and store randomize:true instead,
+    // so the server re-shuffles fresh on every future Publish.
     let allQs = tcQSources.flatMap(s=>s.questions);
-    if(tcRandomize) allQs = allQs.slice().sort(()=>Math.random()-.5);
+    if(tcMode==='test' && tcRandomize) allQs = allQs.slice().sort(()=>Math.random()-.5);
     if(!allQs.length){ tcMsg='No questions found in selected sources'; render(); return; }
-    tcMsg='Publishing…'; render();
+    const timerEl = document.getElementById('tc-timer-val');
+    const timerVal = tcTimerType==='total'
+      ? (parseInt(timerEl?.value)||tcTimerValue)*60
+      : (parseInt(timerEl?.value)||tcTimerValue);
+    const commonFields = {
+      title:titleVal, subject:subjectVal,
+      timerType:tcTimerType, timerValue:timerVal,
+      questions:allQs, randomize:tcRandomize,
+      sourceRepo:tcQSources[0]?.repo||'',
+      sourceFiles:tcQSources.flatMap(s=>s.files||[]),
+      sourceStart:tcQSources[0]?.start||0,
+      sourceCount:allQs.length,
+    };
+    if(tcMode==='test'){
+      tcMsg='Publishing…'; render();
+      try{
+        // datetime-local inputs give a timezone-less string (e.g. "2026-07-10T14:30").
+        // Resolve it using the BROWSER's own timezone (new Date() on a bare
+        // datetime-local string is parsed as local time) and convert to a real
+        // UTC ISO string before sending, so the server — which may run in a
+        // different timezone — parses the exact same moment the host picked.
+        const toUtcIso = v => v ? new Date(v).toISOString() : null;
+        await apiPost('/api/tests',{
+          ...commonFields,
+          availFrom:toUtcIso(tcAvailFrom),
+          availTo:toUtcIso(tcAvailTo),
+        },true);
+        tcMsg='✓ Test published!';
+        tcTitle=''; tcSubject=''; tcTimerType='none'; tcTimerValue=0;
+        tcQSources=[]; tcRandomize=false; tcAvailFrom=''; tcAvailTo='';
+        await fetchTestHistory();
+        testBoardTab='history';
+      }catch(e){ tcMsg=e.message||'Failed to publish'; }
+      render();
+      return;
+    }
+    // ── Preset create / edit ──────────────────────────────────────────────────
+    tcMsg = tcMode==='preset-edit' ? 'Saving…' : 'Creating…'; render();
     try{
-      const timerEl = document.getElementById('tc-timer-val');
-      const timerVal = tcTimerType==='total'
-        ? (parseInt(timerEl?.value)||tcTimerValue)*60
-        : (parseInt(timerEl?.value)||tcTimerValue);
-      // datetime-local inputs give a timezone-less string (e.g. "2026-07-10T14:30").
-      // Resolve it using the BROWSER's own timezone (new Date() on a bare
-      // datetime-local string is parsed as local time) and convert to a real
-      // UTC ISO string before sending, so the server — which may run in a
-      // different timezone — parses the exact same moment the host picked.
-      const toUtcIso = v => v ? new Date(v).toISOString() : null;
-      await apiPost('/api/tests',{
-        title:titleVal, subject:subjectVal,
-        timerType:tcTimerType, timerValue:timerVal,
-        questions:allQs,
-        randomize:tcRandomize,
-        availFrom:toUtcIso(tcAvailFrom),
-        availTo:toUtcIso(tcAvailTo),
-        sourceRepo:tcQSources[0]?.repo||'',
-        sourceFiles:tcQSources.flatMap(s=>s.files||[]),
-        sourceStart:tcQSources[0]?.start||0,
-        sourceCount:allQs.length,
-      },true);
-      tcMsg='✓ Test published!';
+      if(tcMode==='preset-edit'){
+        await apiPut('/api/presets/'+sylEditingPresetId, commonFields, true);
+        sylPresetMsg='✓ Preset updated.';
+      } else {
+        await apiPost('/api/presets', commonFields, true);
+        sylPresetMsg='✓ Preset created.';
+      }
+      tcMode='test'; sylEditingPresetId=null;
       tcTitle=''; tcSubject=''; tcTimerType='none'; tcTimerValue=0;
-      tcQSources=[]; tcRandomize=false; tcAvailFrom=''; tcAvailTo='';
-      await fetchTestHistory();
-      testBoardTab='history';
-    }catch(e){ tcMsg=e.message||'Failed to publish'; }
-    render();
+      tcQSources=[]; tcRandomize=false; tcMsg='';
+      await fetchPresets();
+    }catch(e){ tcMsg=e.message||'Failed to save preset'; render(); }
   });
 
   // History actions
@@ -3213,10 +3462,17 @@ function attach(){
 
   // ── Available Tests (student) ─────────────────────────────────────────────
   on('btn-avail-tests-open', ()=>{
-    availTestsOpen=true; availTestsTab='available'; availTests=null; myAttempts=null; render();
-    fetchAvailTests(); fetchMyAttempts();
+    availTestsOpen=true; atSection='chooser'; availTestsTab='available'; availTests=null; myAttempts=null; render();
+    fetchAvailTests(); fetchMyAttempts(); fetchSylWindow();
   });
   on('btn-avail-tests-close', ()=>{ availTestsOpen=false; atTest=null; atAttemptId=null; atAnswers=[]; if(atTimerHandle){clearInterval(atTimerHandle);atTimerHandle=null;} if(availCountdownHandle){clearInterval(availCountdownHandle);availCountdownHandle=null;} render(); });
+
+  on('btn-at-back-chooser', ()=>{ atSection='chooser'; fetchSylWindow(); render(); });
+  on('btn-at-open-regular', ()=>{ atSection='regular'; availTestsTab='available'; render(); });
+  on('btn-at-open-syllabus', ()=>{
+    atSection='syllabus'; sylTests=null; render();
+    fetchSylWindow().then(()=>{ if(sylWindow?.isOpen) fetchSylTests(); });
+  });
 
   // Student per-test leaderboard has been removed — students now go straight
   // to their own results in the Attempted tab, no leaderboard button/overlay.
@@ -3236,13 +3492,13 @@ function attach(){
       const data = await r.json();
       if(r.status===403){
         showToast(data.error||'This test is not available right now','neutral');
-        await fetchAvailTests();
+        if(atSection==='syllabus') await fetchSylTests(); else await fetchAvailTests();
         return;
       }
       if(r.status===409){
         if(data.autoSubmitted){
           showToast(`⏱ Time ran out while you were away — auto-submitted. Score: ${data.result?.score??'?'}/${data.result?.total??'?'}`,'neutral');
-          availTestsTab='attempted'; await fetchMyAttempts(); await fetchAvailTests();
+          atSection='regular'; availTestsTab='attempted'; await fetchMyAttempts(); await fetchAvailTests();
         } else {
           showToast('Already submitted','neutral');
         }
