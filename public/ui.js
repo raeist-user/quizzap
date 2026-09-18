@@ -3143,7 +3143,7 @@ function attach(){
     if(!from || !to){ sylWindowMsg='Both times are required'; render(); return; }
     sylWindowMsg='Saving…'; render();
     try{
-      await apiPost('/api/syllabus-window', { fromTime: from, toTime: to }, true);
+      await apiPost('/api/syllabus-window?localTime='+localHHMM(), { fromTime: from, toTime: to }, true);
       sylWindowEditing=false; sylWindowMsg='';
       await fetchSylWindow();
     }catch(e){ sylWindowMsg=e.message||'Failed to save'; render(); }
@@ -3488,7 +3488,8 @@ function attach(){
     if(btn.disabled) return;
     const testId = btn.dataset.testId;
     try{
-      const r = await fetch('/api/tests/'+testId+'/take', {headers:{Authorization:'Bearer '+authToken}});
+      const takeUrl = '/api/tests/'+testId+'/take' + (atSection==='syllabus' ? '?localTime='+localHHMM() : '');
+      const r = await fetch(takeUrl, {headers:{Authorization:'Bearer '+authToken}});
       const data = await r.json();
       if(r.status===403){
         showToast(data.error||'This test is not available right now','neutral');

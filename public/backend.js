@@ -471,9 +471,17 @@ async function fetchAvailTests(){
 }
 
 // ── SYLLABUS TEST fetchers ───────────────────────────────────────────────────
+// The daily window is a wall-clock time-of-day. The server may run in a
+// different timezone than the device (e.g. a host deployed on UTC while
+// students are in IST), so every window-sensitive call sends the device's
+// own local "HH:MM" and the server trusts that over its own clock.
+function localHHMM(){
+  const d=new Date();
+  return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
+}
 async function fetchSylWindow(){
   try{
-    const r=await fetch('/api/syllabus-window',{headers:{Authorization:'Bearer '+authToken}});
+    const r=await fetch('/api/syllabus-window?localTime='+localHHMM(),{headers:{Authorization:'Bearer '+authToken}});
     const d=await r.json();
     sylWindow={ fromTime:d.fromTime||null, toTime:d.toTime||null, isOpen:!!d.isOpen };
   }catch(e){ sylWindow=sylWindow||{ fromTime:null, toTime:null, isOpen:false }; }
