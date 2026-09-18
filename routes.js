@@ -39,6 +39,21 @@ function minutesOfDay(hhmm) {
   const [h, m] = (hhmm || '0:0').split(':').map(n => parseInt(n, 10) || 0);
   return h * 60 + m;
 }
+// The server's own clock may run in a different timezone than the school
+// (e.g. host deployments defaulting to UTC). Since the daily window is a
+// wall-clock time-of-day, not an absolute timestamp, trust the requesting
+// device's own clock when it sends one (?localTime=HH:MM) instead of the
+// server's — this is what actually matters for "is it 7pm where the user
+// is right now", and avoids requiring server TZ configuration entirely.
+function resolveNow(req) {
+  const now = new Date();
+  const lt = req.query?.localTime;
+  if (/^([01]\d|2[0-3]):[0-5]\d$/.test(lt || '')) {
+    const [h, m] = lt.split(':').map(Number);
+    now.setHours(h, m, 0, 0);
+  }
+  return now;
+}
 function isSyllabusWindowOpen(win, now = new Date()) {
   if (!win || !win.fromTime || !win.toTime) return false;
   const from = minutesOfDay(win.fromTime);
@@ -722,7 +737,7 @@ function initRoutes(app) {
       res.json({
         fromTime: win?.fromTime || null,
         toTime: win?.toTime || null,
-        isOpen: isSyllabusWindowOpen(win),
+        isOpen: isSyllabusWindowOpen(win, resolveNow(req)),
       });
     } catch (e) { res.status(500).json({ error: e.message }); }
   });
@@ -736,7 +751,7 @@ function initRoutes(app) {
         {}, { fromTime, toTime, updatedAt: new Date() },
         { upsert: true, new: true },
       );
-      res.json({ ok: true, fromTime: win.fromTime, toTime: win.toTime, isOpen: isSyllabusWindowOpen(win) });
+      res.json({ ok: true, fromTime: win.fromTime, toTime: win.toTime, isOpen: isSyllabusWindowOpen(win, resolveNow(req)) });
     } catch (e) { res.status(500).json({ error: e.message }); }
   });
 
@@ -1030,7 +1045,7 @@ function initRoutes(app) {
       }
       if (test.type === 'syllabus') {
         const win = await SyllabusWindow.findOne({}).lean();
-        if (!isSyllabusWindowOpen(win, now)) {
+        if (!isSyllabusWindowOpen(win, resolveNow(req))) {
           return res.status(403).json({ error: 'Syllabus Test is closed right now', fromTime: win?.fromTime, toTime: win?.toTime });
         }
       }
