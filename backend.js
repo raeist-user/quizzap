@@ -1,0 +1,2465 @@
+/* ══════════════════════════════════════
+   STATE
+══════════════════════════════════════ */
+let S={}, role=null, myPid=null, myName=null, hostAuthed=false;
+let currentUser=null;
+let authToken=null;
+
+// Profile page
+let showingProfile=false, profileTab='overview';
+
+// Score tracking for +N badge
+let prevMyScore=0, scoreGain=0;
+
+// Host
+let questions=[], selIdx=-1, answerKey=-1, inspectPid=null;
+let sidebarQOpen=false, sidebarStudOpen=false, sidebarScoreOpen=false, sidebarSchedOpen=false, showStandingsOverlay=false;
+let hostTimerSeconds=0;
+let hostRandomize=false; // OFF by default — questions load in file order
+
+// Resource browser
+let repoPath=null;
+let subjects=[];          // [{name, path, files:[], filesLoaded:false}]
+let expandedSubject=null; // which subject accordion is open in generate tab
+let folderOverlaySubject=null;   // subject name whose chapter overlay is open
+let folderOverlayDraft={};       // {fileName: {selected, count}} — pending selections inside overlay
+let folderManageSubject=null;    // subject name whose manage overlay is open
+let showNewFolderCard=false;     // whether the + new folder card input is shown
+let repoLoading=false;
+
+// Host halt confirmation menu state
+let showingHaltMenu=false;
+let showingHaltBomb=false, haltBombTimer=null; // bomb drop animation before halt menu
+
+// Kick modal state (host only)
+let kickConfirmPid=null;   // pid of student being kicked
+let kickConfirmName='';    // display name for modal
+let showingDismissBomb=false, dismissBombTimer=null; // bomb before stop & dismiss fires
+
+// Session backup / restore overlay (host only)
+let showingBackupOverlay=false;
+let backupOverlayState={ list:[], loading:false, error:null, restoredMsg:null };
+
+// Host settings/shortcuts overlay
+let hostSettingsOpen=false;
+let hostEndedTab='public';   // 'public' | 'exiled' — toggle on post-game results screen
+
+/* ── PLANNED TEST STATE ──────────────────────────────────────────────────────
+   Shared between host (Test Board) and student (Available Tests) views.
+──────────────────────────────────────────────────────────────────────────── */
+// Host
+let testBoardOpen = false;          // is Test Board overlay open?
+let tbSection = 'chooser';          // 'chooser' | 'regular' | 'syllabus' — which screen inside the overlay
+let testBoardTab  = 'create';       // 'create' | 'history' (only meaningful when tbSection==='regular')
+let testHistory   = null;           // fetched list of host's tests
+let testHistoryError = null;        // set when /api/tests/host fails — lets the UI
+                                     // show a real error + retry instead of a false
+                                     // "no tests created yet" whenever a fetch fails
+let testViewId    = null;           // currently inspected test in history
+let testViewAttempts = null;        // attempts for testViewId
+let testAttemptDetail = null;       // { attempt, questions } for per-student view
+// Reschedule modal (edit availFrom/availTo on an already-created test)
+let testRescheduleId   = null;      // _id of test being rescheduled, or null when closed
+let testRescheduleFrom = '';        // datetime-local string
+let testRescheduleTo   = '';        // datetime-local string
+let testRescheduleMsg  = '';        // error message shown in the modal
+let testRescheduleBusy = false;     // true while the PUT request is in flight
+// Create-test / Create-preset form state (shared — only one of these forms is
+// ever visible at a time, distinguished by tcMode).
+let tcMode='test';                  // 'test' | 'preset-new' | 'preset-edit' — who btn-tc-publish targets
+let tcTitle='', tcSubject='', tcTimerType='none', tcTimerValue=0;
+let tcQSources=[];                  // [{ repo, files, start, count, questions, label }]
+let tcRandomize=false;              // shuffle questions before publishing
+let tcAvailFrom='';                 // ISO datetime string — when test becomes available (tcMode:'test' only)
+let tcAvailTo='';                   // ISO datetime string — when test closes (tcMode:'test' only)
+let tcMsg='';                       // error/success message
+
+// ── SYLLABUS TEST ────────────────────────────────────────────────────────────
+// A single global daily time-of-day window (shared setting, read by host +
+// student) gates the whole Syllabus Test section. Hosts build reusable
+// TestPreset templates and Publish them to spin up live rounds.
+let sylWindow = null;               // { fromTime, toTime, isOpen } from /api/syllabus-window
+let sylWindowEditing = false;       // host is editing the window right now
+let sylWindowDraftFrom = '19:00';
+let sylWindowDraftTo   = '00:00';
+let sylWindowMsg = '';
+// Host: presets
+let presets = null;                 // fetched list (host)
+let presetsError = null;
+let sylManageMode = false;          // pencil-toggle reveals Edit/Delete on every preset card
+let sylEditingPresetId = null;      // preset._id being edited via tcMode:'preset-edit', else null
+let sylPresetMsg = '';
+// Student: syllabus test list
+let atSection = 'chooser';          // 'chooser' | 'regular' | 'syllabus' — mirrors tbSection for students
+let sylTests = null;                // fetched list (student, type=syllabus)
+let sylStudentTab = 'available';    // 'available' | 'attempted' — Syllabus Test's OWN tabs, separate from Regular's
+let sylReattemptMsg = {};           // { [testId]: 'Requesting…' | '✓ Requested' | error } — per-card status
+
+// Host: notifications inbox (bell next to the daily-window Edit button)
+let notifOpen = false;              // is the notification panel overlay open?
+let notifications = null;           // fetched list
+let notifUnreadCount = 0;           // badge count on the bell — total unread, independent of the filter below
+let notifFilter = 'all';            // 'all' | 'syllabus_attempt' | 'reattempt_request'
+let notifLoading = false;
+
+// Student
+let availTestsOpen = false;         // is Available Tests overlay open?
+let availTestsTab  = 'available';   // 'available' | 'attempted'
+let availTests     = null;          // fetched list of active tests
+let availCountdownHandle = null;    // ticks "Starts in …" labels on scheduled tests
+let myAttempts     = null;          // fetched list of my submitted attempts
+// Per-test leaderboard, shown to a student for a test they've completed —
+// either auto-opened right after submit, or re-opened later from the
+// "Attempted" tab. Same data shape either way: {test:{title,subject},
+// myUserId, attempts:[{userId,userName,score,total}]}
+let testLbOpen    = false;          // is the leaderboard overlay visible?
+let testLbLoading = false;          // fetch in flight
+let testLbError   = '';             // fetch error message, if any
+let testLbData    = null;           // the fetched leaderboard payload
+// Active attempt state
+let atTest         = null;
+let atAttemptId    = null;        // server-side TestAttempt._id backing the current attempt — lets a rejoin resume the SAME attempt
+let atAnswers      = [];
+let atQIdx         = 0;
+let atTimeLeft     = 0;
+let atPerQLeft     = 0;
+let atTimerHandle  = null;
+let atReportOpen   = -1;
+let atStartTime    = 0;            // ms anchor — server startedAt
+let atQStartTime   = 0;            // ms anchor — current question start
+let atQPausedElapsed = 0;          // ms elapsed when timer was paused (answer selected)
+let atAutoAdvancing= false;        // blocks input during reveal+advance
+let atRevealData   = null;         // {chosen, correct, isCorrect} during reveal
+let atBeepedSeconds= new Set();    // which countdown seconds have been beeped
+
+// ── Beep: Web Audio API ───────────────────────────────────────────────────
+function playBeep(freq=880, dur=0.18){
+  try{
+    const ctx=new (window.AudioContext||window.webkitAudioContext)();
+    const osc=ctx.createOscillator();
+    const gain=ctx.createGain();
+    osc.connect(gain); gain.connect(ctx.destination);
+    osc.frequency.value=freq; osc.type='sine';
+    gain.gain.setValueAtTime(0.45, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime+dur);
+    osc.start(); osc.stop(ctx.currentTime+dur);
+    ctx.close();
+  }catch(e){}
+}
+
+// ── Result sound for tests: use the exact same playCorrect / playWrong
+//    that the live-quiz session uses — defined in function.js, always loaded.
+function playResultSound(isCorrect){
+  if(isCorrect) playCorrect();
+  else          playWrong();
+}
+
+// ── Smooth timer RAF loop ─────────────────────────────────────────────────
+// Updates the timer bar + label at ~60 fps without a full re-render.
+function atTimerRAF(){
+  if(!atTest){ return; }
+  const bar=document.getElementById('at-timer-bar');
+  const lbl=document.getElementById('at-timer-lbl');
+  if(!bar){ requestAnimationFrame(atTimerRAF); return; }
+  let pct=100, col='#6366f1', label='';
+  if(atTest.timerType==='total' && atStartTime){
+    const elapsed=(Date.now()-atStartTime)/1000;
+    const rem=Math.max(0,(atTest.timerValue||0)-elapsed);
+    pct=rem/(atTest.timerValue||1)*100;
+    col=pct>33?'#6366f1':pct>15?'#f59e0b':'#ef4444';
+    const mm=Math.floor(rem/60), ss=Math.floor(rem%60);
+    label=`${mm}:${String(ss).padStart(2,'0')}`;
+  } else if(atTest.timerType==='perQuestion' && atQStartTime){
+    // atQStartTime is the real moment THIS question became visible — never a
+    // fixed multiple of the test start — so unused time from an earlier
+    // question can never bleed into this one's countdown.
+    const elapsed = atAutoAdvancing
+      ? atQPausedElapsed / 1000          // frozen during 3 s reveal
+      : (Date.now()-atQStartTime)/1000;
+    const rem=Math.max(0,(atTest.timerValue||0)-elapsed);
+    pct=rem/(atTest.timerValue||1)*100;
+    col=pct>33?'#6366f1':pct>15?'#f59e0b':'#ef4444';
+    label=`${Math.ceil(rem)}s`;
+  }
+  bar.style.width=Math.max(0,Math.min(100,pct))+'%';
+  bar.style.background=col;
+  if(lbl){ lbl.textContent=label; lbl.style.color=col; }
+  requestAnimationFrame(atTimerRAF);
+}
+
+// Upload manage state
+let manageEditMode=null;      // null | 'existing' | 'new'
+let manageFolderFiles=[];     // [{name, path, sha}] files in currently selected manage folder
+let manageFile=null;          // which specific .txt file is selected in manage tab
+let manageNewFileName='';
+let editorFullscreen=false;   // whether the editor is in fullscreen overlay mode
+
+// Voice (host)
+let localStream=null;
+// Mic system — see rebuilt functions below
+// All state is managed in the MIC SYSTEM block
+
+// Timer
+let timerInterval=null;
+// Clock-skew correction: difference between server clock and local clock (ms).
+// Updated on every incoming state broadcast so it stays accurate.
+// Usage: corrected "now" = Date.now() + clockOffset
+let clockOffset=0;
+
+// Push question debounce
+let pushing=false, pushTimeout=null;
+
+// Halt flow
+let showingHalted=false, haltedIsPreview=false, haltedCountdown=0, haltedTimer=null, haltedSnapshot=[];
+let haltedTotalQuestions=0;   // total questions asked in the session (for score/total display)
+let haltedTotalLabel='';      // denominator label for final leaderboard: 'all' or specific count string
+let hostShutdownLeaderboard=null; // captured final leaderboard shown to host after Stop & Dismiss — {public:[], exiled:[], totalQ}
+let hostShutdownLbTab='public';   // 'public' | 'exiled' — toggle on the post-halt final leaderboard screen
+
+// ── QUESTION REPORT STATE ────────────────────────────────────────────────────
+let receivedReports=[];          // [{rid,question,correct,reportedAnswer,reporterName,ts,count}]
+let reportsOverlayOpen=false;    // whether the host reports overlay is visible
+let expandedReportRid=null;      // which report card is expanded (shows options)
+let editingReportRid=null;       // which report is in edit mode
+let editReportDraft={};          // {text, options:[], correct}
+let myReportedQuestions=new Set(); // track question texts reported by this student (prevent duplicates)
+
+// Dismissed flow
+let showingDismissed=false, dismissedCountdown=120, dismissedTimer=null;
+let dismissedAmIExiled=false; // set explicitly by the server on 'kicked' — authoritative, doesn't depend on id-matching
+
+// Answer timing (client-side — seconds taken to answer current question)
+let myLastAnswerTime=null;
+let localAnswerTimes={};   // {pid: secs} built client-side from S.answers appearance time
+let sessionCorrectTimes=[]; // secs for each correctly answered question this session
+let studentQCount=0;       // how many questions this client has seen pushed (for student denominator)
+// Cumulative answer times per player — accumulated across all revealed questions this session
+// Used for tiebreaking: same pts → less total time = higher rank
+let cumulativeAnswerTimes={};  // {pid: totalSecs}
+
+// Cumulative scoring is now handled server-side via gameScores in server.js
+
+// 🔥 Streak tracking
+// For host: computed from S.history (full history available)
+// For participants: tracked live in clientStreaks (persisted across renders)
+let _streakCache = { histLen: -1, map: {} };
+let clientStreaks = {}; // {pid: number} — maintained by participant client on each reveal
+let lastFastestPid = null; // persists from revealed → idle so badge shows on waiting screen
+
+// Home tabs
+let homeSection='home'; // 'home' | 'leaderboard'
+
+// Role-based admin state
+let hostNotice='';           // text of global notice fetched from server
+let joinRequests=[];         // [{id,name,email,username,createdAt}]
+let updateRequests=[];       // [{id,userId,userName,type,newValue,createdAt}]
+let registeredUsers=[];      // [{id,name,email,username,role,status,createdAt}]
+let inspectingUser=null;     // user object host is currently inspecting
+let inspectTab='overview';   // 'overview' | 'history'
+let inspectCache=null;       // cached session history for inspected user
+let adminLoading=false;      // whether admin requests are being fetched
+
+// All-time leaderboard cache
+let allTimeLB=null;
+let todayLB=null;
+let weekLB=null;
+let homeLbTab='today'; // 'today' | 'week' | 'all'
+// Per-tab fetch tracking: null=not started, false=loading, true=done
+let lbFetched={today:null, week:null, all:null};
+// Per-tab error messages (null = no error)
+let lbErrors={today:null, week:null, all:null};
+
+// Server schedules (shared between students and host)
+let serverSchedules=null;
+let hostSchedules=[]; // schedules shown in host panel
+
+const STUN={iceServers:[{urls:'stun:stun.l.google.com:19302'},{urls:'stun:stun1.l.google.com:19302'}]};
+
+// ── GITHUB CONFIG ─────────────────────────────────────────────────────────
+// MY_TOKEN is injected into window.MY_TOKEN by index.html (server-side template replacement).
+const MY_TOKEN = (typeof window !== 'undefined' && window.MY_TOKEN) ? window.MY_TOKEN : '';
+
+const GITHUB_REPO  = 'raeist-user/quizzap';
+const GITHUB_BRANCH = 'main';
+/* ══════════════════════════════════════
+   AUTH
+══════════════════════════════════════ */
+function loadStoredAuth(){
+  try{
+    const t=localStorage.getItem('scc_token');
+    const u=localStorage.getItem('scc_user');
+    if(t&&u){ authToken=t; currentUser=JSON.parse(u); }
+  }catch(e){}
+}
+function saveAuth(token,user){ authToken=token; currentUser=user; localStorage.setItem('scc_token',token); localStorage.setItem('scc_user',JSON.stringify(user)); }
+function clearAuth(){ authToken=null; currentUser=null; localStorage.removeItem('scc_token'); localStorage.removeItem('scc_user'); invalidateSessionCache(); }
+
+/* ── Server-side session sync ───────────────────────────────────────────────
+   Called once on boot: verifies the stored token against the DB.
+   - If the account was deleted  → clears auth and shows login screen
+   - If the account data changed (e.g. username was manually added) → refreshes local session
+   This ensures deleted accounts never persist in localStorage.
+──────────────────────────────────────────────────────────────────────────── */
+async function syncAuthWithServer(){
+  if(!authToken) return; // not logged in — nothing to sync
+  try{
+    const r=await fetch('/api/me',{headers:{Authorization:'Bearer '+authToken}});
+    if(r.status===401||r.status===403){
+      // Account deleted or token invalid — force logout
+      clearAuth();
+      // Also clear nav state so we don't restore a stale screen
+      try{ sessionStorage.removeItem('scc_nav'); sessionStorage.removeItem('qz_pid'); }catch(_){}
+      render();
+      return;
+    }
+    if(!r.ok) return; // server error — fail silently, don't log out on transient errors
+    const d=await r.json();
+    if(d.token&&d.user){
+      // Refresh token + user data in case anything changed (e.g. username updated in DB)
+      saveAuth(d.token,d.user);
+      currentUser=d.user;
+    }
+  }catch(e){
+    // Network error (offline, server starting up) — don't log out, just continue
+    console.warn('Session sync skipped (network):', e.message);
+  }
+}
+
+/* ── Navigation-state persistence (survives reload) ─────────────────────── */
+const NAV_KEY='scc_nav';
+function saveNavState(){
+  try{
+    // Only persist states that make sense to restore after reload.
+    // We never restore a mid-question live session since WS reconnect handles that.
+    const st={
+      role: role,
+      hostAuthed: hostAuthed,
+      myName: myName,
+      showingProfile: showingProfile,
+      profileTab: profileTab,
+      homeSection: homeSection,
+    };
+    sessionStorage.setItem(NAV_KEY, JSON.stringify(st));
+  }catch(e){}
+}
+function loadNavState(){
+  try{
+    const raw=sessionStorage.getItem(NAV_KEY);
+    if(!raw) return;
+    const st=JSON.parse(raw);
+    role          = st.role          ?? null;
+    hostAuthed    = st.hostAuthed    ?? false;
+    myName        = st.myName        ?? null;
+    showingProfile= st.showingProfile?? false;
+    profileTab    = st.profileTab    ?? 'overview';
+    homeSection   = st.homeSection   ?? 'home';
+    // myPid already persisted separately in sessionStorage by existing code
+    if(myName) myPid = sessionStorage.getItem('qz_pid') || null;
+  }catch(e){}
+}
+
+async function apiPost(path,body,withAuth){
+  const h={'Content-Type':'application/json'};
+  if(withAuth&&authToken) h['Authorization']='Bearer '+authToken;
+  const r=await fetch(path,{method:'POST',headers:h,body:JSON.stringify(body)});
+  const d=await r.json();
+  if(!r.ok) throw new Error(d.error||'Request failed');
+  return d;
+}
+async function apiPut(path,body,withAuth){
+  const h={'Content-Type':'application/json'};
+  if(withAuth&&authToken) h['Authorization']='Bearer '+authToken;
+  const r=await fetch(path,{method:'PUT',headers:h,body:JSON.stringify(body)});
+  const d=await r.json();
+  if(!r.ok) throw new Error(d.error||'Request failed');
+  return d;
+}
+async function apiDel(path){
+  const h={'Authorization':'Bearer '+authToken};
+  const r=await fetch(path,{method:'DELETE',headers:h});
+  const d=await r.json();
+  if(!r.ok) throw new Error(d.error||'Failed');
+  return d;
+}
+
+// ── SESSION HISTORY ──────────────────────────────────────────────────────
+// History is now stored server-side. We keep a short-lived in-memory cache
+// so the profile page doesn't re-fetch on every tab switch.
+let _sessionCache = null;       // null = not loaded yet, [] = loaded but empty
+let _sessionCacheTime = 0;
+const SESSION_CACHE_TTL = 30000; // 30 s
+
+async function loadHistory(){
+  if(_sessionCache !== null && (Date.now()-_sessionCacheTime) < SESSION_CACHE_TTL)
+    return _sessionCache;
+  if(!authToken) return [];
+  try{
+    const r = await fetch('/api/sessions',{headers:{Authorization:'Bearer '+authToken}});
+    const d = await r.json();
+    _sessionCache = d.history || [];
+    _sessionCacheTime = Date.now();
+    return _sessionCache;
+  }catch(e){ return _sessionCache || []; }
+}
+function invalidateSessionCache(){ _sessionCache=null; _sessionCacheTime=0; }
+
+async function saveSession(e){
+  // Persist to DB — fire and forget, no UI block
+  if(!authToken) return;
+  try{
+    await fetch('/api/sessions',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+authToken},
+      body:JSON.stringify(e)
+    });
+    invalidateSessionCache(); // force fresh load next time profile opens
+  }catch(err){ console.warn('saveSession failed:',err.message); }
+}
+async function computeStats(){
+  const h=await loadHistory(); if(!h||!h.length) return null;
+  const totalCorrect=h.reduce((s,e)=>s+(e.correct||0),0);
+  const totalQs=h.reduce((s,e)=>s+(e.total||0),0);
+  const accuracy=totalQs?Math.round(totalCorrect/totalQs*100):0;
+  const bestScore=Math.max(...h.map(e=>e.score||0));
+  const bestRank=Math.min(...h.map(e=>e.rank||999));
+  const today=new Date(); today.setHours(0,0,0,0);
+  const dayMs=86400000;
+  const days=[...new Set(h.map(e=>{ const d=new Date(e.date); d.setHours(0,0,0,0); return d.getTime(); }))].sort((a,b)=>b-a);
+  let streak=0;
+  if(days.length&&(today.getTime()-days[0])<=dayMs){
+    for(let i=0;i<days.length;i++){ if(Math.abs(days[i]-(today.getTime()-i*dayMs))<=dayMs) streak++; else break; }
+  }
+  return {sessions:h.length,totalCorrect,totalQs,accuracy,bestScore,bestRank:bestRank===999?null:bestRank,streak};
+}
+
+// ── SCHEDULES (server-side) ───────────────────────────────────────────────
+function cdStr(ts){ const d=ts-Date.now(); if(d<=0)return'Now/Overdue'; const h=Math.floor(d/3600000),m=Math.floor((d%3600000)/60000); if(h>48)return'in '+Math.floor(h/24)+' days'; if(h>0)return'in '+h+'h '+m+'m'; return'in '+m+'m'; }
+
+async function fetchSchedules(){
+  try{
+    const r=await fetch('/api/schedules');
+    const d=await r.json();
+    serverSchedules=d.schedules||[];
+    render();
+  }catch(e){ serverSchedules=[]; }
+}
+
+async function fetchHostSchedules(){
+  try{
+    const r=await fetch('/api/schedules');
+    const d=await r.json();
+    hostSchedules=d.schedules||[];
+    render();
+  }catch(e){ hostSchedules=[]; }
+}
+
+/* ── PLANNED TEST helpers ─────────────────────────────────────────────────── */
+
+async function fetchTestHistory(){
+  testHistoryError=null;
+  try{
+    const r=await fetch('/api/tests/host',{headers:{Authorization:'Bearer '+authToken}});
+    const d=await r.json().catch(()=>({}));
+    if(!r.ok) throw new Error(d?.error || `Failed to load tests (HTTP ${r.status})`);
+    testHistory=Array.isArray(d.tests) ? d.tests : [];
+  }catch(e){
+    testHistory=null;
+    testHistoryError = e.message || 'Failed to load tests — check your connection and try again.';
+  }
+  render();
+}
+
+async function fetchAvailTests(){
+  try{
+    const r=await fetch('/api/tests',{headers:{Authorization:'Bearer '+authToken}});
+    const d=await r.json();
+    availTests=d.tests||[];
+  }catch(e){ availTests=[]; }
+  render();
+  startAvailCountdownTicker();
+}
+
+// ── SYLLABUS TEST fetchers ───────────────────────────────────────────────────
+// The daily window is a wall-clock time-of-day. The server may run in a
+// different timezone than the device (e.g. a host deployed on UTC while
+// students are in IST), so every window-sensitive call sends the device's
+// own local "HH:MM" and the server trusts that over its own clock.
+function localHHMM(){
+  const d=new Date();
+  return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
+}
+async function fetchSylWindow(){
+  try{
+    const r=await fetch('/api/syllabus-window?localTime='+localHHMM(),{headers:{Authorization:'Bearer '+authToken}});
+    const d=await r.json();
+    sylWindow={ fromTime:d.fromTime||null, toTime:d.toTime||null, isOpen:!!d.isOpen };
+  }catch(e){ sylWindow=sylWindow||{ fromTime:null, toTime:null, isOpen:false }; }
+  render();
+}
+async function fetchPresets(){
+  presetsError=null;
+  try{
+    const r=await fetch('/api/presets',{headers:{Authorization:'Bearer '+authToken}});
+    const d=await r.json().catch(()=>({}));
+    if(!r.ok) throw new Error(d?.error||'Failed to load presets');
+    presets=Array.isArray(d.presets)?d.presets:[];
+  }catch(e){ presets=null; presetsError=e.message||'Failed to load presets'; }
+  render();
+}
+async function fetchSylTests(){
+  try{
+    const r=await fetch('/api/tests?type=syllabus',{headers:{Authorization:'Bearer '+authToken}});
+    const d=await r.json();
+    sylTests=d.tests||[];
+  }catch(e){ sylTests=[]; }
+  render();
+}
+// "19:00" → "7:00 PM"
+function fmtTime12(hhmm){
+  if(!hhmm) return '';
+  const [h,m]=hhmm.split(':').map(Number);
+  const period=h>=12?'PM':'AM';
+  const h12=h%12===0?12:h%12;
+  return `${h12}:${String(m).padStart(2,'0')} ${period}`;
+}
+
+// ── NOTIFICATIONS (host) ─────────────────────────────────────────────────────
+async function fetchNotifications(){
+  notifLoading=true; render();
+  try{
+    const q = notifFilter!=='all' ? '?type='+notifFilter : '';
+    const r=await fetch('/api/notifications'+q,{headers:{Authorization:'Bearer '+authToken}});
+    const d=await r.json();
+    notifications=d.notifications||[];
+    notifUnreadCount=d.unreadCount||0;
+  }catch(e){ notifications=notifications||[]; }
+  notifLoading=false; render();
+}
+// Lightweight badge-only refresh (used when just opening the Syllabus board,
+// so the bell shows a live count without loading the whole panel).
+async function fetchNotifCount(){
+  try{
+    const r=await fetch('/api/notifications',{headers:{Authorization:'Bearer '+authToken}});
+    const d=await r.json();
+    notifUnreadCount=d.unreadCount||0;
+  }catch(e){ /* leave last known count */ }
+  render();
+}
+
+// Patches each "Starts in …" button directly every second (no full re-render,
+// same lightweight approach the in-test timer uses) so scheduled tests count
+// down live. Once a countdown reaches zero it refetches the list once, which
+// swaps that card over to a real Start/Rejoin button server-side-verified.
+function startAvailCountdownTicker(){
+  if(availCountdownHandle) clearInterval(availCountdownHandle);
+  availCountdownHandle=setInterval(()=>{
+    const els=document.querySelectorAll('[data-countdown-label]');
+    if(!els.length){ clearInterval(availCountdownHandle); availCountdownHandle=null; return; }
+    let anyElapsed=false;
+    els.forEach(el=>{
+      const from=Number(el.dataset.availFrom);
+      const rem=from-Date.now();
+      if(rem<=0){ anyElapsed=true; return; }
+      el.textContent=formatCountdown(rem);
+    });
+    if(anyElapsed){ clearInterval(availCountdownHandle); availCountdownHandle=null; fetchAvailTests(); }
+  },1000);
+}
+
+async function fetchMyAttempts(){
+  try{
+    const r=await fetch('/api/my-attempts',{headers:{Authorization:'Bearer '+authToken}});
+    const d=await r.json();
+    myAttempts=d.attempts||[];
+  }catch(e){ myAttempts=[]; }
+  render();
+}
+
+// Per-test student leaderboard has been disabled — students see their own
+// results only (Attempted tab). openTestLeaderboard/closeTestLeaderboard and
+// the testLbOpen/testLbData state above are intentionally no longer wired to
+// any UI. Host-side leaderboard (live quiz + final leaderboard, ws.js /
+// /api/leaderboard) is untouched.
+
+async function doSubmitTest(){
+  if(!atTest) return;
+  // Clean up timer interval and beforeunload guard
+  if(atTimerHandle){ clearInterval(atTimerHandle); atTimerHandle=null; }
+  window.removeEventListener('beforeunload', window._atUnloadGuard);
+  atRevealData=null; atAutoAdvancing=false; atBeepedSeconds=new Set();
+  try{
+    const r=await fetch('/api/tests/'+atTest._id+'/submit',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+authToken},
+      body:JSON.stringify({answers:atAnswers}),
+    });
+    const d=await r.json();
+    if(!r.ok) throw new Error(d.error||'Submission failed');
+    showToast(`✓ Submitted! Score: ${d.result?.score??'?'}/${d.result?.total??'?'}`,'good');
+    const wasSyllabus = atTest.type==='syllabus';
+    atTest=null; atAttemptId=null; atAnswers=[];
+    if(wasSyllabus){ atSection='syllabus'; sylStudentTab='attempted'; }
+    else { atSection='regular'; availTestsTab='attempted'; }
+    availTestsOpen=true; // student lands directly on their own result card, no leaderboard
+    await fetchMyAttempts();
+    if(wasSyllabus) fetchSylTests(); // refresh so the just-submitted card disappears from Available too
+  }catch(e){
+    showToast(e.message||'Submission failed','bad');
+  }
+  render();
+}
+
+let _tcLoadingSource=false; // flag: browse result should be piped to test builder
+
+// ── Embedded GitHub browser inside Test Board ─────────────────────────────
+// When the host taps "Select from GitHub" inside the Test Board overlay, we
+// open a self-contained file browser RIGHT INSIDE the overlay instead of
+// trying to reuse the GitHub browser that lives in hostHTML().
+let tcBrowserOpen    = false;   // browser screen is active
+let tcBrowserSubj    = null;    // drilled-in subject name; null = subject list
+let tcBrowserFiles   = null;    // null=loading, Array=loaded file list
+let tcBrowserLoading = false;   // initial subject-list fetch in progress
+let tcBrowserErr     = '';      // last error string
+
+function _showTcRangeSelector(allQ, sourceLabel){
+  // Remove any existing
+  const ex=document.getElementById('tc-range-overlay'); if(ex) ex.remove();
+
+  const total=allQ.length;
+  const overlay=document.createElement('div');
+  overlay.id='tc-range-overlay';
+  overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9000;display:flex;align-items:flex-end';
+  overlay.innerHTML=`<div style="background:var(--white);border-radius:14px 14px 0 0;padding:20px;width:100%;box-sizing:border-box;max-height:80vh;overflow-y:auto">
+    <div style="font-weight:700;font-size:.9rem;margin-bottom:4px">📐 Select Question Range</div>
+    <div style="font-size:.75rem;color:var(--mid);margin-bottom:14px">${esc(sourceLabel)} · ${total} questions total</div>
+    <div style="display:flex;gap:10px;margin-bottom:12px">
+      <div style="flex:1">
+        <label style="font-size:.72rem;font-weight:600;color:var(--mid);display:block;margin-bottom:4px">START FROM (Q#)</label>
+        <input class="form-input" id="tc-range-start" type="number" min="1" max="${total}" value="1" style="font-size:.85rem"/>
+        <div style="font-size:.7rem;color:var(--mid);margin-top:3px">1 = first question</div>
+      </div>
+      <div style="flex:1">
+        <label style="font-size:.72rem;font-weight:600;color:var(--mid);display:block;margin-bottom:4px">HOW MANY</label>
+        <input class="form-input" id="tc-range-count" type="number" min="1" max="${total}" value="${total}" style="font-size:.85rem"/>
+        <div style="font-size:.7rem;color:var(--mid);margin-top:3px">max ${total}</div>
+      </div>
+    </div>
+    <div id="tc-range-preview" style="font-size:.78rem;color:#4338ca;margin-bottom:14px;padding:6px 10px;background:#ede9fe;border-radius:6px">Will use Q1–Q${total} (${total} questions)</div>
+    <div style="display:flex;gap:8px">
+      <button id="tc-range-confirm" class="btn btn-dark btn-sm" style="flex:1;justify-content:center;padding:10px">✓ Use These Questions</button>
+      <button id="tc-range-cancel" class="btn btn-ghost btn-sm" style="padding:10px">Cancel</button>
+    </div>
+  </div>`;
+  document.body.appendChild(overlay);
+
+  function updatePreview(){
+    const s=Math.max(1,Math.min(total,parseInt(document.getElementById('tc-range-start')?.value)||1));
+    const c=Math.max(1,Math.min(total-s+1,parseInt(document.getElementById('tc-range-count')?.value)||total));
+    const end=Math.min(total,s-1+c);
+    const el=document.getElementById('tc-range-preview');
+    if(el) el.textContent=`Will use Q${s}–Q${end} (${c} question${c!==1?'s':''})`;
+  }
+  ['tc-range-start','tc-range-count'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el) el.addEventListener('input',updatePreview);
+  });
+
+  document.getElementById('tc-range-confirm')?.addEventListener('click',()=>{
+    const s=Math.max(1,Math.min(total,parseInt(document.getElementById('tc-range-start')?.value)||1));
+    const c=Math.max(1,Math.min(total-s+1,parseInt(document.getElementById('tc-range-count')?.value)||total));
+    const sliced=allQ.slice(s-1,s-1+c);
+    tcQSources.push({ questions:sliced, files:[sourceLabel], start:s-1, count:c, repo:GITHUB_REPO, label:sourceLabel });
+    overlay.remove();
+    testBoardOpen=true; testBoardTab='create'; render();
+  });
+  document.getElementById('tc-range-cancel')?.addEventListener('click',()=>{
+    overlay.remove();
+    testBoardOpen=true; testBoardTab='create'; render();
+  });
+}
+
+/* ── Embedded GitHub browser helpers (called from ui_1_.js event handlers) ── */
+
+// Step 1: load the subject list (reuses/populates the shared `subjects` array)
+async function tcBrowserInit(){
+  if(tcBrowserLoading) return;
+  tcBrowserLoading=true; tcBrowserErr='';
+  render(); // show spinner immediately
+  if(!subjects.length){
+    try{
+      const res=await fetch(`https://api.github.com/repos/${GITHUB_REPO}/contents/resources?ref=${GITHUB_BRANCH}`,{headers:ghHeaders()});
+      if(!res.ok) throw new Error(`GitHub API ${res.status}: Check token and repo.`);
+      const items=await res.json();
+      const dirs=items.filter(i=>i.type==='dir');
+      if(!dirs.length) throw new Error('No subject folders found inside "resources".');
+      subjects=dirs.map(d=>{
+        const ex=subjects.find(s=>s.name===d.name);
+        return ex||{name:d.name,path:d.path,files:[],filesLoaded:false};
+      });
+    }catch(e){ tcBrowserErr=e.message; }
+  }
+  tcBrowserLoading=false; render();
+}
+
+// Step 2: user tapped a subject folder — load its .txt files
+async function tcBrowserDrillSubject(name){
+  tcBrowserSubj=name; tcBrowserFiles=null; tcBrowserErr=''; render();
+  const subj=subjects.find(s=>s.name===name);
+  if(!subj){ tcBrowserErr='Subject not found'; render(); return; }
+  if(subj.filesLoaded){ tcBrowserFiles=subj.files; render(); return; }
+  try{
+    const encodedPath=subj.path.split('/').map(encodeURIComponent).join('/');
+    const res=await fetch(`https://api.github.com/repos/${GITHUB_REPO}/contents/${encodedPath}?ref=${GITHUB_BRANCH}`,{headers:ghHeaders()});
+    if(!res.ok) throw new Error(`GitHub API ${res.status}`);
+    const items=await res.json();
+    subj.files=items
+      .filter(i=>i.type==='file'&&i.name.endsWith('.txt')&&i.name!=='.gitkeep')
+      .map(i=>({name:i.name,path:i.path,sha:i.sha,selected:false,count:0}));
+    subj.filesLoaded=true;
+    tcBrowserFiles=subj.files;
+  }catch(e){ tcBrowserErr=e.message; tcBrowserFiles=[]; }
+  render();
+}
+
+// Step 3: user tapped a file — fetch it, parse questions, open range selector
+async function tcBrowserPickFile(filePath, displayName){
+  // Capture BEFORE resetting below — tcBrowserSubj gets nulled out on the very
+  // next line to close the browser UI, so reading it later in this function
+  // (after that reset) would always yield an empty subject tag.
+  const subjName = tcBrowserSubj;
+  // Collapse browser immediately so the overlay stays visible (with loading state)
+  tcBrowserOpen=false; tcBrowserSubj=null; tcBrowserFiles=null; tcBrowserErr='';
+  testBoardOpen=true; testBoardTab='create';
+  render();
+  try{
+    const encodedPath=filePath.split('/').map(encodeURIComponent).join('/');
+    const res=await fetch(`https://api.github.com/repos/${GITHUB_REPO}/contents/${encodedPath}?ref=${GITHUB_BRANCH}`,{headers:ghHeaders()});
+    if(!res.ok) throw new Error(`GitHub API ${res.status}`);
+    const data=await res.json();
+    const bytes=Uint8Array.from(atob(data.content.replace(/\n/g,'')),c=>c.charCodeAt(0));
+    const text=new TextDecoder('utf-8').decode(bytes);
+    const allQ=parseQuestions(text);
+    if(!allQ.length){
+      tcMsg='No valid questions found in that file.';
+      render();
+      return;
+    }
+    // Tag each question with its source folder — same subject tag live quiz
+    // attaches (see generateQuiz) — so the test-taking view can pick the
+    // right font (e.g. Urdu) per question later, not just off the test title.
+    allQ.forEach(q=>{ q.subject=subjName||''; q.chapter=displayName.replace(/\.txt$/i,''); });
+    _showTcRangeSelector(allQ, displayName);
+  }catch(e){
+    tcMsg='Load failed: '+e.message;
+    render();
+  }
+}
+
+// ── NOTICE ────────────────────────────────────────────────────────────────────
+async function fetchNotice(){
+  try{
+    const r=await fetch('/api/notice');
+    const d=await r.json();
+    hostNotice=d.text||'';
+    render();
+  }catch(e){}
+}
+
+async function postNotice(text){
+  try{
+    await apiPost('/api/notice',{text},true);
+    hostNotice=text;
+    showToast('📢 Notice broadcast to all students.','good');
+    render();
+  }catch(e){ showToast('Failed to post notice: '+e.message,'bad'); }
+}
+
+// ── ADMIN REQUESTS ────────────────────────────────────────────────────────────
+async function fetchAdminRequests(){
+  if(!authToken||currentUser?.role!=='host') return;
+  const hdr={Authorization:'Bearer '+authToken};
+  const safeFetch = async (url) => {
+    try{
+      const r = await fetch(url,{headers:hdr});
+      if(!r.ok) return {};
+      return await r.json();
+    }catch(e){ console.warn('Fetch failed:',url,e.message); return {}; }
+  };
+  const [jr, ur, ru] = await Promise.all([
+    safeFetch('/api/admin/join-requests'),
+    safeFetch('/api/admin/update-requests'),
+    safeFetch('/api/admin/users'),
+  ]);
+  joinRequests    = jr.requests || [];
+  updateRequests  = ur.requests || [];
+  registeredUsers = ru.users    || [];
+  render();
+}
+
+async function approveJoinReq(id){
+  try{
+    const r=await fetch('/api/admin/join-requests/'+id+'/approve',{method:'POST',headers:{Authorization:'Bearer '+authToken}});
+    const d=await r.json();
+    if(!r.ok) throw new Error(d.error||'Failed');
+    showToast('✅ User approved and account created.','good');
+    await fetchAdminRequests();
+  }catch(e){ showToast('Error: '+e.message,'bad'); }
+}
+
+async function rejectJoinReq(id){
+  try{
+    const r=await fetch('/api/admin/join-requests/'+id+'/reject',{method:'POST',headers:{Authorization:'Bearer '+authToken}});
+    if(!r.ok) throw new Error('Failed');
+    showToast('Request rejected.','neutral');
+    await fetchAdminRequests();
+  }catch(e){ showToast('Error: '+e.message,'bad'); }
+}
+
+async function approveUpdateReq(id){
+  try{
+    const r=await fetch('/api/admin/update-requests/'+id+'/approve',{method:'POST',headers:{Authorization:'Bearer '+authToken}});
+    const d=await r.json();
+    if(!r.ok) throw new Error(d.error||'Failed');
+    showToast('✅ Update approved.','good');
+    await fetchAdminRequests();
+  }catch(e){ showToast('Error: '+e.message,'bad'); }
+}
+
+async function rejectUpdateReq(id){
+  try{
+    const r=await fetch('/api/admin/update-requests/'+id+'/reject',{method:'POST',headers:{Authorization:'Bearer '+authToken}});
+    if(!r.ok) throw new Error('Failed');
+    showToast('Update rejected.','neutral');
+    await fetchAdminRequests();
+  }catch(e){ showToast('Error: '+e.message,'bad'); }
+}
+
+async function deleteUser(id, name){
+  if(!confirm(`Permanently delete "${name}"?\n\nThis will purge their account, session history, leaderboard scores and all pending requests. This cannot be undone.`)) return;
+  try{
+    const r=await fetch('/api/admin/users/'+id,{method:'DELETE',headers:{Authorization:'Bearer '+authToken}});
+    const d=await r.json();
+    if(!r.ok) throw new Error(d.error||'Failed');
+    showToast('🗑 Account deleted and fully purged.','neutral');
+    await fetchAdminRequests();
+  }catch(e){ showToast('Error: '+e.message,'bad'); }
+}
+
+function openInspect(id){
+  const u = registeredUsers.find(u=>String(u.id)===String(id));
+  if(!u) return;
+  inspectingUser = u;
+  inspectTab = 'overview';
+  inspectCache = null;
+  render();
+}
+
+function inspectProfileHTML(){
+  const u = inspectingUser;
+  const initials = u.name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+  const TABS = [['overview','📈 Overview'],['history','📋 History']];
+  const tabsHTML = TABS.map(([t,l])=>`<div class="ptab${inspectTab===t?' active':''}" data-itab="${t}">${l}</div>`).join('');
+  const joined = u.createdAt ? new Date(u.createdAt).toLocaleDateString('en',{year:'numeric',month:'short',day:'numeric'}) : '';
+  return `<div class="profile-page">
+    <div class="row gap2 mb3">
+      <span style="font-size:.95rem;font-weight:600">Inspecting Account</span>
+    </div>
+    <div class="profile-hero">
+      <div class="ph-avatar">${initials}</div>
+      <div class="ph-info">
+        <div class="ph-name">${esc(u.name)}</div>
+        <div class="ph-email">${esc(u.email)}${u.username?`<span style="color:var(--mid);margin-left:5px">· @${esc(u.username)}</span>`:''}</div>
+        <div style="display:flex;align-items:center;gap:6px;margin-top:5px">
+          <span class="user-role-pill" style="background:${u.role==='host'?'#7c3aed':'#0ea5e9'}">${u.role}</span>
+          ${joined?`<span style="font-size:.68rem;color:var(--mid)">Joined ${joined}</span>`:''}
+        </div>
+      </div>
+      <button class="btn btn-bad btn-sm" style="flex-shrink:0;align-self:flex-start;padding:5px 10px" data-user-delete="${u.id}" data-user-name="${esc(u.name)}">🗑</button>
+    </div>
+    <div class="ptabs">${tabsHTML}</div>
+    <div id="inspect-data-body">
+      <div style="text-align:center;padding:48px 16px;color:var(--mid)">
+        <div style="font-size:1.5rem;margin-bottom:10px;opacity:.4">⏳</div>
+        <div style="font-size:.83rem">Loading…</div>
+      </div>
+    </div>
+  </div>`;
+}
+
+async function loadInspectData(){
+  const el = document.getElementById('inspect-data-body');
+  if(!el || !inspectingUser) return;
+  try{
+    if(!inspectCache){
+      const r = await fetch('/api/admin/sessions/'+inspectingUser.id, {headers:{Authorization:'Bearer '+authToken}});
+      if(r.status === 404){
+        // Route not deployed yet — show clear message
+        el.innerHTML='<div class="no-data-notice"><span>🚫</span><b style="color:var(--ink)">Deploy updated server.js</b><br><span style="font-size:.75rem;color:var(--mid)">The /api/admin/sessions route is not available on the server yet.</span></div>';
+        return;
+      }
+      if(!r.ok){
+        el.innerHTML='<div class="no-data-notice"><span>⚠️</span>Server error ('+r.status+')</div>';
+        return;
+      }
+      let d; try{ d = await r.json(); }catch(_){ d = {}; }
+      inspectCache = d.history || [];
+    }
+    if(inspectTab==='overview') el.innerHTML = buildOverviewHTML(inspectCache);
+    else el.innerHTML = buildHistoryHTML(inspectCache);
+    requestAnimationFrame(setupProfileCharts);
+  }catch(err){
+    if(el) el.innerHTML=`<div class="no-data-notice"><span>⚠️</span><b style="color:var(--ink)">Failed to load</b><br><span style="font-size:.75rem;font-family:monospace">${err.message}</span></div>`;
+    console.error('loadInspectData:', err.message);
+  }
+}
+
+/* ══════════════════════════════════════
+   EVENTS
+══════════════════════════════════════ */
+
+// Set up outside-click for profile dropdown once at boot
+let _outsideClickReady=false;
+function setupOutsideClick(){
+  if(_outsideClickReady) return;
+  _outsideClickReady=true;
+  // Profile button toggle — attached once here, not in attach(), so it never stacks
+  document.addEventListener('click', e=>{
+    const wrap=document.getElementById('profile-wrap');
+    const btn=document.getElementById('profile-btn');
+    if(!wrap) return;
+    if(btn&&btn.contains(e.target)){
+      // Toggle dropdown
+      document.getElementById('p-dropdown')?.classList.toggle('hidden');
+      e.stopPropagation();
+      return;
+    }
+    // Click outside — close
+    if(!wrap.contains(e.target)) document.getElementById('p-dropdown')?.classList.add('hidden');
+  });
+  document.addEventListener('touchstart', e=>{
+    const wrap=document.getElementById('profile-wrap');
+    if(wrap&&!wrap.contains(e.target)) document.getElementById('p-dropdown')?.classList.add('hidden');
+  },{passive:true});
+}
+/* ══════════════════════════════════════
+   RENDER
+══════════════════════════════════════ */
+
+// Inject keyframes that aren't in the static stylesheet
+(function injectKeyframes(){
+  const s = document.createElement('style');
+  s.textContent = `
+    @keyframes popIn {
+      from { opacity:0; transform:scale(.82) translateY(6px); }
+      to   { opacity:1; transform:scale(1)   translateY(0);   }
+    }
+  `;
+  document.head.appendChild(s);
+})();
+/* ── Screen key: identifies which logical screen is active.
+   Transitions only animate when this changes, preventing flicker
+   on frequent same-screen re-renders (WS score updates, timer ticks). ── */
+let _screenKey = '';
+let _renderPending = false;
+
+function _getScreenKey(){
+  if(!currentUser)                    return 'auth';
+  if(showingDismissed)                return 'dismissed';
+  if(showingHalted)                   return 'halted';
+  if(inspectingUser)                  return 'inspect:'+inspectingUser.id+':'+inspectTab;
+  if(showingProfile)                  return 'profile:'+profileTab;
+  if(!role)                           return 'landing:'+homeSection+(homeSection==='leaderboard'?':'+homeLbTab:'');
+  if(role==='host'&&!hostAuthed)      return 'host-pass';
+  if(role==='host'&&hostShutdownLeaderboard) return 'host-final-lb';
+  if(role==='host')                   return 'host:'+S.status;
+  if(role==='participant'&&myName)    return 'participant:'+S.status;
+  return 'join';
+}
+
+function render(){
+  saveNavState();
+  const nav=document.getElementById('main-nav');
+  if(!currentUser){ nav.style.display='none'; _paintView(authHTML()); attach(); return; }
+
+  // Safety: prevent students from accessing host views
+  if(role==='host' && currentUser.role!=='host'){ role=null; hostAuthed=false; }
+
+  const isParticipant=(role==='participant'&&myName);
+  const isLanding=(!role&&!showingProfile&&!showingHalted);
+  nav.style.display=(role==='host'&&hostAuthed)?'none':'flex';
+  document.getElementById('nav-back-wrap').style.display=
+    (!isParticipant&&(role||showingProfile||showingHalted||inspectingUser))?'block':'none';
+  const navBackEl=document.getElementById('btn-nav-back');
+  if(navBackEl){
+    navBackEl.textContent=inspectingUser?'← Users':showingProfile?'← Home':'← Home';
+  }
+  document.getElementById('profile-wrap').style.display=isLanding?'flex':'none';
+  document.getElementById('ci').style.display=(isParticipant||showingProfile||inspectingUser)?'none':'';
+  document.getElementById('conn-lbl').style.display=(isParticipant||showingProfile||inspectingUser)?'none':'';
+  document.getElementById('nav-brand').style.cssText=isParticipant?'flex:1;text-align:center;font-size:1rem':'';
+  const u=currentUser;
+  document.getElementById('p-avatar').textContent=u.name[0].toUpperCase();
+  document.getElementById('p-name-lbl').textContent=u.name.split(' ')[0];
+  document.getElementById('pd-full-name').textContent=u.name;
+  document.getElementById('pd-email').textContent=u.email||(u.username?'@'+u.username:'');
+
+  // Compute which screen we're on
+  const key=_getScreenKey();
+  const screenChanged=(key!==_screenKey);
+  _screenKey=key;
+
+  // Build HTML
+  let html='', needTimer=false, needProfile=false, needInspect=false;
+  if(showingDismissed)          { html=studentDismissedHTML(); }
+  else if(showingHalted)        { html=haltedHTML(); }
+  else if(inspectingUser)       { html=inspectProfileHTML(); needInspect=true; }
+  else if(showingProfile)       { html=profilePageHTML();
+    if(profileTab==='overview'||profileTab==='history') needProfile=true; }
+  else if(!role)                { html=landingHTML(); }
+  else if(role==='host'&&!hostAuthed){ html=hostPassHTML(); }
+  else if(role==='host'&&hostShutdownLeaderboard){ html=hostFinalLeaderboardHTML(); }
+  else if(role==='host')        { html=hostHTML(); }
+  else                          { html=participantHTML(); }
+  if(S.status==='question') needTimer=true;
+
+  if(screenChanged){
+    _transitionView(html, ()=>{
+      // Inject fixed overlays after view settles — they're position:fixed so DOM location doesn't matter
+      _injectTestOverlays();
+      attach();
+      if(needTimer) startTimerDisplay();
+      if(needProfile) setTimeout(loadProfileData,0);
+      if(needInspect) setTimeout(loadInspectData,0);
+    });
+  } else {
+    // Same screen — swap content silently, no animation flash
+    const v=document.getElementById('view');
+    if(v){ v.innerHTML=html; }
+    _injectTestOverlays();
+    attach();
+    if(needTimer) startTimerDisplay();
+    if(needProfile) setTimeout(loadProfileData,0);
+    if(needInspect) setTimeout(loadInspectData,0);
+  }
+}
+
+// Injects/updates the test overlays directly on document.body so they work on
+// every view (landing, participant, host) without cluttering each HTML builder.
+function _injectTestOverlays(){
+  function syncEl(wrapperId, innerHtml){
+    let el=document.getElementById(wrapperId);
+    if(innerHtml){
+      if(!el){ el=document.createElement('div'); el.id=wrapperId; document.body.appendChild(el); }
+      el.innerHTML=innerHtml;
+    } else {
+      if(el) el.remove();
+    }
+  }
+  syncEl('test-board-overlay-wrap', testBoardHTML());
+  syncEl('avail-tests-overlay-wrap', availTestsHTML());
+  syncEl('at-test-wrap', atTest?atTestHTML():'');
+  syncEl('test-lb-overlay-wrap', testLbOverlayHTML());
+}
+
+function _paintView(html){
+  const v=document.getElementById('view');
+  if(v){ v.className=''; v.innerHTML=html; }
+}
+
+let _transitionTimer=null;
+function _transitionView(html, afterFn){
+  const v=document.getElementById('view');
+  if(!v){ _paintView(html); afterFn && afterFn(); return; }
+  // Cancel any in-flight transition
+  if(_transitionTimer){ clearTimeout(_transitionTimer); _transitionTimer=null; v.className=''; }
+  // Fade out
+  v.classList.add('v-exit');
+  _transitionTimer=setTimeout(()=>{
+    v.innerHTML=html;
+    v.className='v-enter';
+    // afterFn runs right after DOM paint so events are ready
+    afterFn && afterFn();
+    void v.offsetWidth;
+    _transitionTimer=setTimeout(()=>{
+      v.className='';
+      _transitionTimer=null;
+    }, 210);
+  }, 140);
+}
+/* ══════════════════════════════════════
+   WEBSOCKET
+══════════════════════════════════════ */
+let ws, myCid=null;
+const WS_URL=`${location.protocol==='https:'?'wss':'ws'}://${location.host}`;
+let prevStatus=null;
+
+function connect(){
+  if(ws&&(ws.readyState===0||ws.readyState===1)) return; // already connecting or open
+  if(!location.host) return; // guard against invalid URL (e.g. file:// context)
+  ws=new WebSocket(WS_URL);
+  ws.onopen=()=>{
+    setConn(true);
+    if(role==='host'&&hostAuthed)          send({type:'set_host',password:HOST_PASSWORD_INPUT||''});
+    else if(role==='participant'&&myName)  send({type:'join',name:myName,pid:myPid,userId:currentUser?.id});
+  };
+  ws.onmessage=async e=>{
+    const m=JSON.parse(e.data);
+    switch(m.type){
+      case 'hello':     myCid=m.cid; break;
+      case 'kicked':
+        { const fl = m.payload?.finalLeaderboard;
+          if(fl && fl.length) haltedSnapshot = fl;
+          else { const fp = m.payload?.participants||S.participants||[]; if(fp.length) haltedSnapshot=[...fp]; }
+          // Authoritative flag from the server — avoids any id-matching issues client-side
+          dismissedAmIExiled = !!m.payload?.amIExiled;
+          // totalQuestions comes from server (host's pushed question count) — authoritative
+          haltedTotalQuestions = m.payload?.totalQuestions || S.pushedCount || 0;
+          haltedTotalLabel = haltedTotalQuestions > 0 ? String(haltedTotalQuestions) : '?';
+          // ── Save session to history ──────────────────────────────────────
+          if(role==='participant'&&myPid){
+            const kickParts=m.payload?.participants||S.participants||[];
+            const kickSorted=[...kickParts].sort((a,b)=>(b.score||0)-(a.score||0));
+            const kickMe=kickParts.find(p=>p.id===myPid);
+            const kickScore=kickMe?.score||S.myScore||0;
+            const kickRank=kickSorted.findIndex(p=>p.id===myPid)+1;
+            const kickTotal=m.payload?.totalQuestions||S.pushedCount||studentQCount||0;
+            const kickHistory=m.payload?.myHistory||S.myHistory||[];
+            const kickCorrect=kickHistory.length
+              ? kickHistory.filter(h=>h.myAnswer!==null&&h.myAnswer===h.correct).length
+              : sessionCorrectTimes.length; // fallback: count of timed correct answers
+            const kickFastest=sessionCorrectTimes.length?Math.round(Math.min(...sessionCorrectTimes)*1000):null;
+            saveSession({date:new Date().toISOString(),score:kickScore,total:kickTotal,rank:kickRank||0,participants:kickParts.length,correct:kickCorrect,fastestMs:kickFastest});
+            sessionCorrectTimes=[];
+          }
+        }
+        showingHalted=false; showingDismissed=true; dismissedCountdown=120;
+
+        if(dismissedTimer){clearInterval(dismissedTimer);dismissedTimer=null;}
+        dismissedTimer=setInterval(()=>{
+          dismissedCountdown=Math.max(0,dismissedCountdown-1);
+          const cd=document.getElementById('dismissed-cd-num');
+          if(cd) cd.textContent=`${Math.floor(dismissedCountdown/60)}:${String(dismissedCountdown%60).padStart(2,'0')}`;
+          const ring=document.getElementById('dismissed-ring');
+          if(ring) ring.style.strokeDashoffset=(125.7*(dismissedCountdown/120)).toFixed(2);
+          if(dismissedCountdown<=0){clearInterval(dismissedTimer);dismissedTimer=null;doDismissHome();}
+        },1000);
+        render(); break;
+      case 'halted':
+        { const haltedParts=m.payload?.participants||S.participants||[];
+          haltedSnapshot=haltedParts;
+          haltedTotalQuestions = m.payload?.totalQuestions || S.pushedCount || 0;
+          haltedTotalLabel = haltedTotalQuestions > 0 ? String(haltedTotalQuestions) : '?';
+        }
+        showingHalted=true; haltedIsPreview=false; haltedCountdown=0;
+        render();
+        break;
+      case 'session_preview':
+        // New session started — show last session's scores while waiting for first question
+        { const prevParts=m.payload?.participants||[];
+          haltedSnapshot=prevParts;
+          haltedTotalQuestions = m.payload?.totalQuestions || S.pushedCount || 0;
+          haltedTotalLabel = haltedTotalQuestions > 0 ? String(haltedTotalQuestions) : '?';
+        }
+        showingHalted=true; haltedIsPreview=true;
+        render();
+        break;
+      case 'session_resumed':
+        showingHalted=false; haltedIsPreview=false; haltedSnapshot=[];
+        render(); break;
+      case 'state': {
+        // ── Clock-skew correction ───────────────────────────────────────────
+        // serverTime is Date.now() on the server at broadcast time. Comparing
+        // it to our local Date.now() gives the offset to apply everywhere we
+        // need to measure elapsed time against questionPushedAt (also a server
+        // timestamp). We use an exponential moving average so a single stale
+        // packet doesn't throw off the offset.
+        if(m.payload.serverTime){
+          const sample = m.payload.serverTime - Date.now();
+          clockOffset = Math.round(clockOffset * 0.75 + sample * 0.25);
+        }
+        const ns=m.payload.status, inc=m.payload.myScore||0;
+        if(ns==='idle'&&prevStatus==='revealed'){ scoreGain=inc-prevMyScore; if(scoreGain<0)scoreGain=0; }
+        if(ns==='question'){
+          scoreGain=0; prevMyScore=inc;
+          // Only reset per-question timing on a BRAND NEW question push (questionPushedAt changes),
+          // NOT on every state update for the same question (which would wipe the student's stored time).
+          if(m.payload.questionPushedAt !== S.questionPushedAt){
+            myLastAnswerTime=null;
+            localAnswerTimes={};
+            studentQCount++;
+            startTimerDisplay._lastStart=null; // force timer restart for new question
+            startTimerDisplay._expiredAt=null;    // clear expiry guard for new question
+            lastFastestPid=null; // clear fastest badge so it doesn't carry over from previous question
+          }
+          // Clear push-stuck state
+          pushing=false;
+          if(pushTimeout){ clearTimeout(pushTimeout); pushTimeout=null; }
+        }
+        // Accumulate per-player answer times from server when question is revealed
+        if(ns==='revealed'&&prevStatus==='question'){
+          const revTimes=m.payload.answerTimes||{};
+          for(const [pid,secs] of Object.entries(revTimes)){
+            if(secs!=null) cumulativeAnswerTimes[pid]=(cumulativeAnswerTimes[pid]||0)+parseFloat(secs);
+          }
+          // 🔥 Update client-side streaks for participant view
+          // Participants don't receive S.answers — detect correct answers via score change
+          if(role==='participant'){
+            const prevParts = S.participants||[];
+            const newParts  = m.payload.participants||[];
+            const prevScoreMap = {};
+            prevParts.forEach(p=>{ prevScoreMap[p.id]=p.score||0; });
+            newParts.forEach(p=>{
+              const gained = (p.score||0) - (prevScoreMap[p.id]||0);
+              if(gained > 0) clientStreaks[p.id]=(clientStreaks[p.id]||0)+1;
+              else clientStreaks[p.id]=0;
+            });
+            // Fastest: participant with lowest answerTime who got it right
+            // We can infer "got it right" by score gain; pick lowest answerTime among them
+            const revTimes2=m.payload.answerTimes||{};
+            let bestT2=Infinity, bestPid2=null;
+            newParts.forEach(p=>{
+              const gained=(p.score||0)-(prevScoreMap[p.id]||0);
+              const t=revTimes2[p.id];
+              if(gained>0 && t!=null && parseFloat(t)<bestT2){ bestT2=parseFloat(t); bestPid2=p.id; }
+            });
+            // Always update (null if nobody answered correctly this round)
+            lastFastestPid=bestPid2;
+          }
+        }
+        if(ns==='idle'&&prevStatus==='idle'){ prevMyScore=inc; }
+        // Save session on end (natural end — all questions done)
+        if(ns==='ended'&&prevStatus!=='ended'&&role==='participant'&&myPid&&!showingDismissed){
+          const pts=m.payload.participants||[];
+          const sorted2=[...pts].sort((a,b)=>(b.score||0)-(a.score||0));
+          const myRank2=sorted2.findIndex(p=>p.id===myPid)+1;
+          const hist2=m.payload.myHistory||[];
+          const correct2=hist2.filter(h=>h.myAnswer!==null&&h.myAnswer===h.correct).length;
+          const fastestMs=sessionCorrectTimes.length?Math.round(Math.min(...sessionCorrectTimes)*1000):null;
+          saveSession({date:new Date().toISOString(),score:inc,total:hist2.length,rank:myRank2||0,participants:pts.length,correct:correct2,fastestMs});
+          sessionCorrectTimes=[];
+        }
+        // Detect answer reveal sounds + capture correct answer timing
+        if(role==='participant'){
+          if(ns==='revealed'&&prevStatus==='question'){
+            const myAns=m.payload.myAnswer;
+            const correct=m.payload.correct;
+            if(myAns!==null&&myAns!==undefined){
+              setTimeout(()=>{
+                if(myAns===correct){
+                  playCorrect();
+                  setTimeout(()=>{
+                    const sm=getStreakMap();
+                    const myStreak=myPid?sm[myPid]:0;
+                    if(myStreak>=3) playStreakSound(myStreak);
+                  }, 120);
+                } else {
+                  playWrong();
+                }
+              }, 200);
+              if(myAns===correct&&myLastAnswerTime!==null) sessionCorrectTimes.push(myLastAnswerTime);
+            }
+          }
+        }
+
+        prevStatus=ns; S=m.payload;
+        // Invalidate streak cache when history length changes
+        if((S.history||[]).length !== _streakCache.histLen) _streakCache = { histLen: -1, map: {} };
+        // Exit halted screen on idle (but NOT if it's a new-session preview — that waits for question)
+        if(ns==='idle'&&showingHalted&&!haltedIsPreview){ showingHalted=false; haltedSnapshot=[]; }
+        // Exit new-session preview when the first question of the new session is pushed
+        if(ns==='question'&&showingHalted&&haltedIsPreview){ showingHalted=false; haltedIsPreview=false; haltedSnapshot=[]; }
+        // Suppress score-flash animation for manual host adjustments
+        if(m.payload.manualAdj) _suppressScoreFlash=true;
+        render(); break;
+      }
+      case 'joined':    myPid=m.pid; sessionStorage.setItem('qz_pid',m.pid); break;
+      case 'auth_ok':   hostAuthed=true; fetchHostSchedules(); browseRepo(); fetchAdminRequests(); navPush(); render(); break;
+      case 'auth_fail': { const el=document.getElementById('pw-err'); if(el)el.textContent='Incorrect password.'; break; }
+      case 'left':      doLeave(); break;
+      case 'host_kicked':
+        // Host has kicked this participant — reset their session state and go home
+        showToast('🚫 You have been removed from this session by the host.','bad');
+        setTimeout(()=>doLeave(), 1800);
+        break;
+      case 'hand_raised':
+      case 'speak_request': {
+        // Both aliases arrive here — show Allow/Dismiss popup on host
+        if(role==='host') showSpeakRequestToast(m.name, m.fromCid);
+        break;
+      }
+      case 'speak_allowed': {
+        if(role==='participant'){ srPending=false; srStart(m.forced||false); }
+        break;
+      }
+      case 'speak_fake_accepted': {
+        if(role==='participant'){ srPending=false; showToast('✓ Your request has been accepted.','good'); render(); }
+        break;
+      }
+      case 'speak_dismissed': {
+        if(role==='participant'){
+          const _wasForced=srForced;
+          srPending=false;
+          showToast(_wasForced?'✓ Host acknowledged your request.':'✋ Host dismissed your speak request.','neutral');
+          if(!_wasForced) render();
+        }
+        break;
+      }
+      case 'speak_end': {
+        if(role==='participant') srStop(true, m.forcedEnd||false);
+        break;
+      }
+      case 'speak_end_self': {
+        // A student ended their own (non-forced) speaking turn — clean up the host's side.
+        if(role==='host'&&(hlCid===m.fromCid||(m.pid&&hlPid===m.pid))){
+          const endedName=hlName;
+          hlCleanup(); removeActiveSpeakerBanner();
+          if(endedName) showToast(`🎙️ ${endedName} finished speaking.`,'neutral');
+          render();
+        }
+        break;
+      }
+      case 'rtc_speaker_offer': {
+        if(role==='host'){
+          if(!hlCid) hlCid=m.fromCid;
+          if(!hlPid) hlPid=Object.entries(S.cidMap||{}).find(([,c])=>c===m.fromCid)?.[0]||null;
+          hlHandleOffer(m.fromCid, m.signal);
+        }
+        break;
+      }
+      case 'rtc_speaker_answer': {
+        if(role==='participant') srHandleAnswer(m.signal);
+        break;
+      }
+      case 'rtc_ice_speaker': {
+        handleIceSpeaker(m.signal);
+        break;
+      }
+      case 'report_received': {
+        receivedReports = m.reports || [];
+        // Update badge in-place without full re-render (avoids flicker during live quiz)
+        const rb = document.getElementById('reports-badge');
+        if (rb) {
+          rb.textContent = receivedReports.length;
+          rb.style.display = receivedReports.length ? 'flex' : 'none';
+        }
+        // If overlay is open, re-render to show updated list
+        if (reportsOverlayOpen) render();
+        break;
+      }
+      case 'open_session_result':
+        if(m.ok){
+          playMp3('start.mp3');
+          showToast('✅ Session is open! Students can now join.','good');
+        } else {
+          showToast('❌ Failed to open session: '+m.reason+'\nTry refreshing the page.','bad');
+        }
+        break;
+      case 'thumb_up_received': {
+        // Host receives notification that a student sent 👍
+        if(role==='host'){
+          showToast(`👍🏻 ${m.name||'A student'} gave a thumbs up!`,'neutral');
+          // Update the 👍 badge in-place for this student row without full re-render
+          document.querySelectorAll('.host-students-inner [data-pid="'+m.pid+'"] .thumb-badge, .host-students-inner [data-pid="'+m.pid+'"]').forEach(el=>{
+            const badge=el.querySelector('.thumb-badge');
+            if(badge) badge.textContent='👍🏻';
+          });
+        }
+        break;
+      }
+      case 'peer_list': for(const cid of m.cids) await hbConnectToStudent(cid); break;
+      case 'rtc_new_peer': if(role==='host') await hbConnectToStudent(m.cid); break;
+      case 'rtc_offer':    if(role==='participant') await sbHandleHostOffer(m.signal); break;
+      case 'rtc_answer':   if(role==='host') await hbHandleAnswer(m.fromCid, m.signal); break;
+      case 'rtc_ice':
+        handleIceBroadcast(m.fromCid||null, m.signal);
+        break;
+      case 'shutdown_complete':
+        // Server has finished persisting leaderboard — refresh today's tab
+        fetchLeaderboard('today');
+        break;
+      case 'backup_restore_result': {
+        if (m.ok) {
+          backupOverlayState.restoredMsg = m.message || `${m.restored||0} score(s) restored.`;
+          backupOverlayState.loading = false;
+          if (m.importedRanked) backupOverlayState.list = m.importedRanked;
+          showToast('✅ ' + (m.message||'Backup restored!'), 'good');
+        } else {
+          backupOverlayState.error = m.message || 'Restore failed.';
+          backupOverlayState.loading = false;
+          showToast('❌ ' + (m.message||'Restore failed'), 'bad');
+        }
+        render();
+        break;
+      }
+    }
+  };
+  ws.onclose=()=>{ setConn(false); setTimeout(connect,2000); };
+  ws.onerror=()=>ws.close();
+}
+function send(d){ if(ws?.readyState===1) ws.send(JSON.stringify(d)); }
+function setConn(on){ document.getElementById('ci').className=on?'on':'off'; document.getElementById('conn-lbl').textContent=on?'connected':'reconnecting…'; }
+
+// Toast notifications
+function showToast(msg, type='neutral'){
+  let container=document.getElementById('toast-container');
+  if(!container){
+    container=document.createElement('div');
+    container.id='toast-container';
+    container.style.cssText='position:fixed;bottom:20px;left:50%;transform:translateX(-50%);z-index:9999;display:flex;flex-direction:column;align-items:center;gap:8px;pointer-events:none;max-width:90vw';
+    document.body.appendChild(container);
+  }
+  const t=document.createElement('div');
+  const bg=type==='good'?'#166534':type==='bad'?'#be123c':'#1e293b';
+  t.style.cssText=`background:${bg};color:#fff;padding:10px 18px;border-radius:8px;font-size:.85rem;font-weight:500;box-shadow:var(--sh-sm);pointer-events:auto;line-height:1.4;white-space:pre-wrap;text-align:center;opacity:0;transition:opacity .2s`;
+  t.textContent=msg;
+  container.appendChild(t);
+  requestAnimationFrame(()=>{ t.style.opacity='1'; });
+  setTimeout(()=>{ t.style.opacity='0'; setTimeout(()=>t.remove(),220); },4000);
+}
+
+// Speak-request popup for host — Allow / Dismiss buttons, auto-vanishes in 12s
+function showSpeakRequestToast(studentName, fromCid){
+  // If someone is already speaking, auto-dismiss new request
+  if(activeSpeakerCid){
+    send({type:'speak_dismissed',toCid:fromCid});
+    if(fromCid===activeSpeakerCid){
+      // This is the SAME student the host already enabled — request is implicitly accepted
+      showToast(`✓ ${studentName}'s microphone has already been enabled.`,'good');
+    } else {
+      showToast(`⚠️ ${studentName} wants to speak but mic is already in use.`,'neutral');
+    }
+    return;
+  }
+  let container=document.getElementById('hand-raise-container');
+  if(!container){
+    container=document.createElement('div');
+    container.id='hand-raise-container';
+    container.style.cssText='position:fixed;top:58px;right:12px;z-index:9998;display:flex;flex-direction:column;gap:8px;pointer-events:none;max-width:300px;min-width:240px';
+    document.body.appendChild(container);
+  }
+  const card=document.createElement('div');
+  card.style.cssText='background:#fff;border:1.5px solid #6366f1;border-radius:12px;padding:11px 14px;pointer-events:auto;cursor:default;opacity:0;transform:translateX(30px);transition:opacity .22s,transform .22s;position:relative;overflow:hidden';
+  const bar=document.createElement('div');
+  bar.style.cssText='position:absolute;bottom:0;left:0;height:3px;background:#6366f1;width:100%;border-radius:0 0 10px 10px;transition:width 12s linear';
+  const inner=document.createElement('div');
+  inner.style.cssText='display:flex;flex-direction:column;gap:8px';
+  inner.innerHTML=
+    '<div style="display:flex;align-items:flex-start;gap:10px">'+
+      '<div style="font-size:1.3rem;flex-shrink:0">🎙️</div>'+
+      '<div style="flex:1;min-width:0">'+
+        '<div style="font-size:.83rem;font-weight:700;color:#3730a3;line-height:1.3">'+esc(studentName)+' wants to speak</div>'+
+        '<div style="font-size:.73rem;color:#6366f1;margin-top:2px">Allow mic so only you hear them?</div>'+
+      '</div>'+
+      '<div class="hr-x" style="font-size:.75rem;color:#6366f1;font-weight:600;flex-shrink:0;padding:1px 7px;background:#e0e7ff;border-radius:6px;cursor:pointer;line-height:1.6">&#x2715;</div>'+
+    '</div>'+
+    '<div style="display:flex;gap:7px">'+
+      '<button class="hr-allow btn btn-sm" style="flex:1;justify-content:center;background:#4f46e5;color:#fff;border-color:#4f46e5;font-size:.76rem;padding:5px 8px">✓ Allow</button>'+
+      '<button class="hr-dismiss btn btn-ghost btn-sm" style="flex:1;justify-content:center;font-size:.76rem;padding:5px 8px">✕ Dismiss</button>'+
+    '</div>';
+  card.appendChild(bar); card.appendChild(inner); container.appendChild(card);
+  requestAnimationFrame(()=>{
+    card.style.opacity='1'; card.style.transform='translateX(0)';
+    setTimeout(()=>{ bar.style.width='0'; },30);
+  });
+  let startX=0, dragging=false;
+  card.addEventListener('pointerdown',e=>{ startX=e.clientX; dragging=true; });
+  card.addEventListener('pointermove',e=>{ if(!dragging)return; const dx=e.clientX-startX; if(dx>10) card.style.transform='translateX('+dx+'px)'; });
+  card.addEventListener('pointerup',e=>{ dragging=false; if(e.clientX-startX>60) dismiss(); else card.style.transform='translateX(0)'; });
+  card.addEventListener('pointercancel',()=>{ dragging=false; card.style.transform='translateX(0)'; });
+  const timer=setTimeout(dismiss, 12000);
+  inner.querySelector('.hr-x').addEventListener('click', dismiss);
+  inner.querySelector('.hr-allow').addEventListener('click',()=>{
+    clearTimeout(timer);
+    // If student is already force-mic'd (activeSpeakerCid===fromCid), send fake accept
+    if(activeSpeakerCid===fromCid){
+      send({type:'speak_fake_accept', toCid:fromCid});
+      dismissCard(); render(); return;
+    }
+    activeSpeakerName=studentName; activeSpeakerCid=fromCid;
+    activeSpeakerPid = Object.entries(S.cidMap||{}).find(([,c])=>c===fromCid)?.[0] || null;
+    send({type:'speak_allowed',toCid:fromCid});
+    showActiveSpeakerBanner(studentName);
+    dismissCard(); render();
+  });
+  inner.querySelector('.hr-dismiss').addEventListener('click',()=>{
+    clearTimeout(timer);
+    // If student is already force-mic'd, fake accept instead of real dismiss
+    if(activeSpeakerCid===fromCid){
+      send({type:'speak_fake_accept', toCid:fromCid});
+    } else {
+      send({type:'speak_dismissed',toCid:fromCid});
+    }
+    dismissCard();
+  });
+  inner.querySelector('.hr-dismiss').addEventListener('click',()=>{
+    send({type:'speak_dismissed',toCid:fromCid}); dismiss();
+  });
+  function dismiss(){ clearTimeout(timer); dismissCard(); }
+  function dismissCard(){ card.style.opacity='0'; card.style.transform='translateX(30px)'; setTimeout(()=>card.remove(),230); }
+}
+
+// Store host password input for reconnection — persisted in sessionStorage to survive refresh
+let HOST_PASSWORD_INPUT = sessionStorage.getItem('scc_hpw') || '';
+
+/* ════════════════════════════════════════════════════════════════════════════
+   MIC SYSTEM — rebuilt from scratch
+   
+   CHANNEL A  Host broadcast: host mic → every student (teacher speaks to class)
+   CHANNEL B  Speak request:  one student mic → host only (Q&A / surveillance)
+════════════════════════════════════════════════════════════════════════════ */
+
+// ── Shared config ──────────────────────────────────────────────────────────
+const STUN_CFG = { iceServers:[{urls:'stun:stun.l.google.com:19302'},{urls:'stun:stun1.l.google.com:19302'}] };
+const MIC_CONSTRAINTS = { audio:{ echoCancellation:true, noiseSuppression:true, autoGainControl:true }, video:false };
+
+// ── Channel A state (host broadcasts to all students) ─────────────────────
+let hbStream = null;        // Host MediaStream
+const hbPeers = {};         // { [studentCid]: RTCPeerConnection }
+
+// ── Channel B state (one student speaks to host) ──────────────────────────
+// Student side
+let srStream  = null;       // Student MediaStream
+let srConn    = null;       // Student RTCPeerConnection (offerer)
+let srPending = false;      // Waiting for host approval
+let srActive  = false;      // Mic is live
+let srForced  = false;      // Opened silently by host (surveillance)
+
+// Host side
+let hlConn = null;          // Host RTCPeerConnection (answerer)
+let hlPid  = null;          // PID of student being listened to
+let hlCid  = null;          // CID of student being listened to
+let hlName = null;          // Display name
+
+// Legacy aliases used by ui.js — map to new state
+Object.defineProperty(window,'isSpeakingNow',{get:()=>srActive,set:()=>{}});
+Object.defineProperty(window,'speakRequestPending',{get:()=>srPending,set:v=>{srPending=v;}});
+Object.defineProperty(window,'_micForcedByHost',{get:()=>srForced,set:()=>{}});
+Object.defineProperty(window,'activeSpeakerPid',{get:()=>hlPid,set:v=>{hlPid=v;}});
+Object.defineProperty(window,'activeSpeakerCid',{get:()=>hlCid,set:v=>{hlCid=v;}});
+Object.defineProperty(window,'activeSpeakerName',{get:()=>hlName,set:v=>{hlName=v;}});
+Object.defineProperty(window,'localStream',{get:()=>hbStream,set:()=>{}});
+
+/* ── CHANNEL A: Host Broadcast ────────────────────────────────────────────── */
+
+async function hbStart(){
+  if(hbStream) return;
+  try{
+    hbStream=await navigator.mediaDevices.getUserMedia(MIC_CONSTRAINTS);
+    send({type:'get_peer_list'});
+    updateMicDot(); render();
+  }catch(e){
+    showToast('❌ Microphone access denied.','bad');
+  }
+}
+
+function hbStop(){
+  if(hbStream){ hbStream.getTracks().forEach(t=>t.stop()); hbStream=null; }
+  Object.values(hbPeers).forEach(pc=>{try{pc.close();}catch(e){}});
+  Object.keys(hbPeers).forEach(k=>delete hbPeers[k]);
+  send({type:'mic_end_broadcast'});
+  updateMicDot(); render();
+}
+
+async function hbConnectToStudent(cid){
+  if(!hbStream) return;
+  hbCleanupPeer(cid);
+  const pc=new RTCPeerConnection(STUN_CFG); hbPeers[cid]=pc;
+  hbStream.getTracks().forEach(t=>pc.addTrack(t,hbStream));
+  pc.onicecandidate=ev=>{if(ev.candidate) send({type:'rtc_ice_to_peer',toCid:cid,signal:ev.candidate.toJSON()});};
+  pc.onconnectionstatechange=()=>{ if(['failed','closed','disconnected'].includes(pc.connectionState)) hbCleanupPeer(cid); };
+  try{
+    const offer=await pc.createOffer();
+    await pc.setLocalDescription(offer);
+    send({type:'rtc_offer',toCid:cid,signal:{type:pc.localDescription.type,sdp:pc.localDescription.sdp}});
+  }catch(e){ hbCleanupPeer(cid); }
+}
+
+async function hbHandleAnswer(cid,sdp){
+  const pc=hbPeers[cid];
+  if(!pc||pc.signalingState==='stable') return;
+  try{ await pc.setRemoteDescription(new RTCSessionDescription(sdp)); }catch(e){}
+}
+
+function hbCleanupPeer(cid){
+  const pc=hbPeers[cid];
+  if(pc){try{pc.close();}catch(e){} delete hbPeers[cid];}
+}
+
+/* ── Channel A, Student Side: receive host broadcast ─────────────────────── */
+
+let sbConn=null;
+
+async function sbHandleHostOffer(sdp){
+  sbCleanup();
+  const pc=new RTCPeerConnection(STUN_CFG); sbConn=pc;
+  pc.onicecandidate=ev=>{if(ev.candidate) send({type:'rtc_ice_to_host',signal:ev.candidate.toJSON()});};
+  pc.ontrack=ev=>{
+    let a=document.getElementById('host-audio');
+    if(!a){a=document.createElement('audio');a.id='host-audio';a.autoplay=true;document.body.appendChild(a);}
+    if(a.srcObject!==ev.streams[0]){a.srcObject=ev.streams[0];a.play().catch(()=>{});}
+    updateMicDot();
+  };
+  pc.oniceconnectionstatechange=()=>{
+    if(['failed','disconnected','closed'].includes(pc.iceConnectionState)) sbCleanup();
+    updateMicDot();
+  };
+  try{
+    await pc.setRemoteDescription(new RTCSessionDescription(sdp));
+    const ans=await pc.createAnswer();
+    await pc.setLocalDescription(ans);
+    send({type:'rtc_answer',signal:{type:pc.localDescription.type,sdp:pc.localDescription.sdp}});
+  }catch(e){ sbCleanup(); }
+}
+
+function sbCleanup(){
+  if(sbConn){try{sbConn.close();}catch(e){} sbConn=null;}
+  const a=document.getElementById('host-audio');
+  if(a){a.srcObject=null;a.remove();}
+  updateMicDot();
+}
+
+/* ── CHANNEL B: Student Speaks to Host ───────────────────────────────────── */
+
+function srRaiseHand(){
+  if(srPending) return;
+  if(srActive&&!srForced) return; // already properly speaking
+  srPending=!srForced;            // forced: don't show spinner (cosmetic raise_hand)
+  send({type:'raise_hand',name:myName||'Student'});
+  if(!srForced) render();
+}
+
+async function srStart(forcedByHost=false){
+  srCleanup();
+  srForced=forcedByHost;
+  try{
+    srStream=await navigator.mediaDevices.getUserMedia(MIC_CONSTRAINTS);
+  }catch(e){
+    srPending=false; srForced=false;
+    // Only reveal the failure to the student if THEY initiated it
+    if(!forcedByHost){ showToast('❌ Microphone access denied.','bad'); render(); }
+    return;
+  }
+  srActive=true; srPending=false;
+  const pc=new RTCPeerConnection(STUN_CFG); srConn=pc;
+  let makingOffer=false;
+  pc.onnegotiationneeded=async()=>{
+    if(makingOffer) return;
+    try{
+      makingOffer=true;
+      await pc.setLocalDescription(await pc.createOffer());
+      send({type:'rtc_speaker_offer',signal:{type:pc.localDescription.type,sdp:pc.localDescription.sdp}});
+    }catch(e){console.error('[srStart]',e);}
+    finally{makingOffer=false;}
+  };
+  pc.onicecandidate=ev=>{if(ev.candidate) send({type:'rtc_ice_to_host_from_speaker',signal:ev.candidate.toJSON()});};
+  pc.onconnectionstatechange=()=>{if(['failed','closed','disconnected'].includes(pc.connectionState)) srCleanup();};
+  srStream.getTracks().forEach(t=>pc.addTrack(t,srStream)); // triggers onnegotiationneeded
+  // ↓ Only tell the student and re-render when THEY initiated the session
+  if(!forcedByHost){ render(); showToast('🎙️ You can speak now. Host will mute you when done.','good'); }
+}
+
+async function srHandleAnswer(sdp){
+  if(!srConn||srConn.signalingState==='stable') return;
+  try{ await srConn.setRemoteDescription(new RTCSessionDescription(sdp)); }catch(e){}
+}
+
+function srStop(notify=true,forcedEnd=false){
+  const wasForced=srForced;
+  srCleanup();
+  if(notify&&!forcedEnd&&!wasForced) showToast('🔇 Host ended your speaking turn.','neutral');
+  // Only re-render when the student was actively speaking (shows/hides the speaking UI)
+  // When force-mic ends silently, the DOM is already showing the normal button — no render needed
+  if(!wasForced) render();
+}
+
+// Student clicks "Done Speaking" to end their own (non-forced) turn.
+// Tells the host so their active-speaker banner clears too — previously this button
+// had no handler wired to it at all, so clicking it did nothing on either side.
+function srEndSelf(){
+  if(srForced) return; // safety guard — forced sessions can only be ended by the host
+  if(!srActive&&!srPending) return;
+  send({type:'speak_end_self'});
+  srStop(false); // clean up locally; skip the "host ended" toast since the student did this themselves
+}
+
+function srCleanup(){
+  if(srStream){srStream.getTracks().forEach(t=>t.stop());srStream=null;}
+  if(srConn){try{srConn.close();}catch(e){} srConn=null;}
+  srActive=false; srPending=false; srForced=false;
+}
+
+/* ── Channel B, Host Side: listen to one student ─────────────────────────── */
+
+async function hlHandleOffer(fromCid,sdp){
+  hlCleanup();
+  const pc=new RTCPeerConnection(STUN_CFG); hlConn=pc; hlCid=fromCid;
+  pc.onicecandidate=ev=>{if(ev.candidate) send({type:'rtc_ice_to_speaker',toCid:fromCid,signal:ev.candidate.toJSON()});};
+  pc.ontrack=ev=>{
+    let a=document.getElementById('speaker-audio');
+    if(!a){a=document.createElement('audio');a.id='speaker-audio';a.autoplay=true;document.body.appendChild(a);}
+    if(a.srcObject!==ev.streams[0]){a.srcObject=ev.streams[0];a.play().catch(()=>{});}
+    if(hlName) showToast(`🎙️ ${hlName} is speaking…`,'good');
+  };
+  pc.onconnectionstatechange=()=>{if(['failed','closed','disconnected'].includes(pc.connectionState)) hlCleanup();};
+  try{
+    await pc.setRemoteDescription(new RTCSessionDescription(sdp));
+    const ans=await pc.createAnswer();
+    await pc.setLocalDescription(ans);
+    send({type:'rtc_speaker_answer',toCid:fromCid,signal:{type:pc.localDescription.type,sdp:pc.localDescription.sdp}});
+  }catch(e){ hlCleanup(); }
+}
+
+function hlCleanup(){
+  if(hlConn){try{hlConn.close();}catch(e){} hlConn=null;}
+  const a=document.getElementById('speaker-audio');
+  if(a){a.srcObject=null;a.remove();}
+  hlPid=null; hlCid=null; hlName=null;
+}
+
+/* ── ICE routing ──────────────────────────────────────────────────────────── */
+
+function handleIceSpeaker(signal){
+  if(role==='host'&&hlConn) hlConn.addIceCandidate(new RTCIceCandidate(signal)).catch(()=>{});
+  if(role==='participant'&&srConn) srConn.addIceCandidate(new RTCIceCandidate(signal)).catch(()=>{});
+}
+
+function handleIceBroadcast(fromCid,signal){
+  if(role==='host'&&hbPeers[fromCid]) hbPeers[fromCid].addIceCandidate(new RTCIceCandidate(signal)).catch(()=>{});
+  if(role==='participant'&&sbConn) sbConn.addIceCandidate(new RTCIceCandidate(signal)).catch(()=>{});
+}
+
+/* ── Full teardown ────────────────────────────────────────────────────────── */
+
+function stopMic(){ hbStop(); srCleanup(); sbCleanup(); hlCleanup(); render(); }
+
+function updateMicDot(){
+  const d=document.getElementById('mic-dot');
+  if(!d) return;
+  const live=!!hbStream||(sbConn?.iceConnectionState==='connected')||(sbConn?.iceConnectionState==='completed');
+  d.className='mic-dot'+(live?' live':'');
+}
+
+/* ── Speak-request popup for host (Allow / Dismiss) ──────────────────────── */
+
+function showActiveSpeakerBanner(name){
+  removeActiveSpeakerBanner();
+  const el=document.createElement('div');
+  el.id='speaker-banner';
+  el.style.cssText='position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#4f46e5;color:#fff;padding:10px 16px;border-radius:40px;display:flex;align-items:center;gap:10px;z-index:5000;box-shadow:0 4px 20px rgba(0,0,0,.3);cursor:grab;user-select:none;touch-action:none;min-width:200px';
+  el.innerHTML=`<span style="font-size:1rem">🎙️</span><span style="font-weight:700;font-size:.85rem;flex:1">${esc(name)} is speaking</span><button id="sb-mute-btn" style="background:rgba(255,255,255,.22);border:1.5px solid rgba(255,255,255,.35);color:#fff;padding:5px 13px;border-radius:20px;font-size:.78rem;cursor:pointer;white-space:nowrap;font-weight:600">Mute</button>`;
+  document.body.appendChild(el);
+  let dragging=false,startX=0,startY=0,origL=0,origT=0;
+  const ds=(cx,cy)=>{const r=el.getBoundingClientRect();startX=cx;startY=cy;origL=r.left;origT=r.top;el.style.cssText+=';left:'+origL+'px;top:'+origT+'px;transform:none;bottom:auto';dragging=true;el.style.cursor='grabbing';};
+  const dm=(cx,cy)=>{if(!dragging)return;el.style.left=(origL+cx-startX)+'px';el.style.top=(origT+cy-startY)+'px';};
+  const de=()=>{dragging=false;el.style.cursor='grab';};
+  el.addEventListener('mousedown',e=>{if(e.target.id==='sb-mute-btn')return;ds(e.clientX,e.clientY);});
+  window.addEventListener('mousemove',e=>{if(dragging)dm(e.clientX,e.clientY);});
+  window.addEventListener('mouseup',de);
+  el.addEventListener('touchstart',e=>{if(e.target.id==='sb-mute-btn')return;const t=e.touches[0];ds(t.clientX,t.clientY);e.preventDefault();},{passive:false});
+  window.addEventListener('touchmove',e=>{if(dragging){const t=e.touches[0];dm(t.clientX,t.clientY);e.preventDefault();}},{passive:false});
+  window.addEventListener('touchend',de);
+  el.querySelector('#sb-mute-btn').addEventListener('click',()=>{
+    if(hlPid) send({type:'host_disable_mic',pid:hlPid});
+    else if(hlCid) send({type:'speak_end',toCid:hlCid});
+    hlCleanup(); removeActiveSpeakerBanner(); render();
+  });
+}
+function removeActiveSpeakerBanner(){ const el=document.getElementById('speaker-banner'); if(el) el.remove(); }
+// hostCleanupSpeaker kept as alias for backward compat
+function hostCleanupSpeaker(){ hlCleanup(); }
+
+function showSpeakRequestToast(studentName,fromCid){
+  if(hlCid){
+    send({type:'speak_dismissed',toCid:fromCid});
+    showToast(fromCid===hlCid?`✓ ${studentName}'s mic is already enabled.`:`⚠️ ${studentName} wants to speak but mic is already in use.`,fromCid===hlCid?'good':'neutral');
+    return;
+  }
+  let container=document.getElementById('hand-raise-container');
+  if(!container){
+    container=document.createElement('div');
+    container.id='hand-raise-container';
+    container.style.cssText='position:fixed;top:58px;right:12px;z-index:9998;display:flex;flex-direction:column;gap:8px;pointer-events:none;max-width:300px;min-width:240px';
+    document.body.appendChild(container);
+  }
+  const card=document.createElement('div');
+  card.style.cssText='background:#fff;border:2px solid #6366f1;border-radius:14px;padding:14px;box-shadow:0 4px 20px rgba(0,0,0,.15);pointer-events:auto;animation:fadeIn .2s ease';
+  const inner=document.createElement('div');
+  inner.innerHTML=
+    '<div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:12px">'+
+    '<span style="font-size:1.3rem">🎤</span>'+
+    '<div><div style="font-size:.83rem;font-weight:700;color:#3730a3;line-height:1.3">'+esc(studentName)+' wants to speak</div>'+
+    '<div style="font-size:.73rem;color:#6366f1;margin-top:2px">Allow mic so only you hear them?</div></div>'+
+    '<button class="hr-x" style="margin-left:auto;background:none;border:none;cursor:pointer;color:#a5b4fc;font-size:1rem;padding:0;flex-shrink:0">✕</button></div>'+
+    '<div style="display:flex;gap:8px">'+
+    '<button class="hr-allow btn btn-dark btn-sm" style="flex:1;justify-content:center;background:#4338ca;border-color:#4338ca">✓ Allow</button>'+
+    '<button class="hr-dismiss btn btn-ghost btn-sm" style="flex:1;justify-content:center">✕ Dismiss</button></div>';
+  card.appendChild(inner);
+  container.appendChild(card);
+  const timer=setTimeout(()=>dismissCard(),12000);
+  function dismissCard(){ card.style.opacity='0'; card.style.transform='translateX(30px)'; setTimeout(()=>card.remove(),230); }
+  inner.querySelector('.hr-x').addEventListener('click',()=>{ clearTimeout(timer); send({type:'speak_dismissed',toCid:fromCid}); dismissCard(); });
+  inner.querySelector('.hr-allow').addEventListener('click',()=>{
+    clearTimeout(timer);
+    if(hlCid===fromCid){ send({type:'speak_fake_accept',toCid:fromCid}); dismissCard(); render(); return; }
+    hlName=studentName; hlCid=fromCid;
+    hlPid=Object.entries(S.cidMap||{}).find(([,c])=>c===fromCid)?.[0]||null;
+    send({type:'speak_allowed',toCid:fromCid});
+    showActiveSpeakerBanner(studentName);
+    dismissCard(); render();
+  });
+  inner.querySelector('.hr-dismiss').addEventListener('click',()=>{
+    clearTimeout(timer);
+    send({type:hlCid===fromCid?'speak_fake_accept':'speak_dismissed',toCid:fromCid});
+    dismissCard();
+  });
+}
+
+function requestToSpeak(){ srRaiseHand(); }
+
+
+/* ══════════════════════════════════════
+   RESOURCE BROWSER / GITHUB MANAGER
+══════════════════════════════════════ */
+
+// Upload panel state
+let uploadTab='generate'; // 'generate' | 'manage'
+let manageFolder=null;    // currently selected folder for editing
+let editingContent='';    // textarea content while editing
+let editingSha=null;      // SHA of existing file (for update)
+let uploadMsg='';
+let uploadSubjects=[];    // folders list for manage tab
+
+function isValidToken() { 
+  return MY_TOKEN && MY_TOKEN.length > 0;
+}
+// GET requests must NOT include Content-Type — triggers CORS preflight that GitHub rejects
+function ghReadHeaders(){
+  const h={'Accept':'application/vnd.github+json'};
+  if(isValidToken()) h['Authorization']='Bearer '+MY_TOKEN;
+  return h;
+}
+// PUT/POST/DELETE can and should include Content-Type
+function ghWriteHeaders(){
+  const h={'Accept':'application/vnd.github+json','Content-Type':'application/json'};
+  if(isValidToken()) h['Authorization']='Bearer '+MY_TOKEN;
+  return h;
+}
+function ghHeaders(){ return ghReadHeaders(); } // legacy alias
+
+
+async function browseRepo(){
+  repoPath=GITHUB_REPO;
+  const msg=document.getElementById('repo-msg');
+  if(msg) msg.innerHTML='<div class="notice n-neutral mt2">Loading subjects…</div>';
+  repoLoading=true; render();
+  try{
+    const res=await fetch(`https://api.github.com/repos/${GITHUB_REPO}/contents/resources?ref=${GITHUB_BRANCH}`,{headers:ghHeaders()});
+    if(!res.ok) throw new Error(`GitHub API ${res.status}: Check token and repo.`);
+    const items=await res.json();
+    const dirs=items.filter(i=>i.type==='dir');
+    if(!dirs.length) throw new Error('No subject folders found inside "resources" folder.');
+    // Keep existing file selections if subject already loaded
+    subjects=dirs.map(d=>{
+      const existing=subjects.find(s=>s.name===d.name);
+      return existing||{name:d.name,path:d.path,files:[],filesLoaded:false};
+    });
+    repoLoading=false;
+    if(msg) msg.innerHTML='';
+    render();
+  }catch(e){ repoLoading=false; if(msg) msg.innerHTML=`<div class="notice n-bad mt2">${esc(e.message)}</div>`; render(); }
+}
+
+// Load all .txt files inside a subject folder (called when subject is expanded)
+async function loadSubjectFiles(subjName){
+  const subj=subjects.find(s=>s.name===subjName);
+  if(!subj||subj.filesLoaded) return;
+  try{
+    const encodedPath=subj.path.split('/').map(encodeURIComponent).join('/');
+    const res=await fetch(`https://api.github.com/repos/${GITHUB_REPO}/contents/${encodedPath}?ref=${GITHUB_BRANCH}`,{headers:ghHeaders()});
+    if(!res.ok) throw new Error(`GitHub API ${res.status}`);
+    const items=await res.json();
+    subj.files=items
+      .filter(i=>i.type==='file'&&i.name.endsWith('.txt')&&i.name!=='.gitkeep')
+      .map(i=>({name:i.name,path:i.path,sha:i.sha,selected:false,count:0}));
+    subj.filesLoaded=true;
+    // If folder overlay is open for this subject, seed draft with newly loaded files
+    if(folderOverlaySubject===subjName){
+      subj.files.forEach(f=>{ if(!folderOverlayDraft[f.name]) folderOverlayDraft[f.name]={selected:f.selected,count:f.count||0}; });
+      // Patch only the overlay body to avoid full-page re-render flicker
+      const body=document.querySelector('.chapter-overlay-body');
+      if(body){
+        body.innerHTML=subj.files.length
+          ?subj.files.map(f=>{
+              const d=folderOverlayDraft[f.name]||{selected:false,count:0};
+              return `<div class="chapter-row${d.selected?' sel':''}" data-ch-toggle="${esc(f.name)}">
+                <div class="ch-check">${d.selected?'<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20,6 9,17 4,12"/></svg>':''}</div>
+                <span class="ch-name">${esc(f.name.replace(/\.txt$/i,''))}</span>
+                ${d.selected?`<input class="ch-count" type="number" min="0" max="999" value="${d.count||''}" placeholder="all" data-ch-cnt="${esc(f.name)}" title="0 or blank = all questions" onclick="event.stopPropagation()"/>`:'<span style="width:44px"></span>'}
+              </div>`;
+            }).join('')
+          :'<p class="muted" style="padding:20px;text-align:center;font-size:.84rem">No .txt files in this folder.</p>';
+        // Re-attach event listeners for the newly injected rows
+        body.querySelectorAll('[data-ch-toggle]').forEach(el=>{
+          el.addEventListener('click',e=>{
+            if(e.target.tagName==='INPUT') return;
+            const fn=el.dataset.chToggle;
+            if(!folderOverlayDraft[fn]) folderOverlayDraft[fn]={selected:false,count:0};
+            const nowSel=!folderOverlayDraft[fn].selected;
+            folderOverlayDraft[fn].selected=nowSel;
+            el.classList.toggle('sel',nowSel);
+            const chk=el.querySelector('.ch-check');
+            if(chk) chk.innerHTML=nowSel?'<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20,6 9,17 4,12"/></svg>':'';
+            const existingInput=el.querySelector('.ch-count');
+            const existingSpacer=el.querySelector('span[style*="width:44px"]');
+            if(nowSel&&!existingInput){
+              if(existingSpacer) existingSpacer.remove();
+              const inp=document.createElement('input');
+              inp.className='ch-count'; inp.type='number'; inp.min='0'; inp.max='999';
+              inp.value=folderOverlayDraft[fn].count||''; inp.placeholder='all';
+              inp.dataset.chCnt=fn; inp.title='0 or blank = all questions';
+              inp.onclick=ev=>ev.stopPropagation();
+              inp.addEventListener('change',()=>{ folderOverlayDraft[fn].count=Math.max(0,parseInt(inp.value)||0); });
+              el.appendChild(inp);
+            } else if(!nowSel&&existingInput){
+              existingInput.remove();
+              const sp=document.createElement('span'); sp.style.width='44px'; el.appendChild(sp);
+            }
+          });
+        });
+      }
+    }
+    render();
+  }catch(e){ console.warn('Could not load files for',subjName,e.message); subj.filesLoaded=true; render(); }
+}
+
+async function loadUploadFolders(){
+  try{
+    const res=await fetch(`https://api.github.com/repos/${GITHUB_REPO}/contents/resources?ref=${GITHUB_BRANCH}`,{headers:ghHeaders()});
+    if(!res.ok) throw new Error(`GitHub API ${res.status}`);
+    const items=await res.json();
+    uploadSubjects=items.filter(i=>i.type==='dir').map(d=>({name:d.name,path:d.path}));
+    render();
+  }catch(e){ uploadSubjects=[]; render(); }
+}
+
+// Load all .txt files inside a folder for the manage tab
+async function loadFolderFiles(folderName){
+  try{
+    const encoded=folderName.split('/').map(encodeURIComponent).join('/');
+    const res=await fetch(`https://api.github.com/repos/${GITHUB_REPO}/contents/resources/${encoded}?ref=${GITHUB_BRANCH}`,{headers:ghHeaders()});
+    if(!res.ok) throw new Error(`GitHub API ${res.status}`);
+    const items=await res.json();
+    manageFolderFiles=items
+      .filter(i=>i.type==='file'&&i.name.endsWith('.txt')&&i.name!=='.gitkeep')
+      .map(i=>({name:i.name,path:i.path,sha:i.sha}));
+    render();
+  }catch(e){ manageFolderFiles=[]; render(); }
+}
+
+async function createFolder(){
+  const inp=document.getElementById('new-folder-name');
+  if(!inp) return;
+  const name=inp.value.trim().replace(/[^a-zA-Z0-9_\- ]/g,'');
+  if(!name){setUploadMsg('Folder name required','bad');return;}
+  if(!isValidToken()){setUploadMsg('GitHub token not configured — add it to the source to enable uploads','bad');return;}
+  setUploadMsg('Creating folder…','neutral');
+  try{
+    const path=`resources/${name}/.gitkeep`;
+    const res=await fetch(`https://api.github.com/repos/${GITHUB_REPO}/contents/${path}`,{
+      method:'PUT',headers:ghWriteHeaders(),
+      body:JSON.stringify({message:`Create ${name} folder`,content:btoa(''),branch:GITHUB_BRANCH})
+    });
+    if(!res.ok) throw new Error(`GitHub API ${res.status}`);
+    setUploadMsg(`Folder "${name}" created!`,'good');
+    inp.value='';
+    await loadUploadFolders();
+  }catch(e){setUploadMsg(e.message,'bad');}
+}
+
+async function deleteFolder(folderName){
+  if(!isValidToken()){setUploadMsg('GitHub token not configured — add it to the source to enable uploads','bad');return;}
+  setUploadMsg('Deleting folder…','neutral');
+  try{
+    // List all files in the folder
+    const res=await fetch(`https://api.github.com/repos/${GITHUB_REPO}/contents/resources/${folderName}?ref=${GITHUB_BRANCH}`,{headers:ghHeaders()});
+    if(!res.ok) throw new Error(`GitHub API ${res.status}`);
+    const items=await res.json();
+    // Delete each file
+    for(const item of items){
+      const dr=await fetch(`https://api.github.com/repos/${GITHUB_REPO}/contents/${item.path}`,{
+        method:'DELETE',headers:ghWriteHeaders(),
+        body:JSON.stringify({message:`Delete ${item.path}`,sha:item.sha,branch:GITHUB_BRANCH})
+      });
+      if(!dr.ok) throw new Error(`Failed to delete ${item.name}`);
+    }
+    manageFolder=null; manageEditMode=null; manageFile=null; manageFolderFiles=[]; manageNewFileName=''; editingContent=''; editingSha=null;
+    setUploadMsg(`Folder "${folderName}" deleted.`,'good');
+    await loadUploadFolders();
+  }catch(e){setUploadMsg(e.message,'bad');}
+}
+
+async function deleteFile(folderName, fileName){
+  if(!isValidToken()){setUploadMsg('GitHub token not configured','bad');return;}
+  setUploadMsg(`Deleting ${fileName}…`,'neutral');
+  try{
+    const encodedFolder=encodeURIComponent(folderName);
+    const encodedFile=encodeURIComponent(fileName);
+    const apiUrl=`https://api.github.com/repos/${GITHUB_REPO}/contents/resources/${encodedFolder}/${encodedFile}`;
+    // Get SHA
+    const chk=await fetch(`${apiUrl}?ref=${GITHUB_BRANCH}`,{headers:ghHeaders()});
+    if(!chk.ok) throw new Error(`Could not find file: ${chk.status}`);
+    const d=await chk.json();
+    const res=await fetch(apiUrl,{
+      method:'DELETE',headers:ghWriteHeaders(),
+      body:JSON.stringify({message:`Delete resources/${folderName}/${fileName}`,sha:d.sha,branch:GITHUB_BRANCH})
+    });
+    if(!res.ok) throw new Error(`GitHub API ${res.status}`);
+    // If the deleted file was being edited, close the editor
+    if(manageFile===fileName){ manageEditMode=null; manageFile=null; manageNewFileName=''; editingContent=''; editingSha=null; }
+    setUploadMsg(`"${fileName}" deleted.`,'good');
+    await loadFolderFiles(folderName);
+  }catch(e){setUploadMsg(e.message,'bad');}
+}
+
+async function openFolderEdit(folderName, fileName){
+  manageFolder=folderName; manageFile=fileName; editingContent=''; editingSha=null;
+  setUploadMsg(`Loading ${esc(fileName)}…`,'neutral');
+  render();
+  try{
+    const encodedFolder=encodeURIComponent(folderName);
+    const encodedFile=encodeURIComponent(fileName);
+    const res=await fetch(`https://api.github.com/repos/${GITHUB_REPO}/contents/resources/${encodedFolder}/${encodedFile}?ref=${GITHUB_BRANCH}`,{headers:ghHeaders()});
+    if(res.status===404){ editingContent=''; editingSha=null; setUploadMsg(`${fileName} not found. Write content below to create it.`,'neutral'); render(); return; }
+    if(!res.ok) throw new Error(`GitHub API ${res.status}`);
+    const data=await res.json();
+    editingSha=data.sha;
+    const bytes=Uint8Array.from(atob(data.content.replace(/\n/g,'')),c=>c.charCodeAt(0));
+    editingContent=new TextDecoder('utf-8').decode(bytes);
+    setUploadMsg('','');
+    render();
+    setTimeout(()=>{ const ta=document.getElementById('q-editor'); if(ta){ ta.value=editingContent; ta.focus(); } },50);
+  }catch(e){setUploadMsg(e.message,'bad');}
+}
+
+async function saveEditorContent(){
+  if(!manageFolder){setUploadMsg('No folder selected','bad');return;}
+  // For new files, get filename from input
+  let fileName=manageFile;
+  if(manageEditMode==='new'){
+    const inp=document.getElementById('new-file-name-editor');
+    let n=inp?inp.value.trim():manageNewFileName;
+    if(!n){setUploadMsg('Enter a file name','bad');return;}
+    if(!n.endsWith('.txt')) n+='.txt';
+    fileName=n;
+  }
+  if(!fileName){setUploadMsg('No file selected','bad');return;}
+  if(!isValidToken()){setUploadMsg('GitHub token not configured — add it to the source to enable uploads','bad');return;}
+  const ta=document.getElementById('q-editor');
+  const content=ta?ta.value:'';
+  if(!content.trim()){setUploadMsg('Content is empty','bad');return;}
+  setUploadMsg('Saving…','neutral');
+  try{
+    const encodedFolder=encodeURIComponent(manageFolder);
+    const encodedFile=encodeURIComponent(fileName);
+    const apiPath=`resources/${manageFolder}/${fileName}`;
+    const apiUrl=`https://api.github.com/repos/${GITHUB_REPO}/contents/resources/${encodedFolder}/${encodedFile}`;
+    // Always fetch latest SHA before saving to prevent 409 Conflict
+    let sha=editingSha;
+    if(!sha){
+      const chk=await fetch(`${apiUrl}?ref=${GITHUB_BRANCH}`,{headers:ghHeaders()});
+      if(chk.ok){ const d=await chk.json(); sha=d.sha; }
+    }
+    const body={message:`Update ${apiPath}`,content:btoa(unescape(encodeURIComponent(content))),branch:GITHUB_BRANCH};
+    if(sha) body.sha=sha;
+    const res=await fetch(apiUrl,{method:'PUT',headers:ghWriteHeaders(),body:JSON.stringify(body)});
+    if(!res.ok) throw new Error(`GitHub API ${res.status}`);
+    const data=await res.json();
+    editingSha=data.content?.sha||sha;
+    manageFile=fileName;
+    setUploadMsg('Saved successfully!','good');
+    await loadFolderFiles(manageFolder);
+  }catch(e){setUploadMsg(e.message,'bad');}
+}
+
+async function uploadQuestionsFile(){
+  if(!manageFolder){setUploadMsg('Select a folder first','bad');return;}
+  if(!isValidToken()){setUploadMsg('GitHub token not configured — add it to the source to enable uploads','bad');return;}
+  const inp=document.getElementById('file-upload-inp');
+  if(!inp||!inp.files.length){setUploadMsg('Choose a .txt file first','bad');return;}
+  const file=inp.files[0];
+  if(!file.name.endsWith('.txt')){setUploadMsg('Only .txt files allowed','bad');return;}
+  const targetFile=file.name; // use the actual uploaded filename
+  setUploadMsg('Reading file…','neutral');
+  const reader=new FileReader();
+  reader.onload=async(ev)=>{
+    const content=ev.target.result;
+    try{
+      setUploadMsg('Uploading…','neutral');
+      const encodedFolder=encodeURIComponent(manageFolder);
+      const encodedFile=encodeURIComponent(targetFile);
+      const apiUrl=`https://api.github.com/repos/${GITHUB_REPO}/contents/resources/${encodedFolder}/${encodedFile}`;
+      // Fetch existing SHA to avoid 409 if file exists
+      let sha=null;
+      const chk=await fetch(`${apiUrl}?ref=${GITHUB_BRANCH}`,{headers:ghHeaders()});
+      if(chk.ok){ const d=await chk.json(); sha=d.sha; }
+      const body={message:`Upload resources/${manageFolder}/${targetFile}`,content:btoa(unescape(encodeURIComponent(content))),branch:GITHUB_BRANCH};
+      if(sha) body.sha=sha;
+      const res=await fetch(apiUrl,{method:'PUT',headers:ghWriteHeaders(),body:JSON.stringify(body)});
+      if(!res.ok) throw new Error(`GitHub API ${res.status}`);
+      setUploadMsg(`Uploaded as ${targetFile}!`,'good');
+      await loadFolderFiles(manageFolder);
+    }catch(err){setUploadMsg(err.message,'bad');}
+  };
+  reader.readAsText(file);
+}
+
+function setUploadMsg(msg,type){
+  uploadMsg=msg?`<div class="notice n-${type} mt2">${esc(msg)}</div>`:'';
+  const el=document.getElementById('upload-msg');
+  if(el) el.innerHTML=uploadMsg;
+}
+
+async function generateQuiz(){
+  const msg=document.getElementById('gen-msg'); if(!msg)return;
+  const selections=[];
+  subjects.forEach(s=>{
+    s.files.filter(f=>f.selected).forEach(f=>selections.push({file:f,subjName:s.name}));
+  });
+  if(!selections.length){msg.innerHTML='<div class="notice n-bad mt2">Select at least one chapter file above.</div>';return;}
+  // Denominator is now based on questions actually pushed, not questions loaded
+  msg.innerHTML='<div class="notice n-neutral mt2">Fetching questions…</div>';
+  let all=[];
+  try{
+    for(const {file,subjName} of selections){
+      // Use GitHub contents API (not raw.githubusercontent.com) — avoids CORS preflight rejection
+      const encodedPath=file.path.split('/').map(encodeURIComponent).join('/');
+      const apiUrl=`https://api.github.com/repos/${GITHUB_REPO}/contents/${encodedPath}?ref=${GITHUB_BRANCH}`;
+      const res=await fetch(apiUrl,{headers:ghHeaders()});
+      if(!res.ok) throw new Error(`Could not fetch ${file.name} (HTTP ${res.status})`);
+      const data=await res.json();
+      // Decode base64 content (handles UTF-8 / Hindi / Urdu etc.)
+      const bytes=Uint8Array.from(atob(data.content.replace(/\n/g,'')),c=>c.charCodeAt(0));
+      const text=new TextDecoder('utf-8').decode(bytes);
+      const parsed=parseQuestions(text);
+      if(!parsed.length) throw new Error(`No valid questions found in ${file.name}`);
+      const take=(file.count>0)?Math.min(file.count,parsed.length):parsed.length;
+      const ordered=hostRandomize?[...parsed].sort(()=>Math.random()-.5):parsed;
+      const picked=ordered.slice(0,take);
+      picked.forEach(q=>{ q.subject=subjName; q.chapter=file.name.replace(/\.txt$/i,''); });
+      all=[...all,...picked];
+    }
+    // Global shuffle: interleave questions from all selected files/folders
+    if(hostRandomize && all.length>1){
+      for(let i=all.length-1;i>0;i--){
+        const j=Math.floor(Math.random()*(i+1));
+        [all[i],all[j]]=[all[j],all[i]];
+      }
+    }
+    questions=all; selIdx=0; answerKey=all[0]?.correct??-1;
+    // ── Test Builder intercept: if host opened GitHub browser from Test Board,
+    //    show range selector instead of loading into live quiz.
+    if(_tcLoadingSource){
+      _tcLoadingSource=false;
+      // Show range selector overlay to pick start index and count
+      _showTcRangeSelector(all, selections.map(s=>s.subjName+'/'+s.file.name).join(', '));
+      msg.innerHTML=''; return;
+    }
+    msg.innerHTML=''; render();
+  }catch(e){ msg.innerHTML=`<div class="notice n-bad mt2">${esc(e.message)}</div>`; }
+}
+
+/* ══════════════════════════════════════
+   GITHUB QUESTION UPDATER
+   Reads the source .txt file, finds the question, moves the @ marker
+   to the newly selected correct option, and writes back to GitHub.
+══════════════════════════════════════ */
+/* ══════════════════════════════════════
+   GITHUB QUESTION DELETER
+   Reads the source .txt file, removes the question line + its options line,
+   renumbers remaining questions, then writes back to GitHub.
+══════════════════════════════════════ */
+// GitHub's Contents API is eventually consistent: a GET for a file made
+// shortly after a write (to that file or elsewhere in the repo) can
+// transiently 404 for a short window — commonly under a minute — before
+// GitHub's read replicas catch up with the just-landed commit. This is a
+// documented GitHub quirk, not a bug in our data. Without a retry, editing
+// two reports back-to-back means the second edit's read races the first
+// edit's write and fails with a 404 that only clears once GitHub catches up
+// (which is exactly the "works after ~52 seconds" symptom). We retry with
+// backoff so that resolves automatically instead of surfacing an error.
+async function ghGetContentWithRetry(apiUrl, onRetry){
+  const delays=[1500,2500,4000,6500,10000,15000,20000]; // ~60s total worst case
+  let lastStatus=0;
+  for(let i=0;i<=delays.length;i++){
+    const res=await fetch(apiUrl,{headers:ghHeaders(),cache:'no-store'});
+    if(res.ok) return {ok:true,data:await res.json()};
+    lastStatus=res.status;
+    // Only 404 is worth retrying — it's the eventual-consistency case.
+    // Auth/permission errors (401/403) or anything else won't fix itself.
+    if(res.status!==404 || i===delays.length) break;
+    if(onRetry) onRetry(i+1, delays.length+1);
+    await new Promise(r=>setTimeout(r,delays[i]));
+  }
+  return {ok:false,status:lastStatus};
+}
+
+async function deleteQuestionFromGitHub(q){
+  if(!q||!q.subject||!q.chapter) return {ok:false,error:'No subject/chapter info on question'};
+  if(!isValidToken())             return {ok:false,error:'No GitHub token configured'};
+  const fileName=q.chapter+'.txt';
+  const encS=q.subject.split('/').map(encodeURIComponent).join('/');
+  const encF=encodeURIComponent(fileName);
+  const apiUrl=`https://api.github.com/repos/${GITHUB_REPO}/contents/resources/${encS}/${encF}?ref=${GITHUB_BRANCH}`;
+  try{
+    const got=await ghGetContentWithRetry(apiUrl);
+    if(!got.ok) throw new Error(`Cannot read file (HTTP ${got.status})`);
+    const data=got.data;
+    const bytes=Uint8Array.from(atob(data.content.replace(/\n/g,'')),c=>c.charCodeAt(0));
+    const fileText=new TextDecoder('utf-8').decode(bytes);
+    const lines=fileText.split('\n');
+    // Find the question line
+    const origText=q.text.trim();
+    let qi=-1;
+    for(let i=0;i<lines.length;i++){
+      const stripped=lines[i].trim().replace(/^\d+[.)]\s*/,'');
+      if(stripped===origText&&i+1<lines.length&&/\(A\)/i.test(lines[i+1])){ qi=i; break; }
+    }
+    if(qi<0) return {ok:false,error:'Question not found in file — delete manually'};
+    // Remove the question line and its options line (2 lines total)
+    lines.splice(qi,2);
+    // Renumber remaining questions that have a numeric prefix
+    let num=1;
+    const renumbered=lines.map(l=>{
+      const m=l.match(/^(\d+[.)]\s*)(.*)/);
+      if(m&&!/^\(A\)/i.test(m[2].trim())) return `${num++}. ${m[2]}`;
+      if(m) return l; // options line — don't renumber
+      if(l.trim()&&!/^\(A\)/i.test(l.trim())) { /* plain question without number */ }
+      return l;
+    });
+    const newContent=renumbered.join('\n');
+    const writeUrl=`https://api.github.com/repos/${GITHUB_REPO}/contents/resources/${encS}/${encF}`;
+    const wr=await fetch(writeUrl,{method:'PUT',headers:ghWriteHeaders(),body:JSON.stringify({
+      message:`Delete question: ${origText.slice(0,55)}`,
+      content:btoa(unescape(encodeURIComponent(newContent))),
+      sha:data.sha, branch:GITHUB_BRANCH
+    })});
+    if(!wr.ok) throw new Error(`Write failed (HTTP ${wr.status})`);
+    return {ok:true};
+  }catch(e){ return {ok:false,error:e.message}; }
+}
+
+async function updateReportedQuestionInGitHub(q, newText, newOptions, newCorrect, onRetry){
+  if(!q||!q.subject||!q.chapter) return {ok:false,error:'No subject/chapter info on question'};
+  if(!isValidToken())             return {ok:false,error:'No GitHub token configured'};
+  const fileName=q.chapter+'.txt';
+  const encS=q.subject.split('/').map(encodeURIComponent).join('/');
+  const encF=encodeURIComponent(fileName);
+  const apiUrl=`https://api.github.com/repos/${GITHUB_REPO}/contents/resources/${encS}/${encF}?ref=${GITHUB_BRANCH}`;
+  try{
+    const got=await ghGetContentWithRetry(apiUrl, onRetry);
+    if(!got.ok) throw new Error(`Cannot read file (HTTP ${got.status})`);
+    const data=got.data;
+    const bytes=Uint8Array.from(atob(data.content.replace(/\n/g,'')),c=>c.charCodeAt(0));
+    const fileText=new TextDecoder('utf-8').decode(bytes);
+    const lines=fileText.split('\n');
+    // Find question line — strip leading "1. " numbering before comparing
+    const origText=q.text.trim();
+    let qi=-1;
+    for(let i=0;i<lines.length;i++){
+      const stripped=lines[i].trim().replace(/^\d+[.)]\s*/,'');
+      if(stripped===origText&&i+1<lines.length&&/\(A\)/i.test(lines[i+1])){ qi=i; break; }
+    }
+    if(qi<0) return {ok:false,error:'Question not found in file — edit manually'};
+    // Preserve existing number prefix  e.g. "12. "
+    const pfx=(lines[qi].match(/^(\d+[.)]\s*)/))||[''];
+    lines[qi]=pfx[0]+newText.trim();
+    // Rebuild option line with @ on correct answer
+    lines[qi+1]=newOptions.map((o,i)=>`(${['A','B','C','D'][i]}) ${o.replace(/@/g,'').trim()}${i===newCorrect?' @':''}`).join(', ');
+    const newContent=lines.join('\n');
+    const writeUrl=`https://api.github.com/repos/${GITHUB_REPO}/contents/resources/${encS}/${encF}`;
+    const wr=await fetch(writeUrl,{method:'PUT',headers:ghWriteHeaders(),body:JSON.stringify({
+      message:`Fix answer: ${newText.trim().slice(0,55)}`,
+      content:btoa(unescape(encodeURIComponent(newContent))),
+      sha:data.sha, branch:GITHUB_BRANCH
+    })});
+    if(!wr.ok) throw new Error(`Write failed (HTTP ${wr.status})`);
+    return {ok:true};
+  }catch(e){ return {ok:false,error:e.message}; }
+}
+/* ══════════════════════════════════════
+   BOOT
+══════════════════════════════════════ */
+
+/* Push a history entry whenever we navigate deeper, so the phone's
+   hardware/gesture back button can pop back to the previous screen. */
+function navPush(){
+  history.pushState({qz:true}, '', location.href);
+}
+
+// Intercept browser/phone back button
+window.addEventListener('popstate', ()=>{
+  // If we're somewhere deep, go back one level
+  if(showingDismissed||showingProfile||role||showingHalted||atTest||testLbOpen){
+    doBack();
+    // Re-push so the next back press also works
+    history.pushState({qz:true}, '', location.href);
+  }
+});
+
+/* ══════════════════════════════════════
+   ANIMATION ENHANCEMENTS
+══════════════════════════════════════ */
+
+// Stagger lb-rows and hist-rows after each render
+function animateStagger(selector, delayStep=40, maxDelay=400){
+  document.querySelectorAll(selector).forEach((el,i)=>{
+    el.style.animationDelay = Math.min(i*delayStep, maxDelay)+'ms';
+    el.style.animationFillMode = 'backwards';
+  });
+}
+
+// Score flash — briefly highlight a score cell when it changes
+let _lastScores={};
+function flashScoreChanges(){
+  if(_suppressScoreFlash){ _suppressScoreFlash=false; return; } // skip for manual adjustments
+  document.querySelectorAll('.lb-row, .score-row').forEach(row=>{
+    const pts=row.querySelector('.score-pts, .sb-pts');
+    if(!pts) return;
+    const pid=row.dataset.pid||row.dataset.id||pts.textContent;
+    const val=pts.textContent;
+    if(_lastScores[pid]!==undefined && _lastScores[pid]!==val){
+      pts.animate([
+        {color:'#16a34a',transform:'scale(1.25)'},
+        {color:'inherit', transform:'scale(1)'}
+      ],{duration:500,easing:'cubic-bezier(.34,1.56,.64,1)'});
+    }
+    _lastScores[pid]=val;
+  });
+}
+
+// Patch render to trigger animations
+const _origRender = render;
+window.render = function(){
+  // Preserve host-students-inner scroll position across re-renders
+  const _scroller = document.querySelector('.host-students-inner');
+  const _savedScroll = _scroller ? _scroller.scrollTop : 0;
+
+  _origRender.apply(this, arguments);
+
+  requestAnimationFrame(()=>{
+    // Restore scroll position without jumping to top
+    const scroller2 = document.querySelector('.host-students-inner');
+    if(scroller2 && _savedScroll > 0) scroller2.scrollTop = _savedScroll;
+
+    animateStagger('.lb-row', 35, 350);
+    animateStagger('.hist-row', 45, 500);
+    animateStagger('.student-chip', 30, 300);
+    animateStagger('.sb-chip', 25, 200);
+    animateStagger('.score-row', 35, 400);
+    animateStagger('.sched-card', 50, 300);
+    animateStagger('.pov-stat', 40, 200);
+    flashScoreChanges();
+  });
+};
+
+/* ══════════════════════════════════════
+   EDITOR PICKER POPUP
+══════════════════════════════════════ */
+(function(){
+  // Create the overlay backdrop
+  const backdrop = document.createElement('div');
+  backdrop.id = 'editor-picker-backdrop';
+  backdrop.style.cssText = 'display:none;position:fixed;inset:0;z-index:9998;background:rgba(0,0,0,.25);backdrop-filter:blur(2px);-webkit-backdrop-filter:blur(2px)';
+
+  // Create the popup card
+  const popup = document.createElement('div');
+  popup.id = 'editor-picker-popup';
+  popup.style.cssText = [
+    'position:fixed;z-index:9999;background:#fff;border:1px solid #e2e0da',
+    'border-radius:14px;padding:8px;min-width:220px;box-shadow:0 8px 32px rgba(14,14,18,.16)',
+    'display:none;flex-direction:column;gap:4px;animation:popIn .18s cubic-bezier(.34,1.56,.64,1) both'
+  ].join(';');
+
+  popup.innerHTML = `
+    <div style="padding:8px 10px 6px;font-size:.65rem;font-weight:800;letter-spacing:.09em;text-transform:uppercase;color:#6e6e7a">Open Editor</div>
+    <button id="ep-local" style="display:flex;align-items:center;gap:10px;padding:11px 12px;border:none;background:transparent;border-radius:8px;cursor:pointer;font-family:inherit;font-size:.84rem;font-weight:600;color:#0e0e12;text-align:left;transition:background .14s ease" onmouseover="this.style.background='#f0efe9'" onmouseout="this.style.background='transparent'">
+      <span style="font-size:1.1rem">📄</span>
+      <span><span style="display:block">Local Editor</span><span style="font-size:.71rem;font-weight:500;color:#6e6e7a">/editor (built-in)</span></span>
+    </button>
+    <button id="ep-remote" style="display:flex;align-items:center;gap:10px;padding:11px 12px;border:none;background:transparent;border-radius:8px;cursor:pointer;font-family:inherit;font-size:.84rem;font-weight:600;color:#0e0e12;text-align:left;transition:background .14s ease" onmouseover="this.style.background='#f0efe9'" onmouseout="this.style.background='transparent'">
+      <span style="font-size:1.1rem">🌐</span>
+      <span><span style="display:block">Page Editor</span><span style="font-size:.71rem;font-weight:500;color:#6e6e7a">pageeditor.onrender.com</span></span>
+    </button>
+  `;
+
+  document.body.appendChild(backdrop);
+  document.body.appendChild(popup);
+
+  function closeEditorPicker(){
+    backdrop.style.display = 'none';
+    popup.style.display = 'none';
+  }
+
+  window.openEditorPicker = function(e){
+    e.stopPropagation();
+    const btn = e.currentTarget;
+    const rect = btn.getBoundingClientRect();
+    // Position popup above or below the button depending on space
+    const spaceBelow = window.innerHeight - rect.bottom;
+    const popH = 160; // estimated popup height
+    if(spaceBelow >= popH || spaceBelow >= 100){
+      popup.style.top = (rect.bottom + 6) + 'px';
+      popup.style.bottom = 'auto';
+    } else {
+      popup.style.bottom = (window.innerHeight - rect.top + 6) + 'px';
+      popup.style.top = 'auto';
+    }
+    // Align to button left, but clamp to viewport
+    let left = rect.left;
+    const popW = 224;
+    if(left + popW > window.innerWidth - 8) left = window.innerWidth - popW - 8;
+    popup.style.left = Math.max(8, left) + 'px';
+
+    backdrop.style.display = 'block';
+    popup.style.display = 'flex';
+  };
+
+  document.getElementById('ep-local').addEventListener('click', function(){
+    closeEditorPicker();
+    location.href = '/editor';
+  });
+
+  document.getElementById('ep-remote').addEventListener('click', function(){
+    closeEditorPicker();
+    window.open('https://pageeditor.onrender.com/', '_blank');
+  });
+
+  backdrop.addEventListener('click', closeEditorPicker);
+  document.addEventListener('keydown', function(e){ if(e.key==='Escape') closeEditorPicker(); });
+})();
+
+loadStoredAuth();
+loadNavState(); // restore navigation position from before reload
+// Seed the history stack so popstate always has a base entry
+history.replaceState({qz:true}, '', location.href);
+render();
+// Always connect WebSocket — needed for host-only sessions (no currentUser) and participant reconnects
+connect();
+if(currentUser){
+  fetchSchedules();
+  fetchLeaderboard();
+  fetchNotice();
+  if(currentUser.role==='host') fetchAdminRequests();
+}
+// Sync session with DB on every page load:
+// - Clears session if account was deleted
+// - Refreshes user data if anything was manually updated (e.g. username added)
+syncAuthWithServer().then(()=>{
+  render();
+  if(currentUser){
+    fetchSchedules();
+    fetchLeaderboard();
+    fetchNotice();
+    if(currentUser.role==='host') fetchAdminRequests();
+  }
+});
