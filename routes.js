@@ -6,7 +6,7 @@ const mongoose = require('mongoose');
 const {
   User, PendingReg, UpdateReq, Notice, Schedule,
   LeaderboardEntry, ScoreLog, SessionEntry, ReportDB,
-  PlannedTest, TestAttempt, TestPreset, SyllabusWindow,
+  PlannedTest, TestAttempt, TestPreset, SyllabusWindow, Notification,
 } = require('./models');
 const { shared, txHost, getBackupWindow } = require('./ws');
 const { SessionBackup } = require('./models');
@@ -118,6 +118,17 @@ async function finalizeAttempt(attempt, test, { auto = false } = {}) {
   attempt.submittedAt = new Date();
   attempt.autoSubmitted = auto;
   await attempt.save();
+  // Notify the host whenever a student finishes a Syllabus Test round —
+  // covers manual submit AND the auto-submit-on-timeout path, since both
+  // pass through here.
+  if (test.type === 'syllabus') {
+    Notification.create({
+      type: 'syllabus_attempt',
+      testId: test._id, testTitle: test.title,
+      attemptId: attempt._id, studentId: attempt.userId, studentName: attempt.userName,
+      message: `${attempt.userName || 'A student'} attempted "${test.title}" — scored ${correct}/${test.questions.length}`,
+    }).catch(e => console.error('Notification.create (syllabus_attempt) failed:', e.message));
+  }
   return { correct, incorrect, skipped, score: correct, total: test.questions.length };
 }
 
@@ -1153,6 +1164,59 @@ function initRoutes(app) {
 
       const result = await finalizeAttempt(attempt, test, { auto: false });
       res.json({ ok: true, result });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+  });
+
+  // ── Student: request a reattempt on a completed Syllabus Test round.
+  //    One request per attempt — the host actions it manually from their
+  //    notification inbox, nothing here re-opens the test automatically. ─────
+  app.post('/api/tests/:id/request-reattempt', requireAuth, async (req, res) => {
+    try {
+      const test = await PlannedTest.findById(req.params.id).select('title type').lean();
+      if (!test) return res.status(404).json({ error: 'Test not found' });
+      if (test.type !== 'syllabus') return res.status(400).json({ error: 'Reattempt requests are only for Syllabus Tests' });
+      const attempt = await TestAttempt.findOne({ testId: req.params.id, userId: req.user.id, completed: true });
+      if (!attempt) return res.status(403).json({ error: 'Submit this test before requesting a reattempt' });
+      if (attempt.reattemptRequested) return res.status(409).json({ error: 'Already requested' });
+      attempt.reattemptRequested = true;
+      attempt.reattemptRequestedAt = new Date();
+      await attempt.save();
+      await Notification.create({
+        type: 'reattempt_request',
+        testId: test._id, testTitle: test.title,
+        attemptId: attempt._id, studentId: req.user.id, studentName: req.user.name,
+        message: `${req.user.name} asked to retake "${test.title}"`,
+      });
+      res.json({ ok: true });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+  });
+
+  /* ════════════════════════════════════════════════════════════════════════
+     NOTIFICATIONS — host inbox. Fed by finalizeAttempt() (syllabus_attempt)
+     and the reattempt-request route above. Filterable by type so the two
+     kinds don't just pile into one undifferentiated feed.
+     ══════════════════════════════════════════════════════════════════════ */
+  app.get('/api/notifications', requireHost, async (req, res) => {
+    try {
+      const query = {};
+      if (req.query.type === 'syllabus_attempt' || req.query.type === 'reattempt_request') query.type = req.query.type;
+      const notifications = await Notification.find(query).sort({ createdAt: -1 }).limit(200).lean();
+      const unreadCount = await Notification.countDocuments({ read: false });
+      res.json({ notifications, unreadCount });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+  });
+  app.post('/api/notifications/:id/read', requireHost, async (req, res) => {
+    try {
+      await Notification.findByIdAndUpdate(req.params.id, { read: true });
+      res.json({ ok: true });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+  });
+  app.post('/api/notifications/read-all', requireHost, async (req, res) => {
+    try {
+      const query = {};
+      if (req.query.type === 'syllabus_attempt' || req.query.type === 'reattempt_request') query.type = req.query.type;
+      await Notification.updateMany({ ...query, read: false }, { read: true });
+      res.json({ ok: true });
     } catch (e) { res.status(500).json({ error: e.message }); }
   });
 

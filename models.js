@@ -191,6 +191,24 @@ const syllabusWindowSchema = new mongoose.Schema({
 });
 const SyllabusWindow = mongoose.model('SyllabusWindow', syllabusWindowSchema);
 
+// ── NOTIFICATIONS (host-facing) ─────────────────────────────────────────────
+// Two kinds today: a student completing a syllabus round ('syllabus_attempt'),
+// and a student asking to retake one ('reattempt_request'). Kept as one
+// collection with a `type` so the host inbox can filter instead of mixing
+// everything into one undifferentiated feed.
+const notificationSchema = new mongoose.Schema({
+  type:        { type: String, enum: ['syllabus_attempt','reattempt_request'], required: true, index: true },
+  testId:      { type: mongoose.Schema.Types.ObjectId, ref: 'PlannedTest', default: null },
+  testTitle:   { type: String, default: '' },
+  attemptId:   { type: mongoose.Schema.Types.ObjectId, ref: 'TestAttempt', default: null },
+  studentId:   { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+  studentName: { type: String, default: '' },
+  message:     { type: String, default: '' },
+  read:        { type: Boolean, default: false, index: true },
+  createdAt:   { type: Date, default: Date.now, index: true },
+});
+const Notification = mongoose.model('Notification', notificationSchema);
+
 // ── TEST ATTEMPT ──────────────────────────────────────────────────────────────
 const testAttemptSchema = new mongoose.Schema({
   testId:     { type: mongoose.Schema.Types.ObjectId, ref: 'PlannedTest', required: true, index: true },
@@ -223,6 +241,11 @@ const testAttemptSchema = new mongoose.Schema({
     note: String,
     ts: { type: Date, default: Date.now },
   }],
+  // Syllabus tests only — a student can ask the host to let them retake a
+  // specific completed round. One request per attempt (button disables/shows
+  // "Requested" once set); the host actions it manually, nothing automated.
+  reattemptRequested:   { type: Boolean, default: false },
+  reattemptRequestedAt: { type: Date, default: null },
 });
 // One in-progress (or completed) attempt per student per test — fast lookup
 // for resume/rejoin checks on the available-tests list and on /take.
@@ -248,5 +271,5 @@ module.exports = {
   User, PendingReg, UpdateReq, Notice, Schedule,
   LeaderboardEntry, ScoreLog,
   SessionBackup, SessionEntry, ReportDB,
-  PlannedTest, TestAttempt, TestPreset, SyllabusWindow,
+  PlannedTest, TestAttempt, TestPreset, SyllabusWindow, Notification,
 };
