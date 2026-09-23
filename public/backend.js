@@ -92,6 +92,15 @@ let sylPresetMsg = '';
 // Student: syllabus test list
 let atSection = 'chooser';          // 'chooser' | 'regular' | 'syllabus' — mirrors tbSection for students
 let sylTests = null;                // fetched list (student, type=syllabus)
+let sylStudentTab = 'available';    // 'available' | 'attempted' — Syllabus Test's OWN tabs, separate from Regular's
+let sylReattemptMsg = {};           // { [testId]: 'Requesting…' | '✓ Requested' | error } — per-card status
+
+// Host: notifications inbox (bell next to the daily-window Edit button)
+let notifOpen = false;              // is the notification panel overlay open?
+let notifications = null;           // fetched list
+let notifUnreadCount = 0;           // badge count on the bell — total unread, independent of the filter below
+let notifFilter = 'all';            // 'all' | 'syllabus_attempt' | 'reattempt_request'
+let notifLoading = false;
 
 // Student
 let availTestsOpen = false;         // is Available Tests overlay open?
@@ -514,6 +523,29 @@ function fmtTime12(hhmm){
   return `${h12}:${String(m).padStart(2,'0')} ${period}`;
 }
 
+// ── NOTIFICATIONS (host) ─────────────────────────────────────────────────────
+async function fetchNotifications(){
+  notifLoading=true; render();
+  try{
+    const q = notifFilter!=='all' ? '?type='+notifFilter : '';
+    const r=await fetch('/api/notifications'+q,{headers:{Authorization:'Bearer '+authToken}});
+    const d=await r.json();
+    notifications=d.notifications||[];
+    notifUnreadCount=d.unreadCount||0;
+  }catch(e){ notifications=notifications||[]; }
+  notifLoading=false; render();
+}
+// Lightweight badge-only refresh (used when just opening the Syllabus board,
+// so the bell shows a live count without loading the whole panel).
+async function fetchNotifCount(){
+  try{
+    const r=await fetch('/api/notifications',{headers:{Authorization:'Bearer '+authToken}});
+    const d=await r.json();
+    notifUnreadCount=d.unreadCount||0;
+  }catch(e){ /* leave last known count */ }
+  render();
+}
+
 // Patches each "Starts in …" button directly every second (no full re-render,
 // same lightweight approach the in-test timer uses) so scheduled tests count
 // down live. Once a countdown reaches zero it refetches the list once, which
@@ -564,10 +596,13 @@ async function doSubmitTest(){
     const d=await r.json();
     if(!r.ok) throw new Error(d.error||'Submission failed');
     showToast(`✓ Submitted! Score: ${d.result?.score??'?'}/${d.result?.total??'?'}`,'good');
+    const wasSyllabus = atTest.type==='syllabus';
     atTest=null; atAttemptId=null; atAnswers=[];
-    atSection='regular'; availTestsTab='attempted';
+    if(wasSyllabus){ atSection='syllabus'; sylStudentTab='attempted'; }
+    else { atSection='regular'; availTestsTab='attempted'; }
     availTestsOpen=true; // student lands directly on their own result card, no leaderboard
     await fetchMyAttempts();
+    if(wasSyllabus) fetchSylTests(); // refresh so the just-submitted card disappears from Available too
   }catch(e){
     showToast(e.message||'Submission failed','bad');
   }

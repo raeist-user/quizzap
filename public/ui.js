@@ -143,10 +143,12 @@ function landingHTML(){
   // Buttons differ by role
   const actionButtons = isHost
     ? `<button class="btn btn-dark btn-lg" id="go-host">🖥 Host Interface</button>
-       <button class="btn btn-ghost btn-lg" id="btn-test-board-open" style="margin-top:2px">📋 Test Board</button>
+       <button class="btn btn-ghost btn-lg" id="btn-tb-home-regular" style="margin-top:2px">📋 Regular Test</button>
+       <button class="btn btn-ghost btn-lg" id="btn-tb-home-syllabus" style="margin-top:2px">🗂️ Syllabus Test</button>
        <button class="btn btn-ghost btn-lg" id="go-selfquiz" style="margin-top:2px">📝 Self Quiz</button>`
     : `<button class="btn btn-dark btn-lg" id="go-join">🎓 Join Session</button>
-       <button class="btn btn-ghost btn-lg" id="btn-avail-tests-open" style="margin-top:2px">📋 Test</button>`;
+       <button class="btn btn-ghost btn-lg" id="btn-at-home-regular" style="margin-top:2px">📋 Regular Test</button>
+       <button class="btn btn-ghost btn-lg" id="btn-at-home-syllabus" style="margin-top:2px">🗂️ Syllabus Test</button>`;
 
   return `<div class="lb-full-screen">
     <div class="lb-full-inner">
@@ -201,7 +203,7 @@ function availTestsHTML(){
   }
 
   // ── Syllabus Test (student) ────────────────────────────────────────────────
-  function syllabusBody(){
+  function syllabusAvailableBody(){
     const winOpen = !!sylWindow?.isOpen;
     if(!winOpen){
       return `<div style="padding:50px 24px;text-align:center;color:var(--mid)">
@@ -237,6 +239,73 @@ function availTestsHTML(){
           </div>
         </div>`;
       }).join('')}
+    </div>`;
+  }
+
+  // Renders one "Attempted" card. Regular tests get the disabled/grey
+  // leaderboard button (existing behavior); Syllabus tests instead get a
+  // Request Reattempt action, since they have no leaderboard concept at all
+  // and live in their own separate Attempted tab.
+  function renderAttemptCard(a){
+    const t=a.testId||{};
+    const total=(a.correct||0)+(a.incorrect||0)+(a.skipped||0);
+    const pct=total?Math.round((a.correct||0)/total*100):0;
+    const d=a.submittedAt?new Date(a.submittedAt).toLocaleDateString('en',{day:'numeric',month:'short',year:'numeric'}):'';
+    const isSyl = t.type==='syllabus';
+    const reMsg = sylReattemptMsg[t._id];
+    let trailing;
+    if(isSyl){
+      trailing = a.reattemptRequested
+        ? `<button class="btn btn-sm" disabled style="width:100%;justify-content:center;margin-top:8px;font-size:.75rem;background:#fef3c7;color:#92400e;border-color:#fde68a;cursor:default">✓ Reattempt Requested</button>`
+        : `<button class="btn btn-sm reattempt-btn" data-test-id="${t._id}" style="width:100%;justify-content:center;margin-top:8px;font-size:.75rem;background:#4338ca;border-color:#4338ca;color:#fff">🔄 Request Reattempt</button>`;
+    } else {
+      trailing = `<button class="btn btn-sm" disabled style="width:100%;justify-content:center;margin-top:8px;font-size:.75rem;background:#e5e7eb;color:#9ca3af;border-color:#e5e7eb;cursor:not-allowed;pointer-events:none">🏆 View Leaderboard</button>`;
+    }
+    return `<div style="border:1.5px solid var(--line);border-radius:10px;padding:12px;margin-bottom:8px;background:var(--white)">
+      <div style="font-weight:700;font-size:.88rem;margin-bottom:4px">${esc(t.title||'Test')}</div>
+      ${t.subject?`<div style="font-size:.72rem;color:var(--mid);margin-bottom:8px">📚 ${esc(t.subject)}</div>`:''}
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:8px">
+        <div style="background:#dcfce7;border-radius:8px;padding:8px;text-align:center">
+          <div style="font-size:1.2rem;font-weight:700;color:#16a34a">${a.correct||0}</div>
+          <div style="font-size:.65rem;color:#15803d;font-weight:600">CORRECT</div>
+        </div>
+        <div style="background:#fee2e2;border-radius:8px;padding:8px;text-align:center">
+          <div style="font-size:1.2rem;font-weight:700;color:#dc2626">${a.incorrect||0}</div>
+          <div style="font-size:.65rem;color:#b91c1c;font-weight:600">WRONG</div>
+        </div>
+        <div style="background:#f3f4f6;border-radius:8px;padding:8px;text-align:center">
+          <div style="font-size:1.2rem;font-weight:700;color:var(--mid)">${a.skipped||0}</div>
+          <div style="font-size:.65rem;color:var(--mid);font-weight:600">SKIPPED</div>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;justify-content:space-between;font-size:.75rem;color:var(--mid)">
+        <span>Score: <strong style="color:var(--ink)">${a.score||0}/${total}</strong> (${pct}%)</span>
+        <span>${d}</span>
+      </div>
+      ${trailing}
+      ${isSyl&&reMsg?`<div class="notice n-bad" style="font-size:.72rem;margin-top:6px">${esc(reMsg)}</div>`:''}
+      ${!isSyl?`<div style="margin-top:8px;padding:6px 10px;background:var(--faint);border-radius:6px;font-size:.72rem;color:var(--mid);text-align:center">
+        🔒 Detailed review · <em>Coming soon</em>
+      </div>`:''}
+    </div>`;
+  }
+
+  // Syllabus Test's OWN Attempted tab — separate from Regular's, syllabus
+  // attempts only, each with a Request Reattempt action instead of a
+  // leaderboard button.
+  function syllabusAttemptedBody(){
+    if(!myAttempts) return '<div style="padding:40px;text-align:center"><div class="spinner"></div></div>';
+    const sylAttempts = myAttempts.filter(a=>a.testId?.type==='syllabus');
+    if(!sylAttempts.length) return '<div style="padding:40px;text-align:center;color:var(--mid)"><div style="font-size:2rem;margin-bottom:8px">📂</div><div style="font-size:.85rem">No submitted syllabus tests yet.</div></div>';
+    return `<div style="padding:12px">${sylAttempts.map(renderAttemptCard).join('')}</div>`;
+  }
+  function syllabusBody(){
+    return `<div>
+      <div style="display:flex;border-bottom:1.5px solid var(--line)">
+        <button class="btn" id="btn-syl-tab-available" style="flex:1;border:none;border-radius:0;padding:10px;font-size:.82rem;font-weight:600;border-bottom:3px solid ${sylStudentTab==='available'?'#6366f1':'transparent'};color:${sylStudentTab==='available'?'#4338ca':'var(--mid)'}">📝 Available</button>
+        <button class="btn" id="btn-syl-tab-attempted" style="flex:1;border:none;border-radius:0;padding:10px;font-size:.82rem;font-weight:600;border-bottom:3px solid ${sylStudentTab==='attempted'?'#6366f1':'transparent'};color:${sylStudentTab==='attempted'?'#4338ca':'var(--mid)'}">📂 Attempted</button>
+      </div>
+      ${sylStudentTab==='attempted' ? syllabusAttemptedBody() : syllabusAvailableBody()}
     </div>`;
   }
 
@@ -279,45 +348,15 @@ function availTestsHTML(){
         </div>`;
       }).join('');
     }
-    // Attempted tab
+    // Attempted tab — Regular tests only now; Syllabus has its own separate
+    // Attempted tab (see syllabusAttemptedBody below).
+    const regularAttempts = (myAttempts||[]).filter(a=>a.testId?.type!=='syllabus');
     if(!myAttempts) return '<div style="padding:40px;text-align:center"><div class="spinner"></div></div>';
-    if(!myAttempts.length) return '<div style="padding:40px;text-align:center;color:var(--mid)"><div style="font-size:2rem;margin-bottom:8px">📂</div><div style="font-size:.85rem">No submitted tests yet.</div></div>';
-    return myAttempts.map(a=>{
-      const t=a.testId||{};
-      const total=(a.correct||0)+(a.incorrect||0)+(a.skipped||0);
-      const pct=total?Math.round((a.correct||0)/total*100):0;
-      const d=a.submittedAt?new Date(a.submittedAt).toLocaleDateString('en',{day:'numeric',month:'short',year:'numeric'}):'';
-      return `<div style="border:1.5px solid var(--line);border-radius:10px;padding:12px;margin-bottom:8px;background:var(--white)">
-        <div style="font-weight:700;font-size:.88rem;margin-bottom:4px">${esc(t.title||'Test')}</div>
-        ${t.subject?`<div style="font-size:.72rem;color:var(--mid);margin-bottom:8px">📚 ${esc(t.subject)}</div>`:''}
-        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:8px">
-          <div style="background:#dcfce7;border-radius:8px;padding:8px;text-align:center">
-            <div style="font-size:1.2rem;font-weight:700;color:#16a34a">${a.correct||0}</div>
-            <div style="font-size:.65rem;color:#15803d;font-weight:600">CORRECT</div>
-          </div>
-          <div style="background:#fee2e2;border-radius:8px;padding:8px;text-align:center">
-            <div style="font-size:1.2rem;font-weight:700;color:#dc2626">${a.incorrect||0}</div>
-            <div style="font-size:.65rem;color:#b91c1c;font-weight:600">WRONG</div>
-          </div>
-          <div style="background:#f3f4f6;border-radius:8px;padding:8px;text-align:center">
-            <div style="font-size:1.2rem;font-weight:700;color:var(--mid)">${a.skipped||0}</div>
-            <div style="font-size:.65rem;color:var(--mid);font-weight:600">SKIPPED</div>
-          </div>
-        </div>
-        <div style="display:flex;align-items:center;justify-content:space-between;font-size:.75rem;color:var(--mid)">
-          <span>Score: <strong style="color:var(--ink)">${a.score||0}/${total}</strong> (${pct}%)</span>
-          <span>${d}</span>
-        </div>
-        ${t.type!=='syllabus'?`<button class="btn btn-sm" disabled style="width:100%;justify-content:center;margin-top:8px;font-size:.75rem;background:#e5e7eb;color:#9ca3af;border-color:#e5e7eb;cursor:not-allowed;pointer-events:none">🏆 View Leaderboard</button>`:''}
-        <div style="margin-top:8px;padding:6px 10px;background:var(--faint);border-radius:6px;font-size:.72rem;color:var(--mid);text-align:center">
-          🔒 Detailed review · <em>Coming soon</em>
-        </div>
-      </div>`;
-    }).join('');
+    if(!regularAttempts.length) return '<div style="padding:40px;text-align:center;color:var(--mid)"><div style="font-size:2rem;margin-bottom:8px">📂</div><div style="font-size:.85rem">No submitted tests yet.</div></div>';
+    return regularAttempts.map(renderAttemptCard).join('');
   }  return `<div id="avail-tests-overlay" style="position:fixed;inset:0;background:var(--white);z-index:500;display:flex;flex-direction:column;overflow:hidden">
     <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:2px solid var(--line);background:var(--faint);flex-shrink:0">
       <span style="font-weight:700;font-size:.95rem;display:flex;align-items:center;gap:8px">
-        ${atSection!=='chooser'?`<button class="btn btn-ghost btn-sm" id="btn-at-back-chooser" style="padding:3px 8px">←</button>`:''}
         📋 Test${atSection==='regular'?' — Regular':atSection==='syllabus'?' — Syllabus':''}
       </span>
       <button class="btn btn-ghost btn-sm" id="btn-avail-tests-close">✕ Close</button>
@@ -1374,7 +1413,48 @@ function testBoardHTML(){
         <div style="font-size:.68rem;font-weight:700;color:var(--mid)">🕒 DAILY WINDOW</div>
         <div style="font-size:.85rem;font-weight:700;margin-top:1px">${hasWindow?`${fmtTime12(win.fromTime)} – ${fmtTime12(win.toTime)}`:'Not set yet'}</div>
       </div>
-      <button class="btn btn-ghost btn-sm" id="btn-syl-win-edit">${hasWindow?'✏️ Edit':'+ Set window'}</button>
+      <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
+        <button class="btn btn-ghost btn-sm" id="btn-notif-open" style="position:relative;padding:6px 10px">
+          🔔
+          ${notifUnreadCount>0?`<span style="position:absolute;top:-6px;right:-6px;background:#dc2626;color:#fff;min-width:18px;height:18px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:.65rem;font-weight:800;padding:0 4px;box-shadow:0 1px 3px rgba(0,0,0,.3)">${notifUnreadCount>99?'99+':notifUnreadCount}</span>`:''}
+        </button>
+        <button class="btn btn-ghost btn-sm" id="btn-syl-win-edit">${hasWindow?'✏️ Edit':'+ Set window'}</button>
+      </div>
+    </div>`;
+  }
+  // ── Notifications panel (host) — students completing a Syllabus round, or
+  //    asking to retake one. Filterable so the two kinds don't just pile up
+  //    into one undifferentiated feed. ────────────────────────────────────────
+  function notifPanelHTML(){
+    if(!notifOpen) return '';
+    const filters = [
+      { id:'all', label:'All' },
+      { id:'syllabus_attempt', label:'📝 Attempts' },
+      { id:'reattempt_request', label:'🔄 Reattempts' },
+    ];
+    const list = notifications||[];
+    return `<div style="position:absolute;inset:0;background:var(--white);z-index:20;display:flex;flex-direction:column">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1.5px solid var(--line);background:var(--faint);flex-shrink:0">
+        <span style="font-weight:700;font-size:.88rem">🔔 Notifications</span>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-ghost btn-sm" id="btn-notif-mark-all" style="font-size:.72rem">✓ Mark all read</button>
+          <button class="btn btn-ghost btn-sm" id="btn-notif-close" style="font-size:.72rem">✕</button>
+        </div>
+      </div>
+      <div style="display:flex;gap:6px;padding:10px 14px;border-bottom:1px solid var(--line);flex-shrink:0;overflow-x:auto">
+        ${filters.map(f=>`<button class="btn btn-sm notif-filter-btn" data-filter="${f.id}" style="flex-shrink:0;padding:5px 12px;font-size:.74rem;${notifFilter===f.id?'background:#4338ca;border-color:#4338ca;color:#fff;':'background:var(--faint);color:var(--mid);'}">${f.label}</button>`).join('')}
+      </div>
+      <div style="flex:1;overflow-y:auto;padding:10px 14px">
+        ${notifLoading?'<div style="padding:40px;text-align:center"><div class="spinner"></div></div>'
+          :!list.length?`<div style="padding:40px;text-align:center;color:var(--mid)"><div style="font-size:2rem;margin-bottom:8px">📭</div><div style="font-size:.85rem">No notifications${notifFilter!=='all'?' of this type':''} yet.</div></div>`
+          :list.map(n=>`
+            <div class="notif-row" data-notif-id="${n._id}" style="border:1.5px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:8px;background:${n.read?'var(--white)':'#eef2ff'};position:relative">
+              ${!n.read?'<span style="position:absolute;top:12px;right:12px;width:8px;height:8px;border-radius:4px;background:#4338ca"></span>':''}
+              <div style="font-size:.68rem;font-weight:700;color:${n.type==='reattempt_request'?'#b45309':'#4338ca'};margin-bottom:3px">${n.type==='reattempt_request'?'🔄 REATTEMPT REQUEST':'📝 SYLLABUS ATTEMPT'}</div>
+              <div style="font-size:.82rem;padding-right:16px">${esc(n.message||'')}</div>
+              <div style="font-size:.7rem;color:var(--mid);margin-top:4px">${new Date(n.createdAt).toLocaleString('en',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}</div>
+            </div>`).join('')}
+      </div>
     </div>`;
   }
   function presetsListHTML(){
@@ -1561,7 +1641,6 @@ function testBoardHTML(){
   return `<div id="test-board-overlay" style="position:fixed;inset:0;background:var(--white);z-index:500;display:flex;flex-direction:column;overflow:hidden">
     <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:2px solid var(--line);background:var(--faint);flex-shrink:0">
       <span style="font-weight:700;font-size:.95rem;display:flex;align-items:center;gap:8px">
-        ${tbSection!=='chooser'&&tcMode==='test'?`<button class="btn btn-ghost btn-sm" id="btn-tb-back-chooser" style="padding:3px 8px">←</button>`:''}
         📋 Test Board${tbSection==='regular'?' — Regular':tbSection==='syllabus'?' — Syllabus':''}
       </span>
       <button class="btn btn-ghost btn-sm" id="btn-test-board-close">✕ Close</button>
@@ -1570,11 +1649,12 @@ function testBoardHTML(){
       <button class="btn" id="btn-tb-tab-create" style="flex:1;border:none;border-radius:0;padding:10px;font-size:.82rem;font-weight:600;border-bottom:3px solid ${testBoardTab==='create'?'#6366f1':'transparent'};color:${testBoardTab==='create'?'#4338ca':'var(--mid)'}">✏️ Create Test</button>
       <button class="btn" id="btn-tb-tab-history" style="flex:1;border:none;border-radius:0;padding:10px;font-size:.82rem;font-weight:600;border-bottom:3px solid ${testBoardTab==='history'?'#6366f1':'transparent'};color:${testBoardTab==='history'?'#4338ca':'var(--mid)'}">📚 History</button>
     </div>`:''}
-    <div style="flex:1;overflow-y:auto;${tbSection==='regular'&&testBoardTab==='history'&&(testViewId||testAttemptDetail)?'overflow:hidden;display:flex;flex-direction:column':''}">
+    <div style="flex:1;overflow-y:auto;position:relative;${tbSection==='regular'&&testBoardTab==='history'&&(testViewId||testAttemptDetail)?'overflow:hidden;display:flex;flex-direction:column':''}">
       ${tbSection==='chooser' ? chooserHTML()
         : tbSection==='syllabus' ? syllabusSectionHTML()
         : (testBoardTab==='create' ? createTab() : historyTab())}
       ${tbSection==='regular' ? rescheduleOverlayHTML() : ''}
+      ${tbSection==='syllabus' ? notifPanelHTML() : ''}
     </div>
   </div>`;
 }
@@ -3108,27 +3188,27 @@ function attach(){
   on('go-host', ()=>{ role='host'; hostAuthed=false; navPush(); render(); });
   on('go-selfquiz', ()=>{ location.href='/selfquiz'; });
 
-  // ── Test Board (host) ─────────────────────────────────────────────────────
-  on('btn-test-board-open', ()=>{
-    testBoardOpen=true; tbSection='chooser'; testBoardTab='create';
+  // ── Test Board (host) — home screen now opens straight into Regular or
+  //    Syllabus; the old chooser step is gone. ────────────────────────────────
+  function openTestBoardBase(){
+    testBoardOpen=true; testBoardTab='create';
     testHistory=null; testHistoryError=null; testViewId=null; testViewAttempts=null; testAttemptDetail=null;
     tcMode='test'; tcTitle=''; tcSubject=''; tcTimerType='none'; tcTimerValue=0;
     tcQSources=[]; tcRandomize=false; tcAvailFrom=''; tcAvailTo=''; tcMsg='';
-    render();
-    fetchSylWindow();
+  }
+  on('btn-tb-home-regular', ()=>{
+    openTestBoardBase(); tbSection='regular'; render(); fetchTestHistory();
   });
-  on('btn-test-board-close', ()=>{ testBoardOpen=false; testRescheduleId=null; testRescheduleMsg=''; render(); });
+  on('btn-tb-home-syllabus', ()=>{
+    openTestBoardBase(); tbSection='syllabus';
+    presets=null; presetsError=null; sylManageMode=false; sylWindowEditing=false;
+    render();
+    fetchPresets(); fetchSylWindow(); fetchNotifCount();
+  });
+  on('btn-test-board-close', ()=>{ testBoardOpen=false; testRescheduleId=null; testRescheduleMsg=''; notifOpen=false; render(); });
   on('btn-tb-tab-create', ()=>{ testBoardTab='create'; render(); });
   on('btn-tb-tab-history', ()=>{ testBoardTab='history'; render(); fetchTestHistory(); });
   on('btn-retry-history', ()=>{ fetchTestHistory(); });
-
-  on('btn-tb-open-regular', ()=>{ tbSection='regular'; testBoardTab='create'; render(); fetchTestHistory(); });
-  on('btn-tb-open-syllabus', ()=>{
-    tbSection='syllabus'; presets=null; presetsError=null; sylManageMode=false; sylWindowEditing=false;
-    render();
-    fetchPresets(); fetchSylWindow();
-  });
-  on('btn-tb-back-chooser', ()=>{ tbSection='chooser'; sylWindowEditing=false; render(); });
 
   // ── Syllabus window (host) ──────────────────────────────────────────────────
   on('btn-syl-win-edit', ()=>{
@@ -3148,6 +3228,27 @@ function attach(){
       await fetchSylWindow();
     }catch(e){ sylWindowMsg=e.message||'Failed to save'; render(); }
   });
+
+  // ── Notifications (host) ─────────────────────────────────────────────────────
+  on('btn-notif-open', ()=>{ notifOpen=true; render(); fetchNotifications(); });
+  on('btn-notif-close', ()=>{ notifOpen=false; render(); });
+  on('btn-notif-mark-all', async ()=>{
+    try{
+      const q = notifFilter!=='all' ? '?type='+notifFilter : '';
+      await apiPost('/api/notifications/read-all'+q, {}, true);
+      await fetchNotifications();
+    }catch(e){ showToast(e.message||'Failed to mark as read','bad'); }
+  });
+  document.querySelectorAll('.notif-filter-btn').forEach(b=>b.addEventListener('click', ()=>{
+    notifFilter=b.dataset.filter; render(); fetchNotifications();
+  }));
+  document.querySelectorAll('.notif-row').forEach(row=>row.addEventListener('click', async ()=>{
+    const id=row.dataset.notifId;
+    const n=(notifications||[]).find(x=>x._id===id);
+    if(!n || n.read) return;
+    n.read=true; notifUnreadCount=Math.max(0,notifUnreadCount-1); render();
+    try{ await apiPost('/api/notifications/'+id+'/read', {}, true); }catch(e){ /* best-effort */ }
+  }));
 
   // ── Presets (host) ──────────────────────────────────────────────────────────
   on('btn-syl-retry-presets', ()=>{ fetchPresets(); });
@@ -3460,24 +3561,42 @@ function attach(){
     render();
   }));
 
-  // ── Available Tests (student) ─────────────────────────────────────────────
-  on('btn-avail-tests-open', ()=>{
-    availTestsOpen=true; atSection='chooser'; availTestsTab='available'; availTests=null; myAttempts=null; render();
-    fetchAvailTests(); fetchMyAttempts(); fetchSylWindow();
+  // ── Available Tests (student) — home screen opens straight into Regular or
+  //    Syllabus now; the old chooser step is gone. ───────────────────────────
+  on('btn-at-home-regular', ()=>{
+    availTestsOpen=true; atSection='regular'; availTestsTab='available'; availTests=null; myAttempts=null; render();
+    fetchAvailTests(); fetchMyAttempts();
   });
-  on('btn-avail-tests-close', ()=>{ availTestsOpen=false; atTest=null; atAttemptId=null; atAnswers=[]; if(atTimerHandle){clearInterval(atTimerHandle);atTimerHandle=null;} if(availCountdownHandle){clearInterval(availCountdownHandle);availCountdownHandle=null;} render(); });
-
-  on('btn-at-back-chooser', ()=>{ atSection='chooser'; fetchSylWindow(); render(); });
-  on('btn-at-open-regular', ()=>{ atSection='regular'; availTestsTab='available'; render(); });
-  on('btn-at-open-syllabus', ()=>{
-    atSection='syllabus'; sylTests=null; render();
+  on('btn-at-home-syllabus', ()=>{
+    availTestsOpen=true; atSection='syllabus'; sylStudentTab='available'; sylTests=null; myAttempts=null; render();
+    fetchMyAttempts();
     fetchSylWindow().then(()=>{ if(sylWindow?.isOpen) fetchSylTests(); });
   });
+  on('btn-avail-tests-close', ()=>{ availTestsOpen=false; atTest=null; atAttemptId=null; atAnswers=[]; if(atTimerHandle){clearInterval(atTimerHandle);atTimerHandle=null;} if(availCountdownHandle){clearInterval(availCountdownHandle);availCountdownHandle=null;} render(); });
 
   // Student per-test leaderboard has been removed — students now go straight
   // to their own results in the Attempted tab, no leaderboard button/overlay.
   on('btn-at-tab-available', ()=>{ availTestsTab='available'; render(); });
   on('btn-at-tab-attempted', ()=>{ availTestsTab='attempted'; render(); });
+  on('btn-syl-tab-available', ()=>{
+    sylStudentTab='available'; render();
+    if(sylWindow?.isOpen && !sylTests) fetchSylTests();
+  });
+  on('btn-syl-tab-attempted', ()=>{ sylStudentTab='attempted'; render(); fetchMyAttempts(); });
+
+  document.querySelectorAll('.reattempt-btn').forEach(btn=>btn.addEventListener('click', async ()=>{
+    if(btn.disabled) return;
+    const testId=btn.dataset.testId;
+    delete sylReattemptMsg[testId];
+    btn.disabled=true; btn.style.opacity='.6'; btn.textContent='Requesting…';
+    try{
+      await apiPost('/api/tests/'+testId+'/request-reattempt', {}, true);
+      await fetchMyAttempts();
+    }catch(e){
+      sylReattemptMsg[testId]=e.message||'Failed to request reattempt';
+      render();
+    }
+  }));
 
   // ── Start / Rejoin a test ───────────────────────────────────────────────────
   // The server always returns the SAME in-progress attempt for a given
@@ -3499,7 +3618,8 @@ function attach(){
       if(r.status===409){
         if(data.autoSubmitted){
           showToast(`⏱ Time ran out while you were away — auto-submitted. Score: ${data.result?.score??'?'}/${data.result?.total??'?'}`,'neutral');
-          atSection='regular'; availTestsTab='attempted'; await fetchMyAttempts(); await fetchAvailTests();
+          if(atSection==='syllabus'){ sylStudentTab='attempted'; await fetchMyAttempts(); await fetchSylTests(); }
+          else { availTestsTab='attempted'; await fetchMyAttempts(); await fetchAvailTests(); }
         } else {
           showToast('Already submitted','neutral');
         }
