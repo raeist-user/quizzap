@@ -89,9 +89,18 @@ let presetsError = null;
 let sylManageMode = false;          // pencil-toggle reveals Edit/Delete on every preset card
 let sylEditingPresetId = null;      // preset._id being edited via tcMode:'preset-edit', else null
 let sylPresetMsg = '';
+// Host: folders (for sorting presets)
+let sylFoldersHost = [];            // [{ _id, name, locked, presetCount }] from /api/presets
+let sylHostFolderId = null;         // folder currently opened in the host list; null = top level
+let sylSheet = null;                // bottom sheet: { type:'new-folder'|'rename-folder'|'move', folderId?, presetId? } | null
+let sylSheetName = '';              // folder-name input value (kept in state so re-renders don't wipe it)
+let sylSheetMsg = '';
+let sylSheetBusy = false;
 // Student: syllabus test list
 let atSection = 'chooser';          // 'chooser' | 'regular' | 'syllabus' — mirrors tbSection for students
 let sylTests = null;                // fetched list (student, type=syllabus)
+let sylFolders = [];                // student: folders that hold ≥1 takeable test — [{ _id, name, locked, testCount }]
+let sylOpenFolderId = null;         // student: folder currently opened; null = top level
 let sylStudentTab = 'available';    // 'available' | 'attempted' — Syllabus Test's OWN tabs, separate from Regular's
 let sylReattemptMsg = {};           // { [testId]: 'Requesting…' | '✓ Requested' | error } — per-card status
 
@@ -503,6 +512,9 @@ async function fetchPresets(){
     const d=await r.json().catch(()=>({}));
     if(!r.ok) throw new Error(d?.error||'Failed to load presets');
     presets=Array.isArray(d.presets)?d.presets:[];
+    sylFoldersHost=Array.isArray(d.folders)?d.folders:[];
+    // The folder we were inside may have been deleted — fall back to top level.
+    if(sylHostFolderId && !sylFoldersHost.some(f=>f._id===sylHostFolderId)) sylHostFolderId=null;
   }catch(e){ presets=null; presetsError=e.message||'Failed to load presets'; }
   render();
 }
@@ -511,7 +523,11 @@ async function fetchSylTests(){
     const r=await fetch('/api/tests?type=syllabus',{headers:{Authorization:'Bearer '+authToken}});
     const d=await r.json();
     sylTests=d.tests||[];
-  }catch(e){ sylTests=[]; }
+    sylFolders=d.folders||[];
+  }catch(e){ sylTests=[]; sylFolders=[]; }
+  // If the folder the student had open was locked or emptied meanwhile, send
+  // them back to the top level instead of leaving them in a dead view.
+  if(sylOpenFolderId && !sylFolders.some(f=>f._id===sylOpenFolderId && !f.locked)) sylOpenFolderId=null;
   render();
 }
 // "19:00" → "7:00 PM"

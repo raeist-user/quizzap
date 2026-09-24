@@ -203,6 +203,52 @@ function availTestsHTML(){
   }
 
   // ── Syllabus Test (student) ────────────────────────────────────────────────
+  function sylTestCard(t){
+    const isRejoin = t.inProgress;
+    const timerLabel = t.timerType==='total'?`⏱ ${Math.round(t.timerValue/60)} min total`
+      :t.timerType==='perQuestion'?`⏱ ${t.timerValue}s / question`:'No timer';
+    return `<div class="at-card" data-test-id="${t._id}" style="${isRejoin?'border-color:#f59e0b;':''}margin-bottom:8px">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:8px">
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:700;font-size:.9rem">${esc(t.title)}</div>
+          ${t.subject?`<div style="font-size:.75rem;color:var(--mid);margin-top:1px">📚 ${esc(t.subject)}</div>`:''}
+        </div>
+        <button class="btn btn-sm at-start-btn" data-test-id="${t._id}" style="flex-shrink:0;padding:5px 14px;font-size:.78rem;${isRejoin?'background:#f59e0b;border-color:#f59e0b;color:#fff;':'background:#4338ca;border-color:#4338ca;color:#fff;'}">
+          ${isRejoin?'↻ Rejoin':'Start →'}
+        </button>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <span style="font-size:.72rem;background:var(--faint);padding:2px 8px;border-radius:20px;color:var(--mid)">${timerLabel}</span>
+        <span style="font-size:.72rem;background:var(--faint);padding:2px 8px;border-radius:20px;color:var(--mid)">📝 ${t.questionCount||0} questions</span>
+        ${isRejoin?`<span style="font-size:.72rem;background:#fef3c7;padding:2px 8px;border-radius:20px;color:#92400e;font-weight:600">⏳ In progress — clock is still running</span>`:''}
+      </div>
+    </div>`;
+  }
+
+  // One folder row. Unlocked → tappable, opens the folder. Locked → greyed out,
+  // not tappable (the server also refuses to start anything inside it).
+  function sylFolderCard(f){
+    if(f.locked){
+      return `<div class="syl-folder-locked" aria-disabled="true" style="display:flex;align-items:center;gap:12px;border:1.5px solid #d1d5db;border-radius:12px;padding:14px;margin-bottom:8px;background:#f3f4f6;filter:grayscale(1);opacity:.75;cursor:not-allowed;user-select:none">
+        <div style="font-size:1.6rem;line-height:1">📁</div>
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:700;font-size:.9rem;color:#6b7280;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(f.name)}</div>
+          <div style="font-size:.72rem;color:#9ca3af;margin-top:1px">Locked by host</div>
+        </div>
+        <div style="font-size:1.2rem;line-height:1">🔒</div>
+      </div>`;
+    }
+    const n = f.testCount||0;
+    return `<div class="at-card syl-folder-open" data-folder-id="${f._id}" role="button" tabindex="0" style="display:flex;align-items:center;gap:12px;cursor:pointer;padding:14px;margin-bottom:8px;border-color:#a5b4fc;background:#eef2ff">
+      <div style="font-size:1.6rem;line-height:1">📁</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-weight:700;font-size:.9rem;color:#3730a3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(f.name)}</div>
+        <div style="font-size:.72rem;color:var(--mid);margin-top:1px">${n} test${n!==1?'s':''}</div>
+      </div>
+      <div style="font-size:1.3rem;color:#6366f1;line-height:1">›</div>
+    </div>`;
+  }
+
   function syllabusAvailableBody(){
     const winOpen = !!sylWindow?.isOpen;
     if(!winOpen){
@@ -215,30 +261,32 @@ function availTestsHTML(){
       </div>`;
     }
     if(!sylTests) return '<div style="padding:40px;text-align:center"><div class="spinner"></div></div>';
-    if(!sylTests.length) return `<div style="padding:40px;text-align:center;color:var(--mid)"><div style="font-size:2rem;margin-bottom:8px">📋</div><div style="font-size:.85rem">No syllabus tests published right now.</div></div>`;
+
+    const folders = sylFolders||[];
+    const openFolder = sylOpenFolderId ? folders.find(f=>f._id===sylOpenFolderId && !f.locked) : null;
+    const windowNotice = `<div class="notice n-accent" style="font-size:.76rem;margin-bottom:10px">🕒 Open now — ${fmtTime12(sylWindow.fromTime)} to ${fmtTime12(sylWindow.toTime)} daily</div>`;
+
+    // ── Inside a folder ────────────────────────────────────────────────────
+    if(openFolder){
+      const inside = sylTests.filter(t=>t.folderId===openFolder._id);
+      return `<div style="padding:12px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+          <button class="btn btn-ghost btn-sm" id="btn-syl-folder-back" style="padding:4px 8px;flex-shrink:0">← Back</button>
+          <div style="font-weight:700;font-size:.9rem;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">📁 ${esc(openFolder.name)}</div>
+        </div>
+        ${windowNotice}
+        ${inside.length?inside.map(sylTestCard).join('')
+          :`<div style="padding:30px;text-align:center;color:var(--mid);font-size:.85rem">Nothing left to take in this folder.</div>`}
+      </div>`;
+    }
+
+    // ── Top level: folders first, then any unfiled tests ───────────────────
+    const unfiled = sylTests.filter(t=>!t.folderId);
+    if(!folders.length && !unfiled.length) return `<div style="padding:40px;text-align:center;color:var(--mid)"><div style="font-size:2rem;margin-bottom:8px">📋</div><div style="font-size:.85rem">No syllabus tests published right now.</div></div>`;
     return `<div style="padding:12px">
-      <div class="notice n-accent" style="font-size:.76rem;margin-bottom:10px">🕒 Open now — ${fmtTime12(sylWindow.fromTime)} to ${fmtTime12(sylWindow.toTime)} daily</div>
-      ${sylTests.map(t=>{
-        const isRejoin = t.inProgress;
-        const timerLabel = t.timerType==='total'?`⏱ ${Math.round(t.timerValue/60)} min total`
-          :t.timerType==='perQuestion'?`⏱ ${t.timerValue}s / question`:'No timer';
-        return `<div class="at-card" data-test-id="${t._id}" style="${isRejoin?'border-color:#f59e0b;':''}margin-bottom:8px">
-          <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:8px">
-            <div style="flex:1;min-width:0">
-              <div style="font-weight:700;font-size:.9rem">${esc(t.title)}</div>
-              ${t.subject?`<div style="font-size:.75rem;color:var(--mid);margin-top:1px">📚 ${esc(t.subject)}</div>`:''}
-            </div>
-            <button class="btn btn-sm at-start-btn" data-test-id="${t._id}" style="flex-shrink:0;padding:5px 14px;font-size:.78rem;${isRejoin?'background:#f59e0b;border-color:#f59e0b;color:#fff;':'background:#4338ca;border-color:#4338ca;color:#fff;'}">
-              ${isRejoin?'↻ Rejoin':'Start →'}
-            </button>
-          </div>
-          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-            <span style="font-size:.72rem;background:var(--faint);padding:2px 8px;border-radius:20px;color:var(--mid)">${timerLabel}</span>
-            <span style="font-size:.72rem;background:var(--faint);padding:2px 8px;border-radius:20px;color:var(--mid)">📝 ${t.questionCount||0} questions</span>
-            ${isRejoin?`<span style="font-size:.72rem;background:#fef3c7;padding:2px 8px;border-radius:20px;color:#92400e;font-weight:600">⏳ In progress — clock is still running</span>`:''}
-          </div>
-        </div>`;
-      }).join('')}
+      ${windowNotice}
+      ${folders.map(sylFolderCard).join('')}
+      ${unfiled.map(sylTestCard).join('')}
     </div>`;
   }
 
@@ -1457,32 +1505,134 @@ function testBoardHTML(){
       </div>
     </div>`;
   }
+  // ── Preset + folder list (host) ─────────────────────────────────────────────
+  function sylLockBtnHTML(f){
+    const l = !!f.locked;
+    return `<button class="btn btn-sm btn-syl-folder-lock" data-folder-id="${f._id}" data-locked="${l?1:0}" title="${l?'Tap to unlock — students can open it again':'Tap to lock — students see it greyed out'}" style="flex-shrink:0;padding:5px 10px;font-size:.74rem;font-weight:700;${l?'background:#fee2e2;border-color:#fecaca;color:#b91c1c':'background:#dcfce7;border-color:#bbf7d0;color:#15803d'}">${l?'🔒 Locked':'🔓 Unlocked'}</button>`;
+  }
+  function sylPresetCardHTML(p){
+    return `
+      <div style="border:1.5px solid var(--line);border-radius:10px;padding:10px 12px;background:var(--white)">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+          <div style="flex:1;min-width:0">
+            <div style="font-weight:700;font-size:.85rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(p.title)}</div>
+            <div style="font-size:.7rem;color:var(--mid)">${p.subject?esc(p.subject)+' · ':''}${p.questionCount||0} question${p.questionCount!==1?'s':''}${p.publishedCount?` · Published ${p.publishedCount}×`:''}</div>
+          </div>
+          <button class="btn btn-dark btn-sm btn-syl-publish" data-preset-id="${p._id}" style="flex-shrink:0;padding:5px 12px;font-size:.76rem">📤 Publish</button>
+        </div>
+        ${sylManageMode?`<div style="display:flex;gap:8px;margin-top:8px">
+          <button class="btn btn-ghost btn-sm btn-syl-edit-preset" data-preset-id="${p._id}" style="flex:1;justify-content:center;font-size:.75rem">✏️ Edit</button>
+          <button class="btn btn-ghost btn-sm btn-syl-move-preset" data-preset-id="${p._id}" style="flex:1;justify-content:center;font-size:.75rem">📁 Move</button>
+          <button class="btn btn-ghost btn-sm btn-syl-delete-preset" data-preset-id="${p._id}" style="flex:1;justify-content:center;font-size:.75rem;color:#be123c;border-color:#fecdd3">🗑 Delete</button>
+        </div>`:''}
+      </div>`;
+  }
+  function sylFolderCardHTML(f){
+    const n = f.presetCount||0;
+    return `
+      <div style="border:1.5px solid ${f.locked?'#fecaca':'#a5b4fc'};border-radius:10px;padding:10px 12px;background:${f.locked?'#fef2f2':'#eef2ff'}">
+        <div style="display:flex;align-items:center;gap:8px">
+          <div class="syl-host-folder-open" data-folder-id="${f._id}" role="button" tabindex="0" style="flex:1;min-width:0;display:flex;align-items:center;gap:10px;cursor:pointer">
+            <span style="font-size:1.4rem;line-height:1">📁</span>
+            <div style="min-width:0;flex:1">
+              <div style="font-weight:700;font-size:.85rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(f.name)}</div>
+              <div style="font-size:.7rem;color:var(--mid)">${n} preset${n!==1?'s':''}</div>
+            </div>
+            <span style="color:var(--mid);font-size:1.2rem;line-height:1">›</span>
+          </div>
+          ${sylLockBtnHTML(f)}
+        </div>
+        ${sylManageMode?`<div style="display:flex;gap:8px;margin-top:8px">
+          <button class="btn btn-ghost btn-sm btn-syl-folder-rename" data-folder-id="${f._id}" style="flex:1;justify-content:center;font-size:.75rem">✏️ Rename</button>
+          <button class="btn btn-ghost btn-sm btn-syl-folder-delete" data-folder-id="${f._id}" style="flex:1;justify-content:center;font-size:.75rem;color:#be123c;border-color:#fecdd3">🗑 Delete</button>
+        </div>`:''}
+      </div>`;
+  }
+  // Bottom sheet: new folder / rename folder / move a preset.
+  function sylSheetHTML(){
+    if(!sylSheet) return '';
+    const shell = inner => `<div style="position:fixed;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:flex-end;justify-content:center;z-index:700;backdrop-filter:blur(3px)">
+      <div style="background:var(--white);border-radius:20px 20px 0 0;width:100%;max-width:480px;padding:18px 20px 24px;animation:slideUp .22s ease;max-height:85vh;overflow-y:auto">
+        <div style="width:36px;height:4px;background:var(--line);border-radius:2px;margin:0 auto 14px"></div>
+        ${inner}
+      </div></div>`;
+    const msg = sylSheetMsg?`<div style="font-size:.78rem;color:#dc2626;margin-bottom:10px">${esc(sylSheetMsg)}</div>`:'';
+
+    if(sylSheet.type==='new-folder' || sylSheet.type==='rename-folder'){
+      const renaming = sylSheet.type==='rename-folder';
+      const movingPreset = !renaming && sylSheet.presetId ? (presets||[]).find(x=>x._id===sylSheet.presetId) : null;
+      return shell(`
+        <div style="font-weight:700;font-size:1rem;margin-bottom:${movingPreset?'2':'14'}px">${renaming?'✏️ Rename Folder':'📁 New Folder'}</div>
+        ${movingPreset?`<div style="font-size:.78rem;color:var(--mid);margin-bottom:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">“${esc(movingPreset.title)}” will be moved into it</div>`:''}
+        <input class="form-input" id="syl-sheet-name" maxlength="60" value="${esc(sylSheetName)}" placeholder="e.g. Chapter 5 · Biology" style="font-size:.9rem;margin-bottom:10px"/>
+        ${msg}
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <button class="btn btn-dark btn-lg" id="btn-syl-sheet-save" style="justify-content:center" ${sylSheetBusy?'disabled':''}>${sylSheetBusy?'Saving…':(renaming?'💾 Save':'＋ Create Folder')}</button>
+          <button class="btn btn-ghost btn-sm" id="btn-syl-sheet-cancel" style="justify-content:center">Cancel</button>
+        </div>`);
+    }
+
+    // type === 'move'
+    const preset = (presets||[]).find(x=>x._id===sylSheet.presetId) || {};
+    const cur = preset.folderId || '';
+    const dest = (id,label,icon)=>{
+      const here = String(cur)===String(id);
+      return `<button class="btn btn-ghost btn-sm btn-syl-move-dest" data-folder-id="${id}" ${here||sylSheetBusy?'disabled':''} style="width:100%;justify-content:flex-start;gap:10px;padding:11px 12px;font-size:.85rem;${here?'background:var(--faint);opacity:.7':''}">
+        <span style="font-size:1.1rem">${icon}</span><span style="flex:1;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(label)}</span>${here?'<span style="font-size:.7rem;color:var(--mid)">current</span>':''}
+      </button>`;
+    };
+    return shell(`
+      <div style="font-weight:700;font-size:1rem;margin-bottom:2px">📁 Move to folder</div>
+      <div style="font-size:.78rem;color:var(--mid);margin-bottom:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(preset.title||'')}</div>
+      ${msg}
+      <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px">
+        ${dest('','No folder (top level)','🗂️')}
+        ${sylFoldersHost.map(f=>dest(f._id,f.name+(f.locked?'  🔒':''),'📁')).join('')}
+        <button class="btn btn-ghost btn-sm" id="btn-syl-move-newfolder" style="width:100%;justify-content:center;padding:10px;border-style:dashed;font-size:.8rem" ${sylSheetBusy?'disabled':''}>＋ New folder…</button>
+      </div>
+      <button class="btn btn-ghost btn-sm" id="btn-syl-sheet-cancel" style="width:100%;justify-content:center">Cancel</button>`);
+  }
   function presetsListHTML(){
     if(presetsError) return `<div style="padding:40px;text-align:center;color:var(--mid)"><div style="font-size:.85rem;margin-bottom:12px">${esc(presetsError)}</div><button class="btn btn-dark btn-sm" id="btn-syl-retry-presets">Retry</button></div>`;
     if(!presets) return '<div style="padding:40px;text-align:center"><div class="spinner"></div></div>';
+
+    const curFolder = sylHostFolderId ? sylFoldersHost.find(f=>f._id===sylHostFolderId) : null;
+    const shown = presets.filter(p=>String(p.folderId||'')===String(curFolder?._id||''));
+    const hasAnything = presets.length || sylFoldersHost.length;
+    const msg = sylPresetMsg?`<div class="notice ${sylPresetMsg.startsWith('✓')?'n-good':'n-bad'}" style="font-size:.8rem;margin-top:10px">${esc(sylPresetMsg)}</div>`:'';
+
+    // ── Inside a folder ──────────────────────────────────────────────────────
+    if(curFolder){
+      return `<div style="padding:12px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+          <button class="btn btn-ghost btn-sm" id="btn-syl-host-folder-back" style="padding:4px 8px;flex-shrink:0">← All</button>
+          <div style="flex:1;min-width:0;font-weight:700;font-size:.92rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">📁 ${esc(curFolder.name)}</div>
+          ${sylLockBtnHTML(curFolder)}
+        </div>
+        ${curFolder.locked?`<div class="notice n-bad" style="font-size:.76rem;margin-bottom:10px">🔒 Locked — students still see this folder, but greyed out and closed, until you unlock it.</div>`:''}
+        <button class="btn btn-ghost btn-sm" id="btn-syl-create-open" style="width:100%;justify-content:center;padding:9px;border-style:dashed;font-size:.8rem;margin-bottom:10px">＋ Create Preset in this folder</button>
+        ${shown.length?`<div style="display:flex;justify-content:flex-end;margin-bottom:8px">
+          <button class="btn btn-ghost btn-sm" id="btn-syl-manage-toggle" style="font-size:.75rem">${sylManageMode?'✓ Done':'✏️ Manage presets'}</button>
+        </div>`:`<div style="padding:26px 10px;text-align:center;color:var(--mid)"><div style="font-size:2rem;margin-bottom:8px">📂</div><div style="font-size:.85rem">This folder is empty — create a preset here, or use Manage → Move to file one in.</div></div>`}
+        <div style="display:flex;flex-direction:column;gap:8px">${shown.map(sylPresetCardHTML).join('')}</div>
+        ${msg}
+      </div>`;
+    }
+
+    // ── Top level ────────────────────────────────────────────────────────────
     return `<div style="padding:12px">
-      <button class="btn btn-ghost btn-sm" id="btn-syl-create-open" style="width:100%;justify-content:center;padding:9px;border-style:dashed;font-size:.8rem;margin-bottom:10px">＋ Create Preset</button>
-      ${presets.length?`<div style="display:flex;justify-content:flex-end;margin-bottom:8px">
-        <button class="btn btn-ghost btn-sm" id="btn-syl-manage-toggle" style="font-size:.75rem">${sylManageMode?'✓ Done':'✏️ Manage presets'}</button>
-      </div>`:''}
-      ${!presets.length?`<div style="padding:30px 10px;text-align:center;color:var(--mid)"><div style="font-size:2rem;margin-bottom:8px">🗂️</div><div style="font-size:.85rem">No presets yet — create one to get started.</div></div>`:''}
-      <div style="display:flex;flex-direction:column;gap:8px">
-        ${presets.map(p=>`
-          <div style="border:1.5px solid var(--line);border-radius:10px;padding:10px 12px;background:var(--white)">
-            <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
-              <div style="flex:1;min-width:0">
-                <div style="font-weight:700;font-size:.85rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(p.title)}</div>
-                <div style="font-size:.7rem;color:var(--mid)">${p.subject?esc(p.subject)+' · ':''}${p.questionCount||0} question${p.questionCount!==1?'s':''}${p.publishedCount?` · Published ${p.publishedCount}×`:''}</div>
-              </div>
-              <button class="btn btn-dark btn-sm btn-syl-publish" data-preset-id="${p._id}" style="flex-shrink:0;padding:5px 12px;font-size:.76rem">📤 Publish</button>
-            </div>
-            ${sylManageMode?`<div style="display:flex;gap:8px;margin-top:8px">
-              <button class="btn btn-ghost btn-sm btn-syl-edit-preset" data-preset-id="${p._id}" style="flex:1;justify-content:center;font-size:.75rem">✏️ Edit</button>
-              <button class="btn btn-ghost btn-sm btn-syl-delete-preset" data-preset-id="${p._id}" style="flex:1;justify-content:center;font-size:.75rem;color:#be123c;border-color:#fecdd3">🗑 Delete</button>
-            </div>`:''}
-          </div>`).join('')}
+      <div style="display:flex;gap:8px;margin-bottom:10px">
+        <button class="btn btn-ghost btn-sm" id="btn-syl-create-open" style="flex:1;justify-content:center;padding:9px;border-style:dashed;font-size:.8rem">＋ Create Preset</button>
+        <button class="btn btn-ghost btn-sm" id="btn-syl-new-folder" style="flex:1;justify-content:center;padding:9px;border-style:dashed;font-size:.8rem">📁 New Folder</button>
       </div>
-      ${sylPresetMsg?`<div class="notice ${sylPresetMsg.startsWith('✓')?'n-good':'n-bad'}" style="font-size:.8rem;margin-top:10px">${esc(sylPresetMsg)}</div>`:''}
+      ${hasAnything?`<div style="display:flex;justify-content:flex-end;margin-bottom:8px">
+        <button class="btn btn-ghost btn-sm" id="btn-syl-manage-toggle" style="font-size:.75rem">${sylManageMode?'✓ Done':'✏️ Manage'}</button>
+      </div>`:''}
+      ${!hasAnything?`<div style="padding:30px 10px;text-align:center;color:var(--mid)"><div style="font-size:2rem;margin-bottom:8px">🗂️</div><div style="font-size:.85rem">No presets yet — create one to get started.</div></div>`:''}
+      ${sylFoldersHost.length?`<div style="display:flex;flex-direction:column;gap:8px;margin-bottom:${shown.length?'14':'0'}px">${sylFoldersHost.map(sylFolderCardHTML).join('')}</div>`:''}
+      ${shown.length&&sylFoldersHost.length?`<div style="font-size:.68rem;font-weight:700;color:var(--mid);letter-spacing:.04em;margin-bottom:6px">UNFILED PRESETS</div>`:''}
+      <div style="display:flex;flex-direction:column;gap:8px">${shown.map(sylPresetCardHTML).join('')}</div>
+      ${msg}
     </div>`;
   }
   function syllabusSectionHTML(){
@@ -1492,7 +1642,7 @@ function testBoardHTML(){
         ${createTab()}
       </div>`;
     }
-    return `<div>${windowBarHTML()}${presetsListHTML()}</div>`;
+    return `<div>${windowBarHTML()}${presetsListHTML()}${sylSheetHTML()}</div>`;
   }
 
   // ── Chooser: Regular Test / Syllabus Test ───────────────────────────────────
@@ -3202,10 +3352,11 @@ function attach(){
   on('btn-tb-home-syllabus', ()=>{
     openTestBoardBase(); tbSection='syllabus';
     presets=null; presetsError=null; sylManageMode=false; sylWindowEditing=false;
+    sylHostFolderId=null; sylSheet=null; sylSheetName=''; sylSheetMsg=''; sylSheetBusy=false; sylPresetMsg='';
     render();
     fetchPresets(); fetchSylWindow(); fetchNotifCount();
   });
-  on('btn-test-board-close', ()=>{ testBoardOpen=false; testRescheduleId=null; testRescheduleMsg=''; notifOpen=false; render(); });
+  on('btn-test-board-close', ()=>{ testBoardOpen=false; testRescheduleId=null; testRescheduleMsg=''; notifOpen=false; sylSheet=null; render(); });
   on('btn-tb-tab-create', ()=>{ testBoardTab='create'; render(); });
   on('btn-tb-tab-history', ()=>{ testBoardTab='history'; render(); fetchTestHistory(); });
   on('btn-retry-history', ()=>{ fetchTestHistory(); });
@@ -3299,6 +3450,99 @@ function attach(){
       render();
     }catch(e){ sylPresetMsg=e.message||'Failed to load preset for editing'; render(); }
   }));
+
+  // ── Folders (host): open / back / lock / rename / delete / move ─────────────
+  const focusSheetInput = ()=>setTimeout(()=>{ const el=document.getElementById('syl-sheet-name'); if(el){ el.focus(); el.setSelectionRange(el.value.length, el.value.length); } }, 60);
+  const closeSylSheet = ()=>{ sylSheet=null; sylSheetName=''; sylSheetMsg=''; sylSheetBusy=false; };
+
+  const openHostFolder = id=>{ sylHostFolderId=id; sylPresetMsg=''; sylManageMode=false; render(); };
+  document.querySelectorAll('.syl-host-folder-open').forEach(el=>{
+    el.addEventListener('click', ()=>openHostFolder(el.dataset.folderId));
+    el.addEventListener('keydown', e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); openHostFolder(el.dataset.folderId); } });
+  });
+  on('btn-syl-host-folder-back', ()=>{ sylHostFolderId=null; sylPresetMsg=''; sylManageMode=false; render(); });
+
+  // Lock / unlock — takes effect for students immediately (server-enforced).
+  document.querySelectorAll('.btn-syl-folder-lock').forEach(b=>b.addEventListener('click', async ()=>{
+    if(b.disabled) return;
+    const id=b.dataset.folderId, lock=b.dataset.locked!=='1';
+    b.disabled=true; b.style.opacity='.6';
+    try{
+      await apiPut('/api/folders/'+id, { locked: lock }, true);
+      sylPresetMsg = lock ? '✓ Folder locked — students see it greyed out and can\'t open it.'
+                          : '✓ Folder unlocked — students can open it again.';
+      await fetchPresets();
+    }catch(e){ sylPresetMsg=e.message||'Failed to update folder'; render(); }
+  }));
+
+  on('btn-syl-new-folder', ()=>{ sylSheet={ type:'new-folder' }; sylSheetName=''; sylSheetMsg=''; sylSheetBusy=false; render(); focusSheetInput(); });
+  document.querySelectorAll('.btn-syl-folder-rename').forEach(b=>b.addEventListener('click', ()=>{
+    const f=sylFoldersHost.find(x=>x._id===b.dataset.folderId); if(!f) return;
+    sylSheet={ type:'rename-folder', folderId:f._id }; sylSheetName=f.name; sylSheetMsg=''; sylSheetBusy=false; render(); focusSheetInput();
+  }));
+  document.querySelectorAll('.btn-syl-folder-delete').forEach(b=>b.addEventListener('click', async ()=>{
+    const f=sylFoldersHost.find(x=>x._id===b.dataset.folderId); if(!f) return;
+    const n=f.presetCount||0;
+    if(!confirm(`Delete the folder "${f.name}"?\n\n${n?`Its ${n} preset${n!==1?'s':''} will NOT be deleted — ${n!==1?'they':'it'} will move back to the top level, and any tests already published from ${n!==1?'them':'it'} will show there for students.`:'It is empty.'}`)) return;
+    try{
+      await apiDel('/api/folders/'+f._id);
+      if(sylHostFolderId===f._id) sylHostFolderId=null;
+      sylPresetMsg='✓ Folder deleted.';
+      await fetchPresets();
+    }catch(e){ sylPresetMsg=e.message||'Failed to delete folder'; render(); }
+  }));
+
+  document.querySelectorAll('.btn-syl-move-preset').forEach(b=>b.addEventListener('click', ()=>{
+    sylSheet={ type:'move', presetId:b.dataset.presetId }; sylSheetMsg=''; sylSheetBusy=false; render();
+  }));
+  document.querySelectorAll('.btn-syl-move-dest').forEach(b=>b.addEventListener('click', async ()=>{
+    if(b.disabled || !sylSheet?.presetId) return;
+    const folderId=b.dataset.folderId||null;
+    const destName = folderId ? (sylFoldersHost.find(f=>f._id===folderId)?.name||'folder') : 'the top level';
+    sylSheetBusy=true; sylSheetMsg=''; render();
+    try{
+      await apiPut('/api/presets/'+sylSheet.presetId+'/move', { folderId }, true);
+      sylPresetMsg='✓ Moved to '+(folderId?`“${destName}”`:destName)+'.';
+      closeSylSheet();
+      await fetchPresets();
+    }catch(e){ sylSheetBusy=false; sylSheetMsg=e.message||'Failed to move preset'; render(); }
+  }));
+  // "＋ New folder…" from inside the Move sheet: create it, then move the preset in.
+  on('btn-syl-move-newfolder', ()=>{
+    sylSheet={ type:'new-folder', presetId:sylSheet?.presetId }; sylSheetName=''; sylSheetMsg=''; sylSheetBusy=false; render(); focusSheetInput();
+  });
+
+  on('btn-syl-sheet-cancel', ()=>{ closeSylSheet(); render(); });
+  document.getElementById('syl-sheet-name')?.addEventListener('input', e=>{ sylSheetName=e.target.value; });
+  document.getElementById('syl-sheet-name')?.addEventListener('keydown', e=>{
+    if(e.key==='Enter'){ e.preventDefault(); document.getElementById('btn-syl-sheet-save')?.click(); }
+  });
+  on('btn-syl-sheet-save', async ()=>{
+    if(!sylSheet || sylSheetBusy) return;
+    const name=(document.getElementById('syl-sheet-name')?.value ?? sylSheetName).trim();
+    sylSheetName=name;
+    if(!name){ sylSheetMsg='Enter a folder name'; render(); focusSheetInput(); return; }
+    sylSheetBusy=true; sylSheetMsg=''; render();
+    try{
+      if(sylSheet.type==='rename-folder'){
+        await apiPut('/api/folders/'+sylSheet.folderId, { name }, true);
+        sylPresetMsg='✓ Folder renamed.';
+      } else {
+        const d=await apiPost('/api/folders', { name }, true);
+        if(sylSheet.presetId){
+          try{
+            await apiPut('/api/presets/'+sylSheet.presetId+'/move', { folderId:d.folder._id }, true);
+            sylPresetMsg=`✓ Folder “${name}” created and preset moved into it.`;
+          }catch(moveErr){
+            // Folder exists now — don't leave the sheet open to retry (that would hit "already exists").
+            sylPresetMsg=`Folder “${name}” was created, but the preset couldn't be moved: ${moveErr.message||'try Move again'}`;
+          }
+        } else sylPresetMsg=`✓ Folder “${name}” created.`;
+      }
+      closeSylSheet();
+      await fetchPresets();
+    }catch(e){ sylSheetBusy=false; sylSheetMsg=e.message||'Failed to save folder'; render(); focusSheetInput(); }
+  });
 
   // Create Test form inputs — use 'input' so state syncs while typing (fixes publish always-disabled bug)
   document.getElementById('tc-title')?.addEventListener('input', e=>{ tcTitle=e.target.value; /* no render() — avoids destroying the input mid-type */ });
@@ -3419,7 +3663,8 @@ function attach(){
         await apiPut('/api/presets/'+sylEditingPresetId, commonFields, true);
         sylPresetMsg='✓ Preset updated.';
       } else {
-        await apiPost('/api/presets', commonFields, true);
+        // Created while inside a folder → filed straight into it.
+        await apiPost('/api/presets', { ...commonFields, folderId: sylHostFolderId||null }, true);
         sylPresetMsg='✓ Preset created.';
       }
       tcMode='test'; sylEditingPresetId=null;
@@ -3568,11 +3813,11 @@ function attach(){
     fetchAvailTests(); fetchMyAttempts();
   });
   on('btn-at-home-syllabus', ()=>{
-    availTestsOpen=true; atSection='syllabus'; sylStudentTab='available'; sylTests=null; myAttempts=null; render();
+    availTestsOpen=true; atSection='syllabus'; sylStudentTab='available'; sylTests=null; sylFolders=[]; sylOpenFolderId=null; myAttempts=null; render();
     fetchMyAttempts();
     fetchSylWindow().then(()=>{ if(sylWindow?.isOpen) fetchSylTests(); });
   });
-  on('btn-avail-tests-close', ()=>{ availTestsOpen=false; atTest=null; atAttemptId=null; atAnswers=[]; if(atTimerHandle){clearInterval(atTimerHandle);atTimerHandle=null;} if(availCountdownHandle){clearInterval(availCountdownHandle);availCountdownHandle=null;} render(); });
+  on('btn-avail-tests-close', ()=>{ availTestsOpen=false; sylOpenFolderId=null; atTest=null; atAttemptId=null; atAnswers=[]; if(atTimerHandle){clearInterval(atTimerHandle);atTimerHandle=null;} if(availCountdownHandle){clearInterval(availCountdownHandle);availCountdownHandle=null;} render(); });
 
   // Student per-test leaderboard has been removed — students now go straight
   // to their own results in the Attempted tab, no leaderboard button/overlay.
@@ -3583,6 +3828,15 @@ function attach(){
     if(sylWindow?.isOpen && !sylTests) fetchSylTests();
   });
   on('btn-syl-tab-attempted', ()=>{ sylStudentTab='attempted'; render(); fetchMyAttempts(); });
+
+  // Syllabus folders (student) — open a folder / go back. Opening re-fetches
+  // so a folder the host locked a moment ago is caught before it's entered.
+  const openSylFolder = id=>{ sylOpenFolderId=id; render(); fetchSylTests(); };
+  document.querySelectorAll('.syl-folder-open').forEach(el=>{
+    el.addEventListener('click', ()=>openSylFolder(el.dataset.folderId));
+    el.addEventListener('keydown', e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); openSylFolder(el.dataset.folderId); } });
+  });
+  on('btn-syl-folder-back', ()=>{ sylOpenFolderId=null; render(); });
 
   document.querySelectorAll('.reattempt-btn').forEach(btn=>btn.addEventListener('click', async ()=>{
     if(btn.disabled) return;
