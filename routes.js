@@ -6,7 +6,7 @@ const mongoose = require('mongoose');
 const {
   User, PendingReg, UpdateReq, Notice, Schedule,
   LeaderboardEntry, ScoreLog, SessionEntry, ReportDB,
-  PlannedTest, TestAttempt, TestPreset, SyllabusWindow, Notification,
+  PlannedTest, TestAttempt, TestPreset, SyllabusFolder, SyllabusWindow, Notification,
 } = require('./models');
 const { shared, txHost, getBackupWindow } = require('./ws');
 const { SessionBackup } = require('./models');
@@ -62,6 +62,41 @@ function isSyllabusWindowOpen(win, now = new Date()) {
   if (from === to) return true;         // 24h open, no gap
   if (from < to)   return cur >= from && cur < to;
   return cur >= from || cur < to;       // wraps past midnight
+}
+
+// ── SYLLABUS FOLDER HELPERS ───────────────────────────────────────────────────
+const naturalByName = (a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' });
+
+// Validates a folder name (trimmed, 1–60 chars, unique ignoring case).
+// Returns { name } or { error }.
+async function validateFolderName(raw, excludeId = null) {
+  const name = (typeof raw === 'string' ? raw : '').trim();
+  if (!name) return { error: 'Folder name is required' };
+  if (name.length > 60) return { error: 'Folder name must be 60 characters or fewer' };
+  const all = await SyllabusFolder.find({}).select('name').lean();
+  const clash = all.some(f => (!excludeId || f._id.toString() !== String(excludeId)) &&
+                              f.name.toLowerCase() === name.toLowerCase());
+  if (clash) return { error: 'A folder with that name already exists' };
+  return { name };
+}
+
+// Resolves a request-supplied folderId. null/''/undefined → null (top level).
+// Anything else must be the id of an existing folder, otherwise { error }.
+async function resolveFolderId(raw) {
+  if (raw === null || raw === undefined || raw === '') return { id: null };
+  if (!mongoose.isValidObjectId(raw)) return { error: 'Invalid folder' };
+  const exists = await SyllabusFolder.exists({ _id: raw });
+  if (!exists) return { error: 'Folder not found' };
+  return { id: raw };
+}
+
+// The folder a live syllabus test currently sits in (via its preset), or
+// null when it's unfiled / its preset or folder no longer exists.
+async function folderForTest(test) {
+  if (test.type !== 'syllabus' || !test.presetId) return null;
+  const preset = await TestPreset.findById(test.presetId).select('folderId').lean();
+  if (!preset?.folderId) return null;
+  return SyllabusFolder.findById(preset.folderId).select('name locked').lean();
 }
 
 // ── PLANNED TEST HELPERS ──────────────────────────────────────────────────────
@@ -770,14 +805,17 @@ function initRoutes(app) {
   app.post('/api/presets', requireHost, async (req, res) => {
     try {
       const { title, subject, timerType, timerValue, questions, randomize,
-              sourceRepo, sourceFiles, sourceStart, sourceCount } = req.body;
+              sourceRepo, sourceFiles, sourceStart, sourceCount, folderId } = req.body;
       if (!title?.trim()) return res.status(400).json({ error: 'Title required' });
       if (!questions?.length) return res.status(400).json({ error: 'No questions provided' });
+      const folder = await resolveFolderId(folderId);
+      if (folder.error) return res.status(400).json({ error: folder.error });
       const preset = await TestPreset.create({
         title: title.trim(), subject: (subject||'').trim(),
         timerType: timerType||'none', timerValue: timerValue||0,
         questions, randomize: !!randomize,
         sourceRepo, sourceFiles, sourceStart, sourceCount,
+        folderId: folder.id,
         createdBy: req.user.id,
       });
       res.json({ ok: true, preset });
@@ -787,13 +825,28 @@ function initRoutes(app) {
   // ── Host: list all presets (with a lightweight publish count) ──────────────
   app.get('/api/presets', requireHost, async (req, res) => {
     try {
-      const presets = await TestPreset.find({}).select('-questions').sort({ createdAt: -1 }).lean();
+      // Aggregate (rather than .select('-questions')) so each preset also
+      // carries its question count without shipping the questions themselves.
+      const presets = await TestPreset.aggregate([
+        { $addFields: { questionCount: { $size: { $ifNull: ['$questions', []] } } } },
+        { $project: { questions: 0 } },
+        { $sort: { createdAt: -1 } },
+      ]);
       const counts = await PlannedTest.aggregate([
         { $match: { type: 'syllabus', presetId: { $in: presets.map(p => p._id) } } },
         { $group: { _id: '$presetId', count: { $sum: 1 } } },
       ]);
       const countMap = Object.fromEntries(counts.map(c => [c._id.toString(), c.count]));
-      res.json({ presets: presets.map(p => ({ ...p, publishedCount: countMap[p._id.toString()] || 0 })) });
+      const folderDocs = await SyllabusFolder.find({}).lean();
+      const inFolder = {};
+      presets.forEach(p => { if (p.folderId) inFolder[p.folderId.toString()] = (inFolder[p.folderId.toString()] || 0) + 1; });
+      const folders = folderDocs
+        .map(f => ({ ...f, presetCount: inFolder[f._id.toString()] || 0 }))
+        .sort(naturalByName);
+      res.json({
+        presets: presets.map(p => ({ ...p, publishedCount: countMap[p._id.toString()] || 0 })),
+        folders,
+      });
     } catch (e) { res.status(500).json({ error: e.message }); }
   });
 
@@ -836,6 +889,61 @@ function initRoutes(app) {
       const preset = await TestPreset.findByIdAndDelete(req.params.id);
       if (!preset) return res.status(404).json({ error: 'Preset not found' });
       res.json({ ok: true });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+  });
+
+  // ── Host: folders (for sorting presets) ────────────────────────────────────
+  app.post('/api/folders', requireHost, async (req, res) => {
+    try {
+      const v = await validateFolderName(req.body?.name);
+      if (v.error) return res.status(400).json({ error: v.error });
+      const folder = await SyllabusFolder.create({ name: v.name, createdBy: req.user.id });
+      res.json({ ok: true, folder });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+  });
+
+  // Rename and/or lock/unlock. Locking hides the folder's contents from
+  // students and blocks starting its tests; nothing is deleted or changed.
+  app.put('/api/folders/:id', requireHost, async (req, res) => {
+    try {
+      if (!mongoose.isValidObjectId(req.params.id)) return res.status(404).json({ error: 'Folder not found' });
+      const folder = await SyllabusFolder.findById(req.params.id);
+      if (!folder) return res.status(404).json({ error: 'Folder not found' });
+      const { name, locked } = req.body || {};
+      if (name !== undefined) {
+        const v = await validateFolderName(name, folder._id);
+        if (v.error) return res.status(400).json({ error: v.error });
+        folder.name = v.name;
+      }
+      if (locked !== undefined) {
+        if (typeof locked !== 'boolean') return res.status(400).json({ error: 'locked must be true or false' });
+        folder.locked = locked;
+      }
+      await folder.save();
+      res.json({ ok: true, folder });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+  });
+
+  // Deleting a folder never deletes presets — they drop back to the top level.
+  app.delete('/api/folders/:id', requireHost, async (req, res) => {
+    try {
+      if (!mongoose.isValidObjectId(req.params.id)) return res.status(404).json({ error: 'Folder not found' });
+      const folder = await SyllabusFolder.findByIdAndDelete(req.params.id);
+      if (!folder) return res.status(404).json({ error: 'Folder not found' });
+      await TestPreset.updateMany({ folderId: folder._id }, { $set: { folderId: null } });
+      res.json({ ok: true });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+  });
+
+  // ── Host: move a preset into a folder (folderId: null → top level) ─────────
+  app.put('/api/presets/:id/move', requireHost, async (req, res) => {
+    try {
+      if (!mongoose.isValidObjectId(req.params.id)) return res.status(404).json({ error: 'Preset not found' });
+      const folder = await resolveFolderId(req.body?.folderId);
+      if (folder.error) return res.status(400).json({ error: folder.error });
+      const preset = await TestPreset.findByIdAndUpdate(req.params.id, { $set: { folderId: folder.id } }, { new: true }).select('-questions');
+      if (!preset) return res.status(404).json({ error: 'Preset not found' });
+      res.json({ ok: true, preset });
     } catch (e) { res.status(500).json({ error: e.message }); }
   });
 
@@ -968,7 +1076,7 @@ function initRoutes(app) {
         query.$or = [{ availTo: null }, { availTo: { $gte: now } }];
       }
       const tests = await PlannedTest.find(query)
-        .select('title subject timerType timerValue questions createdAt sourceRepo availFrom availTo type')
+        .select('title subject timerType timerValue questions createdAt sourceRepo availFrom availTo type' + (type === 'syllabus' ? ' presetId' : ''))
         .lean();
       // Which of these does this student already have an attempt on?
       // Regular: only unfinished ones matter (drives Start → Rejoin).
@@ -988,7 +1096,39 @@ function initRoutes(app) {
           questions: undefined,
           inProgress: inProgressSet.has(t._id.toString()),
         }));
-      res.json({ tests: questionCounts });
+
+      if (type !== 'syllabus') return res.json({ tests: questionCounts });
+
+      // ── Syllabus: group by folder ────────────────────────────────────────
+      // A test's folder is its preset's folder (looked up live). A folder is
+      // only sent when it holds at least one test THIS student can still take
+      // (empty / fully-completed folders never show). Locked folders are sent
+      // as name-only stubs — their tests are withheld from the response.
+      const presetIds = [...new Set(questionCounts.map(t => t.presetId).filter(Boolean).map(String))];
+      const presetDocs = presetIds.length
+        ? await TestPreset.find({ _id: { $in: presetIds } }).select('folderId').lean() : [];
+      const folderOfPreset = new Map(presetDocs.filter(p => p.folderId).map(p => [p._id.toString(), p.folderId.toString()]));
+      const folderIds = [...new Set(folderOfPreset.values())];
+      const folderDocs = folderIds.length
+        ? await SyllabusFolder.find({ _id: { $in: folderIds } }).select('name locked').lean() : [];
+      const folderById = new Map(folderDocs.map(f => [f._id.toString(), f]));
+
+      const perFolder = new Map();   // folderId → visible test count
+      const outTests = [];
+      for (const t of questionCounts) {
+        const fid = t.presetId ? folderOfPreset.get(t.presetId.toString()) : null;
+        const folder = fid ? folderById.get(fid) : null;   // null if folder was deleted
+        if (folder) {
+          perFolder.set(fid, (perFolder.get(fid) || 0) + 1);
+          if (folder.locked) continue;                      // never leak locked contents
+        }
+        outTests.push({ ...t, presetId: undefined, folderId: folder ? fid : null });
+      }
+      const folders = folderDocs
+        .map(f => ({ _id: f._id, name: f.name, locked: !!f.locked, testCount: perFolder.get(f._id.toString()) || 0 }))
+        .filter(f => f.testCount > 0)
+        .sort(naturalByName);
+      res.json({ tests: outTests, folders });
     } catch (e) { res.status(500).json({ error: e.message }); }
   });
 
@@ -1005,6 +1145,15 @@ function initRoutes(app) {
 
       const existingDone = await TestAttempt.findOne({ testId: req.params.id, userId: req.user.id, completed: true });
       if (existingDone) return res.status(409).json({ error: 'Already submitted', attemptId: existingDone._id });
+
+      // A test inside a LOCKED syllabus folder can't be started or rejoined
+      // until the host unlocks the folder (enforced here, not just in the UI).
+      if (test.type === 'syllabus') {
+        const folder = await folderForTest(test);
+        if (folder?.locked) {
+          return res.status(403).json({ error: `The folder "${folder.name}" is locked by the host`, folderLocked: true });
+        }
+      }
 
       // Correct answers are now sent along with the test so the client can
       // reveal right/wrong the instant a student taps an option, with no

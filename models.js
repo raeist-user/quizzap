@@ -170,6 +170,10 @@ const testPresetSchema = new mongoose.Schema({
     chapter: { type: String, default: '' },
   }],
   randomize:   { type: Boolean, default: false }, // re-shuffled fresh on every Publish
+  // Which SyllabusFolder this preset is filed in (null = top level / unfiled).
+  // Tests published from the preset inherit its folder LIVE (looked up via
+  // presetId at read time), so moving a preset also moves its live tests.
+  folderId:    { type: mongoose.Schema.Types.ObjectId, ref: 'SyllabusFolder', default: null, index: true },
   sourceRepo:  { type: String, default: '' },
   sourceFiles: [{ type: String }],
   sourceStart: { type: Number, default: 0 },
@@ -178,6 +182,20 @@ const testPresetSchema = new mongoose.Schema({
   createdAt:   { type: Date, default: Date.now },
 });
 const TestPreset = mongoose.model('TestPreset', testPresetSchema);
+
+// ── SYLLABUS FOLDER ───────────────────────────────────────────────────────────
+// Host-made folder for sorting presets (and therefore their published tests).
+// Students see a folder only while it holds at least one test they can still
+// take. When `locked` is true the folder stays visible to students but greyed
+// out — its contents are withheld and starting a test inside it is refused
+// server-side — until the host unlocks it again.
+const syllabusFolderSchema = new mongoose.Schema({
+  name:      { type: String, required: true, trim: true, maxlength: 60 },
+  locked:    { type: Boolean, default: false },
+  createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  createdAt: { type: Date, default: Date.now },
+});
+const SyllabusFolder = mongoose.model('SyllabusFolder', syllabusFolderSchema);
 
 // ── SYLLABUS WINDOW ───────────────────────────────────────────────────────────
 // Single global daily time-of-day gate for the whole Syllabus Test section
@@ -271,5 +289,5 @@ module.exports = {
   User, PendingReg, UpdateReq, Notice, Schedule,
   LeaderboardEntry, ScoreLog,
   SessionBackup, SessionEntry, ReportDB,
-  PlannedTest, TestAttempt, TestPreset, SyllabusWindow, Notification,
+  PlannedTest, TestAttempt, TestPreset, SyllabusFolder, SyllabusWindow, Notification,
 };
