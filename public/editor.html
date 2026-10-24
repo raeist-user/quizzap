@@ -171,6 +171,31 @@
     #q-editor{width:100%;font-family:'Courier New',monospace;font-size:.77rem;line-height:1.7;resize:none;padding:11px 12px;border:none;outline:none;display:block;min-height:220px;box-sizing:border-box;background:var(--white);color:var(--ink)}
     .editor-footer{display:flex;gap:6px;padding:8px 11px;background:#fafaf9;border-top:1px solid var(--line);align-items:center;flex-wrap:wrap}
 
+
+    /* ── MERGE FEATURE ── */
+    .file-row{user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
+    .file-row.sel{background:var(--accent-bg)}
+    .sel-tick{width:22px;height:22px;border-radius:50%;border:2px solid var(--line);background:var(--white);display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;font-size:.75rem;font-weight:800;color:transparent;transition:all var(--t-fast)}
+    .file-row.sel .sel-tick{background:var(--accent);border-color:var(--accent);color:#fff}
+    .sel-order{font-size:.62rem;font-weight:800;color:var(--accent);flex-shrink:0}
+    .merge-modal-bg{position:fixed;inset:0;background:rgba(14,14,18,.5);z-index:500;display:none;align-items:center;justify-content:center;padding:18px;animation:fadeIn .15s ease both}
+    .merge-modal-bg.show{display:flex}
+    .merge-modal{background:var(--white);border-radius:var(--r-lg);width:100%;max-width:400px;max-height:88vh;overflow-y:auto;padding:18px;box-shadow:0 12px 40px rgba(14,14,18,.3);animation:slideUp .22s ease both}
+    .merge-modal h3{font-family:var(--serif);font-size:1.05rem;margin-bottom:3px}
+    .merge-modal .mm-sub{font-size:.72rem;color:var(--mid);margin-bottom:12px}
+    .merge-modal label.mm-lbl{display:block;font-size:.63rem;font-weight:800;color:var(--mid);letter-spacing:.1em;text-transform:uppercase;margin:10px 0 5px}
+    .merge-modal input[type=text]{width:100%;padding:10px 12px;font-family:var(--sans);font-size:.88rem;border:1.5px solid var(--line);border-radius:var(--r-sm);outline:none;box-sizing:border-box}
+    .merge-modal input[type=text]:focus{border-color:var(--accent)}
+    .mm-files{border:1px solid var(--line);border-radius:var(--r-sm);max-height:150px;overflow-y:auto}
+    .mm-file{display:flex;gap:7px;align-items:center;padding:6px 10px;font-size:.78rem;border-bottom:1px solid var(--faint)}
+    .mm-file:last-child{border-bottom:none}
+    .mm-file span:first-child{font-size:.65rem;font-weight:800;color:var(--accent);min-width:16px}
+    .mm-file span:last-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .mm-check{display:flex;align-items:center;gap:7px;font-size:.76rem;margin-top:12px;cursor:pointer}
+    .mm-err{display:none;margin-top:10px;padding:7px 10px;border-radius:var(--r-sm);background:var(--bad-bg);color:var(--bad);font-size:.74rem}
+    .mm-actions{display:flex;gap:8px;margin-top:16px}
+    .mm-actions .btn{flex:1}
+
     /* New folder form */
     .new-folder-form{display:flex;gap:6px;margin-top:8px;animation:up .15s ease both}
     .new-folder-form input{flex:1;padding:7px 10px;font-family:var(--sans);font-size:.8rem;border:1.5px solid var(--line);border-radius:var(--r-sm);outline:none}
@@ -217,6 +242,23 @@
 </nav>
 
 <div id="toast-wrap" class="toast-wrap"></div>
+<div class="merge-modal-bg" id="merge-modal-bg" onclick="if(event.target===this)closeMergeModal()">
+  <div class="merge-modal" role="dialog" aria-modal="true">
+    <h3>🔗 Merge files</h3>
+    <div class="mm-sub" id="mm-sub"></div>
+    <label class="mm-lbl" for="merge-name-input">New file name</label>
+    <input type="text" id="merge-name-input" maxlength="60" placeholder="e.g. Class 12 Full Set" autocomplete="off" onkeydown="if(event.key==='Enter')confirmMerge();if(event.key==='Escape')closeMergeModal()"/>
+    <label class="mm-lbl">Merge order</label>
+    <div class="mm-files" id="mm-files"></div>
+    <label class="mm-check"><input type="checkbox" id="merge-delete-orig"/> Delete original files after merging</label>
+    <div class="mm-err" id="mm-err"></div>
+    <div class="mm-actions">
+      <button class="btn btn-ghost" id="mm-cancel" onclick="closeMergeModal()">Cancel</button>
+      <button class="btn btn-accent" id="mm-ok" onclick="confirmMerge()">Merge</button>
+    </div>
+  </div>
+</div>
+
 
 <!-- PASSWORD GATE -->
 <div id="gate" class="gate-wrap" style="display:none">
@@ -324,6 +366,8 @@
           <div class="file-list-head">
             <span style="font-size:1rem">📁</span>
             <span class="file-list-head-title" id="ed-folder-title">—</span>
+            <button class="btn btn-accent btn-sm" id="btn-merge" onclick="openMergeModal()" style="display:none;font-size:.72rem;padding:4px 10px">🔗 Merge (0)</button>
+            <button class="btn btn-ghost btn-sm" id="btn-cancel-select" onclick="exitSelectMode()" style="display:none;font-size:.72rem;padding:4px 8px" title="Cancel selection">✕</button>
             <button class="btn btn-ghost btn-sm" id="btn-rename-folder" onclick="startFolderRename()" style="font-size:.72rem;padding:4px 6px;line-height:1" title="Rename folder">✎</button>
             <div id="folder-rename-form" style="display:none;align-items:center;gap:5px;flex:1;min-width:0">
               <input id="folder-rename-input" class="form-input" style="flex:1;min-width:60px;padding:4px 8px;font-size:.78rem" maxlength="50" onkeydown="handleFolderRenameKey(event)"/>
@@ -579,6 +623,7 @@ let edSaving        = false;
    EDITOR — FOLDER NAVIGATION
 ══════════════════════════════ */
 function edGoHome(){
+  edSelectMode = false; edSelected.clear(); updateSelectUI();
   edCurrentFolder = null;
   edCurrentFile   = null;
   edCurrentSha    = null;
@@ -662,6 +707,7 @@ async function createFolder(){
    EDITOR — FILE LIST
 ══════════════════════════════ */
 async function openFolder(name){
+  edSelectMode = false; edSelected.clear(); updateSelectUI();
   edCurrentFolder = name;
   edCurrentFile   = null;
   edCurrentSha    = null;
@@ -713,8 +759,20 @@ function renderFileList(){
         <button class="btn btn-ghost btn-sm" style="padding:4px 8px;font-size:.72rem" onclick="cancelRename()">✕</button>
       </div>`;
     }
+    if(edSelectMode){
+      const idx = [...edSelected].indexOf(f.name);
+      const on = idx > -1;
+      return `
+    <div class="file-row${on ? ' sel' : ''}" data-fname="${esc(f.name)}" onclick="toggleSelect('${esc(f.name)}')">
+      <span class="sel-tick">✓</span>
+      <span class="file-row-name">${esc(f.name.replace(/\.txt$/i,''))}</span>
+      ${on ? `<span class="sel-order">#${idx+1}</span>` : ''}
+    </div>`;
+    }
     return `
-    <div class="file-row${isEditing ? ' active-file' : ''}" onclick="openFile('${esc(f.name)}','${esc(f.sha)}')">
+    <div class="file-row${isEditing ? ' active-file' : ''}" data-fname="${esc(f.name)}" onclick="if(consumeLongPress())return;openFile('${esc(f.name)}','${esc(f.sha)}')"
+      ontouchstart="lpStart(event,'${esc(f.name)}')" ontouchend="lpCancel()" ontouchmove="lpCancel()" ontouchcancel="lpCancel()"
+      onmousedown="lpStart(event,'${esc(f.name)}')" onmouseup="lpCancel()" onmouseleave="lpCancel()" oncontextmenu="return lpContext(event)">
       <span style="font-size:.9rem">📄</span>
       <span class="file-row-name${isEditing ? ' active-name' : ''}">${esc(f.name.replace(/\.txt$/i,''))}</span>
       ${isEditing ? `<span class="file-row-edit">✎ Editing</span>` : ''}
@@ -872,6 +930,140 @@ function uploadToEditor(input){
     toast('File loaded into editor');
   };
   r.readAsText(file); input.value = '';
+}
+
+
+/* ══════════════════════════════
+   MERGE FILES
+   Long-press a file to select, tap ticks on others,
+   press 🔗 Merge → popup to name the new file.
+══════════════════════════════ */
+let edSelectMode = false;
+let edSelected   = new Set();   // insertion order = merge order
+let lpTimer = null, lpFired = false;
+
+function lpStart(e, name){
+  if(edSelectMode) return;
+  if(e.type === 'mousedown' && e.button !== 0) return;
+  lpFired = false;
+  clearTimeout(lpTimer);
+  lpTimer = setTimeout(() => {
+    lpFired = true;
+    if(navigator.vibrate) try{ navigator.vibrate(30); }catch(_){}
+    enterSelectMode(name);
+    setTimeout(() => { lpFired = false; }, 600);
+  }, 500);
+}
+function lpCancel(){ clearTimeout(lpTimer); }
+function lpContext(e){ if(lpFired || lpTimer){ e.preventDefault(); return false; } return true; }
+function consumeLongPress(){ if(lpFired){ lpFired = false; return true; } return false; }
+
+function enterSelectMode(name){
+  edSelectMode = true;
+  edSelected = new Set(name ? [name] : []);
+  edRenamingFile = null;
+  updateSelectUI();
+}
+function exitSelectMode(){
+  edSelectMode = false;
+  edSelected.clear();
+  updateSelectUI();
+}
+function toggleSelect(name){
+  if(lpFired){ lpFired = false; return; }
+  if(edSelected.has(name)) edSelected.delete(name); else edSelected.add(name);
+  updateSelectUI();
+}
+function updateSelectUI(){
+  const n = edSelected.size;
+  const mb = document.getElementById('btn-merge');
+  mb.style.display = edSelectMode ? '' : 'none';
+  mb.textContent = `🔗 Merge (${n})`;
+  mb.disabled = n < 2;
+  mb.style.opacity = n < 2 ? '.5' : '';
+  document.getElementById('btn-cancel-select').style.display = edSelectMode ? '' : 'none';
+  document.getElementById('btn-rename-folder').style.display = edSelectMode ? 'none' : '';
+  document.getElementById('btn-back-folder').style.display   = edSelectMode ? 'none' : '';
+  renderFileList();
+}
+
+function openMergeModal(){
+  if(edSelected.size < 2){ toast('Select at least 2 files to merge','warn'); return; }
+  const names = [...edSelected];
+  document.getElementById('mm-sub').textContent = `${names.length} files in “${edCurrentFolder}” will be combined into one.`;
+  document.getElementById('mm-files').innerHTML = names.map((n,i) =>
+    `<div class="mm-file"><span>${i+1}</span><span>${esc(n.replace(/\.txt$/i,''))}</span></div>`).join('');
+  const inp = document.getElementById('merge-name-input');
+  inp.value = '';
+  document.getElementById('merge-delete-orig').checked = false;
+  document.getElementById('mm-err').style.display = 'none';
+  document.getElementById('mm-ok').disabled = false;
+  document.getElementById('mm-cancel').disabled = false;
+  document.getElementById('mm-ok').textContent = 'Merge';
+  document.getElementById('merge-modal-bg').classList.add('show');
+  setTimeout(() => inp.focus(), 80);
+}
+function closeMergeModal(){
+  document.getElementById('merge-modal-bg').classList.remove('show');
+}
+function mmError(msg){
+  const el = document.getElementById('mm-err');
+  el.textContent = msg; el.style.display = msg ? 'block' : 'none';
+}
+
+async function fetchFileText(folder, name){
+  const url = `https://api.github.com/repos/${GITHUB_REPO}/contents/resources/${encodeURIComponent(folder)}/${encodeURIComponent(name)}?ref=${GITHUB_BRANCH}`;
+  const res = await fetch(url, { headers: ghHeaders() });
+  if(!res.ok) throw new Error(`Could not read "${name}" (${res.status})`);
+  const d = await res.json();
+  const bytes = Uint8Array.from(atob(d.content.replace(/\n/g,'')), c => c.charCodeAt(0));
+  return { text: new TextDecoder('utf-8').decode(bytes), sha: d.sha };
+}
+
+async function confirmMerge(){
+  if(!isValidToken()){ mmError('GitHub token not configured'); return; }
+  let name = document.getElementById('merge-name-input').value.trim().replace(/[\\\/:*?"<>|]/g,'');
+  if(!name){ mmError('Please enter a name for the new file'); return; }
+  if(!name.toLowerCase().endsWith('.txt')) name += '.txt';
+  if(edFiles.some(f => f.name.toLowerCase() === name.toLowerCase())){
+    mmError(`A file named "${name}" already exists. Choose a different name.`); return;
+  }
+  mmError('');
+  const names = [...edSelected];
+  const delOrig = document.getElementById('merge-delete-orig').checked;
+  const okBtn = document.getElementById('mm-ok'), cancelBtn = document.getElementById('mm-cancel');
+  okBtn.disabled = true; cancelBtn.disabled = true; okBtn.textContent = 'Merging…';
+  const folder = edCurrentFolder;
+  try {
+    const parts = [], shas = {};
+    for(const n of names){
+      const r = await fetchFileText(folder, n);
+      shas[n] = r.sha;
+      const t = r.text.replace(/\r\n/g,'\n').trim();
+      if(t) parts.push(t);
+    }
+    const merged = parts.join('\n\n') + '\n';
+    const apiUrl = `https://api.github.com/repos/${GITHUB_REPO}/contents/resources/${encodeURIComponent(folder)}/${encodeURIComponent(name)}`;
+    const res = await fetch(apiUrl, { method:'PUT', headers: ghWriteHeaders(), body: JSON.stringify({
+      message: `Merge ${names.length} files into resources/${folder}/${name}`,
+      content: btoa(unescape(encodeURIComponent(merged))), branch: GITHUB_BRANCH }) });
+    if(!res.ok) throw new Error(`GitHub API ${res.status}`);
+
+    if(delOrig){
+      for(const n of names){
+        const dr = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/contents/resources/${encodeURIComponent(folder)}/${encodeURIComponent(n)}`,
+          { method:'DELETE', headers: ghWriteHeaders(), body: JSON.stringify({ message:`Delete ${n} after merge`, sha: shas[n], branch: GITHUB_BRANCH }) });
+        if(!dr.ok) toast(`Could not delete "${n}" (${dr.status})`,'warn');
+      }
+    }
+    closeMergeModal();
+    exitSelectMode();
+    toast(`Merged into "${name}"!`, 'good');
+    await loadFolderFiles(folder);
+  } catch(e){
+    mmError('Merge failed: ' + e.message);
+    okBtn.disabled = false; cancelBtn.disabled = false; okBtn.textContent = 'Merge';
+  }
 }
 
 /* ── Upload as new file to folder ── */
