@@ -1,9 +1,11 @@
 /* ══════════════════════════════════════════════════════════════════════════
-   #chatbox — client for the home-screen group chat.
+   #chatbox — client for the #general group chat (opens in its own window).
    Hooks used elsewhere:
-     chatPreRender() – called at the start of render(); parks #chatbox safely
-     chatMount()     – called from attach(); seats #chatbox in #chatbox-slot
-     chatReset()     – called on logout; closes socket and clears state
+     chatPreRender()    – called at the start of render(); parks #chatbox safely
+     chatMount()        – called from attach(); keeps socket/unread alive and,
+                          on the chat screen, seats #chatbox in #chatbox-slot
+     chatReset()        – called on logout; closes socket and clears state
+     chatUnreadLabel()  – text for the unread badge on the Home button
    Server: REST /api/chat/*  +  websocket /chat?token=...
 ══════════════════════════════════════════════════════════════════════════ */
 (function(){
@@ -14,6 +16,7 @@
     smile:'<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>',
     edit:'<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>',
     del:'<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg>',
+    back:'<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>',
     down:'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>'
   };
   const DEFAULT_RX = ['👍','👎','👋','👏','🙌','🙏','🤝','💪','✌️','👌','🤞','☝️'];
@@ -26,6 +29,8 @@
   let pickerFor = null, editingId = null, actionsFor = null;
   let stick = true;         // keep scrolled to bottom
   let draft = '';
+  let readTs = null;        // ms timestamp of the newest message the user has seen
+  let toastEl = null, toastTimer = null, toastedInit = false;
 
   const $ = s => el && el.querySelector(s);
   const E = s => (typeof esc === 'function' ? esc(s) : String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'));
@@ -62,10 +67,10 @@
   function shell() {
     el.innerHTML = `
       <div class="cb-head">
+        <button class="cb-back" data-cb="back" title="Back to Home" aria-label="Back to Home">${ICON.back}</button>
         <div class="cb-title"><span class="cb-hash">#</span>general</div>
         <div class="cb-head-btns">
           <button class="cb-hbtn" data-cb="pins" title="Pinned messages">${ICON.pin}<span class="cb-count" id="cb-pin-n"></span></button>
-          <button class="cb-hbtn" data-cb="online" title="Online">${ICON.users}<span class="cb-count cb-count-online" id="cb-on-n"></span></button>
         </div>
       </div>
       <div class="cb-body">
@@ -76,7 +81,7 @@
       <div class="cb-composer">
         <div class="cb-box">
           <span class="cb-limit" id="cb-limit"></span>
-          <textarea class="cb-input" id="cb-input" rows="1" maxlength="1000" placeholder="Message #general"></textarea>
+          <textarea class="cb-input" id="cb-input" rows="1" maxlength="1000" placeholder="Message #general" enterkeyhint="send" autocomplete="off"></textarea>
           <button class="cb-send" id="cb-send" disabled title="Send">${ICON.send}</button>
         </div>
       </div>`;
@@ -85,7 +90,14 @@
     autosize(inp); updateSend();
   }
 
-  function autosize(t) { t.style.height = 'auto'; t.style.height = Math.min(t.scrollHeight, 140) + 'px'; }
+  function autosize(t) {
+    if (!t || !t.isConnected) return;            // detached => scrollHeight is 0 and the box would collapse
+    t.style.height = 'auto';
+    const h = Math.max(42, Math.min(t.scrollHeight, 140));
+    t.style.height = h + 'px';
+    t.style.overflowY = t.scrollHeight > 140 ? 'auto' : 'hidden';
+    const list = $('#cb-list'); if (list && stick) list.scrollTop = list.scrollHeight;
+  }
   function updateSend() {
     const inp = $('#cb-input'), b = $('#cb-send'), lim = $('#cb-limit');
     if (!inp) return;
@@ -152,10 +164,34 @@
   }
 
   function paintCounts() {
-    const p = $('#cb-pin-n'), o = $('#cb-on-n');
+    const p = $('#cb-pin-n');
     if (p) p.textContent = pinned.length || '';
-    if (o) o.textContent = online.length || '';
+    document.querySelectorAll('.online-n').forEach(n => { n.textContent = online.length; });
+    if (onlinePopEl && onlinePopEl.classList.contains('show')) paintOnlinePop();
   }
+
+  /* ── online members popup (opened from the Home screen) ── */
+  let onlinePopEl = null;
+  function paintOnlinePop() {
+    if (!onlinePopEl) return;
+    const body = online.length
+      ? online.map(u => `<div class="cb-member"><div class="cb-av sm ${u.role === 'host' ? 'host' : ''}">${initial(u.name)}</div><div class="cb-mname">${E(u.name)}${u.role === 'host' ? ' <small>host</small>' : ''}</div><span class="cb-member-ic">${ICON.users}</span></div>`).join('')
+      : '<div class="cb-empty">Nobody online</div>';
+    onlinePopEl.innerHTML = `<div class="cb-pop"><div class="cb-pop-head"><b>${ICON.users} Members online — ${online.length}</b><button data-close>✕</button></div><div class="cb-pop-body">${body}</div></div>`;
+  }
+  window.chatOnlinePopup = function () {
+    if (!onlinePopEl) {
+      onlinePopEl = document.createElement('div');
+      onlinePopEl.className = 'cb-online-ov';
+      onlinePopEl.addEventListener('click', ev => {
+        if (ev.target === onlinePopEl || ev.target.closest('[data-close]')) onlinePopEl.classList.remove('show');
+      });
+      document.body.appendChild(onlinePopEl);
+    }
+    paintOnlinePop();
+    onlinePopEl.classList.add('show');
+  };
+  window.chatOnlineCount = () => online.length;
 
   function paintPopup() {
     const host = $('#cb-pop'); if (!host) return;
@@ -163,7 +199,7 @@
     let title, body;
     if (popup === 'online') {
       title = `Online — ${online.length}`;
-      body = online.length ? online.map(u => `<div class="cb-member"><div class="cb-av sm ${u.role === 'host' ? 'host' : ''}">${initial(u.name)}<span class="cb-dot"></span></div><div class="cb-mname">${E(u.name)}${u.role === 'host' ? ' <small>host</small>' : ''}</div></div>`).join('') : '<div class="cb-empty">Nobody online</div>';
+      body = online.length ? online.map(u => `<div class="cb-member"><div class="cb-av sm ${u.role === 'host' ? 'host' : ''}">${initial(u.name)}</div><div class="cb-mname">${E(u.name)}${u.role === 'host' ? ' <small>host</small>' : ''}</div></div>`).join('') : '<div class="cb-empty">Nobody online</div>';
     } else {
       title = `Pinned — ${pinned.length}`;
       body = pinned.length ? pinned.map(m => `<div class="cb-pin-item" data-cb="jump" data-id="${m.id}"><div class="cb-name ${m.role === 'host' ? 'host' : ''}">${E(m.userName)}</div><div class="cb-text">${E(m.text.length > 160 ? m.text.slice(0, 160) + '…' : m.text)}</div><div class="cb-pinby">${m.pinnedBy ? 'Pinned by ' + E(m.pinnedBy) : ''}</div>${isHost() ? `<button class="cb-unpin" data-cb="unpin" data-id="${m.id}">Unpin</button>` : ''}</div>`).join('') : '<div class="cb-empty">No pinned messages</div>';
@@ -180,9 +216,13 @@
       msgs = j.messages || []; pinned = j.pinned || []; online = j.online || online;
       if (j.reactions?.length) rxList = j.reactions;
       hasMore = !!j.hasMore; loaded = true; stick = true;
+      initRead();
     } catch (e) { loadErr = 'Could not load chat. ' + e.message; }
     loading = false;
     paintList(); paintPopup();
+    if (loaded) {
+      if (isOpen()) markRead(); else { paintBadge(); if (!toastedInit) { toastedInit = true; showToast(); } }
+    }
   }
 
   async function loadOlder() {
@@ -199,6 +239,7 @@
     const inp = $('#cb-input'); if (!inp) return;
     const text = inp.value.trim(); if (!text) return;
     inp.value = ''; draft = ''; autosize(inp); updateSend();
+    try { inp.focus({ preventScroll: true }); } catch { }   // keep the keyboard open after sending
     try {
       const j = await api('/messages', { method: 'POST', body: { text } });
       if (j.message && !msgs.some(m => m.id === j.message.id)) msgs.push(j.message);
@@ -226,6 +267,7 @@
     try {
       const j = await api('/messages');
       msgs = j.messages || []; pinned = j.pinned || []; hasMore = !!j.hasMore; paintList();
+      if (isOpen()) markRead(); else { paintBadge(true); showToast(); }
     } catch { }
   }
 
@@ -240,6 +282,8 @@
       stick = atBottom || String(d.message.userId) === myId();
       paintList();
       if (!stick) { const j = $('#cb-jump'); if (j) j.style.display = 'flex'; }
+      if (isOpen()) markRead();
+      else if (String(d.message.userId) !== myId()) { paintBadge(true); showToast(); }
     } else if (d.type === 'msg_edit') {
       const i = msgs.findIndex(m => m.id === d.message.id); if (i >= 0) msgs[i] = d.message;
       const p = pinned.findIndex(m => m.id === d.message.id); if (p >= 0) pinned[p] = d.message;
@@ -247,6 +291,7 @@
     } else if (d.type === 'msg_delete') {
       msgs = msgs.filter(m => m.id !== d.id); pinned = pinned.filter(m => m.id !== d.id);
       stick = false; paintList(); if (popup === 'pins') paintPopup();
+      paintBadge(); if (!unreadCount()) hideToast();
     } else if (d.type === 'msg_react') {
       const m = msgs.find(m => m.id === d.id); if (m) m.reactions = d.reactions;
       stick = false; paintList();
@@ -273,6 +318,7 @@
       try {
         if (a === 'online' || a === 'pins') { popup = popup === (a === 'pins' ? 'pins' : 'online') ? null : (a === 'pins' ? 'pins' : 'online'); paintPopup(); }
         else if (a === 'popclose') { popup = null; paintPopup(); }
+        else if (a === 'back') { if (typeof doBack === 'function') doBack(); }
         else if (a === 'more') loadOlder();
         else if (a === 'retry') { loaded = false; load(); }
         else if (a === 'picker') { pickerFor = pickerFor === id ? null : id; stick = false; paintList(); }
@@ -307,6 +353,16 @@
 
     el.addEventListener('click', ev => { if (ev.target.closest('#cb-send')) send(); if (ev.target.closest('#cb-jump')) { stick = true; paintList(); ev.target.closest('#cb-jump').style.display = 'none'; } });
 
+    // Tapping Send must not steal focus from the textarea (that is what closes the mobile keyboard).
+    el.addEventListener('mousedown', ev => { if (ev.target.closest('#cb-send')) ev.preventDefault(); });
+    // When the keyboard opens, re-fit the window to the visible area a few times while it animates.
+    el.addEventListener('focusin', ev => {
+      if (ev.target.id === 'cb-input') [0, 80, 250, 500].forEach(d => setTimeout(fit, d));
+    });
+    el.addEventListener('focusout', ev => {
+      if (ev.target.id === 'cb-input') [0, 250].forEach(d => setTimeout(fit, d));
+    });
+
     el.addEventListener('scroll', ev => {
       if (ev.target.id !== 'cb-list') return;
       const l = ev.target; stick = l.scrollHeight - l.scrollTop - l.clientHeight < 80;
@@ -331,8 +387,107 @@
     return el;
   }
 
+  /* ── unread tracking ── */
+  const readKey = () => 'cb_read_' + myId();
+  const ts = m => new Date(m.createdAt).getTime();
+  function initRead() {
+    let v = null;
+    try { v = localStorage.getItem(readKey()); } catch { }
+    if (v !== null && v !== '' && !isNaN(+v)) { readTs = +v; return; }
+    // First time on this device: start from "everything seen" so a new user isn't shown 50 unread.
+    readTs = msgs.length ? Math.max(...msgs.map(ts)) : 0;
+    try { localStorage.setItem(readKey(), String(readTs)); } catch { }
+  }
+  function unreadCount() {
+    if (readTs === null) return 0;
+    return msgs.filter(m => String(m.userId) !== myId() && ts(m) > readTs).length;
+  }
+  function unreadLabel() {
+    const n = unreadCount(); if (!n) return '';
+    const more = hasMore && msgs.length && ts(msgs[0]) > readTs;   // older unread messages not loaded
+    return n > 99 ? '99+' : n + (more ? '+' : '');
+  }
+  const isOpen = () => !!(el && el.isConnected && el.closest('#chat-page')) && document.visibilityState === 'visible';
+  const onHome = () => typeof role !== 'undefined' && !role && !(typeof showingProfile !== 'undefined' && showingProfile) && !(typeof showingChat !== 'undefined' && showingChat);
+
+  function markRead() {
+    if (msgs.length) {
+      const latest = Math.max(...msgs.map(ts));
+      if (readTs === null || latest > readTs) {
+        readTs = latest;
+        try { localStorage.setItem(readKey(), String(latest)); } catch { }
+      }
+    }
+    paintBadge(); hideToast();
+  }
+
+  // Badge on the Home screen's #general button
+  function paintBadge(bump) {
+    const label = unreadLabel();
+    document.querySelectorAll('.chat-unread').forEach(b => {
+      b.textContent = label;
+      b.style.display = label ? '' : 'none';
+      if (bump && label) { b.classList.remove('pop'); void b.offsetWidth; b.classList.add('pop'); }
+    });
+  }
+
+  // Small popup with the unread count (tap to open the chat)
+  function showToast() {
+    const n = unreadCount();
+    if (!n || isOpen() || !onHome()) { hideToast(); return; }
+    if (!toastEl) {
+      toastEl = document.createElement('div');
+      toastEl.className = 'cb-toast';
+      toastEl.addEventListener('click', () => { hideToast(); if (typeof openChat === 'function') openChat(); });
+      document.body.appendChild(toastEl);
+    }
+    toastEl.innerHTML = `<span class="cb-toast-ic">💬</span><span class="cb-toast-tx"><b>${E(unreadLabel())} unread message${n !== 1 ? 's' : ''}</b> in #general</span><span class="cb-toast-go">Open</span>`;
+    requestAnimationFrame(() => toastEl && toastEl.classList.add('show'));
+    clearTimeout(toastTimer); toastTimer = setTimeout(hideToast, 5000);
+  }
+  function hideToast() {
+    clearTimeout(toastTimer);
+    if (toastEl) toastEl.classList.remove('show');
+  }
+
+  /* ── keyboard-aware sizing ──
+     The chat window is sized to the *visual* viewport, so when the on-screen keyboard
+     opens, the composer sits directly above it (iOS Safari and Android Chrome). */
+  let fitRaf = 0;
+  function fit() {
+    const page = document.getElementById('chat-page');
+    const root = document.documentElement;
+    if (!page) { root.classList.remove('chat-open'); return; }
+    root.classList.add('chat-open');
+    const vv = window.visualViewport;
+    const h = vv ? vv.height : window.innerHeight;
+    const top = vv ? vv.offsetTop : 0;
+    page.style.setProperty('--vvh', Math.round(h) + 'px');
+    page.style.setProperty('--vvt', Math.round(top) + 'px');
+    page.classList.toggle('kb-open', window.innerHeight - h > 100);
+    const list = $('#cb-list'); if (list && stick) list.scrollTop = list.scrollHeight;
+  }
+  function scheduleFit() { if (fitRaf) return; fitRaf = requestAnimationFrame(() => { fitRaf = 0; fit(); }); }
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', scheduleFit);
+    window.visualViewport.addEventListener('scroll', scheduleFit);
+  }
+  window.addEventListener('resize', scheduleFit);
+  window.addEventListener('orientationchange', scheduleFit);
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && isOpen()) markRead(); });
+
+  /* ── lifecycle hooks used by ui.js / backend.js ── */
+  function ensure() {
+    if (el) return el;
+    el = document.createElement('div');
+    el.id = 'chatbox'; el.className = 'cb';
+    shell(); bind();
+    return el;
+  }
+
   // Park #chatbox outside #view before render() wipes innerHTML, so it survives.
   window.chatPreRender = function () {
+    document.documentElement.classList.remove('chat-open');
     if (el && el.parentNode && el.parentNode.id !== 'cb-parking') {
       let park = document.getElementById('cb-parking');
       if (!park) { park = document.createElement('div'); park.id = 'cb-parking'; park.style.display = 'none'; document.body.appendChild(park); }
@@ -341,24 +496,35 @@
   };
 
   window.chatMount = function () {
-    const slot = document.getElementById('chatbox-slot');
-    if (!slot) return;                       // not on the home screen
     if (typeof authToken === 'undefined' || !authToken || !me()) return;
     closed = false;
     ensure();
-    if (el.parentNode !== slot) slot.appendChild(el);
+    // Runs on every screen so the socket stays up and the unread badge stays current.
+    const slot = document.getElementById('chatbox-slot');
+    if (slot && el.parentNode !== slot) slot.appendChild(el);
     if (!loaded && !loading) load();
-    else { paintList(); }
+    else if (slot) paintList();
     connect();
-    const list = $('#cb-list'); if (list && stick) list.scrollTop = list.scrollHeight;
+    paintBadge();
+    if (slot) {
+      stick = true; popup = null; paintPopup();
+      autosize($('#cb-input'));
+      fit(); markRead();
+      const list = $('#cb-list'); if (list) list.scrollTop = list.scrollHeight;
+    }
   };
 
+  window.chatUnreadLabel = unreadLabel;
+
   window.chatReset = function () {
-    closed = true; clearTimeout(wsTimer);
+    closed = true; clearTimeout(wsTimer); hideToast();
+    if (onlinePopEl) onlinePopEl.classList.remove('show');
     try { ws && ws.close(); } catch { }
     ws = null; wsToken = null;
     msgs = []; pinned = []; online = []; hasMore = false; loaded = false; loading = false; loadErr = '';
     popup = null; pickerFor = null; editingId = null; actionsFor = null; draft = ''; stick = true;
+    readTs = null; toastedInit = false;
+    document.documentElement.classList.remove('chat-open');
     if (el && el.parentNode) el.parentNode.removeChild(el);
     el = null;
   };

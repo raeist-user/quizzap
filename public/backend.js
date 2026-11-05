@@ -7,6 +7,7 @@ let authToken=null;
 
 // Profile page
 let showingProfile=false, profileTab='overview';
+let showingChat=false;   // #general chat opens as its own full-screen window
 
 // Score tracking for +N badge
 let prevMyScore=0, scoreGain=0;
@@ -345,6 +346,7 @@ function saveNavState(){
       hostAuthed: hostAuthed,
       myName: myName,
       showingProfile: showingProfile,
+      showingChat: showingChat,
       profileTab: profileTab,
       homeSection: homeSection,
     };
@@ -360,6 +362,7 @@ function loadNavState(){
     hostAuthed    = st.hostAuthed    ?? false;
     myName        = st.myName        ?? null;
     showingProfile= st.showingProfile?? false;
+    showingChat   = st.showingChat   ?? false;
     profileTab    = st.profileTab    ?? 'overview';
     homeSection   = st.homeSection   ?? 'home';
     // myPid already persisted separately in sessionStorage by existing code
@@ -1019,6 +1022,7 @@ function _getScreenKey(){
   if(!currentUser)                    return 'auth';
   if(showingDismissed)                return 'dismissed';
   if(showingHalted)                   return 'halted';
+  if(showingChat)                     return 'chat';
   if(inspectingUser)                  return 'inspect:'+inspectingUser.id+':'+inspectTab;
   if(showingProfile)                  return 'profile:'+profileTab;
   if(!role)                           return 'landing:'+homeSection+(homeSection==='leaderboard'?':'+homeLbTab:'');
@@ -1030,6 +1034,12 @@ function _getScreenKey(){
 }
 
 function render(){
+  // The chat window is never rebuilt while it is open: a rebuild re-parents the
+  // textarea, which blurs it and drops the mobile keyboard (the "glitch").
+  if(showingChat && currentUser && !showingDismissed && !showingHalted && _screenKey==='chat'){
+    const _cb=document.getElementById('chatbox'), _slot=document.getElementById('chatbox-slot');
+    if(_cb && _slot && _slot.contains(_cb)){ saveNavState(); return; }
+  }
   if(typeof chatPreRender==='function') chatPreRender();
   saveNavState();
   const nav=document.getElementById('main-nav');
@@ -1039,8 +1049,9 @@ function render(){
   if(role==='host' && currentUser.role!=='host'){ role=null; hostAuthed=false; }
 
   const isParticipant=(role==='participant'&&myName);
-  const isLanding=(!role&&!showingProfile&&!showingHalted);
-  nav.style.display=(role==='host'&&hostAuthed)?'none':'flex';
+  const chatScreen=showingChat&&!showingDismissed&&!showingHalted;
+  const isLanding=(!role&&!showingProfile&&!showingHalted&&!chatScreen);
+  nav.style.display=((role==='host'&&hostAuthed)||chatScreen)?'none':'flex';
   document.getElementById('nav-back-wrap').style.display=
     (!isParticipant&&(role||showingProfile||showingHalted||inspectingUser))?'block':'none';
   const navBackEl=document.getElementById('btn-nav-back');
@@ -1066,6 +1077,7 @@ function render(){
   let html='', needTimer=false, needProfile=false, needInspect=false;
   if(showingDismissed)          { html=studentDismissedHTML(); }
   else if(showingHalted)        { html=haltedHTML(); }
+  else if(chatScreen)           { html=chatPageHTML(); }
   else if(inspectingUser)       { html=inspectProfileHTML(); needInspect=true; }
   else if(showingProfile)       { html=profilePageHTML();
     if(profileTab==='overview'||profileTab==='history') needProfile=true; }
@@ -2353,7 +2365,7 @@ function navPush(){
 // Intercept browser/phone back button
 window.addEventListener('popstate', ()=>{
   // If we're somewhere deep, go back one level
-  if(showingDismissed||showingProfile||role||showingHalted||atTest||testLbOpen){
+  if(showingDismissed||showingProfile||showingChat||role||showingHalted||atTest||testLbOpen){
     doBack();
     // Re-push so the next back press also works
     history.pushState({qz:true}, '', location.href);

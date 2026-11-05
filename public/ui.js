@@ -145,10 +145,12 @@ function landingHTML(){
     ? `<button class="btn btn-dark btn-lg" id="go-host">🖥 Host Interface</button>
        <button class="btn btn-ghost btn-lg" id="btn-tb-home-regular" style="margin-top:2px">📋 Regular Test</button>
        <button class="btn btn-ghost btn-lg" id="btn-tb-home-syllabus" style="margin-top:2px">🗂️ Syllabus Test</button>
-       <button class="btn btn-ghost btn-lg" id="go-selfquiz" style="margin-top:2px">📝 Self Quiz</button>`
+       <button class="btn btn-ghost btn-lg" id="go-selfquiz" style="margin-top:2px">📝 Self Quiz</button>
+       ${chatEntryBtn()}`
     : `<button class="btn btn-dark btn-lg" id="go-join">🎓 Join Session</button>
        <button class="btn btn-ghost btn-lg" id="btn-at-home-regular" style="margin-top:2px">📋 Regular Test</button>
-       <button class="btn btn-ghost btn-lg" id="btn-at-home-syllabus" style="margin-top:2px">🗂️ Syllabus Test</button>`;
+       <button class="btn btn-ghost btn-lg" id="btn-at-home-syllabus" style="margin-top:2px">🗂️ Syllabus Test</button>
+       ${chatEntryBtn()}`;
 
   return `<div class="lb-full-screen home-scroll">
     <div class="lb-full-inner">
@@ -160,9 +162,28 @@ function landingHTML(){
       ${noticeDisplay}
       ${n?`<p class="muted small mt3" style="text-align:center">${n} student${n!==1?'s':''} in session</p>`:''}
       ${schedHint}
-      <div id="chatbox-slot" class="cb-slot"></div>
     </div>
   </div>`;
+}
+
+/* ══════════════════════════════════════
+   #general CHAT — its own window
+══════════════════════════════════════ */
+function chatEntryBtn(){
+  const label=(typeof window.chatUnreadLabel==='function')?window.chatUnreadLabel():'';
+  const on=(typeof window.chatOnlineCount==='function')?window.chatOnlineCount():0;
+  return `<div class="chat-entry-row">
+    <button class="btn btn-ghost btn-lg chat-entry" id="go-chat">💬 #general Chat<span class="chat-unread"${label?'':' style="display:none"'}>${label}</span></button>
+    <button class="btn btn-ghost btn-lg online-btn" id="go-online" title="Members online" aria-label="Members online"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg><span class="online-n">${on}</span></button>
+  </div>`;
+}
+function chatPageHTML(){
+  return `<div class="chat-page" id="chat-page"><div id="chatbox-slot" class="cb-slot-full"></div></div>`;
+}
+function openChat(){
+  if(showingChat) return;
+  showingChat=true;
+  navPush(); render();
 }
 
 /* ══════════════════════════════════════
@@ -3346,6 +3367,8 @@ function attach(){
   // Landing nav — role-based
   on('go-host', ()=>{ role='host'; hostAuthed=false; navPush(); render(); });
   on('go-selfquiz', ()=>{ location.href='/selfquiz'; });
+  on('go-chat', openChat);
+  on('go-online', ()=>{ if(typeof chatOnlinePopup==='function') chatOnlinePopup(); });
 
   // ── Test Board (host) — home screen now opens straight into Regular or
   //    Syllabus; the old chooser step is gone. ────────────────────────────────
@@ -4732,7 +4755,7 @@ function doDismissHome(){
   // Pre-fetch all three tabs in the background ready for when the user opens LB
   fetchLeaderboard();
 }
-function doLogout(){ if(typeof chatReset==='function') chatReset(); clearAuth(); role=null; myPid=null; myName=null; hostAuthed=false; HOST_PASSWORD_INPUT=''; showingProfile=false; prevMyScore=0; scoreGain=0; myLastAnswerTime=null; localAnswerTimes={}; cumulativeAnswerTimes={}; sessionCorrectTimes=[]; startTimerDisplay._lastStart=null; studentQCount=0; todayLB=null; weekLB=null; allTimeLB=null; lbFetched={today:null,week:null,all:null}; lbErrors={today:null,week:null,all:null}; serverSchedules=null; hostSchedules=[]; hostNotice=''; joinRequests=[]; updateRequests=[]; sessionStorage.removeItem(NAV_KEY); sessionStorage.removeItem('scc_hpw'); _screenKey=''; render(); }
+function doLogout(){ if(typeof chatReset==='function') chatReset(); showingChat=false; clearAuth(); role=null; myPid=null; myName=null; hostAuthed=false; HOST_PASSWORD_INPUT=''; showingProfile=false; prevMyScore=0; scoreGain=0; myLastAnswerTime=null; localAnswerTimes={}; cumulativeAnswerTimes={}; sessionCorrectTimes=[]; startTimerDisplay._lastStart=null; studentQCount=0; todayLB=null; weekLB=null; allTimeLB=null; lbFetched={today:null,week:null,all:null}; lbErrors={today:null,week:null,all:null}; serverSchedules=null; hostSchedules=[]; hostNotice=''; joinRequests=[]; updateRequests=[]; sessionStorage.removeItem(NAV_KEY); sessionStorage.removeItem('scc_hpw'); _screenKey=''; render(); }
 
 /* Shared back navigation */
 function doBack(){
@@ -4744,6 +4767,7 @@ function doBack(){
     render(); return;
   }
   if(showingDismissed){ doDismissHome(); return; }
+  if(showingChat){ showingChat=false; navPush(); render(); return; }
   if(inspectingUser){ inspectingUser=null; inspectTab='overview'; inspectCache=null; render(); return; }
   if(showingProfile){
     showingProfile=false;
