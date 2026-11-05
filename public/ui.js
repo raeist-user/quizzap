@@ -154,21 +154,13 @@ function landingHTML(){
     <div class="lb-full-inner">
       ${isHost ? controlPanelHTML() : ''}
       ${tabs}
-      <h1 class="mb1">Live Quiz</h1>
-      <p class="muted mb3">Welcome, ${esc(currentUser.name.split(' ')[0])} 👋</p>
+      <h1 class="mb3">Welcome, ${esc(currentUser.name.split(' ')[0])} 👋</h1>
       <div class="col gap3">
         ${actionButtons}
       </div>
       ${noticeDisplay}
       ${n?`<p class="muted small mt3" style="text-align:center">${n} student${n!==1?'s':''} in session</p>`:''}
       ${schedHint}
-    </div>
-    <div style="text-align:center;padding:12px 0 4px;flex-shrink:0">
-      <button id="btn-fetch-updates" class="btn btn-ghost btn-sm" style="gap:6px;font-size:.75rem;color:var(--mid)">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
-        Fetch Updates
-      </button>
-      <p style="font-size:.68rem;color:var(--mid);margin-top:4px;opacity:.65">Tap if changes aren't showing up</p>
     </div>
   </div>`;
 }
@@ -1351,6 +1343,7 @@ function testBoardHTML(){
   function createTab(){
     const totalQs = tcQSources.reduce((s,src)=>s+src.questions.length,0);
     const hasSource = totalQs > 0;
+    const effQs = (tcQLimit>0 && tcQLimit<totalQs) ? tcQLimit : totalQs;
     const canPublish = hasSource && tcTitle.trim();
 
     // Source list
@@ -1365,10 +1358,17 @@ function testBoardHTML(){
               <button class="btn btn-ghost btn-sm btn-tc-remove-src" data-src-idx="${i}" style="flex-shrink:0;padding:2px 7px;font-size:.7rem;color:#be123c;border-color:#fecdd3">✕</button>
             </div>`).join('')}
         </div>
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
-          <span style="font-size:.72rem;font-weight:700;color:#4338ca">${totalQs} total question${totalQs!==1?'s':''} across ${tcQSources.length} source${tcQSources.length!==1?'s':''}</span>
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px;margin-bottom:4px">
+          <div style="display:flex;align-items:center;flex-wrap:wrap;gap:6px 8px">
+            <span style="font-size:.72rem;font-weight:700;color:#4338ca">${totalQs} total question${totalQs!==1?'s':''} across ${tcQSources.length} source${tcQSources.length!==1?'s':''}</span>
+            <span style="display:inline-flex;align-items:center;gap:5px;font-size:.72rem;color:var(--mid)">
+              · use
+              <input id="tc-qlimit" type="number" min="1" max="${totalQs}" inputmode="numeric" value="${tcQLimit>0&&tcQLimit<totalQs?tcQLimit:''}" placeholder="all" title="Randomly pick this many questions from all added files. Blank = use all." style="width:58px;padding:3px 6px;font-size:.75rem;border:1.5px solid #a5b4fc;border-radius:6px;background:var(--white);color:var(--ink);text-align:center"/>
+            </span>
+          </div>
           <button class="btn btn-ghost btn-sm" id="btn-tc-clear-src" style="font-size:.7rem;color:var(--mid);padding:2px 8px">Clear all</button>
-        </div>`
+        </div>
+        ${tcQLimit>0&&tcQLimit<totalQs?`<div style="font-size:.7rem;color:#4338ca;margin-bottom:4px">🎲 ${tcQLimit} random question${tcQLimit!==1?'s':''} will be picked from all ${totalQs} (not in order)</div>`:''}`
       : '';
 
     return `<div style="padding:14px;display:flex;flex-direction:column;gap:12px">
@@ -1428,9 +1428,9 @@ function testBoardHTML(){
 
       ${tcMsg?`<div class="notice ${tcMsg.startsWith('✓')?'n-good':'n-bad'}" style="font-size:.8rem">${esc(tcMsg)}</div>`:''}
       <button class="btn btn-dark btn-sm" id="btn-tc-publish" style="width:100%;justify-content:center;padding:10px;font-size:.85rem;font-weight:700" ${!canPublish?'disabled':''}>
-        ${tcMode==='test'?`📤 Publish Test ${totalQs?`(${totalQs} question${totalQs!==1?'s':''})`:''}`
+        ${tcMode==='test'?`📤 Publish Test ${effQs?`(${effQs} question${effQs!==1?'s':''})`:''}`
          :tcMode==='preset-edit'?`💾 Save Preset Changes`
-         :`＋ Create Preset ${totalQs?`(${totalQs} question${totalQs!==1?'s':''})`:''}`}
+         :`＋ Create Preset ${effQs?`(${effQs} question${effQs!==1?'s':''})`:''}`}
       </button>
       ${tcMode!=='test'?`<button class="btn btn-ghost btn-sm" id="btn-pc-cancel" style="width:100%;justify-content:center;font-size:.78rem">Cancel</button>`:''}
     </div>`;
@@ -1818,6 +1818,12 @@ function tcGitHubBrowserHTML(){
   const inSubj = tcBrowserSubj !== null;
 
   function bodyHTML(){
+    if(tcBrowserAdding){
+      return `<div style="padding:56px 20px;display:flex;flex-direction:column;align-items:center;gap:12px;color:var(--mid)">
+        <div class="spinner"></div>
+        <span style="font-size:.84rem">Adding ${tcBrowserSelCount()} file${tcBrowserSelCount()!==1?'s':''}…</span>
+      </div>`;
+    }
     if(tcBrowserLoading){
       return `<div style="padding:56px 20px;display:flex;flex-direction:column;align-items:center;gap:12px;color:var(--mid)">
         <div class="spinner"></div>
@@ -1840,7 +1846,8 @@ function tcGitHubBrowserHTML(){
       }
       return `<div class="folder-grid" style="padding:12px">`
         + subjects.map(s=>`
-          <div class="folder-card" data-tc-subj="${esc(s.name)}" tabindex="0" role="button" aria-label="${esc(s.name)}">
+          <div class="folder-card${tcBrowserSelCountIn(s.name)?' has-sel':''}" data-tc-subj="${esc(s.name)}" tabindex="0" role="button" aria-label="${esc(s.name)}">
+            ${tcBrowserSelCountIn(s.name)?`<span class="fc-badge">${tcBrowserSelCountIn(s.name)}</span>`:''}
             <div class="fc-icon">📁</div>
             <div class="fc-name">${esc(s.name)}</div>
           </div>`).join('')
@@ -1859,13 +1866,16 @@ function tcGitHubBrowserHTML(){
       </div>`;
     }
     return `<div style="padding:10px;display:flex;flex-direction:column;gap:6px">`
-      + tcBrowserFiles.map(f=>`
-        <div class="tc-file-row" data-tc-file="${esc(f.path)}" data-tc-fname="${esc(f.name.replace(/\.txt$/i,''))}"
-             style="display:flex;align-items:center;gap:10px;padding:13px 14px;border:1.5px solid var(--line);border-radius:10px;background:var(--white);cursor:pointer">
-          <span style="font-size:1.1rem;flex-shrink:0">📄</span>
-          <span style="flex:1;font-size:.88rem;font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(f.name.replace(/\.txt$/i,''))}</span>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;color:var(--mid)"><polyline points="9,18 15,12 9,6"/></svg>
-        </div>`).join('')
+      + tcBrowserFiles.map(f=>{
+          const checked=!!tcBrowserSel[f.path];
+          const nm=f.name.replace(/\.txt$/i,'');
+          return `<label class="tc-file-row${checked?' tc-checked':''}"
+             style="display:flex;align-items:center;gap:12px;padding:13px 14px;border:1.5px solid ${checked?'#6366f1':'var(--line)'};border-radius:10px;background:${checked?'#ede9fe':'var(--white)'};cursor:pointer;user-select:none">
+          <input type="checkbox" class="tc-file-chk" data-tc-file="${esc(f.path)}" data-tc-fname="${esc(f.name)}" ${checked?'checked':''}
+                 style="width:20px;height:20px;flex-shrink:0;accent-color:#4338ca;cursor:pointer;margin:0"/>
+          <span style="flex:1;font-size:.88rem;font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(nm)}</span>
+        </label>`;
+        }).join('')
       + `</div>`;
   }
 
@@ -1882,9 +1892,12 @@ function tcGitHubBrowserHTML(){
         ${!inSubj
           ? `<button class="btn btn-ghost btn-sm" id="btn-tc-browser-back" style="padding:3px 8px;font-size:.75rem">← Back</button>`
           : ''}
-        <span style="font-weight:700;font-size:.95rem">📂 Select from GitHub</span>
+        <span style="font-weight:700;font-size:.95rem;white-space:nowrap">📂 Select from GitHub</span>
       </div>
-      <button class="btn btn-ghost btn-sm" id="btn-tc-browser-close">✕ Close</button>
+      <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
+        <button class="btn btn-ghost btn-sm" id="btn-tc-browser-close" ${tcBrowserAdding?'disabled':''}>Cancel</button>
+        <button class="btn btn-dark btn-sm" id="btn-tc-browser-add" ${(!tcBrowserSelCount()||tcBrowserAdding)?'disabled':''}>Add${tcBrowserSelCount()?` (${tcBrowserSelCount()})`:''}</button>
+      </div>
     </div>
     ${breadcrumb}
     <div style="flex:1;overflow-y:auto">${bodyHTML()}</div>
@@ -3123,11 +3136,6 @@ function attach(){
   }
 
   on('btn-dismissed-home', doDismissHome);
-  on('btn-fetch-updates', ()=>{
-    const btn=document.getElementById('btn-fetch-updates');
-    if(btn){ btn.disabled=true; btn.innerHTML='<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="animation:spin .7s linear infinite"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg> Updating…'; }
-    setTimeout(()=>location.reload(), 400);
-  });
   on('btn-lb-refresh',()=>{
     // Refresh only the currently visible tab; reset its cache and re-fetch
     const p = homeLbTab;
@@ -3344,7 +3352,7 @@ function attach(){
     testBoardOpen=true; testBoardTab='create';
     testHistory=null; testHistoryError=null; testViewId=null; testViewAttempts=null; testAttemptDetail=null;
     tcMode='test'; tcTitle=''; tcSubject=''; tcTimerType='none'; tcTimerValue=0;
-    tcQSources=[]; tcRandomize=false; tcAvailFrom=''; tcAvailTo=''; tcMsg='';
+    tcQSources=[]; tcQLimit=0; tcRandomize=false; tcAvailFrom=''; tcAvailTo=''; tcMsg='';
   }
   on('btn-tb-home-regular', ()=>{
     openTestBoardBase(); tbSection='regular'; render(); fetchTestHistory();
@@ -3407,7 +3415,7 @@ function attach(){
   on('btn-syl-create-open', ()=>{
     tcMode='preset-new'; sylEditingPresetId=null;
     tcTitle=''; tcSubject=''; tcTimerType='none'; tcTimerValue=0;
-    tcQSources=[]; tcRandomize=false; tcMsg='';
+    tcQSources=[]; tcQLimit=0; tcRandomize=false; tcMsg='';
     render();
   });
   on('btn-pc-back-list', ()=>{ tcMode='test'; sylEditingPresetId=null; tcMsg=''; render(); });
@@ -3560,11 +3568,12 @@ function attach(){
   if(tcValEl) tcValEl.addEventListener('input',()=>{ tcTimerValue=parseInt(tcValEl.value)||0; });
 
   on('btn-tc-load-src', ()=>{
+    tcBrowserResetSelection();
     tcBrowserOpen=true; tcBrowserSubj=null; tcBrowserFiles=null; tcBrowserLoading=false; tcBrowserErr='';
     render();
     tcBrowserInit();
   });
-  on('btn-tc-clear-src', ()=>{ tcQSources=[]; tcMsg=''; render(); });
+  on('btn-tc-clear-src', ()=>{ tcQSources=[]; tcQLimit=0; tcMsg=''; render(); });
   // Remove individual source by index
   document.querySelectorAll('.btn-tc-remove-src').forEach(b=>b.addEventListener('click',()=>{
     const i=parseInt(b.dataset.srcIdx);
@@ -3579,19 +3588,19 @@ function attach(){
   // ── Embedded GitHub browser (inside Test Board overlay) ───────────────────
   // Back button: if drilled into a subject go up to subject list; otherwise
   // return to Test Board Create tab.
+  // Going up a level keeps the checked files; leaving the browser entirely clears them.
   on('btn-tc-browser-back', ()=>{
     if(tcBrowserSubj){
       tcBrowserSubj=null; tcBrowserFiles=null; tcBrowserErr=''; render();
     } else {
-      tcBrowserOpen=false; tcBrowserErr='';
-      testBoardOpen=true; testBoardTab='create'; render();
+      tcBrowserCancel();
     }
   });
   // Close X: dismiss the whole browser and go back to Test Board Create tab.
-  on('btn-tc-browser-close', ()=>{
-    tcBrowserOpen=false; tcBrowserSubj=null; tcBrowserFiles=null; tcBrowserErr='';
-    testBoardOpen=true; testBoardTab='create'; render();
-  });
+  // Cancel (top right): unchecks everything and returns to the Test Board.
+  on('btn-tc-browser-close', tcBrowserCancel);
+  // Add (top right): adds every checked file, across all folders.
+  on('btn-tc-browser-add', tcBrowserAddSelected);
   // Retry after an error.
   on('btn-tc-browser-retry', ()=>{
     tcBrowserErr='';
@@ -3605,10 +3614,30 @@ function attach(){
       if(e.key==='Enter'||e.key===' '){ e.preventDefault(); tcBrowserDrillSubject(el.dataset.tcSubj); }
     });
   });
-  // File rows.
-  document.querySelectorAll('.tc-file-row[data-tc-file]').forEach(el=>{
-    el.addEventListener('click', ()=> tcBrowserPickFile(el.dataset.tcFile, el.dataset.tcFname));
+  // File checkboxes — update in place (no full re-render, so scroll position stays).
+  document.querySelectorAll('.tc-file-chk').forEach(el=>{
+    el.addEventListener('change',()=>{
+      tcBrowserToggleFile(el.dataset.tcFile, el.dataset.tcFname, tcBrowserSubj, el.checked);
+      const row=el.closest('.tc-file-row');
+      if(row){
+        row.classList.toggle('tc-checked',el.checked);
+        row.style.borderColor=el.checked?'#6366f1':'var(--line)';
+        row.style.background=el.checked?'#ede9fe':'var(--white)';
+      }
+      const addBtn=document.getElementById('btn-tc-browser-add'), n=tcBrowserSelCount();
+      if(addBtn){ addBtn.disabled=!n; addBtn.textContent=n?`Add (${n})`:'Add'; }
+    });
   });
+  // Random question count — saved as you type, applied when publishing / saving.
+  const qLimEl=document.getElementById('tc-qlimit');
+  if(qLimEl){
+    const totalNow=tcQSources.reduce((t,x)=>t+x.questions.length,0);
+    qLimEl.addEventListener('input',()=>{
+      const v=parseInt(qLimEl.value);
+      tcQLimit=(v>0)?Math.min(v,totalNow):0;
+    });
+    qLimEl.addEventListener('change',()=>{ render(); });
+  }
   on('btn-tc-publish', async ()=>{
     const titleVal=(document.getElementById('tc-title')?.value||tcTitle).trim();
     const subjectVal=(document.getElementById('tc-subject')?.value||tcSubject).trim();
@@ -3618,6 +3647,8 @@ function attach(){
     // now; presets keep the original order and store randomize:true instead,
     // so the server re-shuffles fresh on every future Publish.
     let allQs = tcQSources.flatMap(s=>s.questions);
+    // Randomly pick N questions from everything added (not necessarily in order)
+    if(tcQLimit>0 && tcQLimit<allQs.length) allQs = tcRandomPick(allQs, tcQLimit);
     if(tcMode==='test' && tcRandomize) allQs = allQs.slice().sort(()=>Math.random()-.5);
     if(!allQs.length){ tcMsg='No questions found in selected sources'; render(); return; }
     const timerEl = document.getElementById('tc-timer-val');
@@ -3649,7 +3680,7 @@ function attach(){
         },true);
         tcMsg='✓ Test published!';
         tcTitle=''; tcSubject=''; tcTimerType='none'; tcTimerValue=0;
-        tcQSources=[]; tcRandomize=false; tcAvailFrom=''; tcAvailTo='';
+        tcQSources=[]; tcQLimit=0; tcRandomize=false; tcAvailFrom=''; tcAvailTo='';
         await fetchTestHistory();
         testBoardTab='history';
       }catch(e){ tcMsg=e.message||'Failed to publish'; }
@@ -3669,7 +3700,7 @@ function attach(){
       }
       tcMode='test'; sylEditingPresetId=null;
       tcTitle=''; tcSubject=''; tcTimerType='none'; tcTimerValue=0;
-      tcQSources=[]; tcRandomize=false; tcMsg='';
+      tcQSources=[]; tcQLimit=0; tcRandomize=false; tcMsg='';
       await fetchPresets();
     }catch(e){ tcMsg=e.message||'Failed to save preset'; render(); }
   });

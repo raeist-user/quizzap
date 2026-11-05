@@ -636,6 +636,9 @@ let tcBrowserSubj    = null;    // drilled-in subject name; null = subject list
 let tcBrowserFiles   = null;    // null=loading, Array=loaded file list
 let tcBrowserLoading = false;   // initial subject-list fetch in progress
 let tcBrowserErr     = '';      // last error string
+let tcBrowserSel     = {};      // checked files, kept across folders: { [path]: {path,name,subj} }
+let tcBrowserAdding  = false;   // true while the checked files are being fetched
+let tcQLimit         = 0;       // how many questions to randomly pick at publish (0 = use all)
 
 function _showTcRangeSelector(allQ, sourceLabel){
   // Remove any existing
@@ -737,38 +740,60 @@ async function tcBrowserDrillSubject(name){
   render();
 }
 
-// Step 3: user tapped a file — fetch it, parse questions, open range selector
-async function tcBrowserPickFile(filePath, displayName){
-  // Capture BEFORE resetting below — tcBrowserSubj gets nulled out on the very
-  // next line to close the browser UI, so reading it later in this function
-  // (after that reset) would always yield an empty subject tag.
-  const subjName = tcBrowserSubj;
-  // Collapse browser immediately so the overlay stays visible (with loading state)
+// Selection helpers — selection lives in tcBrowserSel so it survives moving
+// between folders.
+function tcBrowserSelCount(){ return Object.keys(tcBrowserSel).length; }
+function tcBrowserSelCountIn(subjName){
+  return Object.values(tcBrowserSel).filter(f=>f.subj===subjName).length;
+}
+function tcBrowserToggleFile(path,name,subj,checked){
+  if(checked) tcBrowserSel[path]={path,name,subj};
+  else delete tcBrowserSel[path];
+}
+function tcBrowserResetSelection(){ tcBrowserSel={}; tcBrowserAdding=false; }
+
+// Cancel: uncheck everything and go back to the Test Board.
+function tcBrowserCancel(){
+  tcBrowserResetSelection();
   tcBrowserOpen=false; tcBrowserSubj=null; tcBrowserFiles=null; tcBrowserErr='';
-  testBoardOpen=true; testBoardTab='create';
-  render();
-  try{
-    const encodedPath=filePath.split('/').map(encodeURIComponent).join('/');
-    const res=await fetch(`https://api.github.com/repos/${GITHUB_REPO}/contents/${encodedPath}?ref=${GITHUB_BRANCH}`,{headers:ghHeaders()});
-    if(!res.ok) throw new Error(`GitHub API ${res.status}`);
-    const data=await res.json();
-    const bytes=Uint8Array.from(atob(data.content.replace(/\n/g,'')),c=>c.charCodeAt(0));
-    const text=new TextDecoder('utf-8').decode(bytes);
-    const allQ=parseQuestions(text);
-    if(!allQ.length){
-      tcMsg='No valid questions found in that file.';
-      render();
-      return;
-    }
-    // Tag each question with its source folder — same subject tag live quiz
-    // attaches (see generateQuiz) — so the test-taking view can pick the
-    // right font (e.g. Urdu) per question later, not just off the test title.
-    allQ.forEach(q=>{ q.subject=subjName||''; q.chapter=displayName.replace(/\.txt$/i,''); });
-    _showTcRangeSelector(allQ, displayName);
-  }catch(e){
-    tcMsg='Load failed: '+e.message;
-    render();
-  }
+  testBoardOpen=true; testBoardTab='create'; render();
+}
+
+// Add: fetch every checked file (from any folder), parse, and add each as a
+// source. No range popup — the host trims with the question-count input.
+async function tcBrowserAddSelected(){
+  const picks=Object.values(tcBrowserSel);
+  if(!picks.length||tcBrowserAdding) return;
+  tcBrowserAdding=true; tcBrowserErr=''; render();
+  const failed=[];
+  const results=await Promise.all(picks.map(async f=>{
+    try{
+      const encodedPath=f.path.split('/').map(encodeURIComponent).join('/');
+      const res=await fetch(`https://api.github.com/repos/${GITHUB_REPO}/contents/${encodedPath}?ref=${GITHUB_BRANCH}`,{headers:ghHeaders()});
+      if(!res.ok) throw new Error('HTTP '+res.status);
+      const data=await res.json();
+      const bytes=Uint8Array.from(atob(data.content.replace(/\n/g,'')),c=>c.charCodeAt(0));
+      const qs=parseQuestions(new TextDecoder('utf-8').decode(bytes));
+      if(!qs.length) throw new Error('no valid questions');
+      const chapter=f.name.replace(/\.txt$/i,'');
+      // Tag with source folder/chapter (used for per-subject fonts and report fixes)
+      qs.forEach(q=>{ q.subject=f.subj||''; q.chapter=chapter; });
+      return {questions:qs, files:[f.name], start:0, count:qs.length, repo:GITHUB_REPO, label:chapter};
+    }catch(e){ failed.push(f.name.replace(/\.txt$/i,'')+' ('+e.message+')'); return null; }
+  }));
+  const ok=results.filter(Boolean);
+  ok.forEach(src=>tcQSources.push(src));
+  tcMsg=failed.length?'Could not load: '+failed.join(', '):'';
+  tcBrowserResetSelection();
+  tcBrowserOpen=false; tcBrowserSubj=null; tcBrowserFiles=null;
+  testBoardOpen=true; testBoardTab='create'; render();
+}
+
+// Randomly pick n items (Fisher–Yates), not necessarily in original order.
+function tcRandomPick(arr,n){
+  const a=arr.slice();
+  for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; }
+  return a.slice(0,n);
 }
 
 // ── NOTICE ────────────────────────────────────────────────────────────────────
@@ -951,6 +976,18 @@ function setupOutsideClick(){
     }
     // Click outside — close
     if(!wrap.contains(e.target)) document.getElementById('p-dropdown')?.classList.add('hidden');
+  });
+  // Fetch Updates (profile menu) — show a loader, then hard-refresh the page.
+  // The loader disappears on its own because the page reloads.
+  document.getElementById('btn-fetch-updates')?.addEventListener('click',()=>{
+    document.getElementById('p-dropdown')?.classList.add('hidden');
+    if(document.getElementById('fetch-updates-loader')) return;
+    const l=document.createElement('div');
+    l.id='fetch-updates-loader';
+    l.style.cssText='position:fixed;inset:0;z-index:99999;background:rgba(255,255,255,.88);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;font-size:.85rem;font-weight:600;color:var(--mid)';
+    l.innerHTML='<div class="spinner"></div><span>Loading…</span>';
+    document.body.appendChild(l);
+    setTimeout(()=>location.reload(), 300);
   });
   document.addEventListener('touchstart', e=>{
     const wrap=document.getElementById('profile-wrap');
