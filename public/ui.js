@@ -151,16 +151,16 @@ function landingHTML(){
        <button class="btn btn-ghost btn-lg" id="btn-at-home-syllabus" style="margin-top:2px">🗂️ Syllabus Test</button>`;
 
   return `<div class="lb-full-screen">
-    <div class="lb-full-inner">
+    <div class="lb-full-inner" style="overflow-y:auto;overflow-x:hidden">
       ${isHost ? controlPanelHTML() : ''}
       ${tabs}
-      <h1 class="mb3">Welcome, ${esc(currentUser.name.split(' ')[0])} 👋</h1>
       <div class="col gap3">
         ${actionButtons}
       </div>
       ${noticeDisplay}
       ${n?`<p class="muted small mt3" style="text-align:center">${n} student${n!==1?'s':''} in session</p>`:''}
       ${schedHint}
+      <div id="chatbox-slot" class="cb-slot"></div>
     </div>
   </div>`;
 }
@@ -3096,6 +3096,7 @@ function setupProfileCharts(){
 }
 
 function attach(){
+  if(typeof chatMount==='function') chatMount();   // re-seat the persistent #chatbox into the home screen
   // Click sounds on interactive elements
   document.querySelectorAll('.btn,.key-card,.auth-tab,.home-tab').forEach(el=>
     el.addEventListener('click',playClick,{capture:true,once:true})
@@ -4731,7 +4732,7 @@ function doDismissHome(){
   // Pre-fetch all three tabs in the background ready for when the user opens LB
   fetchLeaderboard();
 }
-function doLogout(){ clearAuth(); role=null; myPid=null; myName=null; hostAuthed=false; HOST_PASSWORD_INPUT=''; showingProfile=false; prevMyScore=0; scoreGain=0; myLastAnswerTime=null; localAnswerTimes={}; cumulativeAnswerTimes={}; sessionCorrectTimes=[]; startTimerDisplay._lastStart=null; studentQCount=0; todayLB=null; weekLB=null; allTimeLB=null; lbFetched={today:null,week:null,all:null}; lbErrors={today:null,week:null,all:null}; serverSchedules=null; hostSchedules=[]; hostNotice=''; joinRequests=[]; updateRequests=[]; sessionStorage.removeItem(NAV_KEY); sessionStorage.removeItem('scc_hpw'); _screenKey=''; render(); }
+function doLogout(){ if(typeof chatReset==='function') chatReset(); clearAuth(); role=null; myPid=null; myName=null; hostAuthed=false; HOST_PASSWORD_INPUT=''; showingProfile=false; prevMyScore=0; scoreGain=0; myLastAnswerTime=null; localAnswerTimes={}; cumulativeAnswerTimes={}; sessionCorrectTimes=[]; startTimerDisplay._lastStart=null; studentQCount=0; todayLB=null; weekLB=null; allTimeLB=null; lbFetched={today:null,week:null,all:null}; lbErrors={today:null,week:null,all:null}; serverSchedules=null; hostSchedules=[]; hostNotice=''; joinRequests=[]; updateRequests=[]; sessionStorage.removeItem(NAV_KEY); sessionStorage.removeItem('scc_hpw'); _screenKey=''; render(); }
 
 /* Shared back navigation */
 function doBack(){

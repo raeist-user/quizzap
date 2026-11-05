@@ -1030,6 +1030,7 @@ function _getScreenKey(){
 }
 
 function render(){
+  if(typeof chatPreRender==='function') chatPreRender();
   saveNavState();
   const nav=document.getElementById('main-nav');
   if(!currentUser){ nav.style.display='none'; _paintView(authHTML()); attach(); return; }

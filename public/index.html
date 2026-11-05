@@ -50,10 +50,11 @@
 
 <!-- Token injected server-side so backend.js can use it without being served through a template -->
 <script>window.MY_TOKEN = '%%MY_TOKEN%%';</script>
-<!-- Load order: score → function → ui → backend (backend has boot code, must be last) -->
+<!-- Load order: score → function → ui → chat → backend (backend has boot code, must be last) -->
 <script defer src="score.js"></script>
 <script defer src="function.js"></script>
 <script defer src="ui.js"></script>
+<script defer src="chat.js"></script>
 <script defer src="backend.js"></script>
 </body>
 </html>
