@@ -12,6 +12,7 @@ const { ChatMessage } = require('./models');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'change-this-in-production';
 const MAX_LEN    = 1000;
+const MAX_PURGE  = 200;   // most messages the host's  .delete <amount>  command may remove at once
 // Gestures only — no hearts or other affection emojis.
 const ALLOWED_REACTIONS = ['👍','👎','👋','👏','🙌','🙏','🤝','💪','✌️','👌','🤞','☝️'];
 
@@ -147,6 +148,23 @@ function initChat(app) {
       sendAll({ type: 'msg_delete', id: String(m._id) });
       res.json({ ok: true });
     } catch (e) { res.status(500).json({ error: 'Could not delete' }); }
+  });
+
+  // Host command  .delete <amount>  — removes the newest <amount> messages (anyone's, pinned included).
+  app.post('/api/chat/purge', requireAuth, async (req, res) => {
+    try {
+      if (req.user.role !== 'host') return res.status(403).json({ error: 'Host only' });
+      const raw = req.body?.amount;
+      const n = typeof raw === 'number' ? raw : (/^\d+$/.test(String(raw ?? '').trim()) ? parseInt(raw, 10) : NaN);
+      if (!Number.isInteger(n) || n < 1) return res.status(400).json({ error: 'Usage: .delete <amount>' });
+      if (n > MAX_PURGE) return res.status(400).json({ error: `You can delete at most ${MAX_PURGE} messages at a time` });
+      const docs = await ChatMessage.find({}).sort({ _id: -1 }).limit(n).select('_id').lean();
+      const ids = docs.map(d => d._id);
+      if (ids.length) await ChatMessage.deleteMany({ _id: { $in: ids } });
+      const sids = ids.map(String);
+      if (sids.length) sendAll({ type: 'msg_purge', ids: sids });
+      res.json({ ok: true, deleted: sids.length, ids: sids });
+    } catch (e) { res.status(500).json({ error: 'Could not delete messages' }); }
   });
 
   app.post('/api/chat/messages/:id/react', requireAuth, async (req, res) => {
