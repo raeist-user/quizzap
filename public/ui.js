@@ -167,12 +167,12 @@ function landingHTML(){
 }
 
 /* ══════════════════════════════════════
-   #general CHAT — its own window
+   #Chatbox — its own window
 ══════════════════════════════════════ */
 function chatEntryBtn(){
   const label=(typeof window.chatUnreadLabel==='function')?window.chatUnreadLabel():'';
   return `<div class="chat-entry-row">
-    <button class="btn btn-ghost btn-lg chat-entry" id="go-chat">💬 #general Chat<span class="chat-unread"${label?'':' style="display:none"'}>${label}</span></button>
+    <button class="btn btn-ghost btn-lg chat-entry" id="go-chat">💬 #Chatbox<span class="chat-unread"${label?'':' style="display:none"'}>${label}</span></button>
   </div>`;
 }
 function chatPageHTML(){

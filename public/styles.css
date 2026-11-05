@@ -619,7 +619,8 @@
 .cb-day::before,.cb-day::after{content:'';flex:1;height:1px;background:var(--line)}
 .cb-msg{position:relative;display:flex;gap:10px;padding:4px 14px 4px 14px;margin-top:8px;transition:background var(--t-fast)}
 .cb-msg.compact{margin-top:0;padding-top:1px;padding-bottom:1px}
-.cb-msg:hover,.cb-msg.show-actions{background:var(--surface)}
+.cb-msg:hover,.cb-msg.selected{background:var(--surface)}
+.cb-msg{cursor:pointer}
 .cb-msg.pinned{background:#fffbeb}
 .cb-msg.flash{animation:cbFlash 1.4s ease}
 @keyframes cbFlash{0%,60%{background:#e0e7ff}100%{background:transparent}}
@@ -629,7 +630,7 @@
 .cb-av-gap{width:34px;flex-shrink:0;text-align:right}
 .cb-time-hover{display:none;font-size:.58rem;color:var(--mid);line-height:1.6}
 .cb-msg.compact:hover .cb-time-hover{display:inline}
-.cb-main{flex:1;min-width:0}
+.cb-main{flex:1;min-width:0;padding-right:22px}
 .cb-meta{display:flex;align-items:baseline;gap:6px;flex-wrap:wrap}
 .cb-name{font-weight:700;font-size:.82rem}
 .cb-name.host{color:#4338ca}
@@ -639,20 +640,25 @@
 .cb-text a{color:var(--accent)}
 .cb-edited{font-size:.62rem;color:var(--mid)}
 .cb-pinned-tag{font-size:.62rem;font-weight:700;color:#b45309;margin-bottom:1px}
-.cb-rxrow{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px}
+.cb-rxrow{display:flex;flex-wrap:wrap;align-items:center;gap:4px;margin-top:4px}
 .cb-rx{display:inline-flex;align-items:center;gap:4px;border:1.5px solid var(--line);background:var(--faint);border-radius:8px;padding:1px 7px;font-size:.8rem;cursor:pointer;line-height:1.6}
 .cb-rx span{font-size:.7rem;font-weight:700;color:var(--mid)}
 .cb-rx.mine{border-color:#6366f1;background:#eef2ff}
 .cb-rx.mine span{color:#4338ca}
-.cb-picker{display:flex;flex-wrap:wrap;gap:2px;margin-top:5px;padding:4px;border:1.5px solid var(--line);border-radius:10px;background:var(--white);box-shadow:var(--sh-sm);width:fit-content;max-width:100%}
-.cb-picker button{border:none;background:transparent;font-size:1.1rem;padding:3px 6px;border-radius:6px;cursor:pointer}
+.cb-picker{display:flex;flex-wrap:wrap;gap:2px;margin:0;padding:3px 4px;border:1.5px solid var(--line);border-radius:10px;background:var(--white);box-shadow:var(--sh-sm);max-width:100%}
+.cb-picker{flex:1 1 0;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;min-width:120px;width:auto}
+.cb-picker::-webkit-scrollbar{display:none}
+.cb-picker button{flex:none;border:none;background:transparent;font-size:1.1rem;padding:3px 6px;border-radius:6px;cursor:pointer}
 .cb-picker button:hover{background:var(--faint)}
-.cb-actions{position:absolute;right:12px;top:-12px;display:none;gap:1px;background:var(--white);border:1.5px solid var(--line);border-radius:8px;box-shadow:var(--sh-sm);padding:2px;z-index:2}
-.cb-msg:hover .cb-actions,.cb-msg.show-actions .cb-actions{display:flex}
-.cb-actions button{border:none;background:transparent;color:var(--mid);cursor:pointer;padding:5px 7px;border-radius:6px;display:flex;align-items:center}
-.cb-actions button:hover{background:var(--faint);color:var(--ink)}
-.cb-actions button.danger:hover{background:var(--bad-bg);color:var(--bad)}
-.cb-actions button.on{color:#b45309}
+.cb-actions{position:absolute;right:8px;top:2px;z-index:3}
+.cb-dots{border:none;background:transparent;color:var(--mid);cursor:pointer;width:28px;height:28px;border-radius:8px;display:flex;align-items:center;justify-content:center;opacity:.55;-webkit-tap-highlight-color:transparent}
+.cb-msg:hover .cb-dots,.cb-msg.selected .cb-dots,.cb-dots.on{opacity:1}
+.cb-dots:hover,.cb-dots.on{background:var(--line);color:var(--ink)}
+.cb-menu{position:absolute;right:0;top:30px;min-width:130px;display:flex;flex-direction:column;padding:4px;background:var(--white);border:1.5px solid var(--line);border-radius:10px;box-shadow:var(--sh-lg)}
+.cb-menu button{display:flex;align-items:center;gap:9px;border:none;background:transparent;color:var(--ink);font-size:.85rem;font-weight:600;padding:8px 10px;border-radius:7px;cursor:pointer;text-align:left}
+.cb-menu button:hover{background:var(--faint)}
+.cb-menu button.danger{color:var(--bad)}
+.cb-menu button.danger:hover{background:var(--bad-bg)}
 .cb-edit-ta{width:100%;resize:none;border:1.5px solid var(--accent);border-radius:8px;padding:7px 9px;font:inherit;font-size:.86rem;line-height:1.4;background:var(--white);color:var(--ink);outline:none;max-height:160px}
 .cb-edit-hint{font-size:.65rem;color:var(--mid);margin-top:3px}
 .cb-jump{position:absolute;left:50%;bottom:10px;transform:translateX(-50%);align-items:center;gap:5px;border:none;background:var(--ink);color:#fff;font-size:.72rem;font-weight:700;padding:6px 12px;border-radius:999px;cursor:pointer;box-shadow:var(--sh-md);z-index:3}
@@ -680,9 +686,9 @@
 .cb-pin-item:hover{background:var(--faint)}
 .cb-pinby{font-size:.62rem;color:var(--mid);margin-top:2px}
 .cb-unpin{margin-top:5px;border:1.5px solid var(--line);background:var(--white);color:var(--bad);font-size:.68rem;font-weight:700;border-radius:6px;padding:2px 8px;cursor:pointer}
-@media (pointer:coarse){.cb-actions{top:-14px}}
 
-/* ══════════ #general chat window (full screen, keyboard-aware) ══════════ */
+
+/* ══════════ #Chatbox chat window (full screen, keyboard-aware) ══════════ */
 html.chat-open,html.chat-open body{overflow:hidden;overscroll-behavior:none;scroll-behavior:auto}
 .chat-page{position:fixed;left:0;right:0;top:0;height:var(--vvh,100dvh);transform:translateY(var(--vvt,0px));z-index:400;display:flex;background:var(--white)}
 .cb-slot-full{flex:1;min-width:0;min-height:0;display:flex}
@@ -702,12 +708,6 @@ html.chat-open,html.chat-open body{overflow:hidden;overscroll-behavior:none;scro
 .chat-unread{display:inline-flex;align-items:center;justify-content:center;margin-left:8px;min-width:22px;height:22px;padding:0 7px;border-radius:11px;background:#dc2626;color:#fff;font-size:.75rem;font-weight:800;line-height:1;box-shadow:0 1px 3px rgba(0,0,0,.25)}
 .chat-unread.pop{animation:cbBadgePop .45s cubic-bezier(.3,1.6,.5,1)}
 @keyframes cbBadgePop{0%{transform:scale(.4)}60%{transform:scale(1.35)}100%{transform:scale(1)}}
-/* unread popup */
-.cb-toast{position:fixed;left:50%;top:max(14px,env(safe-area-inset-top));transform:translate(-50%,-140%);z-index:500;display:flex;align-items:center;gap:10px;max-width:calc(100vw - 24px);padding:10px 12px 10px 14px;background:var(--ink);color:#fff;border-radius:14px;box-shadow:var(--sh-lg);font-size:.82rem;cursor:pointer;opacity:0;pointer-events:none;transition:transform .3s cubic-bezier(.3,1.3,.5,1),opacity .2s}
-.cb-toast.show{transform:translate(-50%,0);opacity:1;pointer-events:auto}
-.cb-toast-ic{font-size:1.1rem}
-.cb-toast-tx{min-width:0}
-.cb-toast-go{flex:none;background:#fff;color:var(--ink);font-weight:800;font-size:.72rem;padding:4px 10px;border-radius:999px}
 
 /* Members-online button on Home (member icon + count; replaces the green dot) */
 .chat-entry-row{display:flex;gap:8px;margin-top:2px}
@@ -722,7 +722,7 @@ html.chat-open,html.chat-open body{overflow:hidden;overscroll-behavior:none;scro
 .cb-member-ic{margin-left:auto;color:var(--mid);display:flex}
 
 /* Nav: members-online icon (replaces the connection dot) + icon-only profile button */
-.nav-online{position:relative;display:flex;align-items:center;justify-content:center;width:34px;height:34px;padding:0;border:1.5px solid var(--line);border-radius:50%;background:var(--white);color:var(--ink);cursor:pointer;flex:none;-webkit-tap-highlight-color:transparent}
-.nav-online:hover{background:var(--faint)}
-.nav-online .online-n{position:absolute;top:-5px;right:-5px;min-width:16px;height:16px;padding:0 4px;border-radius:8px;background:var(--ink);color:#fff;font-size:.62rem;font-weight:800;line-height:16px;text-align:center}
+.nav-online{position:relative;display:flex;align-items:center;justify-content:center;width:34px;height:34px;padding:0;border:none;border-radius:0;background:transparent;color:var(--ink);cursor:pointer;flex:none;-webkit-tap-highlight-color:transparent}
+.nav-online:hover{background:transparent;opacity:.75}
+.nav-online .online-n{position:absolute;bottom:1px;right:0;min-width:15px;height:15px;padding:0 3px;border-radius:8px;background:var(--ink);color:#fff;font-size:.6rem;font-weight:800;line-height:15px;text-align:center;pointer-events:none}
 .profile-btn{padding:3px;gap:0}

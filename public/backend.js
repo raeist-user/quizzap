@@ -7,7 +7,7 @@ let authToken=null;
 
 // Profile page
 let showingProfile=false, profileTab='overview';
-let showingChat=false;   // #general chat opens as its own full-screen window
+let showingChat=false;   // #Chatbox chat opens as its own full-screen window
 
 // Score tracking for +N badge
 let prevMyScore=0, scoreGain=0;

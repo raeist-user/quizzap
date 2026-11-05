@@ -1,5 +1,5 @@
 /* ══════════════════════════════════════════════════════════════════════════
-   #chatbox — client for the #general group chat (opens in its own window).
+   #chatbox — client for the #Chatbox group chat (opens in its own window).
    Hooks used elsewhere:
      chatPreRender()    – called at the start of render(); parks #chatbox safely
      chatMount()        – called from attach(); keeps socket/unread alive and,
@@ -17,6 +17,7 @@
     edit:'<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>',
     del:'<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg>',
     back:'<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>',
+    dots:'<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="12" cy="19" r="1.8"/></svg>',
     down:'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>'
   };
   const DEFAULT_RX = ['👍','👎','👋','👏','🙌','🙏','🤝','💪','✌️','👌','🤞','☝️'];
@@ -26,11 +27,12 @@
   let msgs = [], pinned = [], online = [], rxList = DEFAULT_RX;
   let hasMore = false, loaded = false, loading = false, loadErr = '';
   let popup = null;         // 'online' | 'pins' | null
-  let pickerFor = null, editingId = null, actionsFor = null;
+  let editingId = null;
+  let actionsFor = null;    // the selected message (drives the reaction bar + highlight)
+  let menuFor = null;       // message whose 3-dot menu is open
   let stick = true;         // keep scrolled to bottom
   let draft = '';
   let readTs = null;        // ms timestamp of the newest message the user has seen
-  let toastEl = null, toastTimer = null, toastedInit = false;
 
   const $ = s => el && el.querySelector(s);
   const E = s => (typeof esc === 'function' ? esc(s) : String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'));
@@ -68,7 +70,7 @@
     el.innerHTML = `
       <div class="cb-head">
         <button class="cb-back" data-cb="back" title="Back to Home" aria-label="Back to Home">${ICON.back}</button>
-        <div class="cb-title"><span class="cb-hash">#</span>general</div>
+        <div class="cb-title"><span class="cb-hash">#</span>Chatbox</div>
         <div class="cb-head-btns">
           <button class="cb-hbtn" data-cb="pins" title="Pinned messages">${ICON.pin}<span class="cb-count" id="cb-pin-n"></span></button>
         </div>
@@ -81,7 +83,7 @@
       <div class="cb-composer">
         <div class="cb-box">
           <span class="cb-limit" id="cb-limit"></span>
-          <textarea class="cb-input" id="cb-input" rows="1" maxlength="1000" placeholder="Message #general" enterkeyhint="send" autocomplete="off"></textarea>
+          <textarea class="cb-input" id="cb-input" rows="1" maxlength="1000" placeholder="Message #Chatbox" enterkeyhint="send" autocomplete="off"></textarea>
           <button class="cb-send" id="cb-send" disabled title="Send">${ICON.send}</button>
         </div>
       </div>`;
@@ -121,17 +123,23 @@
       body = `<div class="cb-text">${linkify(m.text)}${m.editedAt ? ' <span class="cb-edited">(edited)</span>' : ''}</div>`;
     }
 
-    const rx = (m.reactions || []).length
-      ? `<div class="cb-rxrow">${m.reactions.map(r => `<button class="cb-rx ${r.users.includes(myId()) ? 'mine' : ''}" data-cb="react" data-id="${m.id}" data-emoji="${r.emoji}">${r.emoji}<span>${r.users.length}</span></button>`).join('')}</div>` : '';
-    const picker = pickerFor === m.id
-      ? `<div class="cb-picker">${rxList.map(e => `<button data-cb="react" data-id="${m.id}" data-emoji="${e}">${e}</button>`).join('')}</div>` : '';
+    const selected = actionsFor === m.id;
+    // Reaction row: existing reactions first, and (only while the message is selected) the emoji
+    // picker right after them – so it slides along as more reactions are added.
+    const chips = (m.reactions || []).map(r => `<button class="cb-rx ${r.users.includes(myId()) ? 'mine' : ''}" data-cb="react" data-id="${m.id}" data-emoji="${r.emoji}">${r.emoji}<span>${r.users.length}</span></button>`).join('');
+    const picker = selected ? `<div class="cb-picker">${rxList.map(e => `<button data-cb="react" data-id="${m.id}" data-emoji="${e}">${e}</button>`).join('')}</div>` : '';
+    const rx = (chips || picker) ? `<div class="cb-rxrow">${chips}${picker}</div>` : '';
 
-    const actions = `<div class="cb-actions">
-      <button data-cb="picker" data-id="${m.id}" title="React">${ICON.smile}</button>
-      ${mine ? `<button data-cb="edit" data-id="${m.id}" title="Edit">${ICON.edit}</button>` : ''}
-      ${isHost() ? `<button class="${m.pinned ? 'on' : ''}" data-cb="pin" data-id="${m.id}" title="${m.pinned ? 'Unpin' : 'Pin'}">${ICON.pin}</button>` : ''}
-      ${(mine || isHost()) ? `<button class="danger" data-cb="del" data-id="${m.id}" title="Delete">${ICON.del}</button>` : ''}
-    </div>`;
+    // 3-dot menu: edit / pin / delete (only shown when there is something to do)
+    const canEdit = mine, canPin = isHost(), canDel = mine || isHost();
+    const menu = menuFor === m.id
+      ? `<div class="cb-menu">
+          ${canEdit ? `<button data-cb="edit" data-id="${m.id}">${ICON.edit}<span>Edit</span></button>` : ''}
+          ${canPin ? `<button data-cb="pin" data-id="${m.id}">${ICON.pin}<span>${m.pinned ? 'Unpin' : 'Pin'}</span></button>` : ''}
+          ${canDel ? `<button class="danger" data-cb="del" data-id="${m.id}">${ICON.del}<span>Delete</span></button>` : ''}
+        </div>` : '';
+    const actions = (canEdit || canPin || canDel)
+      ? `<div class="cb-actions"><button class="cb-dots ${menuFor === m.id ? 'on' : ''}" data-cb="dots" data-id="${m.id}" title="More" aria-label="More options" aria-haspopup="true">${ICON.dots}</button>${menu}</div>` : '';
 
     const lead = compact
       ? `<div class="cb-av-gap"><span class="cb-time-hover">${fmtTime(m.createdAt)}</span></div>`
@@ -139,8 +147,8 @@
     const meta = compact ? '' : `<div class="cb-meta"><span class="cb-name ${host ? 'host' : ''}">${E(m.userName)}</span>${host ? '<span class="cb-badge">HOST</span>' : ''}<span class="cb-time">${fmtTime(m.createdAt)}</span></div>`;
     const pinTag = m.pinned ? `<div class="cb-pinned-tag">📌 Pinned${m.pinnedBy ? ' by ' + E(m.pinnedBy) : ''}</div>` : '';
 
-    return `${day}<div class="cb-msg ${compact ? 'compact' : ''} ${m.pinned ? 'pinned' : ''} ${actionsFor === m.id ? 'show-actions' : ''}" data-mid="${m.id}">
-      ${lead}<div class="cb-main">${pinTag}${meta}${body}${rx}${picker}</div>${actions}</div>`;
+    return `${day}<div class="cb-msg ${compact ? 'compact' : ''} ${m.pinned ? 'pinned' : ''} ${selected ? 'selected' : ''}" data-mid="${m.id}">
+      ${lead}<div class="cb-main">${pinTag}${meta}${body}${rx}</div>${actions}</div>`;
   }
 
   function paintList(keepScroll) {
@@ -223,7 +231,7 @@
     loading = false;
     paintList(); paintPopup();
     if (loaded) {
-      if (isOpen()) markRead(); else { paintBadge(); if (!toastedInit) { toastedInit = true; showToast(); } }
+      if (isOpen()) markRead(); else paintBadge();
     }
   }
 
@@ -269,7 +277,7 @@
     try {
       const j = await api('/messages');
       msgs = j.messages || []; pinned = j.pinned || []; hasMore = !!j.hasMore; paintList();
-      if (isOpen()) markRead(); else { paintBadge(true); showToast(); }
+      if (isOpen()) markRead(); else paintBadge(true);
     } catch { }
   }
 
@@ -285,7 +293,7 @@
       paintList();
       if (!stick) { const j = $('#cb-jump'); if (j) j.style.display = 'flex'; }
       if (isOpen()) markRead();
-      else if (String(d.message.userId) !== myId()) { paintBadge(true); showToast(); }
+      else if (String(d.message.userId) !== myId()) paintBadge(true);
     } else if (d.type === 'msg_edit') {
       const i = msgs.findIndex(m => m.id === d.message.id); if (i >= 0) msgs[i] = d.message;
       const p = pinned.findIndex(m => m.id === d.message.id); if (p >= 0) pinned[p] = d.message;
@@ -293,7 +301,7 @@
     } else if (d.type === 'msg_delete') {
       msgs = msgs.filter(m => m.id !== d.id); pinned = pinned.filter(m => m.id !== d.id);
       stick = false; paintList(); if (popup === 'pins') paintPopup();
-      paintBadge(); if (!unreadCount()) hideToast();
+      paintBadge();
     } else if (d.type === 'msg_react') {
       const m = msgs.find(m => m.id === d.id); if (m) m.reactions = d.reactions;
       stick = false; paintList();
@@ -307,11 +315,21 @@
 
   /* ── events (delegated, bound once on the persistent element) ── */
   function bind() {
+    const clearSel = () => {
+      if (!actionsFor && !menuFor) return;
+      actionsFor = null; menuFor = null; stick = false; paintList();
+    };
     el.addEventListener('click', async ev => {
       const t = ev.target.closest('[data-cb]');
       if (!t) {
+        // Tap a message to select it (shows the reaction bar); tap it again or tap anywhere else to unselect.
         const m = ev.target.closest('.cb-msg');
-        if (m && window.matchMedia('(pointer:coarse)').matches) { actionsFor = actionsFor === m.dataset.mid ? null : m.dataset.mid; stick = false; paintList(); }
+        if (!m) { clearSel(); return; }
+        if (ev.target.closest('a, textarea, .cb-menu, .cb-actions')) return;
+        if (editingId === m.dataset.mid) return;
+        if (String(window.getSelection && window.getSelection()) !== '') return;   // user is selecting text
+        actionsFor = actionsFor === m.dataset.mid ? null : m.dataset.mid; menuFor = null;
+        stick = false; paintList();
         return;
       }
       const a = t.dataset.cb, id = t.dataset.id;
@@ -323,13 +341,13 @@
         else if (a === 'back') { if (typeof doBack === 'function') doBack(); }
         else if (a === 'more') loadOlder();
         else if (a === 'retry') { loaded = false; load(); }
-        else if (a === 'picker') { pickerFor = pickerFor === id ? null : id; stick = false; paintList(); }
-        else if (a === 'react') { pickerFor = null; stick = false; paintList(); await api(`/messages/${id}/react`, { method: 'POST', body: { emoji: t.dataset.emoji } }); }
-        else if (a === 'edit') { editingId = id; stick = false; paintList(); }
+        else if (a === 'dots') { menuFor = menuFor === id ? null : id; actionsFor = id; stick = false; paintList(); }
+        else if (a === 'react') { await api(`/messages/${id}/react`, { method: 'POST', body: { emoji: t.dataset.emoji } }); }   // stays selected; the live update re-paints the row
+        else if (a === 'edit') { editingId = id; menuFor = null; actionsFor = null; stick = false; paintList(); }
         else if (a === 'edit-cancel') { editingId = null; stick = false; paintList(); }
         else if (a === 'edit-save') saveEdit(id);
-        else if (a === 'del') { if (confirm('Delete this message?')) await api(`/messages/${id}`, { method: 'DELETE' }); }
-        else if (a === 'pin') { const m = msgs.find(x => x.id === id); await api(`/messages/${id}/pin`, { method: 'POST', body: { pinned: !m?.pinned } }); }
+        else if (a === 'del') { menuFor = null; actionsFor = null; stick = false; paintList(); if (confirm('Delete this message?')) await api(`/messages/${id}`, { method: 'DELETE' }); }
+        else if (a === 'pin') { menuFor = null; stick = false; paintList(); const m = msgs.find(x => x.id === id); await api(`/messages/${id}/pin`, { method: 'POST', body: { pinned: !m?.pinned } }); }
         else if (a === 'unpin') { await api(`/messages/${id}/pin`, { method: 'POST', body: { pinned: false } }); }
         else if (a === 'jump') {
           popup = null; paintPopup();
@@ -346,6 +364,7 @@
     });
 
     el.addEventListener('keydown', ev => {
+      if (ev.key === 'Escape' && (actionsFor || menuFor) && !ev.target.matches('[data-edit-ta]')) { clearSel(); return; }
       if (ev.target.id === 'cb-input' && ev.key === 'Enter' && !ev.shiftKey && !ev.isComposing) { ev.preventDefault(); send(); }
       else if (ev.target.matches('[data-edit-ta]')) {
         if (ev.key === 'Enter' && !ev.shiftKey) { ev.preventDefault(); saveEdit(ev.target.dataset.editTa); }
@@ -354,6 +373,9 @@
     });
 
     el.addEventListener('click', ev => { if (ev.target.closest('#cb-send')) send(); if (ev.target.closest('#cb-jump')) { stick = true; paintList(); ev.target.closest('#cb-jump').style.display = 'none'; } });
+
+    // Esc anywhere unselects the message (and closes its menu)
+    document.addEventListener('keydown', ev => { if (ev.key === 'Escape' && el && el.isConnected && (actionsFor || menuFor) && !(ev.target.matches && ev.target.matches('[data-edit-ta]'))) clearSel(); });
 
     // Tapping Send must not steal focus from the textarea (that is what closes the mobile keyboard).
     el.addEventListener('mousedown', ev => { if (ev.target.closest('#cb-send')) ev.preventDefault(); });
@@ -410,7 +432,6 @@
     return n > 99 ? '99+' : n + (more ? '+' : '');
   }
   const isOpen = () => !!(el && el.isConnected && el.closest('#chat-page')) && document.visibilityState === 'visible';
-  const onHome = () => typeof role !== 'undefined' && !role && !(typeof showingProfile !== 'undefined' && showingProfile) && !(typeof showingChat !== 'undefined' && showingChat);
 
   function markRead() {
     if (msgs.length) {
@@ -420,10 +441,10 @@
         try { localStorage.setItem(readKey(), String(latest)); } catch { }
       }
     }
-    paintBadge(); hideToast();
+    paintBadge();
   }
 
-  // Badge on the Home screen's #general button
+  // Badge on the Home screen's #Chatbox button
   function paintBadge(bump) {
     const label = unreadLabel();
     document.querySelectorAll('.chat-unread').forEach(b => {
@@ -431,25 +452,6 @@
       b.style.display = label ? '' : 'none';
       if (bump && label) { b.classList.remove('pop'); void b.offsetWidth; b.classList.add('pop'); }
     });
-  }
-
-  // Small popup with the unread count (tap to open the chat)
-  function showToast() {
-    const n = unreadCount();
-    if (!n || isOpen() || !onHome()) { hideToast(); return; }
-    if (!toastEl) {
-      toastEl = document.createElement('div');
-      toastEl.className = 'cb-toast';
-      toastEl.addEventListener('click', () => { hideToast(); if (typeof openChat === 'function') openChat(); });
-      document.body.appendChild(toastEl);
-    }
-    toastEl.innerHTML = `<span class="cb-toast-ic">💬</span><span class="cb-toast-tx"><b>${E(unreadLabel())} unread message${n !== 1 ? 's' : ''}</b> in #general</span><span class="cb-toast-go">Open</span>`;
-    requestAnimationFrame(() => toastEl && toastEl.classList.add('show'));
-    clearTimeout(toastTimer); toastTimer = setTimeout(hideToast, 5000);
-  }
-  function hideToast() {
-    clearTimeout(toastTimer);
-    if (toastEl) toastEl.classList.remove('show');
   }
 
   /* ── keyboard-aware sizing ──
@@ -519,13 +521,13 @@
   window.chatUnreadLabel = unreadLabel;
 
   window.chatReset = function () {
-    closed = true; clearTimeout(wsTimer); hideToast();
+    closed = true; clearTimeout(wsTimer);
     if (onlinePopEl) onlinePopEl.classList.remove('show');
     try { ws && ws.close(); } catch { }
     ws = null; wsToken = null;
     msgs = []; pinned = []; online = []; hasMore = false; loaded = false; loading = false; loadErr = '';
-    popup = null; pickerFor = null; editingId = null; actionsFor = null; draft = ''; stick = true;
-    readTs = null; toastedInit = false;
+    popup = null; menuFor = null; editingId = null; actionsFor = null; draft = ''; stick = true;
+    readTs = null;
     document.documentElement.classList.remove('chat-open');
     if (el && el.parentNode) el.parentNode.removeChild(el);
     el = null;
