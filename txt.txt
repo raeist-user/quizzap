@@ -1,0 +1,6 @@
+in chatbox add commands for host 
+.delete <amount> 
+it deletes the messages of specified amount
+
+1. for some reason it shows up the entire emojis on message selection instead of just one icon of emojis so clicking it only after shows the emoji menu, also make sure right after just one reaction the menu closes itself.
+2. add a theme toggle mode, and make sure it only toggles between the current white theme and to new dark theme only the button to toggle the themes should be in the profile menu just right above fetch updates button.  
