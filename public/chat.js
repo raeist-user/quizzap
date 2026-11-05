@@ -30,6 +30,7 @@
   let editingId = null;
   let actionsFor = null;    // the selected message (drives the reaction bar + highlight)
   let menuFor = null;       // message whose 3-dot menu is open
+  let pickerFor = null;     // message whose emoji menu is open (opened from its single reaction icon)
   let stick = true;         // keep scrolled to bottom
   let draft = '';
   let readTs = null;        // ms timestamp of the newest message the user has seen
@@ -124,11 +125,14 @@
     }
 
     const selected = actionsFor === m.id;
-    // Reaction row: existing reactions first, and (only while the message is selected) the emoji
-    // picker right after them – so it slides along as more reactions are added.
+    // Reaction row: existing reactions first, then (only while the message is selected) a single
+    // reaction icon. The full emoji menu opens only after that icon is clicked, and closes again
+    // right after one reaction is picked – leaving just the icon.
     const chips = (m.reactions || []).map(r => `<button class="cb-rx ${r.users.includes(myId()) ? 'mine' : ''}" data-cb="react" data-id="${m.id}" data-emoji="${r.emoji}">${r.emoji}<span>${r.users.length}</span></button>`).join('');
-    const picker = selected ? `<div class="cb-picker">${rxList.map(e => `<button data-cb="react" data-id="${m.id}" data-emoji="${e}">${e}</button>`).join('')}</div>` : '';
-    const rx = (chips || picker) ? `<div class="cb-rxrow">${chips}${picker}</div>` : '';
+    const pickerOpen = selected && pickerFor === m.id;
+    const addBtn = selected ? `<button class="cb-rxadd ${pickerOpen ? 'on' : ''}" data-cb="rxopen" data-id="${m.id}" title="Add reaction" aria-label="Add reaction" aria-expanded="${pickerOpen}">${ICON.smile}</button>` : '';
+    const picker = pickerOpen ? `<div class="cb-picker">${rxList.map(e => `<button data-cb="react" data-id="${m.id}" data-emoji="${e}">${e}</button>`).join('')}</div>` : '';
+    const rx = (chips || addBtn) ? `<div class="cb-rxrow">${chips}${addBtn}${picker}</div>` : '';
 
     // 3-dot menu: edit / pin / delete (only shown when there is something to do)
     const canEdit = mine, canPin = isHost(), canDel = mine || isHost();
@@ -248,12 +252,33 @@
   async function send() {
     const inp = $('#cb-input'); if (!inp) return;
     const text = inp.value.trim(); if (!text) return;
+    // Host-only slash-style commands (typed as ".command"). They are never posted as messages.
+    if (isHost() && /^\.delete(\s|$)/i.test(text)) { runDelete(text, inp); return; }
     inp.value = ''; draft = ''; autosize(inp); updateSend();
     try { inp.focus({ preventScroll: true }); } catch { }   // keep the keyboard open after sending
     try {
       const j = await api('/messages', { method: 'POST', body: { text } });
       if (j.message && !msgs.some(m => m.id === j.message.id)) msgs.push(j.message);
       stick = true; paintList();
+    } catch (e) { toast(e.message); inp.value = text; draft = text; autosize(inp); updateSend(); }
+  }
+
+  /* ── host command:  .delete <amount>  →  removes the latest <amount> messages ── */
+  const MAX_PURGE = 200;
+  async function runDelete(text, inp) {
+    const m = text.match(/^\.delete\s+(\d+)$/i);
+    const n = m ? parseInt(m[1], 10) : 0;
+    if (!m || n < 1) { toast('Usage: .delete <amount>   e.g. .delete 10', 'neutral'); return; }
+    if (n > MAX_PURGE) { toast(`You can delete at most ${MAX_PURGE} messages at a time.`, 'neutral'); return; }
+    inp.value = ''; draft = ''; autosize(inp); updateSend();
+    try { inp.focus({ preventScroll: true }); } catch { }
+    try {
+      const j = await api('/purge', { method: 'POST', body: { amount: n } });
+      const gone = new Set(j.ids || []);
+      msgs = msgs.filter(x => !gone.has(x.id)); pinned = pinned.filter(x => !gone.has(x.id));
+      actionsFor = null; menuFor = null; pickerFor = null; stick = true;
+      paintList(); paintBadge();
+      toast(j.deleted ? `Deleted ${j.deleted} message${j.deleted === 1 ? '' : 's'}` : 'No messages to delete', j.deleted ? 'good' : 'neutral');
     } catch (e) { toast(e.message); inp.value = text; draft = text; autosize(inp); updateSend(); }
   }
 
@@ -302,6 +327,13 @@
       msgs = msgs.filter(m => m.id !== d.id); pinned = pinned.filter(m => m.id !== d.id);
       stick = false; paintList(); if (popup === 'pins') paintPopup();
       paintBadge();
+    } else if (d.type === 'msg_purge') {
+      const gone = new Set(d.ids || []);
+      msgs = msgs.filter(m => !gone.has(m.id)); pinned = pinned.filter(m => !gone.has(m.id));
+      if (actionsFor && gone.has(actionsFor)) { actionsFor = null; pickerFor = null; }
+      if (menuFor && gone.has(menuFor)) menuFor = null;
+      stick = false; paintList(); if (popup === 'pins') paintPopup();
+      paintBadge();
     } else if (d.type === 'msg_react') {
       const m = msgs.find(m => m.id === d.id); if (m) m.reactions = d.reactions;
       stick = false; paintList();
@@ -316,8 +348,8 @@
   /* ── events (delegated, bound once on the persistent element) ── */
   function bind() {
     const clearSel = () => {
-      if (!actionsFor && !menuFor) return;
-      actionsFor = null; menuFor = null; stick = false; paintList();
+      if (!actionsFor && !menuFor && !pickerFor) return;
+      actionsFor = null; menuFor = null; pickerFor = null; stick = false; paintList();
     };
     el.addEventListener('click', async ev => {
       const t = ev.target.closest('[data-cb]');
@@ -328,7 +360,7 @@
         if (ev.target.closest('a, textarea, .cb-menu, .cb-actions')) return;
         if (editingId === m.dataset.mid) return;
         if (String(window.getSelection && window.getSelection()) !== '') return;   // user is selecting text
-        actionsFor = actionsFor === m.dataset.mid ? null : m.dataset.mid; menuFor = null;
+        actionsFor = actionsFor === m.dataset.mid ? null : m.dataset.mid; menuFor = null; pickerFor = null;
         stick = false; paintList();
         return;
       }
@@ -341,13 +373,19 @@
         else if (a === 'back') { if (typeof doBack === 'function') doBack(); }
         else if (a === 'more') loadOlder();
         else if (a === 'retry') { loaded = false; load(); }
-        else if (a === 'dots') { menuFor = menuFor === id ? null : id; actionsFor = id; stick = false; paintList(); }
-        else if (a === 'react') { await api(`/messages/${id}/react`, { method: 'POST', body: { emoji: t.dataset.emoji } }); }   // stays selected; the live update re-paints the row
-        else if (a === 'edit') { editingId = id; menuFor = null; actionsFor = null; stick = false; paintList(); }
+        else if (a === 'dots') { menuFor = menuFor === id ? null : id; actionsFor = id; pickerFor = null; stick = false; paintList(); }
+        else if (a === 'rxopen') { pickerFor = pickerFor === id ? null : id; actionsFor = id; menuFor = null; stick = false; paintList(); }
+        else if (a === 'react') {
+          // Close the emoji menu straight away (message stays selected, so only the reaction icon remains);
+          // the live update then re-paints the row with the new reaction.
+          pickerFor = null; stick = false; paintList();
+          await api(`/messages/${id}/react`, { method: 'POST', body: { emoji: t.dataset.emoji } });
+        }
+        else if (a === 'edit') { editingId = id; menuFor = null; actionsFor = null; pickerFor = null; stick = false; paintList(); }
         else if (a === 'edit-cancel') { editingId = null; stick = false; paintList(); }
         else if (a === 'edit-save') saveEdit(id);
-        else if (a === 'del') { menuFor = null; actionsFor = null; stick = false; paintList(); if (confirm('Delete this message?')) await api(`/messages/${id}`, { method: 'DELETE' }); }
-        else if (a === 'pin') { menuFor = null; stick = false; paintList(); const m = msgs.find(x => x.id === id); await api(`/messages/${id}/pin`, { method: 'POST', body: { pinned: !m?.pinned } }); }
+        else if (a === 'del') { menuFor = null; actionsFor = null; pickerFor = null; stick = false; paintList(); if (confirm('Delete this message?')) await api(`/messages/${id}`, { method: 'DELETE' }); }
+        else if (a === 'pin') { menuFor = null; pickerFor = null; stick = false; paintList(); const m = msgs.find(x => x.id === id); await api(`/messages/${id}/pin`, { method: 'POST', body: { pinned: !m?.pinned } }); }
         else if (a === 'unpin') { await api(`/messages/${id}/pin`, { method: 'POST', body: { pinned: false } }); }
         else if (a === 'jump') {
           popup = null; paintPopup();
@@ -364,7 +402,7 @@
     });
 
     el.addEventListener('keydown', ev => {
-      if (ev.key === 'Escape' && (actionsFor || menuFor) && !ev.target.matches('[data-edit-ta]')) { clearSel(); return; }
+      if (ev.key === 'Escape' && (actionsFor || menuFor || pickerFor) && !ev.target.matches('[data-edit-ta]')) { clearSel(); return; }
       if (ev.target.id === 'cb-input' && ev.key === 'Enter' && !ev.shiftKey && !ev.isComposing) { ev.preventDefault(); send(); }
       else if (ev.target.matches('[data-edit-ta]')) {
         if (ev.key === 'Enter' && !ev.shiftKey) { ev.preventDefault(); saveEdit(ev.target.dataset.editTa); }
@@ -375,7 +413,7 @@
     el.addEventListener('click', ev => { if (ev.target.closest('#cb-send')) send(); if (ev.target.closest('#cb-jump')) { stick = true; paintList(); ev.target.closest('#cb-jump').style.display = 'none'; } });
 
     // Esc anywhere unselects the message (and closes its menu)
-    document.addEventListener('keydown', ev => { if (ev.key === 'Escape' && el && el.isConnected && (actionsFor || menuFor) && !(ev.target.matches && ev.target.matches('[data-edit-ta]'))) clearSel(); });
+    document.addEventListener('keydown', ev => { if (ev.key === 'Escape' && el && el.isConnected && (actionsFor || menuFor || pickerFor) && !(ev.target.matches && ev.target.matches('[data-edit-ta]'))) clearSel(); });
 
     // Tapping Send must not steal focus from the textarea (that is what closes the mobile keyboard).
     el.addEventListener('mousedown', ev => { if (ev.target.closest('#cb-send')) ev.preventDefault(); });
@@ -526,7 +564,7 @@
     try { ws && ws.close(); } catch { }
     ws = null; wsToken = null;
     msgs = []; pinned = []; online = []; hasMore = false; loaded = false; loading = false; loadErr = '';
-    popup = null; menuFor = null; editingId = null; actionsFor = null; draft = ''; stick = true;
+    popup = null; menuFor = null; pickerFor = null; editingId = null; actionsFor = null; draft = ''; stick = true;
     readTs = null;
     document.documentElement.classList.remove('chat-open');
     if (el && el.parentNode) el.parentNode.removeChild(el);

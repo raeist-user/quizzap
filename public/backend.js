@@ -980,6 +980,21 @@ function setupOutsideClick(){
     // Click outside — close
     if(!wrap.contains(e.target)) document.getElementById('p-dropdown')?.classList.add('hidden');
   });
+  // Theme toggle (profile menu) — switches between the light (default) and dark theme.
+  const themeBtn=document.getElementById('btn-theme-toggle');
+  const paintThemeBtn=()=>{
+    if(!themeBtn) return;
+    const dark=document.documentElement.getAttribute('data-theme')==='dark';
+    themeBtn.textContent=dark?'☀️ Light mode':'🌙 Dark mode';
+  };
+  paintThemeBtn();
+  themeBtn?.addEventListener('click',()=>{
+    const root=document.documentElement;
+    const toDark=root.getAttribute('data-theme')!=='dark';
+    if(toDark) root.setAttribute('data-theme','dark'); else root.removeAttribute('data-theme');
+    try{ localStorage.setItem('sc-theme',toDark?'dark':'light'); }catch(e){}
+    paintThemeBtn();
+  });
   // Fetch Updates (profile menu) — show a loader, then hard-refresh the page.
   // The loader disappears on its own because the page reloads.
   document.getElementById('btn-fetch-updates')?.addEventListener('click',()=>{

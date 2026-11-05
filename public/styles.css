@@ -645,6 +645,8 @@
 .cb-rx span{font-size:.7rem;font-weight:700;color:var(--mid)}
 .cb-rx.mine{border-color:#6366f1;background:#eef2ff}
 .cb-rx.mine span{color:#4338ca}
+.cb-rxadd{display:inline-flex;align-items:center;justify-content:center;border:1.5px solid var(--line);background:var(--faint);color:var(--mid);border-radius:8px;padding:2px 7px;line-height:1.6;cursor:pointer;-webkit-tap-highlight-color:transparent;transition:background var(--t-fast),color var(--t-fast),border-color var(--t-fast)}
+.cb-rxadd:hover,.cb-rxadd.on{background:var(--white);color:var(--ink);border-color:#6366f1}
 .cb-picker{display:flex;flex-wrap:wrap;gap:2px;margin:0;padding:3px 4px;border:1.5px solid var(--line);border-radius:10px;background:var(--white);box-shadow:var(--sh-sm);max-width:100%}
 .cb-picker{flex:1 1 0;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;min-width:120px;width:auto}
 .cb-picker::-webkit-scrollbar{display:none}
@@ -726,3 +728,130 @@ html.chat-open,html.chat-open body{overflow:hidden;overscroll-behavior:none;scro
 .nav-online:hover{background:transparent;opacity:.75}
 .nav-online .online-n{position:absolute;bottom:1px;right:0;min-width:15px;height:15px;padding:0 3px;border-radius:8px;background:var(--ink);color:#fff;font-size:.6rem;font-weight:800;line-height:15px;text-align:center;pointer-events:none}
 .profile-btn{padding:3px;gap:0}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   DARK THEME — applied when <html data-theme="dark"> (toggled from the profile menu).
+   Light theme is the default and is untouched; everything below only applies in dark.
+══════════════════════════════════════════════════════════════════════════ */
+html[data-theme="dark"]{
+  color-scheme:dark;
+  --bg:#0f1115;--white:#181b21;--ink:#ecebe6;--mid:#9b9ba8;
+  --line:#2c3039;--faint:#21252d;--surface:#1c2027;
+  --good:#17a77c;--bad:#f0525f;--good-bg:#10352a;--bad-bg:#3b1a20;
+  --accent:#6b9bff;--accent-bg:#172338;
+  --warn:#f0a020;--warn-bg:#3a2d10;
+  --sh-xs:0 1px 3px rgba(0,0,0,.45),0 1px 2px rgba(0,0,0,.35);
+  --sh-sm:0 2px 8px rgba(0,0,0,.5),0 1px 3px rgba(0,0,0,.4);
+  --sh-md:0 6px 24px rgba(0,0,0,.55),0 2px 6px rgba(0,0,0,.4);
+  --sh-lg:0 16px 48px rgba(0,0,0,.65),0 4px 12px rgba(0,0,0,.5);
+}
+html[data-theme="dark"] body{background:var(--bg);color:var(--ink)}
+html[data-theme="dark"] nav,
+html[data-theme="dark"] .score-banner{background:rgba(24,27,33,.92)}
+html[data-theme="dark"] .host-live-nav{background:rgba(24,27,33,.95)}
+html[data-theme="dark"] #fetch-updates-loader{background:rgba(15,17,21,.88)!important}
+html[data-theme="dark"] .form-input::placeholder{color:#6b6e7a}
+
+/* Things that use the (now light) --ink as a fill need dark text on top */
+html[data-theme="dark"] .p-avatar,
+html[data-theme="dark"] .btn-dark,
+html[data-theme="dark"] .key-card.selected,
+html[data-theme="dark"] .opt-card:not(.locked):hover .opt-key,
+html[data-theme="dark"] .opt-card.chosen .opt-key,
+html[data-theme="dark"] .sched-date-blk,
+html[data-theme="dark"] .ph-avatar,
+html[data-theme="dark"] .chart-tooltip,
+html[data-theme="dark"] .cp-btn.active,
+html[data-theme="dark"] .cb-jump,
+html[data-theme="dark"] .nav-online .online-n,
+html[data-theme="dark"] [style*="background:var(--ink)"]{color:#0e0e12!important}
+html[data-theme="dark"] .cp-btn.active svg{color:#0e0e12}
+html[data-theme="dark"] .cp-btn.active .cp-btn-label{color:rgba(14,14,18,.7)}
+
+/* Tinted / hard-coded light surfaces in the stylesheet */
+html[data-theme="dark"] .at-card:hover{background:#1c2030;border-color:#4a4f8f}
+html[data-theme="dark"] .tag-ink{background:#2a2e37;color:var(--ink)}
+html[data-theme="dark"] .sb-chip.me,
+html[data-theme="dark"] .score-row.me,
+html[data-theme="dark"] .lb-row.me,
+html[data-theme="dark"] .standings-tbl th.total-col{background:#12352a;border-color:#1f6b50}
+html[data-theme="dark"] .standings-tbl td.total-col{background:#0f2d24;border-left-color:#1f6b50;color:#6ee7b7}
+html[data-theme="dark"] .standings-tbl th.total-col{color:#6ee7b7}
+html[data-theme="dark"] .q-row.live{background:#0f2d24;border-color:#1f6b50}
+html[data-theme="dark"] .opt-card.chosen{background:#232730}
+html[data-theme="dark"] .opt-card.wrong-chosen{background:#3b1a20}
+html[data-theme="dark"] .sched-card:hover,
+html[data-theme="dark"] .hist-row:hover{border-color:#4a4e5a}
+html[data-theme="dark"] .hist-acc.ok{background:#3a3210;color:#fde68a}
+html[data-theme="dark"] .hm-cell[data-v="0"]{background:#262a32}
+html[data-theme="dark"] .hm-cell[data-v="1"]{background:#1f6b50}
+html[data-theme="dark"] .session-ctrl-open,
+html[data-theme="dark"] .session-open-banner{border-color:#1f6b50}
+html[data-theme="dark"] .folder-card-add:hover{background:#262a32;border-color:#555a66}
+html[data-theme="dark"] .kbd{border-color:#3a3f4a}
+html[data-theme="dark"] .r-opt-correct{background:#0f2d24;border-color:#1f6b50}
+html[data-theme="dark"] .r-opt-reported{background:#3a2d10;border-color:#8a6a1a}
+html[data-theme="dark"] .cp-btn:hover{background:#262a32;border-color:#4a4e5a}
+html[data-theme="dark"] .student-notice{background:#3a2d10;border-color:#8a6a1a;border-left-color:#f59e0b;color:#fcd34d}
+html[data-theme="dark"] .student-notice-label{color:#f5b84a}
+
+/* Chatbox */
+html[data-theme="dark"] .cb-msg.pinned{background:#2a2412}
+html[data-theme="dark"] .cb-pinned-tag{color:#f5b84a}
+html[data-theme="dark"] .cb-av{background:#2c3039;color:#d6d6de}
+html[data-theme="dark"] .cb-av.host,
+html[data-theme="dark"] .cb-badge,
+html[data-theme="dark"] .cb-send{background:#5b5bd6;color:#fff}
+html[data-theme="dark"] .cb-send:disabled{background:transparent;color:var(--mid)}
+html[data-theme="dark"] .cb-name.host{color:#a5a8ff}
+html[data-theme="dark"] .cb-rx.mine{background:#25274a;border-color:#6366f1}
+html[data-theme="dark"] .cb-rx.mine span{color:#b4b7ff}
+html[data-theme="dark"] .cb-pop-wrap,
+html[data-theme="dark"] .cb-online-ov{background:rgba(0,0,0,.55)}
+
+/* Inline-styled light tints generated by ui.js / backend.js */
+html[data-theme="dark"] [style*="background:#fff;"],
+html[data-theme="dark"] [style*="background:#fff""],
+html[data-theme="dark"] [style*="background:#ffffff"],
+html[data-theme="dark"] [style*="background:#fafaf9"],
+html[data-theme="dark"] [style*="background:#f8f8f8"],
+html[data-theme="dark"] [style*="background:#f0f0f0"],
+html[data-theme="dark"] [style*="background:#f3f4f6"]{background:var(--white)!important}
+html[data-theme="dark"] [style*="background:#fffbeb"],
+html[data-theme="dark"] [style*="background:#fef3c7"]{background:#3a2d10!important}
+html[data-theme="dark"] [style*="background:#fff1f2"],
+html[data-theme="dark"] [style*="background:#fee2e2"]{background:#3b1a20!important}
+html[data-theme="dark"] [style*="background:#e8f5ee"],
+html[data-theme="dark"] [style*="background:#dcfce7"]{background:#12352a!important}
+html[data-theme="dark"] [style*="background:#ede9fe"],
+html[data-theme="dark"] [style*="background:#e0e7ff"],
+html[data-theme="dark"] [style*="background:#eef2ff"],
+html[data-theme="dark"] [style*="background:#f5f3ff"],
+html[data-theme="dark"] [style*="background:#f9f5ff"]{background:#25274a!important}
+html[data-theme="dark"] [style*="background:#eff6ff"],
+html[data-theme="dark"] [style*="background:#e0f2fe"]{background:#172a42!important}
+html[data-theme="dark"] [style*="color:#111"],
+html[data-theme="dark"] [style*="color:#0e0e12"]{color:var(--ink)!important}
+html[data-theme="dark"] [style*="color:#555"],
+html[data-theme="dark"] [style*="color:#666"],
+html[data-theme="dark"] [style*="color:#6b7280"],
+html[data-theme="dark"] [style*="color:#6e6e7a"],
+html[data-theme="dark"] [style*="color:#475569"]{color:var(--mid)!important}
+html[data-theme="dark"] [style*="color:#be123c"],
+html[data-theme="dark"] [style*="color:#991b1b"],
+html[data-theme="dark"] [style*="color:#b91c1c"],
+html[data-theme="dark"] [style*="color:#7f1d1d"]{color:#fb8892!important}
+html[data-theme="dark"] [style*="color:#166534"],
+html[data-theme="dark"] [style*="color:#15803d"]{color:#6ee7b7!important}
+html[data-theme="dark"] [style*="color:#92400e"]{color:#fcd34d!important}
+html[data-theme="dark"] [style*="color:#4338ca"],
+html[data-theme="dark"] [style*="color:#3730a3"]{color:#a5a8ff!important}
+html[data-theme="dark"] [style*="color:#0369a1"]{color:#7dd3fc!important}
+html[data-theme="dark"] [style*="border-color:#fecdd3"],
+html[data-theme="dark"] [style*="border-color:#fecaca"],
+html[data-theme="dark"] [style*="border-color:#fca5a5"]{border-color:#6b2a33!important}
+html[data-theme="dark"] [style*="border-color:#bbf7d0"]{border-color:#1f6b50!important}
+html[data-theme="dark"] [style*="solid #b7dfc7"]{border-color:#1f6b50!important}
+html[data-theme="dark"] [style*="solid #fde68a"]{border-color:#8a6a1a!important}
+html[data-theme="dark"] [style*="solid #d0d0d0"],
+html[data-theme="dark"] [style*="solid #e5e5e5"]{border-color:var(--line)!important}
