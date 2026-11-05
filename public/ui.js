@@ -150,8 +150,8 @@ function landingHTML(){
        <button class="btn btn-ghost btn-lg" id="btn-at-home-regular" style="margin-top:2px">📋 Regular Test</button>
        <button class="btn btn-ghost btn-lg" id="btn-at-home-syllabus" style="margin-top:2px">🗂️ Syllabus Test</button>`;
 
-  return `<div class="lb-full-screen">
-    <div class="lb-full-inner" style="overflow-y:auto;overflow-x:hidden">
+  return `<div class="lb-full-screen home-scroll">
+    <div class="lb-full-inner">
       ${isHost ? controlPanelHTML() : ''}
       ${tabs}
       <div class="col gap3">
