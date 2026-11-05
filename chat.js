@@ -1,6 +1,6 @@
 'use strict';
 /* ══════════════════════════════════════════════════════════════════════════
-   #chatbox — Discord-style general chat for the home screen.
+   #Chatbox — Discord-style group chat for the home screen.
    • Messages, reactions, pins live in MongoDB (ChatMessage).
    • REST handles every action (auth + validation); a dedicated websocket at
      /chat broadcasts changes in real time and tracks who is online.
