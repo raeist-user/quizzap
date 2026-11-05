@@ -285,7 +285,22 @@ const reportDBSchema = new mongoose.Schema({
 });
 const ReportDB = mongoose.model('ReportDB', reportDBSchema);
 
+// ── CHATBOX (home-screen group chat) ──────────────────────────────────────────
+const chatMessageSchema = new mongoose.Schema({
+  userId:    { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
+  userName:  { type: String, required: true },
+  role:      { type: String, enum: ['student','host'], default: 'student' },
+  text:      { type: String, required: true, maxlength: 1000 },
+  createdAt: { type: Date, default: Date.now, index: true },
+  editedAt:  { type: Date, default: null },
+  pinned:    { type: Boolean, default: false, index: true },
+  pinnedBy:  { type: String, default: '' },
+  reactions: [{ _id: false, emoji: String, users: [String] }],
+});
+const ChatMessage = mongoose.model('ChatMessage', chatMessageSchema);
+
 module.exports = {
+  ChatMessage,
   User, PendingReg, UpdateReq, Notice, Schedule,
   LeaderboardEntry, ScoreLog,
   SessionBackup, SessionEntry, ReportDB,

@@ -15,6 +15,7 @@ const { ReportDB } = require('./models');
 const { shared }      = require('./ws');
 const { initRoutes }  = require('./routes');
 const { initWS }      = require('./ws');
+const { initChat }    = require('./chat');
 
 // ── TODAY LEADERBOARD AUTO-RESET ──────────────────────────────────────────────
 // Today/week leaderboard is now computed by aggregating ScoreLog by date range —
@@ -138,7 +139,15 @@ app.use(express.static(path.join(__dirname, 'public')));
 const server = http.createServer(app);
 
 initRoutes(app);
-initWS(server);
+const wssMain = initWS(server);
+const wssChat = initChat(app);
+
+// Two websocket endpoints share one HTTP server: /chat → chatbox, everything else → live quiz.
+server.on('upgrade', (req, socket, head) => {
+  const pathname = (req.url || '').split('?')[0];
+  const target = pathname === '/chat' ? wssChat : wssMain;
+  target.handleUpgrade(req, socket, head, ws => target.emit('connection', ws, req));
+});
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {

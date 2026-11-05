@@ -252,7 +252,7 @@ async function persistLeaderboard(entries) {
 
 // ── WEBSOCKET SERVER ──────────────────────────────────────────────────────────
 function initWS(server) {
-  const wss = new WebSocketServer({ server });
+  const wss = new WebSocketServer({ noServer: true }); // upgrades are routed in server.js
 
   wss.on('connection', ws => {
     const cid = ++seq;
@@ -906,6 +906,7 @@ function initWS(server) {
       clients.delete(cid);
     });
   });
+  return wss;
 }
 
 module.exports = { initWS, shared, txHost, getBackupWindow };
