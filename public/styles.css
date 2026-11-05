@@ -720,3 +720,9 @@ html.chat-open,html.chat-open body{overflow:hidden;overscroll-behavior:none;scro
 .cb-pop-head b{display:inline-flex;align-items:center;gap:6px}
 .cb-member{position:relative}
 .cb-member-ic{margin-left:auto;color:var(--mid);display:flex}
+
+/* Nav: members-online icon (replaces the connection dot) + icon-only profile button */
+.nav-online{position:relative;display:flex;align-items:center;justify-content:center;width:34px;height:34px;padding:0;border:1.5px solid var(--line);border-radius:50%;background:var(--white);color:var(--ink);cursor:pointer;flex:none;-webkit-tap-highlight-color:transparent}
+.nav-online:hover{background:var(--faint)}
+.nav-online .online-n{position:absolute;top:-5px;right:-5px;min-width:16px;height:16px;padding:0 4px;border-radius:8px;background:var(--ink);color:#fff;font-size:.62rem;font-weight:800;line-height:16px;text-align:center}
+.profile-btn{padding:3px;gap:0}

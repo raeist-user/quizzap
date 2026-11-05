@@ -171,10 +171,8 @@ function landingHTML(){
 ══════════════════════════════════════ */
 function chatEntryBtn(){
   const label=(typeof window.chatUnreadLabel==='function')?window.chatUnreadLabel():'';
-  const on=(typeof window.chatOnlineCount==='function')?window.chatOnlineCount():0;
   return `<div class="chat-entry-row">
     <button class="btn btn-ghost btn-lg chat-entry" id="go-chat">💬 #general Chat<span class="chat-unread"${label?'':' style="display:none"'}>${label}</span></button>
-    <button class="btn btn-ghost btn-lg online-btn" id="go-online" title="Members online" aria-label="Members online"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg><span class="online-n">${on}</span></button>
   </div>`;
 }
 function chatPageHTML(){
@@ -3368,7 +3366,6 @@ function attach(){
   on('go-host', ()=>{ role='host'; hostAuthed=false; navPush(); render(); });
   on('go-selfquiz', ()=>{ location.href='/selfquiz'; });
   on('go-chat', openChat);
-  on('go-online', ()=>{ if(typeof chatOnlinePopup==='function') chatOnlinePopup(); });
 
   // ── Test Board (host) — home screen now opens straight into Regular or
   //    Syllabus; the old chooser step is gone. ────────────────────────────────

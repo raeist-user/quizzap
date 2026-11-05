@@ -192,6 +192,8 @@
     onlinePopEl.classList.add('show');
   };
   window.chatOnlineCount = () => online.length;
+  const navOn = document.getElementById('nav-online');
+  if (navOn) navOn.addEventListener('click', () => window.chatOnlinePopup());
 
   function paintPopup() {
     const host = $('#cb-pop'); if (!host) return;

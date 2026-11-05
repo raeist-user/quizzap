@@ -1059,12 +1059,11 @@ function render(){
     navBackEl.textContent=inspectingUser?'← Users':showingProfile?'← Home':'← Home';
   }
   document.getElementById('profile-wrap').style.display=isLanding?'flex':'none';
-  document.getElementById('ci').style.display=(isParticipant||showingProfile||inspectingUser)?'none':'';
+  document.getElementById('nav-online').style.display=(isParticipant||showingProfile||inspectingUser)?'none':'flex';
   document.getElementById('conn-lbl').style.display=(isParticipant||showingProfile||inspectingUser)?'none':'';
   document.getElementById('nav-brand').style.cssText=isParticipant?'flex:1;text-align:center;font-size:1rem':'';
   const u=currentUser;
   document.getElementById('p-avatar').textContent=u.name[0].toUpperCase();
-  document.getElementById('p-name-lbl').textContent=u.name.split(' ')[0];
   document.getElementById('pd-full-name').textContent=u.name;
   document.getElementById('pd-email').textContent=u.email||(u.username?'@'+u.username:'');
 
