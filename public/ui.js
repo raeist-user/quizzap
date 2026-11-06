@@ -2867,11 +2867,12 @@ function buildRankCardHTML(){
   const myRankAll  = allTimeLB ? allTimeLB.findIndex(e => String(e.userId) === myId) + 1 : 0;
   const totalPlayers = allTimeLB ? allTimeLB.length : 0;
   const totalPts   = myEntry ? (myEntry.totalScore || 0) : 0;
+  const medal = _pico('medal',20);
   if(allTimeLB===null)
-    return `<div class="prank-card" id="profile-rank-card"><div class="prank-num" style="font-size:1.2rem;color:var(--mid)">…</div><div class="prank-info"><div class="prank-label">All-Time Rank</div><div class="prank-sub">Loading leaderboard…</div></div></div>`;
+    return `<div class="pv-rank" id="profile-rank-card"><div class="pv-rank-num" style="color:var(--mid)">…</div><div class="pv-rank-info"><div class="pv-rank-t">All-Time Rank</div><div class="pv-rank-s">Loading leaderboard…</div></div></div>`;
   if(myEntry)
-    return `<div class="prank-card" id="profile-rank-card"><div class="prank-num">#${myRankAll}</div><div class="prank-info"><div class="prank-label">All-Time Rank</div><div class="prank-sub">of ${totalPlayers} players · ${totalPts} total pts</div></div><div style="font-size:1.4rem">🏅</div></div>`;
-  return `<div class="prank-card" id="profile-rank-card"><div class="prank-num" style="font-size:1rem;color:var(--mid)">—</div><div class="prank-info"><div class="prank-label">All-Time Rank</div><div class="prank-sub">Not yet ranked on the leaderboard</div></div></div>`;
+    return `<div class="pv-rank" id="profile-rank-card"><div class="pv-rank-num">#${myRankAll}</div><div class="pv-rank-info"><div class="pv-rank-t">All-Time Rank</div><div class="pv-rank-s">of ${totalPlayers} players · ${totalPts} total pts</div></div><span class="pv-rank-ico">${medal}</span></div>`;
+  return `<div class="pv-rank" id="profile-rank-card"><div class="pv-rank-num" style="color:var(--mid)">—</div><div class="pv-rank-info"><div class="pv-rank-t">All-Time Rank</div><div class="pv-rank-s">Not yet ranked on the leaderboard</div></div></div>`;
 }
 /* ── async profile data loader ─────────────────────────────────────────── */
 async function loadProfileData(){
@@ -2897,122 +2898,125 @@ function buildOverviewHTML(history){
   const allFastMs=history.map(e=>e.fastestMs).filter(v=>v!=null&&v>0);
   const fastestMs=allFastMs.length?Math.min(...allFastMs):null;
   const fastLabel=fastestMs!=null?(fastestMs<1000?(fastestMs+'ms'):(fastestMs/1000).toFixed(1)+'s'):'—';
-  const statsHTML='<div class="pov-stats">'
-    +'<div class="pov-stat"><div class="pov-stat-num">'+history.length+'</div><div class="pov-stat-lbl">Sessions</div></div>'
-    +'<div class="pov-stat"><div class="pov-stat-num">'+accuracy+'%</div><div class="pov-stat-lbl">Accuracy</div></div>'
-    +'<div class="pov-stat"><div class="pov-stat-num">'+bestScore+'</div><div class="pov-stat-lbl">Best Score</div></div>'
-    +'<div class="pov-stat"><div class="pov-stat-num" style="font-size:'+(fastestMs&&fastestMs<10000?'1.25rem':'1rem')+'">'+fastLabel+'</div><div class="pov-stat-lbl">Fastest Correct ⚡</div></div>'
-    +'</div>';
-  // Score bar chart
+
+  // ── Stat cards (2×2) ──
+  const statCards=[
+    ['calendar','Sessions',history.length],
+    ['target','Accuracy',accuracy+'%'],
+    ['trophy','Best Score',bestScore],
+    ['zap','Fastest Correct',fastLabel]
+  ];
+  const statsHTML='<div class="pv-stats">'+statCards.map(([ic,lbl,val])=>
+    '<div class="pv-stat"><span class="pv-stat-ico">'+_pico(ic,16)+'</span><div class="pv-stat-num">'+val+'</div><div class="pv-stat-lbl">'+lbl+'</div></div>'
+  ).join('')+'</div>';
+
+  // ── Score history bar chart ──
   const last15=[...history].reverse().slice(-15);
   const scores=last15.map(e=>e.score||0);
   const maxScore=Math.max(...scores,1);
   const step=profileNiceStep(maxScore);
   const gridMax=Math.ceil(maxScore/step)*step;
-  const gridLines=[];
-  for(let v=0;v<=gridMax;v+=step) gridLines.push(v);
-  const W=520,H=140,PL=36,PB=24,PT=10,PR=6;
+  const W=300,H=120,PL=26,PB=18,PT=10,PR=4;
   const cW=W-PL-PR,cH=H-PT-PB;
-  const bc=last15.length,bW=Math.floor(cW/bc*0.6),bG=cW/bc;
+  const n=last15.length,bG=cW/n,bW=Math.max(bG*0.5,6);
   const mIdx=scores.indexOf(Math.max(...scores));
-  let svgBars='',svgGrid='',svgLbls='';
-  gridLines.forEach(v=>{
+  let svgGrid='',svgBars='';
+  for(let v=0;v<=gridMax;v+=step){
     const y=PT+cH-(v/gridMax)*cH;
-    svgGrid+='<line x1="'+PL+'" x2="'+(W-PR)+'" y1="'+y+'" y2="'+y+'" stroke="#e4e3df" stroke-width="1"/>';
-    svgLbls+='<text x="'+(PL-4)+'" y="'+(y+4)+'" text-anchor="end" font-size="10" fill="#9a9990">'+v+'</text>';
-  });
-  svgGrid+='<line x1="'+PL+'" x2="'+(W-PR)+'" y1="'+(PT+cH)+'" y2="'+(PT+cH)+'" stroke="#e4e3df" stroke-width="1"/>';
+    svgGrid+='<line x1="'+PL+'" x2="'+(W-PR)+'" y1="'+y+'" y2="'+y+'" style="stroke:var(--line)" stroke-width="1"/>'
+      +'<text x="'+(PL-4)+'" y="'+(y+3)+'" text-anchor="end" font-size="8" style="fill:var(--mid)">'+v+'</text>';
+  }
   last15.forEach((e,i)=>{
-    const x=PL+i*bG+bG/2;
-    const bH=scores[i]>0?(scores[i]/gridMax)*cH:2;
-    const y=PT+cH-bH;
-    const fill=i===mIdx?'#111110':'#c8c7c3';
+    const x=PL+i*bG+bG/2,h=scores[i]>0?(scores[i]/gridMax)*cH:2,y=PT+cH-h;
     const d=new Date(e.date);
     const lbl=d.toLocaleDateString('en',{weekday:'short',month:'short',day:'numeric'});
-    svgBars+='<rect class="bar-rect" x="'+(x-bW/2)+'" y="'+y+'" width="'+bW+'" height="'+bH+'" rx="2" fill="'+fill+'" data-score="'+scores[i]+'" data-label="'+lbl+'" style="cursor:pointer"/>';
+    const fill=i===mIdx?'style="fill:var(--good)"':'style="fill:var(--mid);opacity:.35"';
+    svgBars+='<rect class="bar-rect" x="'+(x-bW/2)+'" y="'+y+'" width="'+bW+'" height="'+h+'" rx="2" '+fill+' data-score="'+scores[i]+'" data-label="'+lbl+'" style="cursor:pointer"/>';
   });
-  const barChartHTML='<div class="pchart-card"><div class="pchart-head"><span class="pchart-title">Score History</span><span style="font-size:.7rem;color:var(--mid)">Last '+last15.length+' sessions</span></div>'
+  // (a rect can't carry two style attrs — merge cursor into the fill style)
+  svgBars=svgBars.replace(/style="([^"]*)" data-score="([^"]*)" data-label="([^"]*)" style="cursor:pointer"/g,'style="$1;cursor:pointer" data-score="$2" data-label="$3"');
+  const barChartHTML='<div class="pv-card"><div class="pv-card-head"><span class="pv-card-title">Score History</span><span class="pv-card-sub">Last '+n+' sessions</span></div>'
     +'<div class="chart-wrap" id="score-chart-wrap"><div class="chart-tooltip" id="score-tooltip"></div>'
-    +'<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;height:auto;display:block;overflow:visible"><g>'+svgGrid+svgLbls+svgBars+'</g></svg></div></div>';
-  // Accuracy chart
+    +'<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;height:auto;display:block;overflow:visible">'+svgGrid+svgBars+'</svg></div></div>';
+
+  // ── Accuracy trend ──
   const accs=last15.map(e=>e.total?Math.round(e.correct/e.total*100):null);
   const validAccs=accs.filter(v=>v!==null);
   const avgAcc=validAccs.length?Math.round(validAccs.reduce((a,b)=>a+b,0)/validAccs.length):0;
   const pbAcc=Math.max(...validAccs,0);
   const pbAccIdx=accs.indexOf(pbAcc);
-  const AW=520,AH=150,AL=36,AB=24,AT=18,AR=6;
+  const AW=300,AH=130,AL=26,AB=18,AT=14,AR=4;
   const achW=AW-AL-AR,achH=AH-AT-AB;
-  const pts2=accs.map((v,i)=>v!==null?{x:AL+i*(achW/(last15.length-1||1)),y:AT+achH-(v/100)*achH}:null);
+  const pts2=accs.map((v,i)=>v!==null?{x:AL+i*(achW/(n-1||1)),y:AT+achH-(v/100)*achH}:null);
   const validPts=pts2.filter(p=>p!==null);
-  const curvePath=profileCatmullToCubic(validPts);
-  const fillPath=validPts.length>1?(curvePath+' L'+validPts[validPts.length-1].x+','+( AT+achH)+' L'+validPts[0].x+','+(AT+achH)+' Z'):'';
-  let accGrid='',accLbls='';
+  let linePath='';
+  validPts.forEach((p,i)=>{ linePath+=(i?' L':'M')+p.x+','+p.y; });
+  const fillPath=validPts.length>1?(linePath+' L'+validPts[validPts.length-1].x+','+(AT+achH)+' L'+validPts[0].x+','+(AT+achH)+' Z'):'';
+  let accGrid='';
   [0,25,50,75,100].forEach(v=>{
     const y=AT+achH-(v/100)*achH;
-    accGrid+='<line x1="'+AL+'" x2="'+(AW-AR)+'" y1="'+y+'" y2="'+y+'" stroke="#e4e3df" stroke-width="1" stroke-dasharray="'+(v===0?'none':'3,3')+'"/>';
-    accLbls+='<text x="'+(AL-4)+'" y="'+(y+4)+'" text-anchor="end" font-size="10" fill="#9a9990">'+v+'</text>';
+    accGrid+='<line x1="'+AL+'" x2="'+(AW-AR)+'" y1="'+y+'" y2="'+y+'" style="stroke:var(--line)" stroke-width="1" stroke-dasharray="'+(v===0?'none':'3,3')+'"/>'
+      +'<text x="'+(AL-4)+'" y="'+(y+3)+'" text-anchor="end" font-size="8" style="fill:var(--mid)">'+v+'</text>';
   });
-  const pbY=AT+achH-(pbAcc/100)*achH,avgY=AT+achH-(avgAcc/100)*achH;
-  const pbLine='<line x1="'+AL+'" x2="'+(AW-AR)+'" y1="'+pbY+'" y2="'+pbY+'" stroke="#2d6a4f" stroke-width="1.5" stroke-dasharray="5,3" opacity=".8"/>';
-  const avgLine='<line x1="'+AL+'" x2="'+(AW-AR)+'" y1="'+avgY+'" y2="'+avgY+'" stroke="#9a9990" stroke-width="1.5" stroke-dasharray="5,3" opacity=".7"/>';
+  const avgY=AT+achH-(avgAcc/100)*achH;
   let dots='';
   accs.forEach((v,i)=>{
     if(v===null) return;
-    const p=pts2[i];
-    const isPB=i===pbAccIdx,isLast=i===last15.length-1,isBig=isPB||isLast;
-    let fill=v>=avgAcc?'#2d9e6b':'#c1121f'; if(isPB) fill='#2d6a4f';
+    const p=pts2[i],isPB=i===pbAccIdx,isLast=i===n-1,big=isPB||isLast;
     const d=new Date(last15[i].date);
-    const lbl=v+'% · '+d.toLocaleDateString('en',{weekday:'short',month:'short',day:'numeric'});
-    dots+='<circle class="acc-dot" cx="'+p.x+'" cy="'+p.y+'" r="'+(isBig?5:3.5)+'" fill="'+fill+'" stroke="'+(isBig?'white':'none')+'" stroke-width="'+(isBig?1.5:0)+'" data-label="'+lbl+'" style="cursor:pointer"/>';
+    const lbl=v+'%  '+d.toLocaleDateString('en',{weekday:'short',month:'short',day:'numeric'});
+    dots+='<circle class="acc-dot" cx="'+p.x+'" cy="'+p.y+'" r="'+(big?4:2.5)+'" style="fill:'+(isPB?'var(--good)':'var(--ink)')+';stroke:'+(big?'var(--white)':'none')+';stroke-width:1.5;cursor:pointer" data-label="'+lbl+'"/>';
   });
-  const gId='accGrad';
-  const accChartHTML='<div class="pchart-card"><div class="pchart-head"><span class="pchart-title">Accuracy Trend</span>'
-    +'<div class="pchart-legend"><div class="pchart-leg-item"><div class="pchart-leg-dash" style="border-top:2px dashed #2d6a4f;height:0"></div><span>PB '+pbAcc+'%</span></div>'
-    +'<div class="pchart-leg-item"><div class="pchart-leg-dash" style="border-top:2px dashed #9a9990;height:0"></div><span>Avg '+avgAcc+'%</span></div></div></div>'
+  const accChartHTML='<div class="pv-card"><div class="pv-card-head"><span class="pv-card-title">Accuracy Trend</span><span class="pv-card-sub">PB '+pbAcc+'% · Avg '+avgAcc+'%</span></div>'
     +'<div class="chart-wrap" id="acc-chart-wrap"><div class="chart-tooltip" id="acc-tooltip"></div>'
     +'<svg viewBox="0 0 '+AW+' '+AH+'" style="width:100%;height:auto;display:block;overflow:visible">'
-    +'<defs><linearGradient id="'+gId+'" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#2d9e6b" stop-opacity=".22"/><stop offset="100%" stop-color="#2d9e6b" stop-opacity="0"/></linearGradient></defs>'
-    +accGrid+accLbls
-    +(fillPath?'<path d="'+fillPath+'" fill="url(#'+gId+')"/>' : '')
-    +(validPts.length>1?'<path d="'+curvePath+'" fill="none" stroke="#2d9e6b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>' : '')
-    +avgLine+pbLine+dots
-    +'</svg></div></div>';
-  // Heatmap
+    +'<defs><linearGradient id="accGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" style="stop-color:var(--good)" stop-opacity=".3"/><stop offset="100%" style="stop-color:var(--good)" stop-opacity="0"/></linearGradient></defs>'
+    +accGrid
+    +'<line x1="'+AL+'" x2="'+(AW-AR)+'" y1="'+avgY+'" y2="'+avgY+'" style="stroke:var(--mid)" stroke-width="1" stroke-dasharray="4,3"/>'
+    +(fillPath?'<path d="'+fillPath+'" fill="url(#accGrad)"/>':'')
+    +(validPts.length>1?'<path d="'+linePath+'" fill="none" style="stroke:var(--good)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>':'')
+    +dots+'</svg></div></div>';
+
+  // ── Activity heatmap (15 weeks, real session counts) ──
   const now=new Date(); now.setHours(23,59,59,999);
   const hmStart=new Date(now); hmStart.setDate(hmStart.getDate()-104); hmStart.setHours(0,0,0,0);
   const dayCounts={};
   history.forEach(e=>{ const k=new Date(e.date).toDateString(); dayCounts[k]=(dayCounts[k]||0)+1; });
+  const OPS=[0,.25,.45,.7,1];
   let cols='';
   for(let w=0;w<15;w++){
     let cells='';
     for(let day=0;day<7;day++){
       const dt=new Date(hmStart); dt.setDate(dt.getDate()+w*7+day);
-      if(dt>now){ cells+='<div class="hm-cell" data-v="0" style="opacity:.2"></div>'; continue; }
+      if(dt>now){ cells+='<div class="pv-hcell" style="opacity:.25"></div>'; continue; }
       const cnt=dayCounts[dt.toDateString()]||0;
       const v=cnt===0?0:cnt===1?1:cnt===2?2:cnt<=4?3:4;
-      const lbl=cnt?(dt.toLocaleDateString('en',{month:'short',day:'numeric'})+': '+cnt+' session'+(cnt>1?'s':'')):dt.toLocaleDateString('en',{month:'short',day:'numeric'});
-      cells+='<div class="hm-cell" data-v="'+v+'" title="'+lbl+'"></div>';
+      const lbl=dt.toLocaleDateString('en',{month:'short',day:'numeric'})+(cnt?': '+cnt+' session'+(cnt>1?'s':''):'');
+      cells+=v===0?'<div class="pv-hcell" title="'+lbl+'"></div>':'<div class="pv-hcell on" style="opacity:'+OPS[v]+'" title="'+lbl+'"></div>';
     }
-    cols+='<div class="hm-col">'+cells+'</div>';
+    cols+='<div class="pv-hcol">'+cells+'</div>';
   }
-  const hmHTML='<div class="pchart-card"><div class="pchart-head"><span class="pchart-title">Activity</span></div>'
-    +'<div class="heatmap-grid">'+cols+'</div>'
-    +'<div class="hm-legend"><span>Less</span>'
-    +'<div class="hm-swatch" style="background:#edecea"></div><div class="hm-swatch" style="background:#b7dfc7"></div>'
-    +'<div class="hm-swatch" style="background:#74c69d"></div><div class="hm-swatch" style="background:#40916c"></div>'
-    +'<div class="hm-swatch" style="background:#1b4332"></div><span>More</span></div></div>';
-  // Breakdown
-  const avgScore=history.length?Math.round(history.reduce((s,e)=>s+(e.score||0),0)/history.length):0;
-  const bestRanks=history.map(e=>e.rank||999).filter(r=>r>0);
+  const hmHTML='<div class="pv-card"><div class="pv-card-title" style="margin-bottom:12px">Activity</div>'
+    +'<div class="pv-heat" id="pv-heat">'+cols+'</div>'
+    +'<div class="pv-hleg"><span>Less</span><i class="pv-hcell"></i>'
+    +[1,2,3,4].map(v=>'<i class="pv-hcell on" style="opacity:'+OPS[v]+'"></i>').join('')+'<span>More</span></div></div>';
+
+  // ── Breakdown ──
+  const avgScore=Math.round(history.reduce((s,e)=>s+(e.score||0),0)/history.length);
+  const bestRanks=history.map(e=>e.rank).filter(r=>r>0);
   const bestRank=bestRanks.length?Math.min(...bestRanks):null;
   const since=new Date(history[history.length-1].date).toLocaleDateString('en',{month:'short',day:'numeric',year:'numeric'});
-  const breakdownHTML='<div class="pchart-card"><div class="pchart-head"><span class="pchart-title">Breakdown</span></div>'
-    +'<div class="prow"><span>Avg score per session</span><span class="prow-val">'+avgScore+' pts</span></div>'
-    +'<div class="prow"><span>Personal best accuracy</span><span class="prow-val" style="color:var(--good)">'+pbAcc+'%</span></div>'
-    +(bestRank?'<div class="prow"><span>Best rank achieved</span><span class="prow-val">#'+bestRank+'</span></div>':'')
-    +'<div class="prow"><span>Total questions seen</span><span class="prow-val">'+totalQs+'</span></div>'
-    +'<div class="prow"><span>Total correct answers</span><span class="prow-val">'+totalCorrect+'</span></div>'
-    +'<div class="prow"><span>Playing since</span><span class="prow-val">'+since+'</span></div></div>';
+  const rows=[
+    ['Avg score per session',avgScore+' pts'],
+    ['Personal best accuracy',pbAcc+'%',true],
+    bestRank?['Best rank achieved','#'+bestRank]:null,
+    ['Total questions seen',totalQs],
+    ['Total correct answers',totalCorrect],
+    ['Playing since',since]
+  ].filter(Boolean);
+  const breakdownHTML='<div class="pv-card"><div class="pv-card-title" style="margin-bottom:12px">Breakdown</div>'
+    +rows.map(([l,v,good])=>'<div class="pv-row"><span class="pv-row-l">'+l+'</span><span class="pv-row-v'+(good?' good':'')+'">'+v+'</span></div>').join('')+'</div>';
+
   return statsHTML+barChartHTML+accChartHTML+hmHTML+breakdownHTML+buildRankCardHTML();
 }
 
@@ -3020,22 +3024,23 @@ function buildHistoryHTML(history){
   if(!history.length)
     return '<div class="no-data-notice"><span>📋</span>No sessions recorded yet.</div>';
   const maxScore=Math.max(...history.map(e=>e.score||0));
+  const thisYear=new Date().getFullYear();
   const rows=history.map(e=>{
     const d=new Date(e.date);
     const acc=e.total?Math.round(e.correct/e.total*100):null;
-    const cls=acc===null?'ok':acc>=70?'good':acc>=45?'ok':'bad';
-    const isPB=e.score===maxScore;
+    const cls=acc===null?'mid':acc>=70?'good':acc>=45?'mid':'bad';
+    const isPB=(e.score||0)===maxScore&&maxScore>0;
     const rankStr=e.rank&&e.participants?('#'+e.rank+' of '+e.participants):e.rank?('#'+e.rank):'';
-    return '<div class="hist-row">'
-      +'<div class="col" style="min-width:80px;flex-shrink:0">'
-      +'<span class="hist-date">'+d.toLocaleDateString('en',{month:'short',day:'numeric',year:'numeric'})+'</span>'
-      +'<span class="hist-date" style="margin-top:1px">'+d.toLocaleTimeString('en',{hour:'2-digit',minute:'2-digit'})+'</span></div>'
-      +'<div class="hist-score">'+(e.score||0)+' pts'+(isPB?'<span class="hist-pb-badge">PB</span>':'')+'</div>'
-      +'<div class="hist-rank">'+rankStr+'</div>'
-      +'<div class="hist-acc '+cls+'">'+(acc!==null?acc+'%':'—')+'</div>'
+    const dateStr=d.toLocaleDateString('en',d.getFullYear()===thisYear?{month:'short',day:'numeric'}:{month:'short',day:'numeric',year:'numeric'});
+    const timeStr=d.toLocaleTimeString('en',{hour:'numeric',minute:'2-digit'});
+    return '<div class="pv-hrow">'
+      +'<div class="pv-hdate"><span class="pv-hd1">'+dateStr+'</span><span class="pv-hd2">'+timeStr+'</span></div>'
+      +'<div class="pv-hscore"><span>'+(e.score||0)+'</span><span class="pv-hpts">pts</span>'+(isPB?'<span class="pv-hpb">PB</span>':'')+'</div>'
+      +'<div class="pv-hrank">'+rankStr+'</div>'
+      +'<div class="pv-hacc '+cls+'">'+(acc!==null?acc+'%':'—')+'</div>'
       +'</div>';
   }).join('');
-  return '<div style="margin-bottom:6px;font-size:.75rem;color:var(--mid)">'+history.length+' session'+(history.length>1?'s':'')+' recorded</div>'+rows;
+  return '<div class="pv-hcount">'+history.length+' session'+(history.length>1?'s':'')+' recorded</div><div class="pv-hlist">'+rows+'</div>';
 }
 
 function profileNiceStep(max){
@@ -3060,6 +3065,7 @@ function profileCatmullToCubic(pts){
 // Limited, curated palette — deliberately not a full color wheel.
 const PROFILE_COLORS=['#A3E635','#38BDF8','#F472B6','#FB923C','#C084FC','#F87171','#2DD4BF','#FACC15'];
 let identityDirty=false, passwordDirty=false;
+let _profileFromChat=false;  // profile was opened from the chat screen
 let _pfBase=null;        // last saved/submitted {name, uname, color} — the form is "dirty" when it differs
 let _pfColor=null;       // color currently picked in the form
 
@@ -3070,6 +3076,11 @@ const _PI={ // inline icons (lucide paths)
   lock:'<rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
   right:'<path d="m9 18 6-6-6-6"/>',
   left:'<path d="m15 18-6-6 6-6"/>',
+  calendar:'<path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/><path d="m9 16 2 2 4-4"/>',
+  target:'<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>',
+  trophy:'<path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/>',
+  zap:'<path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/>',
+  medal:'<path d="M7.21 15 2.66 7.14a2 2 0 0 1 .13-2.2L4.4 2.8A2 2 0 0 1 6 2h12a2 2 0 0 1 1.6.8l1.6 2.14a2 2 0 0 1 .14 2.2L16.79 15"/><path d="M11 12 5.12 2.2"/><path d="m13 12 5.88-9.8"/><path d="M8 7h8"/><circle cx="12" cy="17" r="5"/><path d="M12 18v-2h-.5"/>',
   out:'<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>'
 };
 function _pico(n,s){ s=s||18; return `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">${_PI[n]}</svg>`; }
@@ -3356,7 +3367,7 @@ function attach(){
   // Profile dropdown — one-time setup handled in setupOutsideClick() above
   setupOutsideClick();
   on('btn-logout', doLogout);
-  on('btn-profile',()=>{ showingProfile=true; profileTab='menu'; identityDirty=false; passwordDirty=false; _pfBase=null; _pfColor=null; setProfileMenu(false); navPush(); render(); window.scrollTo(0,0); });
+  on('btn-profile',()=>{ _profileFromChat=!!showingChat; showingChat=false; showingProfile=true; profileTab='menu'; identityDirty=false; passwordDirty=false; _pfBase=null; _pfColor=null; setProfileMenu(false); navPush(); render(); window.scrollTo(0,0); });
   on('btn-profile-back',()=>{ showingProfile=false; render(); });
   document.querySelectorAll('.ptab[data-itab]').forEach(el=>el.addEventListener('click',()=>{
     inspectTab=el.dataset.itab;
@@ -4926,7 +4937,7 @@ function doDismissHome(){
   // Pre-fetch all three tabs in the background ready for when the user opens LB
   fetchLeaderboard();
 }
-function doLogout(){ if(typeof chatReset==='function') chatReset(); showingChat=false; profileTab='menu'; identityDirty=false; passwordDirty=false; _pfBase=null; _pfColor=null; clearAuth(); role=null; myPid=null; myName=null; hostAuthed=false; HOST_PASSWORD_INPUT=''; showingProfile=false; prevMyScore=0; scoreGain=0; myLastAnswerTime=null; localAnswerTimes={}; cumulativeAnswerTimes={}; sessionCorrectTimes=[]; startTimerDisplay._lastStart=null; studentQCount=0; todayLB=null; weekLB=null; allTimeLB=null; lbFetched={today:null,week:null,all:null}; lbErrors={today:null,week:null,all:null}; serverSchedules=null; hostSchedules=[]; hostNotice=''; joinRequests=[]; updateRequests=[]; sessionStorage.removeItem(NAV_KEY); sessionStorage.removeItem('scc_hpw'); _screenKey=''; render(); }
+function doLogout(){ if(typeof chatReset==='function') chatReset(); showingChat=false; profileTab='menu'; _profileFromChat=false; identityDirty=false; passwordDirty=false; _pfBase=null; _pfColor=null; clearAuth(); role=null; myPid=null; myName=null; hostAuthed=false; HOST_PASSWORD_INPUT=''; showingProfile=false; prevMyScore=0; scoreGain=0; myLastAnswerTime=null; localAnswerTimes={}; cumulativeAnswerTimes={}; sessionCorrectTimes=[]; startTimerDisplay._lastStart=null; studentQCount=0; todayLB=null; weekLB=null; allTimeLB=null; lbFetched={today:null,week:null,all:null}; lbErrors={today:null,week:null,all:null}; serverSchedules=null; hostSchedules=[]; hostNotice=''; joinRequests=[]; updateRequests=[]; sessionStorage.removeItem(NAV_KEY); sessionStorage.removeItem('scc_hpw'); _screenKey=''; render(); }
 
 /* Shared back navigation */
 function doBack(){
@@ -4943,6 +4954,7 @@ function doBack(){
   if(showingProfile){
     if(!profileConfirmDiscard()) return;
     showingProfile=false; profileTab='menu'; _pfBase=null; _pfColor=null;
+    if(_profileFromChat){ showingChat=true; _profileFromChat=false; } // opened from chat → go back to chat
     navPush(); // push a new state so further back press goes home
     render(); return;
   }
