@@ -961,31 +961,98 @@ async function loadInspectData(){
    EVENTS
 ══════════════════════════════════════ */
 
+// ── Profile menu + bottom navbar (new layout) ────────────────────────────
+const _isBottomLayout=()=>document.documentElement.classList.contains('bottom-layout');
+
+// Opens/closes the profile menu. Classic = dropdown under the top bar;
+// new layout = sheet above the bottom bar with a dimmed scrim behind it.
+function setProfileMenu(open){
+  const dd=document.getElementById('p-dropdown');
+  if(!dd) return;
+  dd.classList.toggle('hidden',!open);
+  document.getElementById('p-scrim')?.classList.toggle('show',!!open&&_isBottomLayout());
+  syncBottomNav();
+}
+
+// Shows/hides the bottom bar for the current screen and keeps its highlight, avatar and chat badge fresh.
+function syncBottomNav(){
+  const root=document.documentElement;
+  const chatScreen=!!(showingChat&&!showingDismissed&&!showingHalted);
+  const isLanding=!!(!role&&!showingProfile&&!showingHalted&&!chatScreen&&!inspectingUser&&!showingDismissed);
+  const show=_isBottomLayout()&&!!currentUser&&(isLanding||chatScreen);
+  root.classList.toggle('has-bnav',show);
+  // The profile menu only exists on landing/chat screens — close it (and its scrim) anywhere else
+  if(!(currentUser&&(isLanding||chatScreen))){
+    document.getElementById('p-dropdown')?.classList.add('hidden');
+    document.getElementById('p-scrim')?.classList.remove('show');
+  }
+  if(!show) return;
+  const menuOpen=!document.getElementById('p-dropdown')?.classList.contains('hidden');
+  const active=menuOpen?'profile':chatScreen?'chat':(homeSection==='leaderboard'?'lb':'home');
+  [['lb','bn-lb'],['home','bn-home'],['chat','bn-chat'],['profile','bn-profile']].forEach(([k,id])=>{
+    document.getElementById(id)?.classList.toggle('active',k===active);
+  });
+  const av=document.getElementById('bn-avatar');
+  if(av&&currentUser?.name) av.textContent=currentUser.name[0].toUpperCase();
+  const badge=document.querySelector('#bn-chat .chat-unread');
+  if(badge&&typeof window.chatUnreadLabel==='function'){
+    const l=window.chatUnreadLabel(); badge.textContent=l; badge.style.display=l?'':'none';
+  }
+}
+
+function bottomNavGo(name){
+  setProfileMenu(false);
+  if(name==='chat'){ if(!showingChat) openChat(); return; }
+  const fromChat=!!showingChat;
+  if(name==='home'){
+    if(!fromChat&&homeSection==='home'){ window.scrollTo({top:0,behavior:'smooth'}); return; }
+    showingChat=false; homeSection='home';
+    if(fromChat) navPush();
+    render(); return;
+  }
+  // leaderboard
+  if(!fromChat&&homeSection==='leaderboard') return;
+  if(homeSection!=='leaderboard') homeLbTab='today';
+  showingChat=false; homeSection='leaderboard';
+  if(fromChat) navPush();
+  render();
+  ['today','week','all'].forEach(p=>{
+    const cached=p==='today'?todayLB:p==='week'?weekLB:allTimeLB;
+    if(cached===null&&lbFetched[p]!==false) fetchLeaderboard(p);
+  });
+}
+
 // Set up outside-click for profile dropdown once at boot
 let _outsideClickReady=false;
 function setupOutsideClick(){
   if(_outsideClickReady) return;
   _outsideClickReady=true;
-  // Profile button toggle — attached once here, not in attach(), so it never stacks
+  const dd=()=>document.getElementById('p-dropdown');
+  // Profile button toggle — attached once here, not in attach(), so it never stacks.
+  // Two triggers: the top-bar avatar (classic) and the bottom-bar avatar (new layout).
   document.addEventListener('click', e=>{
-    const wrap=document.getElementById('profile-wrap');
-    const btn=document.getElementById('profile-btn');
-    if(!wrap) return;
-    if(btn&&btn.contains(e.target)){
-      // Toggle dropdown
-      document.getElementById('p-dropdown')?.classList.toggle('hidden');
+    const d=dd(); if(!d) return;
+    const trigger=e.target.closest&&e.target.closest('#profile-btn, #bn-profile');
+    if(trigger){
+      setProfileMenu(d.classList.contains('hidden'));
       e.stopPropagation();
       return;
     }
     // Click outside — close
-    if(!wrap.contains(e.target)) document.getElementById('p-dropdown')?.classList.add('hidden');
+    if(!d.contains(e.target)) setProfileMenu(false);
   });
+  // Bottom navbar buttons
+  document.getElementById('bn-lb')?.addEventListener('click',()=>bottomNavGo('lb'));
+  document.getElementById('bn-home')?.addEventListener('click',()=>bottomNavGo('home'));
+  document.getElementById('bn-chat')?.addEventListener('click',()=>bottomNavGo('chat'));
+
   // Theme toggle (profile menu) — switches between the light (default) and dark theme.
   const themeBtn=document.getElementById('btn-theme-toggle');
   const paintThemeBtn=()=>{
-    if(!themeBtn) return;
     const dark=document.documentElement.getAttribute('data-theme')==='dark';
-    themeBtn.textContent=dark?'☀️ Light mode':'🌙 Dark mode';
+    const emo=document.getElementById('theme-emo'), lbl=document.getElementById('theme-lbl');
+    if(emo) emo.textContent=dark?'☀️':'🌙';
+    if(lbl) lbl.textContent=dark?'Light mode':'Dark mode';
   };
   paintThemeBtn();
   themeBtn?.addEventListener('click',()=>{
@@ -995,10 +1062,25 @@ function setupOutsideClick(){
     try{ localStorage.setItem('sc-theme',toDark?'dark':'light'); }catch(e){}
     paintThemeBtn();
   });
+  // Toggle Layout (profile menu) — switch between the new bottom-bar layout and the classic one.
+  const paintLayoutHint=()=>{
+    const h=document.getElementById('layout-hint');
+    if(h) h.textContent=_isBottomLayout()?'Bottom bar':'Classic';
+  };
+  paintLayoutHint();
+  document.getElementById('btn-toggle-layout')?.addEventListener('click',()=>{
+    const toBottom=!_isBottomLayout();
+    document.documentElement.classList.toggle('bottom-layout',toBottom);
+    try{ localStorage.setItem('sc-layout',toBottom?'bottom':'classic'); }catch(e){}
+    setProfileMenu(false);
+    paintLayoutHint();
+    render();
+    syncBottomNav();
+  });
   // Fetch Updates (profile menu) — show a loader, then hard-refresh the page.
   // The loader disappears on its own because the page reloads.
   document.getElementById('btn-fetch-updates')?.addEventListener('click',()=>{
-    document.getElementById('p-dropdown')?.classList.add('hidden');
+    setProfileMenu(false);
     if(document.getElementById('fetch-updates-loader')) return;
     const l=document.createElement('div');
     l.id='fetch-updates-loader';
@@ -1008,8 +1090,9 @@ function setupOutsideClick(){
     setTimeout(()=>location.reload(), 300);
   });
   document.addEventListener('touchstart', e=>{
-    const wrap=document.getElementById('profile-wrap');
-    if(wrap&&!wrap.contains(e.target)) document.getElementById('p-dropdown')?.classList.add('hidden');
+    const t=e.target;
+    if(t.closest&&t.closest('#p-dropdown, #profile-btn, #bn-profile')) return;
+    if(dd()&&!dd().classList.contains('hidden')) setProfileMenu(false);
   },{passive:true});
 }
 /* ══════════════════════════════════════
@@ -1053,12 +1136,12 @@ function render(){
   // textarea, which blurs it and drops the mobile keyboard (the "glitch").
   if(showingChat && currentUser && !showingDismissed && !showingHalted && _screenKey==='chat'){
     const _cb=document.getElementById('chatbox'), _slot=document.getElementById('chatbox-slot');
-    if(_cb && _slot && _slot.contains(_cb)){ saveNavState(); return; }
+    if(_cb && _slot && _slot.contains(_cb)){ saveNavState(); syncBottomNav(); return; }
   }
   if(typeof chatPreRender==='function') chatPreRender();
   saveNavState();
   const nav=document.getElementById('main-nav');
-  if(!currentUser){ nav.style.display='none'; _paintView(authHTML()); attach(); return; }
+  if(!currentUser){ nav.style.display='none'; syncBottomNav(); _paintView(authHTML()); attach(); return; }
 
   // Safety: prevent students from accessing host views
   if(role==='host' && currentUser.role!=='host'){ role=null; hostAuthed=false; }
@@ -1079,10 +1162,12 @@ function render(){
   document.getElementById('nav-brand').style.cssText=isParticipant?'flex:1;text-align:center;font-size:1rem':'';
   const u=currentUser;
   document.getElementById('p-avatar').textContent=u.name[0].toUpperCase();
+  const _bnAv=document.getElementById('bn-avatar'); if(_bnAv) _bnAv.textContent=u.name[0].toUpperCase();
   document.getElementById('pd-full-name').textContent=u.name;
   document.getElementById('pd-email').textContent=u.email||(u.username?'@'+u.username:'');
 
   // Compute which screen we're on
+  syncBottomNav();
   const key=_getScreenKey();
   const screenChanged=(key!==_screenKey);
   _screenKey=key;

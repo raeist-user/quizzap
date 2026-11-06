@@ -152,6 +152,57 @@ function landingHTML(){
        <button class="btn btn-ghost btn-lg" id="btn-at-home-syllabus" style="margin-top:2px">🗂️ Syllabus Test</button>
        ${chatEntryBtn()}`;
 
+  // ── NEW LAYOUT home: hero card + 2×1 tiles (chat lives in the bottom bar) ──
+  if(document.documentElement.classList.contains('bottom-layout')){
+    let nextLine='Tap below when your host opens a session';
+    if(nextS){
+      const d=new Date(nextS.ts);
+      const t=d.toLocaleTimeString('en',{hour:'numeric',minute:'2-digit'});
+      const when=(d.toDateString()===new Date().toDateString())?('Today '+t):(d.toLocaleDateString('en-GB',{day:'numeric',month:'short'})+' '+t);
+      nextLine='Next live quiz: '+esc(nextS.title)+' · '+when;
+    }
+    let regBadge=0;
+    if(!isHost){
+      const attemptedIds=new Set((typeof myAttempts!=='undefined'&&myAttempts||[]).map(a=>(a.testId?._id||a.testId||'').toString()));
+      regBadge=((typeof availTests!=='undefined'&&availTests)||[]).filter(t=>{
+        if(attemptedIds.has(String(t._id))) return false;
+        const notYetOpen=t.availFrom&&new Date(t.availFrom).getTime()>Date.now();
+        return !notYetOpen;
+      }).length;
+    }
+    const hero=isHost
+      ?`<div class="bl-card bl-hero">
+          <div class="bl-hero-ico">🎓</div>
+          <h2>Start a live session</h2>
+          <p class="bl-sub">Pick questions, open the room and let students join.</p>
+          <button class="btn btn-dark bl-hero-btn" id="go-host">🖥 Host Interface</button>
+        </div>`
+      :`<div class="bl-card bl-hero">
+          <div class="bl-hero-ico">📚</div>
+          <h2>Join a session</h2>
+          <p class="bl-sub">${nextLine}</p>
+          <button class="btn btn-dark bl-hero-btn" id="go-join">🎓 Join Session</button>
+        </div>`;
+    const regId=isHost?'btn-tb-home-regular':'btn-at-home-regular';
+    const sylId=isHost?'btn-tb-home-syllabus':'btn-at-home-syllabus';
+    return `<div class="lb-full-screen home-scroll">
+      <div class="lb-full-inner">
+        ${isHost ? controlPanelHTML() : ''}
+        <div class="bl-col">
+          ${hero}
+          <div class="bl-tiles">
+            <button class="btn btn-ghost bl-tile" id="${regId}"><span class="bl-tile-ico">📋</span>Regular Test${regBadge?`<span class="bl-badge">${regBadge}</span>`:''}</button>
+            <button class="btn btn-ghost bl-tile" id="${sylId}"><span class="bl-tile-ico">🗂️</span>Syllabus Test</button>
+          </div>
+          ${isHost?`<button class="btn btn-ghost bl-selfquiz" id="go-selfquiz">📝 Self Quiz</button>`:''}
+          ${noticeDisplay}
+          ${isHost&&n?`<p class="muted small" style="text-align:center">${n} student${n!==1?'s':''} in session</p>`:''}
+          ${schedHint.replace('notice n-accent mt3','notice n-accent')}
+        </div>
+      </div>
+    </div>`;
+  }
+
   return `<div class="lb-full-screen home-scroll">
     <div class="lb-full-inner">
       ${isHost ? controlPanelHTML() : ''}
@@ -801,7 +852,7 @@ function controlPanelHTML(){
 
     <!-- Box-button row -->
     <div class="cp-btn-row">
-      <button class="cp-btn" id="cpbtn-join" onclick="cpToggle('join')">
+      <button class="cp-btn" id="cpbtn-join" onclick="cpToggle('join')" aria-label="Join Requests" title="Join Requests">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
           <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
           <circle cx="9" cy="7" r="4"/>
@@ -810,7 +861,7 @@ function controlPanelHTML(){
         <span class="cp-btn-label">Join Requests</span>
         ${joinRequests.length?`<span class="cp-btn-badge">${joinRequests.length}</span>`:''}
       </button>
-      <button class="cp-btn" id="cpbtn-update" onclick="cpToggle('update')">
+      <button class="cp-btn" id="cpbtn-update" onclick="cpToggle('update')" aria-label="Update Requests" title="Update Requests">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
           <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
           <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
@@ -818,7 +869,7 @@ function controlPanelHTML(){
         <span class="cp-btn-label">Update Requests</span>
         ${updateRequests.length?`<span class="cp-btn-badge">${updateRequests.length}</span>`:''}
       </button>
-      <button class="cp-btn" id="cpbtn-notice" onclick="cpToggle('notice')">
+      <button class="cp-btn" id="cpbtn-notice" onclick="cpToggle('notice')" aria-label="Global Notice" title="Global Notice">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
           <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
           <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
@@ -826,7 +877,7 @@ function controlPanelHTML(){
         <span class="cp-btn-label">Global Notice</span>
         ${hostNotice?'<span class="cp-btn-active">ON</span>':''}
       </button>
-      <button class="cp-btn" id="cpbtn-users" onclick="cpToggle('users')">
+      <button class="cp-btn" id="cpbtn-users" onclick="cpToggle('users')" aria-label="Registered Users" title="Registered Users">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
           <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
           <circle cx="9" cy="7" r="4"/>
@@ -839,6 +890,7 @@ function controlPanelHTML(){
     </div>
 
     <!-- Expandable panels -->
+    <div class="cp-stage" id="cpStage">
     <div class="cp-panel" id="cppanel-join">
       <div class="cp-panel-head">
         <span class="cp-panel-title">Join Requests</span>
@@ -885,6 +937,7 @@ function controlPanelHTML(){
           </div>`).join('')
         : '<div class="req-empty">No registered users</div>'}
       </div>
+    </div>
     </div>
   </div>`;
 }
@@ -3337,6 +3390,13 @@ function attach(){
         if(btn)   btn.classList.remove('active');
       }
     });
+    // New layout: one stage whose height animates to the open panel (panels cross-fade inside it)
+    const stage=document.getElementById('cpStage');
+    if(stage && document.documentElement.classList.contains('bottom-layout')){
+      const openPanel=panels.map(k=>document.getElementById('cppanel-'+k)).find(p=>p&&p.classList.contains('open'));
+      stage.classList.toggle('open',!!openPanel);
+      stage.style.height=openPanel?openPanel.offsetHeight+'px':'';
+    }
   };
 
   // Control Panel — admin request actions
