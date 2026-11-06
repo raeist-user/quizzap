@@ -391,6 +391,35 @@
     .form-msg{font-size:.77rem;margin-top:5px;min-height:16px;animation:fadeIn .15s ease}
     .form-msg.ok{color:var(--good)}.form-msg.err{color:var(--bad)}
 
+    /* PROFILE — category list + category pages */
+    .pcat-list{display:flex;flex-direction:column;gap:8px}
+    .pcat{width:100%;display:flex;align-items:center;gap:12px;background:var(--white);border:1px solid var(--line);border-radius:var(--r-lg);padding:14px 16px;text-align:left;cursor:pointer;font-family:inherit;color:var(--ink);-webkit-tap-highlight-color:transparent;transition:border-color var(--t-fast),background var(--t-fast),transform .12s ease}
+    .pcat:hover{border-color:var(--mid)}
+    .pcat:active{transform:scale(.985)}
+    .pcat-ico{width:38px;height:38px;border-radius:10px;background:var(--faint);color:var(--mid);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+    .pcat-txt{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+    .pcat-t{font-size:.9rem;font-weight:700;line-height:1.25}
+    .pcat-d{font-size:.76rem;color:var(--mid);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .pcat-chev{color:var(--mid);display:flex;flex-shrink:0}
+    .pcat-danger{color:var(--bad);margin-top:4px}
+    .pcat-danger .pcat-ico{background:var(--bad-bg);color:var(--bad)}
+    .pcat-danger:hover{border-color:var(--bad)}
+    .pcat-back{display:inline-flex;align-items:center;gap:4px;background:none;border:none;padding:6px 8px 6px 2px;margin:-4px 0 12px -2px;font-family:inherit;font-size:.78rem;font-weight:700;color:var(--mid);cursor:pointer;border-radius:var(--r-sm);transition:color var(--t-fast)}
+    .pcat-back:hover{color:var(--ink)}
+    .pf-top{display:flex;align-items:center;gap:16px;margin-bottom:16px}
+    .pf-avatar{width:56px;height:56px;font-size:1.2rem;transition:background .15s ease}
+    .pf-colors{flex:1;min-width:0}
+    .pf-label{font-size:.72rem;font-weight:700;color:var(--mid);margin-bottom:8px}
+    .pf-swatches{display:flex;flex-wrap:wrap;gap:10px}
+    .pf-sw{width:28px;height:28px;border-radius:50%;border:none;padding:0;cursor:pointer;flex-shrink:0;box-shadow:0 0 0 2px transparent;transition:box-shadow .15s ease,transform .12s ease;-webkit-tap-highlight-color:transparent}
+    .pf-sw:active{transform:scale(.9)}
+    .pf-sw.on{box-shadow:0 0 0 2px var(--white),0 0 0 4px var(--sw)}
+    .pf-savebar{position:sticky;bottom:12px;z-index:5;display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:12px;padding:10px 12px 10px 16px;background:var(--white);border:1px solid var(--line);border-radius:var(--r-lg);box-shadow:var(--sh-md);animation:fadeIn .15s ease}
+    .pf-savebar.hidden{display:none}
+    .pf-unsaved{display:flex;align-items:center;gap:8px;font-size:.76rem;color:var(--mid);font-weight:600;white-space:nowrap}
+    .pf-unsaved i{width:7px;height:7px;border-radius:50%;background:var(--good);flex-shrink:0}
+    .pf-save-actions{display:flex;align-items:center;gap:6px;flex-shrink:0}
+
     /* PROFILE CHARTS */
     .pov-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px}
     @media(max-width:520px){.pov-stats{grid-template-columns:repeat(2,1fr)}}
@@ -876,9 +905,8 @@ html.bottom-layout.has-bnav .bnav{display:flex}
 .bn-item.active svg{transform:translateY(-1px) scale(1.08)}
 .bn-item.active::before{transform:translateX(-50%) scaleX(1)}
 .bnav .bn-badge{position:absolute;top:16px;left:calc(50% + 6px);margin:0;min-width:16px;height:16px;padding:0 4px;border-radius:8px;font-size:.55rem;border:2px solid var(--white);box-shadow:none;box-sizing:content-box}
-.bn-avatar{width:26px;height:26px;border-radius:50%;background:var(--ink);color:#fff;display:flex;align-items:center;justify-content:center;font-size:.66rem;font-weight:800;box-shadow:0 0 0 2px transparent;transition:box-shadow var(--t-fast)}
-html[data-theme="dark"] .bn-avatar{color:#0e0e12}
-.bn-item.active .bn-avatar{box-shadow:0 0 0 2px var(--white),0 0 0 3.5px var(--ink)}
+#bn-profile svg{transition:transform .35s cubic-bezier(.34,1.56,.64,1),color var(--t-fast)}
+#bn-profile.active svg{transform:rotate(60deg) scale(1.08)}
 
 /* ── Top bar: avatar leaves it (profile lives in the bottom bar) ── */
 html.bottom-layout #profile-wrap{display:none!important}

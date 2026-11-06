@@ -3056,77 +3056,241 @@ function profileCatmullToCubic(pts){
   }
   return d;
 }
-function profilePageHTML(){
-  const u=currentUser;
-  const initials=u.name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
-  // Schedule tab removed — only in host panel
-  const TABS=[['overview','📈 Overview'],['history','📋 History'],['settings','⚙️ Settings']];
-  const tabsHTML=TABS.map(([t,l])=>`<div class="ptab${profileTab===t?' active':''}" data-ptab="${t}">${l}</div>`).join('');
+/* ── Profile identity / password UI state ───────────────────────────────── */
+// Limited, curated palette — deliberately not a full color wheel.
+const PROFILE_COLORS=['#A3E635','#38BDF8','#F472B6','#FB923C','#C084FC','#F87171','#2DD4BF','#FACC15'];
+let identityDirty=false, passwordDirty=false;
+let _pfBase=null;        // last saved/submitted {name, uname, color} — the form is "dirty" when it differs
+let _pfColor=null;       // color currently picked in the form
 
-  let body='';
+const _PI={ // inline icons (lucide paths)
+  user:'<path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>',
+  chart:'<path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="m19 9-5 5-4-4-3 3"/>',
+  list:'<path d="M3 12h.01"/><path d="M3 18h.01"/><path d="M3 6h.01"/><path d="M8 12h13"/><path d="M8 18h13"/><path d="M8 6h13"/>',
+  lock:'<rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
+  right:'<path d="m9 18 6-6-6-6"/>',
+  left:'<path d="m15 18-6-6 6-6"/>',
+  out:'<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>'
+};
+function _pico(n,s){ s=s||18; return `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">${_PI[n]}</svg>`; }
 
-  if(profileTab==='overview'||profileTab==='history'){
-    // Render a skeleton — real data loaded async by loadProfileData()
-    body=`<div id="profile-data-body">
+const PROFILE_CATEGORIES=[
+  {id:'profile', icon:'user',  label:'Profile',  desc:'Display name, username & color'},
+  {id:'overview',icon:'chart', label:'Overview', desc:'Stats, charts & activity'},
+  {id:'history', icon:'list',  label:'History',  desc:'Past session results'},
+  {id:'account', icon:'lock',  label:'Account',  desc:'Password & sign out'}
+];
+
+/* Avatar color — kept on this device, per account */
+function _avatarKey(u){ return 'sc-avatar-color:'+String((u&&(u.id||u._id||u.username||u.email))||'me'); }
+function getAvatarColor(u){ try{ const c=localStorage.getItem(_avatarKey(u)); return PROFILE_COLORS.includes(c)?c:null; }catch(e){ return null; } }
+function saveAvatarColor(u,c){ try{ if(c) localStorage.setItem(_avatarKey(u),c); else localStorage.removeItem(_avatarKey(u)); }catch(e){} }
+function applyAvatarColor(el,c){
+  if(!el) return;
+  if(c){ el.style.background=c; el.style.color='#0e0e12'; }
+  else { el.style.background=''; el.style.color=''; }
+}
+
+function profileSwatchesHTML(){
+  return PROFILE_COLORS.map(c=>`<button type="button" class="pf-sw${c===_pfColor?' on':''}" data-pfcolor="${c}" title="${c}" aria-label="Pick color ${c}" style="background:${c};--sw:${c}"></button>`).join('');
+}
+
+function profileCategoryHTML(u){
+  if(profileTab==='profile'){
+    const isStudent=u.role!=='host';
+    const hasUsername=!!u.username;
+    const note=isStudent?`<div class="notice n-accent" style="font-size:.77rem;margin-bottom:14px">ℹ️ Name and username changes require host approval before taking effect.</div>`:'';
+    const initials=u.name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+    return `
+    <div class="psec">
+      <div class="pf-top">
+        <div class="ph-avatar pf-avatar" id="pf-avatar">${esc(initials)}</div>
+        <div class="pf-colors">
+          <div class="pf-label">Profile color</div>
+          <div class="pf-swatches" id="pf-swatches">${profileSwatchesHTML()}</div>
+        </div>
+      </div>
+      ${note}
+      <div class="form-row"><label>Display name</label><input class="form-input" id="p-disp-in" maxlength="32" value="${esc(u.name)}" placeholder="Your quiz nickname"/></div>
+      <div class="form-row" style="margin-bottom:0"><label>Username</label><div style="position:relative"><input class="form-input" id="p-uname-in" maxlength="30" value="${esc(u.username||'')}" placeholder="your_username" autocapitalize="none" spellcheck="false" style="padding-right:36px"/><span id="p-un-status" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);font-size:.85rem;line-height:1;pointer-events:none"></span></div></div>
+      <small id="p-un-hint" style="font-size:.72rem;margin-top:5px;display:block;color:var(--mid)">${hasUsername?'Used for login. Once set it cannot be removed, only changed.':'You haven\'t set one yet — add one to log in without email. It cannot be removed later.'} Letters, numbers, underscores · 3–30 characters.</small>
+      <p class="muted" style="font-size:.72rem;margin-top:8px">Display name is shown during quizzes. Profile color is saved on this device.</p>
+    </div>
+    <div class="form-msg" id="p-prof-msg"></div>
+    <div class="pf-savebar hidden" id="pf-savebar">
+      <span class="pf-unsaved"><i></i>Unsaved changes</span>
+      <div class="pf-save-actions">
+        <button class="btn btn-ghost btn-sm" id="btn-pf-discard" type="button">Discard</button>
+        <button class="btn btn-dark btn-sm" id="btn-pf-save" type="button">Submit${isStudent?' for approval':''}</button>
+      </div>
+    </div>`;
+  }
+  if(profileTab==='account'){
+    return `
+    <div class="psec">
+      <h3>🔑 Change Password</h3>
+      <div class="form-row"><label>Current password</label><input class="form-input" type="password" id="p-pw-cur" placeholder="Current password"/></div>
+      <div class="form-row"><label>New password</label><input class="form-input" type="password" id="p-pw-new" placeholder="Min 6 characters"/></div>
+      <div class="form-row" style="margin-bottom:0"><label>Confirm new</label><input class="form-input" type="password" id="p-pw-new2" placeholder="Repeat new password"/></div>
+    </div>
+    <div class="form-msg" id="p-pw-msg"></div>
+    <div class="pf-savebar hidden" id="pw-savebar">
+      <span class="pf-unsaved"><i></i>Unsaved changes</span>
+      <div class="pf-save-actions">
+        <button class="btn btn-ghost btn-sm" id="btn-pw-discard" type="button">Discard</button>
+        <button class="btn btn-dark btn-sm" id="btn-save-pw" type="button">Update password</button>
+      </div>
+    </div>
+    <button class="pcat pcat-danger" id="btn-account-signout" type="button">
+      <span class="pcat-ico">${_pico('out')}</span>
+      <span class="pcat-txt"><span class="pcat-t">Sign out</span></span>
+    </button>`;
+  }
+  // overview / history — filled in async by loadProfileData()
+  return `<div id="profile-data-body">
       <div style="text-align:center;padding:48px 16px;color:var(--mid)">
         <div style="font-size:1.5rem;margin-bottom:10px;opacity:.4">⏳</div>
         <div style="font-size:.83rem">Loading…</div>
       </div>
     </div>`;
-  }
-  if(profileTab==='settings'){
-    const hasUsername=!!(u.username);
-    const isStudent = u.role !== 'host';
-    const approvalNote = isStudent
-      ? `<div class="notice n-accent" style="font-size:.77rem;margin-bottom:10px">ℹ️ Name and username changes require host approval before taking effect.</div>`
-      : '';
-    body=`
-    <div class="psec">
-      <h3>🎭 Session Display Name</h3>
-      ${approvalNote}
-      <p class="muted small mb2" style="font-size:.77rem">Shown during quizzes instead of your full name.</p>
-      <div class="form-row"><label>Display name</label><input class="form-input" id="p-disp-in" maxlength="32" value="${esc(u.name)}" placeholder="Your quiz nickname"/></div>
-      <button class="btn btn-dark btn-sm" id="btn-save-disp">Submit${isStudent?' for approval':''}</button>
-      <div class="form-msg" id="p-disp-msg"></div>
-    </div>
-    <div class="psec">
-      <h3>🪪 Username</h3>
-      ${hasUsername
-        ? `<p class="muted small mb2" style="font-size:.77rem">Your username is used for login. Once set it cannot be removed, only changed.</p>
-           <div class="form-row"><label>Username</label><div style="position:relative"><input class="form-input" id="p-uname-in" maxlength="30" value="${esc(u.username)}" placeholder="your_username" autocapitalize="none" spellcheck="false" style="padding-right:36px"/><span id="p-un-status" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);font-size:.85rem;line-height:1;pointer-events:none"></span></div></div>
-           <small id="p-un-hint" style="font-size:.72rem;margin-top:3px;display:block;color:var(--mid)">Letters, numbers, underscores · 3–30 characters</small>`
-        : `<p class="muted small mb2" style="font-size:.77rem">You didn't set a username when registering. Add one now to log in without email. Once set it cannot be removed.</p>
-           <div class="form-row"><label>Username</label><div style="position:relative"><input class="form-input" id="p-uname-in" maxlength="30" placeholder="your_username" autocapitalize="none" spellcheck="false" style="padding-right:36px"/><span id="p-un-status" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);font-size:.85rem;line-height:1;pointer-events:none"></span></div></div>
-           <small id="p-un-hint" style="font-size:.72rem;margin-top:3px;display:block;color:var(--mid)">Letters, numbers, underscores · 3–30 characters</small>`
-      }
-      <button class="btn btn-dark btn-sm mt1" id="btn-save-uname">${hasUsername?`Update username${isStudent?' (submit for approval)':''}`:isStudent?'Set username (submit for approval)':'Set username'}</button>
-      <div class="form-msg" id="p-uname-msg"></div>
-    </div>
-    <div class="psec">
-      <h3>🔑 Change Password</h3>
-      <div class="form-row"><label>Current password</label><input class="form-input" type="password" id="p-pw-cur" placeholder="Current password"/></div>
-      <div class="form-row"><label>New password</label><input class="form-input" type="password" id="p-pw-new" placeholder="Min 6 characters"/></div>
-      <div class="form-row"><label>Confirm new</label><input class="form-input" type="password" id="p-pw-new2" placeholder="Repeat new password"/></div>
-      <button class="btn btn-dark btn-sm" id="btn-save-pw">Update password</button>
-      <div class="form-msg" id="p-pw-msg"></div>
-    </div>`;
-  }
+}
 
-  const disp=u.name;
-  return `<div class="profile-page">
-    <div class="row gap2 mb3">
-      <span style="font-size:.95rem;font-weight:600">My Profile</span>
-    </div>
-    <div class="profile-hero">
-      <div class="ph-avatar">${initials}</div>
+function profilePageHTML(){
+  const u=currentUser;
+  const initials=u.name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+  const col=getAvatarColor(u);
+  const avStyle=col?` style="background:${col};color:#0e0e12"`:'';
+  // Static header — always the last *saved* identity; editing lives in the Profile category
+  const hero=`<div class="profile-hero">
+      <div class="ph-avatar"${avStyle}>${esc(initials)}</div>
       <div class="ph-info">
-        <div class="ph-name">${esc(disp)}</div>
-        <div class="ph-email">${u.email ? esc(u.email) : ''}${u.username ? `<span style="color:var(--mid);margin-left:6px">· @${esc(u.username)}</span>` : ''}</div>
+        <div class="ph-name">${esc(u.name)}</div>
+        <div class="ph-email">${u.email?esc(u.email):''}${u.username?`<span style="color:var(--mid);margin-left:${u.email?'6px':'0'}">· @${esc(u.username)}</span>`:''}</div>
       </div>
-    </div>
-    <div class="ptabs">${tabsHTML}</div>
-    ${body}
-  </div>`;
+    </div>`;
+
+  let body;
+  if(profileTab==='menu'||!PROFILE_CATEGORIES.some(c=>c.id===profileTab)){
+    body=`<div class="pcat-list">${PROFILE_CATEGORIES.map(c=>`
+      <button class="pcat" type="button" data-pcat="${c.id}">
+        <span class="pcat-ico">${_pico(c.icon)}</span>
+        <span class="pcat-txt"><span class="pcat-t">${c.label}</span><span class="pcat-d">${c.desc}</span></span>
+        <span class="pcat-chev">${_pico('right',16)}</span>
+      </button>`).join('')}</div>`;
+  } else {
+    body=`<button class="pcat-back" id="btn-pcat-back" type="button">${_pico('left',14)}<span>Categories</span></button>
+    ${profileCategoryHTML(u)}`;
+  }
+  return `<div class="profile-page">${hero}${body}</div>`;
+}
+
+/* ── Profile page behaviour ─────────────────────────────────────────────── */
+function profileConfirmDiscard(){
+  if((identityDirty||passwordDirty)&&!confirm('You have unsaved changes. Discard them?')) return false;
+  identityDirty=false; passwordDirty=false; return true;
+}
+function profileOpenCategory(cat){
+  profileTab=cat; identityDirty=false; passwordDirty=false; _pfBase=null; _pfColor=null;
+  render(); window.scrollTo(0,0);
+  if(cat==='overview'&&!allTimeLB) fetchLeaderboard('all');
+}
+function profileCloseCategory(){
+  if(!profileConfirmDiscard()) return;
+  profileTab='menu'; _pfBase=null; _pfColor=null;
+  render(); window.scrollTo(0,0);
+}
+function profileCheckDirty(){
+  const u=currentUser; if(!u||!_pfBase) return;
+  const name=(document.getElementById('p-disp-in')?.value||'').trim();
+  const uname=(document.getElementById('p-uname-in')?.value||'').trim();
+  identityDirty=(name!==_pfBase.name)||(uname!==_pfBase.uname)||(_pfColor!==_pfBase.color);
+  document.getElementById('pf-savebar')?.classList.toggle('hidden',!identityDirty);
+}
+function profilePwCheckDirty(){
+  const any=['p-pw-cur','p-pw-new','p-pw-new2'].some(id=>document.getElementById(id)?.value);
+  passwordDirty=any;
+  document.getElementById('pw-savebar')?.classList.toggle('hidden',!any);
+}
+async function submitProfileChanges(){
+  const u=currentUser; if(!u||!_pfBase) return;
+  const msg=document.getElementById('p-prof-msg'); if(!msg) return;
+  const btn=document.getElementById('btn-pf-save');
+  const name=(document.getElementById('p-disp-in')?.value||'').trim();
+  const uname=(document.getElementById('p-uname-in')?.value||'').trim();
+  const nameChanged=name!==_pfBase.name, unameChanged=uname!==_pfBase.uname, colorChanged=_pfColor!==_pfBase.color;
+  if(nameChanged&&!name){ msg.className='form-msg err'; msg.textContent='Display name required'; return; }
+  if(unameChanged){
+    if(!uname){ msg.className='form-msg err'; msg.textContent='Username can\'t be removed once set'; return; }
+    if(!/^[a-zA-Z0-9_]{3,30}$/.test(uname)){ msg.className='form-msg err'; msg.textContent='Username: 3–30 chars, letters/numbers/underscores only'; return; }
+    if(document.getElementById('p-un-status')?.textContent==='🚫'){ msg.className='form-msg err'; msg.textContent='That username is already taken'; return; }
+  }
+  if(btn) btn.disabled=true;
+  const pendingMsgs=[]; let saved=false;
+  try{
+    if(nameChanged){
+      const d=await apiPost('/api/update-name',{displayName:name},true);
+      if(d.pending) pendingMsgs.push(d.message); else { saveAuth(d.token,d.user); saved=true; }
+    }
+    if(unameChanged){
+      const d=await apiPost('/api/update-username',{username:uname},true);
+      if(d.pending) pendingMsgs.push(d.message); else { saveAuth(d.token,d.user); saved=true; }
+    }
+    if(colorChanged){ saveAvatarColor(currentUser,_pfColor); saved=true; }
+  }catch(e){
+    msg.className='form-msg err'; msg.textContent=e.message;
+    if(btn) btn.disabled=false; return;
+  }
+  _pfBase={name,uname,color:_pfColor};
+  identityDirty=false;
+  document.getElementById('pf-savebar')?.classList.add('hidden');
+  if(btn) btn.disabled=false;
+  msg.className='form-msg ok';
+  msg.textContent=pendingMsgs.length?('⏳ '+pendingMsgs.join(' ')):'✓ Saved!';
+  if(saved&&!pendingMsgs.length) setTimeout(()=>{ if(showingProfile&&profileTab==='profile') render(); },700);
+  else if(colorChanged) applyAvatarColor(document.getElementById('p-avatar'),getAvatarColor(currentUser));
+}
+async function submitPasswordChange(){
+  const cur=document.getElementById('p-pw-cur')?.value;
+  const nw=document.getElementById('p-pw-new')?.value;
+  const nw2=document.getElementById('p-pw-new2')?.value;
+  const msg=document.getElementById('p-pw-msg'); if(!msg) return;
+  if(!cur||!nw||!nw2){ msg.className='form-msg err'; msg.textContent='Fill in all three fields'; return; }
+  if(nw!==nw2){ msg.className='form-msg err'; msg.textContent='New passwords do not match'; return; }
+  try{
+    await apiPost('/api/change-password',{currentPassword:cur,newPassword:nw},true);
+    msg.className='form-msg ok'; msg.textContent='✓ Password updated!';
+    ['p-pw-cur','p-pw-new','p-pw-new2'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
+    passwordDirty=false; document.getElementById('pw-savebar')?.classList.add('hidden');
+  }catch(e){ msg.className='form-msg err'; msg.textContent=e.message; }
+}
+function setupProfileForms(){
+  if(!showingProfile) return;
+  document.querySelectorAll('[data-pcat]').forEach(el=>el.addEventListener('click',()=>profileOpenCategory(el.dataset.pcat)));
+  on('btn-pcat-back',profileCloseCategory);
+  const u=currentUser;
+  if(profileTab==='profile'&&u){
+    if(!_pfBase){ _pfColor=getAvatarColor(u); _pfBase={name:u.name,uname:u.username||'',color:_pfColor}; }
+    applyAvatarColor(document.getElementById('pf-avatar'),_pfColor);
+    document.getElementById('pf-swatches')?.addEventListener('click',e=>{
+      const b=e.target.closest('[data-pfcolor]'); if(!b) return;
+      // tapping the active swatch again goes back to the default color
+      _pfColor=(_pfColor===b.dataset.pfcolor)?null:b.dataset.pfcolor;
+      document.getElementById('pf-swatches').innerHTML=profileSwatchesHTML();
+      applyAvatarColor(document.getElementById('pf-avatar'),_pfColor);
+      profileCheckDirty();
+    });
+    document.getElementById('p-disp-in')?.addEventListener('input',profileCheckDirty);
+    document.getElementById('p-uname-in')?.addEventListener('input',profileCheckDirty);
+    on('btn-pf-save',submitProfileChanges);
+    on('btn-pf-discard',()=>{ identityDirty=false; _pfBase=null; _pfColor=null; render(); });
+    profileCheckDirty();
+  }
+  if(profileTab==='account'){
+    ['p-pw-cur','p-pw-new','p-pw-new2'].forEach(id=>document.getElementById(id)?.addEventListener('input',profilePwCheckDirty));
+    on('btn-save-pw',submitPasswordChange);
+    on('btn-pw-discard',()=>{ passwordDirty=false; render(); });
+    on('btn-account-signout',()=>{ if(confirm('Sign out of this account?')) doLogout(); });
+  }
 }
 
 /* ══════════════════════════════════════
@@ -3192,13 +3356,8 @@ function attach(){
   // Profile dropdown — one-time setup handled in setupOutsideClick() above
   setupOutsideClick();
   on('btn-logout', doLogout);
-  on('btn-profile',()=>{ showingProfile=true; profileTab='overview'; document.getElementById('p-dropdown')?.classList.add('hidden'); navPush(); render(); if(!allTimeLB) fetchLeaderboard('all'); });
+  on('btn-profile',()=>{ showingProfile=true; profileTab='menu'; identityDirty=false; passwordDirty=false; _pfBase=null; _pfColor=null; setProfileMenu(false); navPush(); render(); window.scrollTo(0,0); });
   on('btn-profile-back',()=>{ showingProfile=false; render(); });
-  document.querySelectorAll('.ptab[data-ptab]').forEach(el=>el.addEventListener('click',()=>{
-    profileTab=el.dataset.ptab;
-    render();
-    if(profileTab==='overview'&&!allTimeLB) fetchLeaderboard('all');
-  }));
   document.querySelectorAll('.ptab[data-itab]').forEach(el=>el.addEventListener('click',()=>{
     inspectTab=el.dataset.itab;
     inspectCache=null;
@@ -3206,6 +3365,7 @@ function attach(){
   }));
   if(showingProfile){
     requestAnimationFrame(setupProfileCharts);
+    setupProfileForms();
   }
 
   on('btn-dismissed-home', doDismissHome);
@@ -3243,21 +3403,6 @@ function attach(){
   on('btn-nav-back', doBack);
 
   // Profile settings
-  on('btn-save-disp', async ()=>{
-    const v=document.getElementById('p-disp-in')?.value?.trim();
-    const msg=document.getElementById('p-disp-msg'); if(!msg)return;
-    if(!v){msg.className='form-msg err';msg.textContent='Name required';return;}
-    try{
-      const d=await apiPost('/api/update-name',{displayName:v},true);
-      if(d.pending){
-        msg.className='form-msg ok';
-        msg.textContent='⏳ '+d.message;
-      } else {
-        saveAuth(d.token,d.user); msg.className='form-msg ok'; msg.textContent='✓ Saved!';
-        setTimeout(()=>render(),700);
-      }
-    }catch(e){msg.className='form-msg err';msg.textContent=e.message;}
-  });
   // Username live availability check in profile settings
   document.getElementById('p-uname-in')?.addEventListener('input', async (e)=>{
     const val=e.target.value.trim();
@@ -3274,37 +3419,6 @@ function attach(){
       status.textContent=j.available?'✅':'🚫';
       if(hint)hint.textContent=j.available?'Username is available':'Username is already taken';
     }catch(_){status.textContent='';}
-  });
-  on('btn-save-uname', async ()=>{
-    const v=document.getElementById('p-uname-in')?.value?.trim();
-    const msg=document.getElementById('p-uname-msg'); if(!msg)return;
-    if(!v){msg.className='form-msg err';msg.textContent='Username required';return;}
-    if(!/^[a-zA-Z0-9_]{3,30}$/.test(v)){msg.className='form-msg err';msg.textContent='3–30 chars, letters/numbers/underscores only';return;}
-    const status=document.getElementById('p-un-status');
-    if(status?.textContent==='🚫'){msg.className='form-msg err';msg.textContent='That username is already taken';return;}
-    try{
-      const d=await apiPost('/api/update-username',{username:v},true);
-      if(d.pending){
-        msg.className='form-msg ok';
-        msg.textContent='⏳ '+d.message;
-      } else {
-        saveAuth(d.token,d.user); msg.className='form-msg ok'; msg.textContent='✓ Username saved!';
-        setTimeout(()=>render(),800);
-      }
-    }catch(e){msg.className='form-msg err';msg.textContent=e.message;}
-  });
-  on('btn-save-pw', async ()=>{
-    const cur=document.getElementById('p-pw-cur')?.value;
-    const nw=document.getElementById('p-pw-new')?.value;
-    const nw2=document.getElementById('p-pw-new2')?.value;
-    const msg=document.getElementById('p-pw-msg'); if(!msg)return;
-    if(!cur||!nw||!nw2){msg.className='form-msg err';msg.textContent='Fill all fields';return;}
-    if(nw!==nw2){msg.className='form-msg err';msg.textContent='New passwords do not match';return;}
-    try{
-      await apiPost('/api/change-password',{currentPassword:cur,newPassword:nw},true);
-      msg.className='form-msg ok'; msg.textContent='✓ Password updated!';
-      ['p-pw-cur','p-pw-new','p-pw-new2'].forEach(id=>{ const el=document.getElementById(id); if(el)el.value=''; });
-    }catch(e){msg.className='form-msg err';msg.textContent=e.message;}
   });
 
   // Teacher Dashboard event handlers
@@ -4812,7 +4926,7 @@ function doDismissHome(){
   // Pre-fetch all three tabs in the background ready for when the user opens LB
   fetchLeaderboard();
 }
-function doLogout(){ if(typeof chatReset==='function') chatReset(); showingChat=false; clearAuth(); role=null; myPid=null; myName=null; hostAuthed=false; HOST_PASSWORD_INPUT=''; showingProfile=false; prevMyScore=0; scoreGain=0; myLastAnswerTime=null; localAnswerTimes={}; cumulativeAnswerTimes={}; sessionCorrectTimes=[]; startTimerDisplay._lastStart=null; studentQCount=0; todayLB=null; weekLB=null; allTimeLB=null; lbFetched={today:null,week:null,all:null}; lbErrors={today:null,week:null,all:null}; serverSchedules=null; hostSchedules=[]; hostNotice=''; joinRequests=[]; updateRequests=[]; sessionStorage.removeItem(NAV_KEY); sessionStorage.removeItem('scc_hpw'); _screenKey=''; render(); }
+function doLogout(){ if(typeof chatReset==='function') chatReset(); showingChat=false; profileTab='menu'; identityDirty=false; passwordDirty=false; _pfBase=null; _pfColor=null; clearAuth(); role=null; myPid=null; myName=null; hostAuthed=false; HOST_PASSWORD_INPUT=''; showingProfile=false; prevMyScore=0; scoreGain=0; myLastAnswerTime=null; localAnswerTimes={}; cumulativeAnswerTimes={}; sessionCorrectTimes=[]; startTimerDisplay._lastStart=null; studentQCount=0; todayLB=null; weekLB=null; allTimeLB=null; lbFetched={today:null,week:null,all:null}; lbErrors={today:null,week:null,all:null}; serverSchedules=null; hostSchedules=[]; hostNotice=''; joinRequests=[]; updateRequests=[]; sessionStorage.removeItem(NAV_KEY); sessionStorage.removeItem('scc_hpw'); _screenKey=''; render(); }
 
 /* Shared back navigation */
 function doBack(){
@@ -4827,7 +4941,8 @@ function doBack(){
   if(showingChat){ showingChat=false; navPush(); render(); return; }
   if(inspectingUser){ inspectingUser=null; inspectTab='overview'; inspectCache=null; render(); return; }
   if(showingProfile){
-    showingProfile=false;
+    if(!profileConfirmDiscard()) return;
+    showingProfile=false; profileTab='menu'; _pfBase=null; _pfColor=null;
     navPush(); // push a new state so further back press goes home
     render(); return;
   }

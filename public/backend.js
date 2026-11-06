@@ -6,7 +6,7 @@ let currentUser=null;
 let authToken=null;
 
 // Profile page
-let showingProfile=false, profileTab='overview';
+let showingProfile=false, profileTab='menu';
 let showingChat=false;   // #Chatbox chat opens as its own full-screen window
 
 // Score tracking for +N badge
@@ -363,7 +363,7 @@ function loadNavState(){
     myName        = st.myName        ?? null;
     showingProfile= st.showingProfile?? false;
     showingChat   = st.showingChat   ?? false;
-    profileTab    = st.profileTab    ?? 'overview';
+    profileTab    = ['menu','profile','overview','history','account'].includes(st.profileTab) ? st.profileTab : 'menu';
     homeSection   = st.homeSection   ?? 'home';
     // myPid already persisted separately in sessionStorage by existing code
     if(myName) myPid = sessionStorage.getItem('qz_pid') || null;
@@ -992,8 +992,6 @@ function syncBottomNav(){
   [['lb','bn-lb'],['home','bn-home'],['chat','bn-chat'],['profile','bn-profile']].forEach(([k,id])=>{
     document.getElementById(id)?.classList.toggle('active',k===active);
   });
-  const av=document.getElementById('bn-avatar');
-  if(av&&currentUser?.name) av.textContent=currentUser.name[0].toUpperCase();
   const badge=document.querySelector('#bn-chat .chat-unread');
   if(badge&&typeof window.chatUnreadLabel==='function'){
     const l=window.chatUnreadLabel(); badge.textContent=l; badge.style.display=l?'':'none';
@@ -1162,7 +1160,7 @@ function render(){
   document.getElementById('nav-brand').style.cssText=isParticipant?'flex:1;text-align:center;font-size:1rem':'';
   const u=currentUser;
   document.getElementById('p-avatar').textContent=u.name[0].toUpperCase();
-  const _bnAv=document.getElementById('bn-avatar'); if(_bnAv) _bnAv.textContent=u.name[0].toUpperCase();
+  if(typeof applyAvatarColor==='function') applyAvatarColor(document.getElementById('p-avatar'),getAvatarColor(u));
   document.getElementById('pd-full-name').textContent=u.name;
   document.getElementById('pd-email').textContent=u.email||(u.username?'@'+u.username:'');
 
@@ -1198,6 +1196,8 @@ function render(){
     });
   } else {
     // Same screen — swap content silently, no animation flash
+    // …but never wipe a profile / password form the user is in the middle of editing
+    if(showingProfile&&(identityDirty||passwordDirty)) return;
     const v=document.getElementById('view');
     if(v){ v.innerHTML=html; }
     _injectTestOverlays();
