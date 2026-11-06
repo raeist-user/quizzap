@@ -25,6 +25,7 @@
   let el = null;            // the persistent #chatbox element
   let ws = null, wsTimer = null, wsToken = null, closed = false;
   let msgs = [], pinned = [], online = [], rxList = DEFAULT_RX;
+  let onlineKnown = false;  // false until the server has told us who is online (and again while disconnected)
   let hasMore = false, loaded = false, loading = false, loadErr = '';
   let popup = null;         // 'online' | 'pins' | null
   let editingId = null;
@@ -178,18 +179,22 @@
   function paintCounts() {
     const p = $('#cb-pin-n');
     if (p) p.textContent = pinned.length || '';
-    document.querySelectorAll('.online-n').forEach(n => { n.textContent = online.length; });
+    document.querySelectorAll('.online-n').forEach(n => { n.textContent = onlineKnown ? online.length : '–'; });
     if (onlinePopEl && onlinePopEl.classList.contains('show')) paintOnlinePop();
   }
 
   /* ── online members popup (opened from the Home screen) ── */
   let onlinePopEl = null;
+  /* single source of truth for the online list (used by both the home popup and the in-chat popup) */
+  function onlineTitle() { return onlineKnown ? `Members online — ${online.length}` : 'Members online'; }
+  function onlineRowsHTML() {
+    if (!onlineKnown) return '<div class="cb-empty">Connecting…</div>';
+    if (!online.length) return '<div class="cb-empty">Nobody online</div>';
+    return online.map(u => `<div class="cb-member"><div class="cb-av sm ${u.role === 'host' ? 'host' : ''}">${initial(u.name)}</div><div class="cb-mname">${E(u.name)}${u.role === 'host' ? ' <small>host</small>' : ''}</div><span class="cb-member-ic">${ICON.users}</span></div>`).join('');
+  }
   function paintOnlinePop() {
     if (!onlinePopEl) return;
-    const body = online.length
-      ? online.map(u => `<div class="cb-member"><div class="cb-av sm ${u.role === 'host' ? 'host' : ''}">${initial(u.name)}</div><div class="cb-mname">${E(u.name)}${u.role === 'host' ? ' <small>host</small>' : ''}</div><span class="cb-member-ic">${ICON.users}</span></div>`).join('')
-      : '<div class="cb-empty">Nobody online</div>';
-    onlinePopEl.innerHTML = `<div class="cb-pop"><div class="cb-pop-head"><b>${ICON.users} Members online — ${online.length}</b><button data-close>✕</button></div><div class="cb-pop-body">${body}</div></div>`;
+    onlinePopEl.innerHTML = `<div class="cb-pop"><div class="cb-pop-head"><b>${ICON.users} ${onlineTitle()}</b><button data-close>✕</button></div><div class="cb-pop-body">${onlineRowsHTML()}</div></div>`;
   }
   window.chatOnlinePopup = function () {
     if (!onlinePopEl) {
@@ -203,7 +208,7 @@
     paintOnlinePop();
     onlinePopEl.classList.add('show');
   };
-  window.chatOnlineCount = () => online.length;
+  window.chatOnlineCount = () => (onlineKnown ? online.length : 0);
   const navOn = document.getElementById('nav-online');
   if (navOn) navOn.addEventListener('click', () => window.chatOnlinePopup());
 
@@ -212,8 +217,8 @@
     if (!popup) { host.innerHTML = ''; return; }
     let title, body;
     if (popup === 'online') {
-      title = `Online — ${online.length}`;
-      body = online.length ? online.map(u => `<div class="cb-member"><div class="cb-av sm ${u.role === 'host' ? 'host' : ''}">${initial(u.name)}</div><div class="cb-mname">${E(u.name)}${u.role === 'host' ? ' <small>host</small>' : ''}</div></div>`).join('') : '<div class="cb-empty">Nobody online</div>';
+      title = `${ICON.users} ${onlineTitle()}`;
+      body = onlineRowsHTML();
     } else {
       title = `Pinned — ${pinned.length}`;
       body = pinned.length ? pinned.map(m => `<div class="cb-pin-item" data-cb="jump" data-id="${m.id}"><div class="cb-name ${m.role === 'host' ? 'host' : ''}">${E(m.userName)}</div><div class="cb-text">${E(m.text.length > 160 ? m.text.slice(0, 160) + '…' : m.text)}</div><div class="cb-pinby">${m.pinnedBy ? 'Pinned by ' + E(m.pinnedBy) : ''}</div>${isHost() ? `<button class="cb-unpin" data-cb="unpin" data-id="${m.id}">Unpin</button>` : ''}</div>`).join('') : '<div class="cb-empty">No pinned messages</div>';
@@ -227,7 +232,7 @@
     loading = true; loadErr = '';
     try {
       const j = await api('/messages');
-      msgs = j.messages || []; pinned = j.pinned || []; online = j.online || online;
+      msgs = j.messages || []; pinned = j.pinned || []; if (j.online) { online = j.online; onlineKnown = true; }
       if (j.reactions?.length) rxList = j.reactions;
       hasMore = !!j.hasMore; loaded = true; stick = true;
       initRead();
@@ -292,6 +297,8 @@
     ws.onmessage = ev => { let d; try { d = JSON.parse(ev.data); } catch { return; } handle(d); };
     ws.onclose = e => {
       ws = null;
+      // Disconnected: we no longer know who is online — don't show a stale list.
+      online = []; onlineKnown = false; paintCounts(); if (popup === 'online') paintPopup();
       if (closed || e.code === 4001) return;
       clearTimeout(wsTimer); wsTimer = setTimeout(() => { connect(); if (loaded) refreshQuiet(); }, 3000);
     };
@@ -301,7 +308,9 @@
   async function refreshQuiet() {
     try {
       const j = await api('/messages');
-      msgs = j.messages || []; pinned = j.pinned || []; hasMore = !!j.hasMore; paintList();
+      msgs = j.messages || []; pinned = j.pinned || []; hasMore = !!j.hasMore;
+      if (j.online) { online = j.online; onlineKnown = true; }
+      paintList();
       if (isOpen()) markRead(); else paintBadge(true);
     } catch { }
   }
@@ -309,7 +318,7 @@
   function handle(d) {
     const list = $('#cb-list');
     const atBottom = list ? (list.scrollHeight - list.scrollTop - list.clientHeight < 80) : true;
-    if (d.type === 'presence') { online = d.users || []; paintCounts(); if (popup === 'online') paintPopup(); return; }
+    if (d.type === 'presence') { online = d.users || []; onlineKnown = true; paintCounts(); if (popup === 'online') paintPopup(); return; }
     if (!loaded) return;
     if (d.type === 'msg_new') {
       if (msgs.some(m => m.id === d.message.id)) return;
@@ -556,6 +565,11 @@
     }
   };
 
+  // Keep the presence socket up on every screen, even if a render path never calls chatMount().
+  setInterval(() => {
+    try { if (!closed && typeof authToken !== 'undefined' && authToken && me() && !ws) connect(); } catch { }
+  }, 5000);
+
   window.chatUnreadLabel = unreadLabel;
 
   window.chatReset = function () {
@@ -563,9 +577,10 @@
     if (onlinePopEl) onlinePopEl.classList.remove('show');
     try { ws && ws.close(); } catch { }
     ws = null; wsToken = null;
-    msgs = []; pinned = []; online = []; hasMore = false; loaded = false; loading = false; loadErr = '';
+    msgs = []; pinned = []; online = []; onlineKnown = false; hasMore = false; loaded = false; loading = false; loadErr = '';
     popup = null; menuFor = null; pickerFor = null; editingId = null; actionsFor = null; draft = ''; stick = true;
     readTs = null;
+    paintCounts();
     document.documentElement.classList.remove('chat-open');
     if (el && el.parentNode) el.parentNode.removeChild(el);
     el = null;
