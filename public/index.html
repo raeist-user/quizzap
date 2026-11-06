@@ -9,8 +9,95 @@
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,600;0,9..144,700;1,9..144,400&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Nastaliq+Urdu:wght@400..700&display=swap" rel="stylesheet"/>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css"/>
-  <link rel="stylesheet" href="styles.css?v=newlayout2"/>
-  <style>.pd-svg{display:none;width:18px;height:18px}.bnav,.p-scrim{display:none}</style>
+  <link rel="stylesheet" href="styles.css"/>
+  <style id="new-layout-css">
+/* ═══════════════════════════════════════════════════════════════════
+   NEW LAYOUT  (html.bottom-layout) — bottom navbar, profile sheet,
+   hero/tile home, icon-only control panel.
+   Everything below is scoped to html.bottom-layout, so the classic
+   layout (Toggle Layout → Classic) is untouched.
+═══════════════════════════════════════════════════════════════════ */
+:root{--bn-h:calc(68px + env(safe-area-inset-bottom,0px))}
+
+/* ── Bottom navbar: FIXED to the viewport, so it always floats above the
+   browser's own bottom bar instead of falling underneath it ── */
+.bnav{display:none;position:fixed;left:0;right:0;bottom:0;height:var(--bn-h);box-sizing:border-box;padding:0 10px env(safe-area-inset-bottom,0px);align-items:center;justify-content:space-around;background:var(--white);border-top:1px solid var(--line);box-shadow:0 -6px 20px rgba(14,14,18,.06);z-index:420;-webkit-tap-highlight-color:transparent}
+html.bottom-layout.has-bnav .bnav{display:flex}
+.bn-item{position:relative;flex:1;height:100%;display:flex;align-items:center;justify-content:center;background:none;border:none;cursor:pointer;color:var(--mid);font-family:inherit}
+.bn-item svg{width:24px;height:24px;transition:transform .2s cubic-bezier(.34,1.56,.64,1),color var(--t-fast)}
+.bn-item::before{content:"";position:absolute;top:0;left:50%;width:22px;height:3px;border-radius:0 0 3px 3px;background:var(--ink);transform:translateX(-50%) scaleX(0);transition:transform .22s cubic-bezier(.4,0,.2,1)}
+.bn-item.active{color:var(--ink)}
+.bn-item.active svg{transform:translateY(-1px) scale(1.08)}
+.bn-item.active::before{transform:translateX(-50%) scaleX(1)}
+.bnav .bn-badge{position:absolute;top:16px;left:calc(50% + 6px);margin:0;min-width:16px;height:16px;padding:0 4px;border-radius:8px;font-size:.55rem;border:2px solid var(--white);box-shadow:none;box-sizing:content-box}
+.bn-avatar{width:26px;height:26px;border-radius:50%;background:var(--ink);color:#fff;display:flex;align-items:center;justify-content:center;font-size:.66rem;font-weight:800;box-shadow:0 0 0 2px transparent;transition:box-shadow var(--t-fast)}
+html[data-theme="dark"] .bn-avatar{color:#0e0e12}
+.bn-item.active .bn-avatar{box-shadow:0 0 0 2px var(--white),0 0 0 3.5px var(--ink)}
+
+/* ── Top bar: avatar leaves it (profile lives in the bottom bar) ── */
+html.bottom-layout #profile-wrap{display:none!important}
+
+/* ── Content never hides behind the bottom bar ── */
+html.bottom-layout.has-bnav .lb-full-screen{height:calc(100vh - 58px - var(--bn-h));height:calc(100dvh - 58px - var(--bn-h))}
+html.bottom-layout.has-bnav .lb-full-screen.home-scroll{height:auto;min-height:calc(100vh - 58px);min-height:calc(100dvh - 58px);padding-bottom:calc(var(--bn-h) + 16px)}
+html.bottom-layout .home-tabs{display:none}
+
+/* ── Chat window sits above the bar; bar tucks away while typing ── */
+html.bottom-layout.has-bnav .chat-page{height:calc(var(--vvh,100dvh) - var(--bn-h))}
+html.bottom-layout.has-bnav .chat-page.kb-open{height:var(--vvh,100dvh)}
+html.bottom-layout.has-bnav .chat-page:not(.kb-open) .cb-composer{padding-bottom:10px}
+html.bottom-layout.has-bnav:has(.chat-page.kb-open) .bnav{display:none}
+
+/* ── Profile menu: classic dropdown vs. sheet that opens upward ── */
+.pd-svg{display:none}
+.pd-item .pd-lbl{flex:0 1 auto}
+.pd-item .pd-hint{margin-left:auto;font-size:.66rem;color:var(--mid);font-weight:600;background:var(--faint);border:1px solid var(--line);padding:1px 8px;border-radius:10px}
+.p-scrim{position:fixed;inset:0;background:rgba(10,10,14,.38);opacity:0;visibility:hidden;transition:opacity .22s ease,visibility .22s;z-index:415}
+html.bottom-layout .p-scrim.show{opacity:1;visibility:visible}
+html.bottom-layout .p-dropdown{left:10px;right:10px;top:auto;bottom:calc(var(--bn-h) + 8px);min-width:0;max-width:420px;margin:0 auto;border-radius:var(--r-xl);box-shadow:var(--sh-lg);z-index:430;transform-origin:bottom center;transition:opacity .2s ease,transform .24s cubic-bezier(.32,.9,.4,1),visibility .2s}
+html.bottom-layout .p-dropdown.hidden{transform:translateY(18px) scale(.98)}
+html.bottom-layout .pd-item{gap:12px;padding:12px 16px}
+html.bottom-layout .pd-item .pd-emo{display:none}
+html.bottom-layout .pd-item .pd-svg{display:block;width:18px;height:18px;flex-shrink:0;color:var(--mid)}
+html.bottom-layout .pd-item.danger .pd-svg{color:var(--bad)}
+html.bottom-layout .pd-item .pd-svg.ico-sun{display:none}
+html.bottom-layout[data-theme="dark"] .pd-item .pd-svg.ico-moon{display:none}
+html.bottom-layout[data-theme="dark"] .pd-item .pd-svg.ico-sun{display:block}
+
+/* ── Home: hero card + 2×1 tiles ── */
+.bl-col{display:flex;flex-direction:column;gap:12px}
+.bl-card{background:var(--white);border:1px solid var(--line);border-radius:var(--r-lg);padding:16px}
+.bl-hero{display:flex;flex-direction:column;align-items:center;text-align:center;gap:4px;padding:18px 16px 16px}
+.bl-hero-ico{font-size:2rem;line-height:1}
+.bl-hero h2{margin-top:4px}
+.bl-sub{color:var(--mid);font-size:.82rem;margin-bottom:10px}
+.bl-hero-btn{width:100%;padding:16px 20px;font-size:.95rem;border-radius:var(--r)}
+.bl-tiles{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.bl-tile{position:relative;flex-direction:column;gap:8px;padding:26px 10px;font-size:.9rem;border-radius:var(--r-lg);line-height:1.2}
+.bl-tile-ico{font-size:1.9rem;line-height:1}
+.bl-badge{position:absolute;top:8px;right:8px;background:#ef4444;color:#fff;font-size:.6rem;font-weight:800;min-width:18px;height:18px;border-radius:9px;display:flex;align-items:center;justify-content:center;padding:0 5px}
+.bl-selfquiz{width:100%;padding:14px 18px;font-size:.92rem;border-radius:var(--r)}
+html.bottom-layout .bl-col .student-notice{max-width:none;width:100%;margin-top:0}
+html.bottom-layout .bl-col .notice{margin-top:0}
+
+/* ── Control panel: icon-only row + ONE stage whose height animates ── */
+html.bottom-layout .ctrl-panel{border:1px solid var(--line);border-radius:var(--r-lg);padding:12px;margin-bottom:14px}
+html.bottom-layout .ctrl-panel-head{margin-bottom:10px}
+html.bottom-layout .cp-btn-row{gap:8px}
+html.bottom-layout .cp-btn{flex-direction:row;height:46px;padding:0;border-radius:var(--r)}
+html.bottom-layout .cp-btn:hover{background:var(--faint);border-color:#c0bfb8}
+html.bottom-layout .cp-btn.active:hover{background:var(--ink);border-color:var(--ink)}
+html.bottom-layout .cp-btn svg{width:21px;height:21px}
+html.bottom-layout .cp-btn-label{display:none}
+html.bottom-layout .cp-btn-badge{font-size:.55rem;padding:1px 5px;min-width:16px;line-height:1.55}
+html.bottom-layout .cp-btn-active{font-size:.5rem;line-height:1.6}
+html.bottom-layout .cp-stage{height:0;margin-top:0;overflow:hidden;position:relative;border-radius:var(--r-sm);transition:height .3s cubic-bezier(.4,0,.2,1),margin-top .3s cubic-bezier(.4,0,.2,1)}
+html.bottom-layout .cp-stage.open{margin-top:10px}
+html.bottom-layout .cp-panel{position:absolute;left:0;right:0;top:0;max-height:none;overflow:hidden;margin-top:0;border:1px solid var(--line);background:var(--white);opacity:0;visibility:hidden;transform:translateY(4px);transition:opacity .2s ease,transform .2s ease,visibility 0s linear .2s}
+html.bottom-layout .cp-panel.open{max-height:none;margin-top:0;opacity:1;visibility:visible;transform:none;transition:opacity .22s ease .06s,transform .22s ease .06s,visibility 0s}
+html.bottom-layout .cp-panel-head{border-radius:var(--r-sm) var(--r-sm) 0 0}
+html.bottom-layout .notice-board-body textarea{resize:none}
+  </style>
   <script>try{if(localStorage.getItem('sc-theme')==='dark')document.documentElement.setAttribute('data-theme','dark')}catch(e){}</script>
   <script>try{if(localStorage.getItem('sc-layout')==='bottom')document.documentElement.classList.add('bottom-layout')}catch(e){}</script>
 </head>
