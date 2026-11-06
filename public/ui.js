@@ -140,6 +140,9 @@ function landingHTML(){
       </div>`
     :'';
 
+  // Join Session stays plain (ghost) until the host actually opens a session, then it lights up
+  const joinCls = S.sessionOpen ? 'btn-dark' : 'btn-ghost';
+
   // Buttons differ by role
   const actionButtons = isHost
     ? `<button class="btn btn-dark btn-lg" id="go-host">🖥 Host Interface</button>
@@ -147,7 +150,7 @@ function landingHTML(){
        <button class="btn btn-ghost btn-lg" id="btn-tb-home-syllabus" style="margin-top:2px">🗂️ Syllabus Test</button>
        <button class="btn btn-ghost btn-lg" id="go-selfquiz" style="margin-top:2px">📝 Self Quiz</button>
        ${chatEntryBtn()}`
-    : `<button class="btn btn-dark btn-lg" id="go-join">🎓 Join Session</button>
+    : `<button class="btn ${joinCls} btn-lg" id="go-join">🎓 Join Session</button>
        <button class="btn btn-ghost btn-lg" id="btn-at-home-regular" style="margin-top:2px">📋 Regular Test</button>
        <button class="btn btn-ghost btn-lg" id="btn-at-home-syllabus" style="margin-top:2px">🗂️ Syllabus Test</button>
        ${chatEntryBtn()}`;
@@ -155,6 +158,7 @@ function landingHTML(){
   // ── NEW LAYOUT home: hero card + 2×1 tiles (chat lives in the bottom bar) ──
   if(document.documentElement.classList.contains('bottom-layout')){
     let nextLine='Tap below when your host opens a session';
+    const liveNow=!!S.sessionOpen;
     if(nextS){
       const d=new Date(nextS.ts);
       const t=d.toLocaleTimeString('en',{hour:'numeric',minute:'2-digit'});
@@ -170,6 +174,7 @@ function landingHTML(){
         return !notYetOpen;
       }).length;
     }
+    if(liveNow) nextLine='A session is live \u2014 tap to join';
     const hero=isHost
       ?`<div class="bl-card bl-hero">
           <div class="bl-hero-ico">🎓</div>
@@ -181,7 +186,7 @@ function landingHTML(){
           <div class="bl-hero-ico">📚</div>
           <h2>Join a session</h2>
           <p class="bl-sub">${nextLine}</p>
-          <button class="btn btn-dark bl-hero-btn" id="go-join">🎓 Join Session</button>
+          <button class="btn ${joinCls} bl-hero-btn" id="go-join">🎓 Join Session</button>
         </div>`;
     const regId=isHost?'btn-tb-home-regular':'btn-at-home-regular';
     const sylId=isHost?'btn-tb-home-syllabus':'btn-at-home-syllabus';
@@ -1403,6 +1408,21 @@ function teacherDashboardHTML(){
    PLANNED TEST — HOST UI (TEST BOARD)
 ══════════════════════════════════════ */
 
+/* Per-file question amounts: each source can carry its own `use` (random pick size; blank/0 = all) */
+function tcSrcEff(src){ const n=(src.questions||[]).length; return (src.use>0&&src.use<n)?src.use:n; }
+function tcTotals(){
+  return { all:tcQSources.reduce((t,x)=>t+(x.questions||[]).length,0), eff:tcQSources.reduce((t,x)=>t+tcSrcEff(x),0) };
+}
+function tcTotalLineHTML(){
+  const t=tcTotals(), n=tcQSources.length;
+  return `<span style="font-size:.72rem;font-weight:700;color:#4338ca">${t.eff} total question${t.eff!==1?'s':''} across ${n} source${n!==1?'s':''}</span>`
+    +(t.eff<t.all?`<span style="font-size:.7rem;color:var(--mid)">(of ${t.all} available)</span>`:'');
+}
+function tcPublishLabel(){
+  const eff=tcTotals().eff, q=eff?`(${eff} question${eff!==1?'s':''})`:'';
+  return tcMode==='test'?`\u{1F4E4} Publish Test ${q}`:tcMode==='preset-edit'?`\u{1F4BE} Save Preset Changes`:`\uFF0B Create Preset ${q}`;
+}
+
 function testBoardHTML(){
   if(!testBoardOpen && !tcBrowserOpen) return '';
 
@@ -1415,32 +1435,32 @@ function testBoardHTML(){
   function createTab(){
     const totalQs = tcQSources.reduce((s,src)=>s+src.questions.length,0);
     const hasSource = totalQs > 0;
-    const effQs = (tcQLimit>0 && tcQLimit<totalQs) ? tcQLimit : totalQs;
+    const effQs = tcTotals().eff;
     const canPublish = hasSource && tcTitle.trim();
 
     // Source list
     const srcList = tcQSources.length
       ? `<div style="display:flex;flex-direction:column;gap:6px;margin-bottom:8px">
-          ${tcQSources.map((src,i)=>`
+          ${tcQSources.map((src,i)=>{
+            const nq=src.questions.length;
+            return `
             <div style="display:flex;align-items:center;gap:8px;border:1.5px solid #a5b4fc;border-radius:8px;padding:8px 10px;background:#ede9fe">
               <div style="flex:1;min-width:0">
                 <div style="font-size:.78rem;font-weight:700;color:#4338ca;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(src.label||src.files?.join(', ')||'Source')}</div>
-                <div style="font-size:.68rem;color:var(--mid)">Q${(src.start||0)+1} – Q${(src.start||0)+(src.count||src.questions.length)} · ${src.questions.length} question${src.questions.length!==1?'s':''}</div>
+                <div style="font-size:.68rem;color:var(--mid)">Q${(src.start||0)+1} \u2013 Q${(src.start||0)+(src.count||nq)} \u00b7 ${nq} question${nq!==1?'s':''}</div>
               </div>
-              <button class="btn btn-ghost btn-sm btn-tc-remove-src" data-src-idx="${i}" style="flex-shrink:0;padding:2px 7px;font-size:.7rem;color:#be123c;border-color:#fecdd3">✕</button>
-            </div>`).join('')}
+              <span style="display:inline-flex;align-items:center;gap:5px;font-size:.7rem;color:#4338ca;font-weight:600;flex-shrink:0">
+                use
+                <input class="tc-src-use" data-src-idx="${i}" type="number" min="1" max="${nq}" inputmode="numeric" value="${src.use>0&&src.use<nq?src.use:''}" placeholder="all" title="Randomly pick this many questions from this file. Blank = use all ${nq}." style="width:52px;padding:3px 5px;font-size:.75rem;border:1.5px solid #a5b4fc;border-radius:6px;background:#fff;color:#111;text-align:center"/>
+              </span>
+              <button class="btn btn-ghost btn-sm btn-tc-remove-src" data-src-idx="${i}" style="flex-shrink:0;padding:2px 7px;font-size:.7rem;color:#be123c;border-color:#fecdd3">\u2715</button>
+            </div>`;}).join('')}
         </div>
         <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px;margin-bottom:4px">
-          <div style="display:flex;align-items:center;flex-wrap:wrap;gap:6px 8px">
-            <span style="font-size:.72rem;font-weight:700;color:#4338ca">${totalQs} total question${totalQs!==1?'s':''} across ${tcQSources.length} source${tcQSources.length!==1?'s':''}</span>
-            <span style="display:inline-flex;align-items:center;gap:5px;font-size:.72rem;color:var(--mid)">
-              · use
-              <input id="tc-qlimit" type="number" min="1" max="${totalQs}" inputmode="numeric" value="${tcQLimit>0&&tcQLimit<totalQs?tcQLimit:''}" placeholder="all" title="Randomly pick this many questions from all added files. Blank = use all." style="width:58px;padding:3px 6px;font-size:.75rem;border:1.5px solid #a5b4fc;border-radius:6px;background:var(--white);color:var(--ink);text-align:center"/>
-            </span>
-          </div>
+          <div id="tc-total-line" style="display:flex;align-items:center;flex-wrap:wrap;gap:4px 8px">${tcTotalLineHTML()}</div>
           <button class="btn btn-ghost btn-sm" id="btn-tc-clear-src" style="font-size:.7rem;color:var(--mid);padding:2px 8px">Clear all</button>
         </div>
-        ${tcQLimit>0&&tcQLimit<totalQs?`<div style="font-size:.7rem;color:#4338ca;margin-bottom:4px">🎲 ${tcQLimit} random question${tcQLimit!==1?'s':''} will be picked from all ${totalQs} (not in order)</div>`:''}`
+        ${tcQSources.some(x=>tcSrcEff(x)<x.questions.length)?`<div style="font-size:.7rem;color:#4338ca;margin-bottom:4px">\u{1F3B2} Files with an amount set will have that many random questions picked (not in order)</div>`:''}`
       : '';
 
     return `<div style="padding:14px;display:flex;flex-direction:column;gap:12px">
@@ -1500,9 +1520,7 @@ function testBoardHTML(){
 
       ${tcMsg?`<div class="notice ${tcMsg.startsWith('✓')?'n-good':'n-bad'}" style="font-size:.8rem">${esc(tcMsg)}</div>`:''}
       <button class="btn btn-dark btn-sm" id="btn-tc-publish" style="width:100%;justify-content:center;padding:10px;font-size:.85rem;font-weight:700" ${!canPublish?'disabled':''}>
-        ${tcMode==='test'?`📤 Publish Test ${effQs?`(${effQs} question${effQs!==1?'s':''})`:''}`
-         :tcMode==='preset-edit'?`💾 Save Preset Changes`
-         :`＋ Create Preset ${effQs?`(${effQs} question${effQs!==1?'s':''})`:''}`}
+        ${tcPublishLabel()}
       </button>
       ${tcMode!=='test'?`<button class="btn btn-ghost btn-sm" id="btn-pc-cancel" style="width:100%;justify-content:center;font-size:.78rem">Cancel</button>`:''}
     </div>`;
@@ -3834,16 +3852,19 @@ function attach(){
       if(addBtn){ addBtn.disabled=!n; addBtn.textContent=n?`Add (${n})`:'Add'; }
     });
   });
-  // Random question count — saved as you type, applied when publishing / saving.
-  const qLimEl=document.getElementById('tc-qlimit');
-  if(qLimEl){
-    const totalNow=tcQSources.reduce((t,x)=>t+x.questions.length,0);
-    qLimEl.addEventListener('input',()=>{
-      const v=parseInt(qLimEl.value);
-      tcQLimit=(v>0)?Math.min(v,totalNow):0;
+  // Per-file question amount  saved as you type, applied when publishing / saving.
+  // Blank = use every question in that file. The footer only shows the running total.
+  document.querySelectorAll('.tc-src-use').forEach(inp=>{
+    const i=parseInt(inp.dataset.srcIdx);
+    inp.addEventListener('input',()=>{
+      const src=tcQSources[i]; if(!src) return;
+      const v=parseInt(inp.value);
+      src.use=(v>0)?Math.min(v,src.questions.length):0;
+      const line=document.getElementById('tc-total-line'); if(line) line.innerHTML=tcTotalLineHTML();
+      const pb=document.getElementById('btn-tc-publish'); if(pb) pb.textContent=tcPublishLabel();
     });
-    qLimEl.addEventListener('change',()=>{ render(); });
-  }
+    inp.addEventListener('change',()=>{ render(); });
+  });
   on('btn-tc-publish', async ()=>{
     const titleVal=(document.getElementById('tc-title')?.value||tcTitle).trim();
     const subjectVal=(document.getElementById('tc-subject')?.value||tcSubject).trim();
@@ -3852,9 +3873,8 @@ function attach(){
     // Merge all sources in order. Regular tests bake in a one-time shuffle
     // now; presets keep the original order and store randomize:true instead,
     // so the server re-shuffles fresh on every future Publish.
-    let allQs = tcQSources.flatMap(s=>s.questions);
-    // Randomly pick N questions from everything added (not necessarily in order)
-    if(tcQLimit>0 && tcQLimit<allQs.length) allQs = tcRandomPick(allQs, tcQLimit);
+    // Each file contributes either all of its questions or its own random pick of `use` questions
+    let allQs = tcQSources.flatMap(src=> tcSrcEff(src)<src.questions.length ? tcRandomPick(src.questions, tcSrcEff(src)) : src.questions);
     if(tcMode==='test' && tcRandomize) allQs = allQs.slice().sort(()=>Math.random()-.5);
     if(!allQs.length){ tcMsg='No questions found in selected sources'; render(); return; }
     const timerEl = document.getElementById('tc-timer-val');
