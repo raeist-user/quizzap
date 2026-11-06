@@ -8,7 +8,7 @@
 const jwt  = require('jsonwebtoken');
 const mongoose = require('mongoose');
 const { WebSocketServer } = require('ws');
-const { ChatMessage } = require('./models');
+const { ChatMessage, User } = require('./models');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'change-this-in-production';
 const MAX_LEN    = 1000;
@@ -56,34 +56,81 @@ function initChat(app) {
       .map(([id, v]) => ({ id, name: v.name, role: v.role }))
       .sort((a, b) => (a.role === 'host' ? -1 : 1) - (b.role === 'host' ? -1 : 1) || a.name.localeCompare(b.name));
   }
+  // Only broadcast when the visible list actually changed (avoids redundant pushes).
+  let lastSig = '';
+  function broadcastPresence(force) {
+    const list = presenceList();
+    const sig = JSON.stringify(list);
+    if (!force && sig === lastSig) return;
+    lastSig = sig;
+    sendAll({ type: 'presence', users: list });
+  }
+  // Authoritative identity from the DB (JWT name/role can be stale after a rename / role change).
+  // Returns null if the account no longer exists.
+  async function lookupUser(uid, fallback) {
+    try {
+      if (!isId(uid)) return fallback;
+      const u = await User.findById(uid).select('name role').lean();
+      if (!u) return null;
+      return { name: u.name, role: u.role === 'host' ? 'host' : 'student' };
+    } catch { return fallback; }   // DB hiccup: keep what we have
+  }
 
-  wss.on('connection', (ws, req) => {
+  wss.on('connection', async (ws, req) => {
     const token = new URL(req.url, 'http://x').searchParams.get('token');
     const user = verify(token);
     if (!user) { ws.close(4001, 'unauthorised'); return; }
     const uid = String(user.id);
-    let entry = online.get(uid);
-    if (!entry) { entry = { name: user.name, role: user.role, sockets: new Set() }; online.set(uid, entry); }
-    entry.sockets.add(ws);
     ws.isAlive = true;
     ws.on('pong', () => { ws.isAlive = true; });
-    ws.send(JSON.stringify({ type: 'presence', users: presenceList() }));
-    sendAll({ type: 'presence', users: presenceList() });
+    ws.on('error', () => {});
 
+    // Register the close handler first so a drop during the DB lookup is never missed.
+    let registered = false;
     ws.on('close', () => {
+      if (!registered) return;
+      const entry = online.get(uid);
+      if (!entry) return;
       entry.sockets.delete(ws);
       if (!entry.sockets.size) online.delete(uid);
-      sendAll({ type: 'presence', users: presenceList() });
+      broadcastPresence();
     });
-    ws.on('error', () => {});
+
+    const info = await lookupUser(uid, { name: user.name, role: user.role === 'host' ? 'host' : 'student' });
+    if (!info) { ws.close(4001, 'unauthorised'); return; }       // deleted account
+    if (ws.readyState !== 1) return;                               // already gone
+
+    let entry = online.get(uid);
+    if (!entry) { entry = { name: info.name, role: info.role, sockets: new Set() }; online.set(uid, entry); }
+    else { entry.name = info.name; entry.role = info.role; }       // refresh stale name/role on every connect
+    entry.sockets.add(ws);
+    registered = true;
+
+    ws.send(JSON.stringify({ type: 'presence', users: presenceList() }));
+    broadcastPresence();
   });
 
-  // Drop dead connections so "online" stays accurate (also keeps proxies from idling out)
-  setInterval(() => {
+  // Heartbeat: drop dead sockets, and re-sync identities of everyone online
+  // (picks up renames, role changes, and deleted accounts).
+  setInterval(async () => {
     for (const ws of wss.clients) {
       if (!ws.isAlive) { ws.terminate(); continue; }
       ws.isAlive = false; try { ws.ping(); } catch {}
     }
+    try {
+      const ids = [...online.keys()].filter(isId);
+      if (!ids.length) return;
+      const rows = await User.find({ _id: { $in: ids } }).select('name role').lean();
+      const byId = new Map(rows.map(r => [String(r._id), r]));
+      for (const [id, entry] of [...online.entries()]) {
+        const r = byId.get(id);
+        if (!r) {                                  // account deleted → disconnect
+          for (const s of entry.sockets) { try { s.close(4001, 'unauthorised'); } catch {} }
+          online.delete(id);
+        } else { entry.name = r.name; entry.role = r.role === 'host' ? 'host' : 'student'; }
+      }
+      broadcastPresence();
+    } catch {}
   }, 30000);
 
   // ── REST ───────────────────────────────────────────────────────────────────
