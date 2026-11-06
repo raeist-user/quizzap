@@ -1065,7 +1065,7 @@ function setupOutsideClick(){
   // Toggle Layout (profile menu) — switch between the new bottom-bar layout and the classic one.
   const paintLayoutHint=()=>{
     const h=document.getElementById('layout-hint');
-    if(h) h.textContent=_isBottomLayout()?'Bottom bar':'Classic';
+    if(h) h.textContent=_isBottomLayout()?'Modern':'Classic';
   };
   paintLayoutHint();
   document.getElementById('btn-toggle-layout')?.addEventListener('click',()=>{
