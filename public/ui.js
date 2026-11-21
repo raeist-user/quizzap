@@ -3572,11 +3572,19 @@ function attach(){
 
   // ── Test Board (host) — home screen now opens straight into Regular or
   //    Syllabus; the old chooser step is gone. ────────────────────────────────
+  // Remember the most recently used availability times and pre-fill them every time
+  function loadLastAvail(){
+    try{ const v=JSON.parse(localStorage.getItem('tc_last_avail')||'{}'); return { from:v.from||'', to:v.to||'' }; }
+    catch(e){ return { from:'', to:'' }; }
+  }
+  function saveLastAvail(from,to){
+    try{ localStorage.setItem('tc_last_avail', JSON.stringify({ from:from||'', to:to||'' })); }catch(e){}
+  }
   function openTestBoardBase(){
     testBoardOpen=true; testBoardTab='create';
     testHistory=null; testHistoryError=null; testViewId=null; testViewAttempts=null; testAttemptDetail=null;
     tcMode='test'; tcTitle=''; tcSubject=''; tcTimerType='none'; tcTimerValue=0;
-    tcQSources=[]; tcQLimit=0; tcRandomize=false; tcAvailFrom=''; tcAvailTo=''; tcMsg='';
+    tcQSources=[]; tcQLimit=0; tcRandomize=false; ({from:tcAvailFrom, to:tcAvailTo}=loadLastAvail()); tcMsg='';
   }
   on('btn-tb-home-regular', ()=>{
     openTestBoardBase(); tbSection='regular'; render(); fetchTestHistory();
@@ -3897,6 +3905,7 @@ function attach(){
         // timezone, then send real UTC ISO strings. 'To' rolls to the next day
         // when it is not later than 'From' (e.g. 22:00 → 01:00).
         const [availFromIso, availToIso] = timesToIso(tcAvailFrom, tcAvailTo);
+        saveLastAvail(tcAvailFrom, tcAvailTo);
         await apiPost('/api/tests',{
           ...commonFields,
           availFrom:availFromIso,
@@ -3904,7 +3913,7 @@ function attach(){
         },true);
         tcMsg='✓ Test published!';
         tcTitle=''; tcSubject=''; tcTimerType='none'; tcTimerValue=0;
-        tcQSources=[]; tcQLimit=0; tcRandomize=false; tcAvailFrom=''; tcAvailTo='';
+        tcQSources=[]; tcQLimit=0; tcRandomize=false; ({from:tcAvailFrom, to:tcAvailTo}=loadLastAvail());
         await fetchTestHistory();
         testBoardTab='history';
       }catch(e){ tcMsg=e.message||'Failed to publish'; }
@@ -3987,6 +3996,7 @@ function attach(){
       if(!r.ok) throw new Error(d.error||'Failed to reschedule');
       testRescheduleBusy=false;
       testRescheduleId=null;
+      saveLastAvail(fromVal, toVal);
       await fetchTestHistory();
       showToast('✓ Test rescheduled','good');
     }catch(e){
