@@ -1490,14 +1490,14 @@ function testBoardHTML(){
         <div style="display:flex;gap:8px">
           <div style="flex:1">
             <div style="font-size:.7rem;color:var(--mid);margin-bottom:3px">From</div>
-            <input class="form-input" type="datetime-local" id="tc-avail-from" value="${esc(tcAvailFrom)}" style="font-size:.8rem"/>
+            <input class="form-input" type="time" step="60" id="tc-avail-from" value="${esc(tcAvailFrom)}" style="font-size:.8rem"/>
           </div>
           <div style="flex:1">
             <div style="font-size:.7rem;color:var(--mid);margin-bottom:3px">To</div>
-            <input class="form-input" type="datetime-local" id="tc-avail-to" value="${esc(tcAvailTo)}" style="font-size:.8rem"/>
+            <input class="form-input" type="time" step="60" id="tc-avail-to" value="${esc(tcAvailTo)}" style="font-size:.8rem"/>
           </div>
         </div>
-        <div style="font-size:.7rem;color:var(--mid);margin-top:3px">Leave blank to keep test open indefinitely</div>
+        <div style="font-size:.7rem;color:var(--mid);margin-top:3px">Pick opening and closing time · leave blank to keep test open indefinitely</div>
       </div>`:''}
 
       <div>
@@ -1791,11 +1791,11 @@ function testBoardHTML(){
         <div style="display:flex;gap:8px;margin-bottom:6px">
           <div style="flex:1">
             <div style="font-size:.7rem;color:var(--mid);margin-bottom:3px">Opens</div>
-            <input class="form-input" type="datetime-local" id="tr-avail-from" value="${esc(testRescheduleFrom)}" style="font-size:.8rem"/>
+            <input class="form-input" type="time" step="60" id="tr-avail-from" value="${esc(testRescheduleFrom)}" style="font-size:.8rem"/>
           </div>
           <div style="flex:1">
             <div style="font-size:.7rem;color:var(--mid);margin-bottom:3px">Closes</div>
-            <input class="form-input" type="datetime-local" id="tr-avail-to" value="${esc(testRescheduleTo)}" style="font-size:.8rem"/>
+            <input class="form-input" type="time" step="60" id="tr-avail-to" value="${esc(testRescheduleTo)}" style="font-size:.8rem"/>
           </div>
         </div>
         <div style="font-size:.7rem;color:var(--mid);margin-bottom:12px">Leave a field blank to keep the test open on that side indefinitely</div>
@@ -3893,16 +3893,14 @@ function attach(){
     if(tcMode==='test'){
       tcMsg='Publishing…'; render();
       try{
-        // datetime-local inputs give a timezone-less string (e.g. "2026-07-10T14:30").
-        // Resolve it using the BROWSER's own timezone (new Date() on a bare
-        // datetime-local string is parsed as local time) and convert to a real
-        // UTC ISO string before sending, so the server — which may run in a
-        // different timezone — parses the exact same moment the host picked.
-        const toUtcIso = v => v ? new Date(v).toISOString() : null;
+        // Time-only inputs (HH:MM) → resolve to today's date in the BROWSER's
+        // timezone, then send real UTC ISO strings. 'To' rolls to the next day
+        // when it is not later than 'From' (e.g. 22:00 → 01:00).
+        const [availFromIso, availToIso] = timesToIso(tcAvailFrom, tcAvailTo);
         await apiPost('/api/tests',{
           ...commonFields,
-          availFrom:toUtcIso(tcAvailFrom),
-          availTo:toUtcIso(tcAvailTo),
+          availFrom:availFromIso,
+          availTo:availToIso,
         },true);
         tcMsg='✓ Test published!';
         tcTitle=''; tcSubject=''; tcTimerType='none'; tcTimerValue=0;
@@ -3942,12 +3940,27 @@ function attach(){
     render();
   }));
   // Reschedule: open modal pre-filled with the test's current window
+  function timesToIso(fromHM, toHM){
+    const at=(hm,addDays)=>{
+      const [h,m]=hm.split(':').map(Number);
+      const d=new Date(); d.setHours(h,m,0,0);
+      if(addDays) d.setDate(d.getDate()+addDays);
+      return d;
+    };
+    const f=fromHM?at(fromHM,0):null;
+    let t=toHM?at(toHM,0):null;
+    if(t){
+      const ref=f||new Date();
+      if(t<=ref) t=at(toHM,1);
+    }
+    return [f?f.toISOString():null, t?t.toISOString():null];
+  }
   function toDatetimeLocal(iso){
     if(!iso) return '';
     const d=new Date(iso);
     if(isNaN(d.getTime())) return '';
     const pad=n=>String(n).padStart(2,'0');
-    return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
   }
   document.querySelectorAll('.tb-resched-btn').forEach(b=>b.addEventListener('click',()=>{
     testRescheduleId=b.dataset.testId;
@@ -3961,7 +3974,6 @@ function attach(){
   document.getElementById('tr-avail-to')?.addEventListener('change',e=>{ testRescheduleTo=e.target.value; });
   on('btn-tr-cancel', ()=>{ testRescheduleId=null; testRescheduleMsg=''; render(); });
   on('btn-tr-save', async()=>{
-    const toUtcIso = v => v ? new Date(v).toISOString() : null;
     const fromVal = document.getElementById('tr-avail-from')?.value ?? testRescheduleFrom;
     const toVal   = document.getElementById('tr-avail-to')?.value   ?? testRescheduleTo;
     testRescheduleBusy=true; testRescheduleMsg=''; render();
@@ -3969,7 +3981,7 @@ function attach(){
       const r=await fetch('/api/tests/'+testRescheduleId+'/schedule',{
         method:'PUT',
         headers:{'Content-Type':'application/json','Authorization':'Bearer '+authToken},
-        body:JSON.stringify({ availFrom:toUtcIso(fromVal), availTo:toUtcIso(toVal) })
+        body:JSON.stringify({ availFrom:timesToIso(fromVal,toVal)[0], availTo:timesToIso(fromVal,toVal)[1] })
       });
       const d=await r.json();
       if(!r.ok) throw new Error(d.error||'Failed to reschedule');
