@@ -370,11 +370,21 @@ function loadNavState(){
   }catch(e){}
 }
 
+// Parse a response as JSON; if the server sent HTML/plain text instead
+// (proxy error, 413, 404...), surface a readable message, not a JSON parse error.
+async function readJsonSafe(r){
+  const txt=await r.text();
+  try{ return JSON.parse(txt); }
+  catch(_){
+    return {error: r.status===413 ? 'Request too large — too many questions for the server limit'
+                                  : 'Server error ('+r.status+')'};
+  }
+}
 async function apiPost(path,body,withAuth){
   const h={'Content-Type':'application/json'};
   if(withAuth&&authToken) h['Authorization']='Bearer '+authToken;
   const r=await fetch(path,{method:'POST',headers:h,body:JSON.stringify(body)});
-  const d=await r.json();
+  const d=await readJsonSafe(r);
   if(!r.ok) throw new Error(d.error||'Request failed');
   return d;
 }
@@ -382,14 +392,14 @@ async function apiPut(path,body,withAuth){
   const h={'Content-Type':'application/json'};
   if(withAuth&&authToken) h['Authorization']='Bearer '+authToken;
   const r=await fetch(path,{method:'PUT',headers:h,body:JSON.stringify(body)});
-  const d=await r.json();
+  const d=await readJsonSafe(r);
   if(!r.ok) throw new Error(d.error||'Request failed');
   return d;
 }
 async function apiDel(path){
   const h={'Authorization':'Bearer '+authToken};
   const r=await fetch(path,{method:'DELETE',headers:h});
-  const d=await r.json();
+  const d=await readJsonSafe(r);
   if(!r.ok) throw new Error(d.error||'Failed');
   return d;
 }
