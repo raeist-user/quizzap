@@ -86,7 +86,10 @@ mongoose.connect(MONGODB_URI)
 
 // ── EXPRESS ───────────────────────────────────────────────────────────────────
 const app = express();
-app.use(express.json());
+// Default limit is only 100kb — a preset/test with a few hundred baked-in
+// questions (esp. Hindi/Urdu, 3 bytes per char) exceeds that and body-parser
+// answers with an HTML 413 page, which the client then fails to parse as JSON.
+app.use(express.json({ limit: '25mb' }));
 
 // Serve index.html with MY_TOKEN injected
 const indexPath = path.join(__dirname, 'public', 'index.html');
@@ -139,6 +142,17 @@ app.use(express.static(path.join(__dirname, 'public')));
 const server = http.createServer(app);
 
 initRoutes(app);
+
+// Always answer API errors (bad/oversized body, etc.) as JSON, never HTML.
+app.use((err, req, res, next) => {
+  if (res.headersSent) return next(err);
+  const status = err.status || err.statusCode || 500;
+  const msg = err.type === 'entity.too.large'
+    ? 'Too many questions in one request — payload too large'
+    : (err.message || 'Server error');
+  if (req.path.startsWith('/api/')) return res.status(status).json({ error: msg });
+  res.status(status).send(msg);
+});
 const wssMain = initWS(server);
 const wssChat = initChat(app);
 
