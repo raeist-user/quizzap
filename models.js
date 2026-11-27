@@ -224,6 +224,10 @@ const notificationSchema = new mongoose.Schema({
   message:     { type: String, default: '' },
   read:        { type: Boolean, default: false, index: true },
   createdAt:   { type: Date, default: Date.now, index: true },
+  // reattempt_request only — the host's decision. Older notifications created
+  // before this field existed have no value and are treated as 'pending'.
+  resolution:  { type: String, enum: ['pending','accepted','rejected'], default: 'pending' },
+  resolvedAt:  { type: Date, default: null },
 });
 const Notification = mongoose.model('Notification', notificationSchema);
 
@@ -264,6 +268,14 @@ const testAttemptSchema = new mongoose.Schema({
   // "Requested" once set); the host actions it manually, nothing automated.
   reattemptRequested:   { type: Boolean, default: false },
   reattemptRequestedAt: { type: Date, default: null },
+  // Host's decision on the request: 'pending' | 'accepted' | 'rejected'.
+  // (Legacy attempts with reattemptRequested=true and no status = pending.)
+  reattemptStatus:      { type: String, enum: ['none','pending','accepted','rejected'], default: 'none' },
+  reattemptResolvedAt:  { type: Date, default: null },
+  // Set when the host accepts a reattempt: the old result is kept for the
+  // host's records but no longer counts as "the" attempt, so the student can
+  // take the test again from scratch.
+  archived:             { type: Boolean, default: false },
 });
 // One in-progress (or completed) attempt per student per test — fast lookup
 // for resume/rejoin checks on the available-tests list and on /take.

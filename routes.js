@@ -1044,7 +1044,7 @@ function initRoutes(app) {
   // ── Host: get all attempts for a test ─────────────────────────────────────
   app.get('/api/tests/:id/attempts', requireHost, async (req, res) => {
     try {
-      const attempts = await TestAttempt.find({ testId: req.params.id })
+      const attempts = await TestAttempt.find({ testId: req.params.id, archived: { $ne: true } })
         .sort({ score: -1, submittedAt: 1 }).lean();
       res.json({ attempts });
     } catch (e) { res.status(500).json({ error: e.message }); }
@@ -1083,7 +1083,7 @@ function initRoutes(app) {
       // Syllabus: a syllabus test disappears from this list entirely the
       // moment the student completes it — full attempts are excluded below.
       const myAttempts = await TestAttempt.find({
-        userId: req.user.id, testId: { $in: tests.map(t => t._id) },
+        userId: req.user.id, testId: { $in: tests.map(t => t._id) }, archived: { $ne: true },
         ...(type === 'syllabus' ? {} : { completed: false }),
       }).select('testId completed').lean();
       const completedSet   = new Set(myAttempts.filter(a => a.completed).map(a => a.testId.toString()));
@@ -1143,7 +1143,7 @@ function initRoutes(app) {
       const test = await PlannedTest.findById(req.params.id).lean();
       if (!test || test.status !== 'active') return res.status(404).json({ error: 'Test not available' });
 
-      const existingDone = await TestAttempt.findOne({ testId: req.params.id, userId: req.user.id, completed: true });
+      const existingDone = await TestAttempt.findOne({ testId: req.params.id, userId: req.user.id, completed: true, archived: { $ne: true } });
       if (existingDone) return res.status(409).json({ error: 'Already submitted', attemptId: existingDone._id });
 
       // A test inside a LOCKED syllabus folder can't be started or rejoined
@@ -1291,7 +1291,7 @@ function initRoutes(app) {
       if (!test || test.status !== 'active') return res.status(404).json({ error: 'Test not available' });
 
       let attempt = await TestAttempt.findOne({ testId: req.params.id, userId: req.user.id, completed: false });
-      const existingDone = await TestAttempt.findOne({ testId: req.params.id, userId: req.user.id, completed: true });
+      const existingDone = await TestAttempt.findOne({ testId: req.params.id, userId: req.user.id, completed: true, archived: { $ne: true } });
       if (existingDone) return res.status(409).json({ error: 'Already submitted' });
 
       const { answers } = req.body; // array of number|null, length == questions.length
@@ -1324,11 +1324,12 @@ function initRoutes(app) {
       const test = await PlannedTest.findById(req.params.id).select('title type').lean();
       if (!test) return res.status(404).json({ error: 'Test not found' });
       if (test.type !== 'syllabus') return res.status(400).json({ error: 'Reattempt requests are only for Syllabus Tests' });
-      const attempt = await TestAttempt.findOne({ testId: req.params.id, userId: req.user.id, completed: true });
+      const attempt = await TestAttempt.findOne({ testId: req.params.id, userId: req.user.id, completed: true, archived: { $ne: true } });
       if (!attempt) return res.status(403).json({ error: 'Submit this test before requesting a reattempt' });
       if (attempt.reattemptRequested) return res.status(409).json({ error: 'Already requested' });
       attempt.reattemptRequested = true;
       attempt.reattemptRequestedAt = new Date();
+      attempt.reattemptStatus = 'pending';
       await attempt.save();
       await Notification.create({
         type: 'reattempt_request',
@@ -1369,10 +1370,43 @@ function initRoutes(app) {
     } catch (e) { res.status(500).json({ error: e.message }); }
   });
 
+  // ── Host: accept or reject a reattempt request. ──────────────────────────
+  //    Accept → the student's completed attempt is archived (kept for the
+  //    host's records, hidden from the student), so the test shows up in their
+  //    Available list again and /take starts a fresh attempt.
+  //    Reject → the attempt stays as-is and the student sees it was declined.
+  async function resolveReattempt(req, res, decision) {
+    try {
+      const n = await Notification.findById(req.params.id);
+      if (!n || n.type !== 'reattempt_request') return res.status(404).json({ error: 'Request not found' });
+      if (n.resolution && n.resolution !== 'pending') {
+        return res.status(409).json({ error: `Already ${n.resolution}`, resolution: n.resolution });
+      }
+      const attempt = n.attemptId ? await TestAttempt.findById(n.attemptId) : null;
+      if (!attempt) return res.status(404).json({ error: 'Attempt no longer exists' });
+      const now = new Date();
+      if (decision === 'accepted') {
+        const test = await PlannedTest.findById(n.testId).select('status').lean();
+        if (!test || test.status !== 'active') return res.status(409).json({ error: 'This test is no longer active' });
+        attempt.archived = true;
+      }
+      attempt.reattemptStatus = decision;
+      attempt.reattemptResolvedAt = now;
+      await attempt.save();
+      n.resolution = decision;
+      n.resolvedAt = now;
+      n.read = true;
+      await n.save();
+      res.json({ ok: true, resolution: decision });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+  }
+  app.post('/api/notifications/:id/accept-reattempt', requireHost, (req, res) => resolveReattempt(req, res, 'accepted'));
+  app.post('/api/notifications/:id/reject-reattempt', requireHost, (req, res) => resolveReattempt(req, res, 'rejected'));
+
   // ── Student: my attempts (summary only — no per-question answers) ─────────
   app.get('/api/my-attempts', requireAuth, async (req, res) => {
     try {
-      const attempts = await TestAttempt.find({ userId: req.user.id, completed: true })
+      const attempts = await TestAttempt.find({ userId: req.user.id, completed: true, archived: { $ne: true } })
         .select('-answers').populate('testId', 'title subject questionCount type').sort({ submittedAt: -1 }).lean();
       res.json({ attempts });
     } catch (e) { res.status(500).json({ error: e.message }); }
