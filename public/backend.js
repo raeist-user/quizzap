@@ -111,6 +111,8 @@ let notifications = null;           // fetched list
 let notifUnreadCount = 0;           // badge count on the bell — total unread, independent of the filter below
 let notifFilter = 'all';            // 'all' | 'syllabus_attempt' | 'reattempt_request'
 let notifLoading = false;
+let reattemptBusy = {};            // { [notificationId]: true } while accept/reject is in flight
+let reattemptErr = {};             // { [notificationId]: message } if accept/reject failed
 
 // Student
 let availTestsOpen = false;         // is Available Tests overlay open?

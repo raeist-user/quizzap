@@ -370,7 +370,9 @@ function availTestsHTML(){
     const reMsg = sylReattemptMsg[t._id];
     let trailing;
     if(isSyl){
-      trailing = a.reattemptRequested
+      trailing = a.reattemptStatus==='rejected'
+        ? `<button class="btn btn-sm" disabled style="width:100%;justify-content:center;margin-top:8px;font-size:.75rem;background:#fee2e2;color:#b91c1c;border-color:#fecaca;cursor:default">✗ Reattempt Declined by Host</button>`
+        : a.reattemptRequested
         ? `<button class="btn btn-sm" disabled style="width:100%;justify-content:center;margin-top:8px;font-size:.75rem;background:#fef3c7;color:#92400e;border-color:#fde68a;cursor:default">✓ Reattempt Requested</button>`
         : `<button class="btn btn-sm reattempt-btn" data-test-id="${t._id}" style="width:100%;justify-content:center;margin-top:8px;font-size:.75rem;background:#4338ca;border-color:#4338ca;color:#fff">🔄 Request Reattempt</button>`;
     } else {
@@ -1563,6 +1565,19 @@ function testBoardHTML(){
   // ── Notifications panel (host) — students completing a Syllabus round, or
   //    asking to retake one. Filterable so the two kinds don't just pile up
   //    into one undifferentiated feed. ────────────────────────────────────────
+  // Accept / Reject controls for a reattempt-request notification. Once the
+  // host decides, the buttons are replaced by a status badge.
+  function reattemptActionsHTML(n){
+    const res = n.resolution || 'pending';
+    if(res==='accepted') return '<div style="margin-top:8px;font-size:.74rem;font-weight:700;color:#15803d">✓ Accepted — student can retake the test</div>';
+    if(res==='rejected') return '<div style="margin-top:8px;font-size:.74rem;font-weight:700;color:#b91c1c">✗ Rejected</div>';
+    const busy = !!(typeof reattemptBusy!=='undefined' && reattemptBusy[n._id]);
+    const err = (typeof reattemptErr!=='undefined' && reattemptErr[n._id]) || '';
+    return `<div style="display:flex;gap:8px;margin-top:10px">
+        <button class="btn btn-sm notif-reattempt-btn" data-notif-id="${n._id}" data-decision="accept" ${busy?'disabled':''} style="flex:1;justify-content:center;font-size:.76rem;background:#16a34a;border-color:#16a34a;color:#fff;${busy?'opacity:.6;':''}">✓ Accept</button>
+        <button class="btn btn-sm notif-reattempt-btn" data-notif-id="${n._id}" data-decision="reject" ${busy?'disabled':''} style="flex:1;justify-content:center;font-size:.76rem;background:#fff;border-color:#fecaca;color:#b91c1c;${busy?'opacity:.6;':''}">✗ Reject</button>
+      </div>${err?`<div class="notice n-bad" style="font-size:.72rem;margin-top:6px">${esc(err)}</div>`:''}`;
+  }
   function notifPanelHTML(){
     if(!notifOpen) return '';
     const filters = [
@@ -1591,6 +1606,7 @@ function testBoardHTML(){
               <div style="font-size:.68rem;font-weight:700;color:${n.type==='reattempt_request'?'#b45309':'#4338ca'};margin-bottom:3px">${n.type==='reattempt_request'?'🔄 REATTEMPT REQUEST':'📝 SYLLABUS ATTEMPT'}</div>
               <div style="font-size:.82rem;padding-right:16px">${esc(n.message||'')}</div>
               <div style="font-size:.7rem;color:var(--mid);margin-top:4px">${new Date(n.createdAt).toLocaleString('en',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}</div>
+              ${n.type==='reattempt_request'?reattemptActionsHTML(n):''}
             </div>`).join('')}
       </div>
     </div>`;
@@ -3632,6 +3648,20 @@ function attach(){
   });
   document.querySelectorAll('.notif-filter-btn').forEach(b=>b.addEventListener('click', ()=>{
     notifFilter=b.dataset.filter; render(); fetchNotifications();
+  }));
+  document.querySelectorAll('.notif-reattempt-btn').forEach(btn=>btn.addEventListener('click', async e=>{
+    e.stopPropagation();
+    if(btn.disabled) return;
+    const id=btn.dataset.notifId, decision=btn.dataset.decision;
+    reattemptBusy[id]=true; delete reattemptErr[id]; render();
+    try{
+      await apiPost('/api/notifications/'+id+'/'+decision+'-reattempt', {}, true);
+      showToast(decision==='accept'?'Reattempt accepted — student can retake the test':'Reattempt request rejected', decision==='accept'?'good':'neutral');
+    }catch(err){
+      reattemptErr[id]=err.message||'Failed to update request';
+    }
+    delete reattemptBusy[id];
+    await fetchNotifications();
   }));
   document.querySelectorAll('.notif-row').forEach(row=>row.addEventListener('click', async ()=>{
     const id=row.dataset.notifId;
