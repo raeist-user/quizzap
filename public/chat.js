@@ -25,6 +25,7 @@
   let el = null;            // the persistent #chatbox element
   let ws = null, wsTimer = null, wsToken = null, closed = false;
   let msgs = [], pinned = [], online = [], rxList = DEFAULT_RX;
+  let onlineCount = 0;      // total online (everyone gets this)
   let onlineKnown = false;  // false until the server has told us who is online (and again while disconnected)
   let hasMore = false, loaded = false, loading = false, loadErr = '';
   let popup = null;         // 'online' | 'pins' | null
@@ -179,14 +180,15 @@
   function paintCounts() {
     const p = $('#cb-pin-n');
     if (p) p.textContent = pinned.length || '';
-    document.querySelectorAll('.online-n').forEach(n => { n.textContent = onlineKnown ? online.length : '–'; });
+    document.querySelectorAll('.online-n').forEach(n => { n.textContent = onlineKnown ? onlineCount : '–'; });
+    document.querySelectorAll('.nav-online').forEach(b => { b.classList.toggle('readonly', !isHost()); b.title = isHost() ? 'Members online' : 'Members online (count only)'; });
     if (onlinePopEl && onlinePopEl.classList.contains('show')) paintOnlinePop();
   }
 
   /* ── online members popup (opened from the Home screen) ── */
   let onlinePopEl = null;
   /* single source of truth for the online list (used by both the home popup and the in-chat popup) */
-  function onlineTitle() { return onlineKnown ? `Members online — ${online.length}` : 'Members online'; }
+  function onlineTitle() { return onlineKnown ? `Members online — ${onlineCount}` : 'Members online'; }
   function onlineRowsHTML() {
     if (!onlineKnown) return '<div class="cb-empty">Connecting…</div>';
     if (!online.length) return '<div class="cb-empty">Nobody online</div>';
@@ -197,6 +199,7 @@
     onlinePopEl.innerHTML = `<div class="cb-pop"><div class="cb-pop-head"><b>${ICON.users} ${onlineTitle()}</b><button data-close>✕</button></div><div class="cb-pop-body">${onlineRowsHTML()}</div></div>`;
   }
   window.chatOnlinePopup = function () {
+    if (!isHost()) return;   // members only see the counter; the list is host-only
     if (!onlinePopEl) {
       onlinePopEl = document.createElement('div');
       onlinePopEl.className = 'cb-online-ov';
@@ -208,7 +211,7 @@
     paintOnlinePop();
     onlinePopEl.classList.add('show');
   };
-  window.chatOnlineCount = () => (onlineKnown ? online.length : 0);
+  window.chatOnlineCount = () => (onlineKnown ? onlineCount : 0);
   const navOn = document.getElementById('nav-online');
   if (navOn) navOn.addEventListener('click', () => window.chatOnlinePopup());
 
@@ -232,7 +235,7 @@
     loading = true; loadErr = '';
     try {
       const j = await api('/messages');
-      msgs = j.messages || []; pinned = j.pinned || []; if (j.online) { online = j.online; onlineKnown = true; }
+      msgs = j.messages || []; pinned = j.pinned || []; if (j.online || j.onlineCount != null) { online = j.online || []; onlineCount = j.onlineCount != null ? j.onlineCount : online.length; onlineKnown = true; }
       if (j.reactions?.length) rxList = j.reactions;
       hasMore = !!j.hasMore; loaded = true; stick = true;
       initRead();
@@ -298,7 +301,7 @@
     ws.onclose = e => {
       ws = null;
       // Disconnected: we no longer know who is online — don't show a stale list.
-      online = []; onlineKnown = false; paintCounts(); if (popup === 'online') paintPopup();
+      online = []; onlineCount = 0; onlineKnown = false; paintCounts(); if (popup === 'online') paintPopup();
       if (closed || e.code === 4001) return;
       clearTimeout(wsTimer); wsTimer = setTimeout(() => { connect(); if (loaded) refreshQuiet(); }, 3000);
     };
@@ -309,7 +312,7 @@
     try {
       const j = await api('/messages');
       msgs = j.messages || []; pinned = j.pinned || []; hasMore = !!j.hasMore;
-      if (j.online) { online = j.online; onlineKnown = true; }
+      if (j.online || j.onlineCount != null) { online = j.online || []; onlineCount = j.onlineCount != null ? j.onlineCount : online.length; onlineKnown = true; }
       paintList();
       if (isOpen()) markRead(); else paintBadge(true);
     } catch { }
@@ -318,7 +321,7 @@
   function handle(d) {
     const list = $('#cb-list');
     const atBottom = list ? (list.scrollHeight - list.scrollTop - list.clientHeight < 80) : true;
-    if (d.type === 'presence') { online = d.users || []; onlineKnown = true; paintCounts(); if (popup === 'online') paintPopup(); return; }
+    if (d.type === 'presence') { online = d.users || []; onlineCount = d.count != null ? d.count : online.length; onlineKnown = true; paintCounts(); if (popup === 'online') paintPopup(); return; }
     if (!loaded) return;
     if (d.type === 'msg_new') {
       if (msgs.some(m => m.id === d.message.id)) return;
@@ -377,7 +380,8 @@
       if (a === 'popbg') { if (ev.target === t) { popup = null; paintPopup(); } return; }
       ev.stopPropagation();
       try {
-        if (a === 'online' || a === 'pins') { popup = popup === (a === 'pins' ? 'pins' : 'online') ? null : (a === 'pins' ? 'pins' : 'online'); paintPopup(); }
+        if ((a === 'online' && !isHost())) { /* members: counter only */ }
+        else if (a === 'online' || a === 'pins') { popup = popup === (a === 'pins' ? 'pins' : 'online') ? null : (a === 'pins' ? 'pins' : 'online'); paintPopup(); }
         else if (a === 'popclose') { popup = null; paintPopup(); }
         else if (a === 'back') { if (typeof doBack === 'function') doBack(); }
         else if (a === 'more') loadOlder();
@@ -577,7 +581,7 @@
     if (onlinePopEl) onlinePopEl.classList.remove('show');
     try { ws && ws.close(); } catch { }
     ws = null; wsToken = null;
-    msgs = []; pinned = []; online = []; onlineKnown = false; hasMore = false; loaded = false; loading = false; loadErr = '';
+    msgs = []; pinned = []; online = []; onlineCount = 0; onlineKnown = false; hasMore = false; loaded = false; loading = false; loadErr = '';
     popup = null; menuFor = null; pickerFor = null; editingId = null; actionsFor = null; draft = ''; stick = true;
     readTs = null;
     paintCounts();

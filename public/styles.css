@@ -1011,3 +1011,7 @@ html.bottom-layout .cp-panel{position:absolute;left:0;right:0;top:0;max-height:n
 html.bottom-layout .cp-panel.open{max-height:none;margin-top:0;opacity:1;visibility:visible;transform:none;transition:opacity .22s ease .06s,transform .22s ease .06s,visibility 0s}
 html.bottom-layout .cp-panel-head{border-radius:var(--r-sm) var(--r-sm) 0 0}
 html.bottom-layout .notice-board-body textarea{resize:none}
+
+/* Members see the online counter as a plain showcase; only the host can open the list */
+.nav-online.readonly{cursor:default;pointer-events:none}
+.nav-online.readonly:hover{opacity:1}
