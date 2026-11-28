@@ -56,6 +56,16 @@ function initChat(app) {
       .map(([id, v]) => ({ id, name: v.name, role: v.role }))
       .sort((a, b) => (a.role === 'host' ? -1 : 1) - (b.role === 'host' ? -1 : 1) || a.name.localeCompare(b.name));
   }
+  // Presence payload: everyone gets the count; only the host gets who exactly is online.
+  function presenceFor(isHostViewer, list) {
+    list = list || presenceList();
+    return isHostViewer ? { type: 'presence', count: list.length, users: list } : { type: 'presence', count: list.length };
+  }
+  function sendPresence(list) {
+    const hostRaw = JSON.stringify(presenceFor(true, list));
+    const memberRaw = JSON.stringify(presenceFor(false, list));
+    for (const ws of wss.clients) if (ws.readyState === 1) ws.send(ws.isHostViewer ? hostRaw : memberRaw);
+  }
   // Only broadcast when the visible list actually changed (avoids redundant pushes).
   let lastSig = '';
   function broadcastPresence(force) {
@@ -63,7 +73,7 @@ function initChat(app) {
     const sig = JSON.stringify(list);
     if (!force && sig === lastSig) return;
     lastSig = sig;
-    sendAll({ type: 'presence', users: list });
+    sendPresence(list);
   }
   // Authoritative identity from the DB (JWT name/role can be stale after a rename / role change).
   // Returns null if the account no longer exists.
@@ -106,7 +116,8 @@ function initChat(app) {
     entry.sockets.add(ws);
     registered = true;
 
-    ws.send(JSON.stringify({ type: 'presence', users: presenceList() }));
+    ws.isHostViewer = info.role === 'host';
+    ws.send(JSON.stringify(presenceFor(ws.isHostViewer)));
     broadcastPresence();
   });
 
@@ -127,9 +138,12 @@ function initChat(app) {
         if (!r) {                                  // account deleted → disconnect
           for (const s of entry.sockets) { try { s.close(4001, 'unauthorised'); } catch {} }
           online.delete(id);
-        } else { entry.name = r.name; entry.role = r.role === 'host' ? 'host' : 'student'; }
+        } else {
+          entry.name = r.name; entry.role = r.role === 'host' ? 'host' : 'student';
+          for (const s of entry.sockets) s.isHostViewer = entry.role === 'host';
+        }
       }
-      broadcastPresence();
+      broadcastPresence(true);
     } catch {}
   }, 30000);
 
@@ -146,7 +160,9 @@ function initChat(app) {
       const out = { messages, hasMore };
       if (!req.query.before) {
         out.pinned = (await ChatMessage.find({ pinned: true }).sort({ _id: -1 }).lean()).map(ser);
-        out.online = presenceList();
+        const pl = presenceList();
+        out.onlineCount = pl.length;
+        if (req.user.role === 'host') out.online = pl;
         out.reactions = ALLOWED_REACTIONS;
       }
       res.json(out);
